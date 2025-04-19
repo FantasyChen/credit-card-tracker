@@ -1,103 +1,171 @@
-import Image from "next/image";
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { BenefitStatus, Benefit, CreditCard } from '@/generated/prisma';
+import { formatDate } from '@/lib/dateUtils';
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+// Define a type for the upcoming benefits data
+interface UpcomingBenefit extends BenefitStatus {
+  benefit: Benefit & { creditCard: CreditCard };
+}
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+export default async function Home() {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    // If not signed in, show a landing page with a sign-in button
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8 text-center">
+          <div>
+            {/* You might want to add a logo here */}
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+              Welcome to CardTracker
+            </h2>
+            <p className="mt-2 text-center text-sm text-gray-600">
+              Track your credit cards and maximize your rewards.
+            </p>
+          </div>
+          <div className="mt-8 space-y-6">
+             <p className="text-center text-sm text-gray-600">
+              Sign in to manage your cards and benefits.
+            </p>
+            <div>
+              <Link
+                href="/api/auth/signin"
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Sign in
+              </Link>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+    );
+  }
+
+  const userId = session.user.id;
+
+  // Fetch card count
+  const cardCount = await prisma.creditCard.count({
+    where: { userId: userId },
+  });
+
+  // Fetch upcoming benefits (not completed, ordered by cycle end date, limit 5)
+  const upcomingBenefits = await prisma.benefitStatus.findMany({
+    where: {
+      userId: userId,
+      isCompleted: false,
+      // Optional: Add a filter for cycleEndDate if needed, e.g., only show benefits ending soon
+      // cycleEndDate: { gte: new Date() } 
+    },
+    include: {
+      benefit: {
+        include: {
+          creditCard: true,
+        },
+      },
+    },
+    orderBy: {
+      cycleEndDate: 'asc',
+    },
+    take: 5, // Limit to the next 5 upcoming benefits
+  }) as UpcomingBenefit[]; // Type assertion
+
+  return (
+    <div>
+      <div className="sm:flex sm:items-center sm:justify-between">
+        <div className="sm:flex-auto">
+          <h1 className="text-2xl font-semibold leading-6 text-gray-900">
+            Dashboard
+          </h1>
+          <p className="mt-2 text-sm text-gray-700">
+            A quick overview of your cards and upcoming benefits.
+          </p>
+        </div>
+        <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+          <Link
+            href="/cards/new"
+            className="block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          >
+            Add Card
+          </Link>
+        </div>
+      </div>
+
+      {/* Card Summary Section */}
+      <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="overflow-hidden rounded-lg bg-white shadow">
+          <div className="p-6">
+             <div className="flex items-center">
+                <div className="flex-shrink-0">
+                    {/* Placeholder icon, replace with a suitable one */}
+                    <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+                    </svg>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt className="truncate text-sm font-medium text-gray-500">Total Cards</dt>
+                        <dd>
+                            <div className="text-lg font-medium text-gray-900">{cardCount}</div>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+          </div>
+           <div className="bg-gray-50 px-6 py-3">
+                <div className="text-sm">
+                    <Link href="/cards" className="font-medium text-indigo-600 hover:text-indigo-500">
+                        View all cards
+                    </Link>
+                </div>
+            </div>
+        </div>
+        {/* Add more summary cards here if needed */}
+      </div>
+
+      {/* Upcoming Benefits Section */}
+      <div className="mt-8">
+        <div className="sm:flex sm:items-center sm:justify-between">
+            <h2 className="text-lg font-medium leading-6 text-gray-900">
+              Upcoming Benefits
+            </h2>
+             <div className="mt-3 sm:ml-4 sm:mt-0">
+                <Link href="/benefits" className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                    View all benefits
+                </Link>
+            </div>
+        </div>
+        
+        {upcomingBenefits.length === 0 ? (
+           <div className="mt-4 rounded-lg border border-dashed border-gray-200 p-8 text-center">
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No upcoming benefits</h3>
+                <p className="mt-1 text-sm text-gray-500">Add cards with benefits or check back later.</p>
+           </div>
+        ) : (
+          <div className="mt-4 overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+             <ul role="list" className="divide-y divide-gray-200 bg-white">
+                {upcomingBenefits.map((status) => (
+                    <li key={status.id} className="px-6 py-4">
+                        <div className="flex items-center justify-between">
+                            <div className="truncate">
+                                <p className="truncate text-sm font-medium text-indigo-600">{status.benefit.description}</p>
+                                <p className="mt-1 truncate text-sm text-gray-500">Card: {status.benefit.creditCard.name}</p>
+                            </div>
+                            <div className="ml-4 flex-shrink-0">
+                                <p className="text-sm text-gray-900">Due: {formatDate(status.cycleEndDate)}</p>
+                                {/* Optionally add a quick action link here */} 
+                            </div>
+                        </div>
+                    </li>
+                ))}
+            </ul>
+           </div>
+        )}
+      </div>
     </div>
   );
 }

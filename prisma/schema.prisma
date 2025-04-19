@@ -1,0 +1,143 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Add Frequency enum
+enum BenefitFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  ONE_TIME // For sign-up bonuses, etc.
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String?
+  email         String         @unique
+  emailVerified DateTime?
+  image         String?
+  creditCards   CreditCard[]
+  accounts      Account[]
+  sessions      Session[]
+  benefitStatuses BenefitStatus[] // Link to tracking instances
+
+  // Notification Preferences
+  notifyNewBenefit      Boolean  @default(false)
+  notifyBenefitExpiration Boolean  @default(false)
+  notifyExpirationDays  Int      @default(7) // Default to 7 days before expiration
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CreditCard {
+  id          String     @id @default(cuid())
+  name        String
+  issuer      String
+  cardNumber  String?
+  expiryDate  DateTime?
+  openedDate  DateTime?  // Used for anniversary calculations
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  benefits    Benefit[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Benefit {
+  id            String     @id @default(cuid())
+  category      String
+  description   String
+  percentage    Float
+  maxAmount     Float?
+  startDate     DateTime   // Might represent initial start or general validity
+  endDate       DateTime?  // Might represent final expiration
+  frequency     BenefitFrequency @default(ONE_TIME)
+  creditCardId  String
+  creditCard    CreditCard @relation(fields: [creditCardId], references: [id])
+  benefitStatuses BenefitStatus[] // Link to tracking instances
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model PredefinedCard {
+  id          String              @id @default(cuid())
+  name        String
+  issuer      String
+  annualFee   Float
+  imageUrl    String?
+  benefits    PredefinedBenefit[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([name])
+}
+
+model PredefinedBenefit {
+  id                String         @id @default(cuid())
+  category          String
+  description       String
+  percentage        Float
+  maxAmount         Float?
+  frequency         BenefitFrequency @default(ONE_TIME)
+  predefinedCardId  String
+  predefinedCard    PredefinedCard @relation(fields: [predefinedCardId], references: [id])
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+// New model to track the status of each benefit cycle
+model BenefitStatus {
+  id            String    @id @default(cuid())
+  benefitId     String
+  benefit       Benefit   @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+  userId        String    // To easily query statuses for a user
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cycleStartDate DateTime // Start date of the specific cycle (e.g., Jan 1st, 2024)
+  cycleEndDate  DateTime // End date of the specific cycle (e.g., Dec 31st, 2024)
+  isCompleted   Boolean   @default(false) // Tracks completion
+  completedAt   DateTime? // Optional: when it was marked complete
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([benefitId, userId, cycleStartDate]) // Ensure only one status per user, per benefit, per cycle start
+}
