@@ -39,3 +39,34 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Optional Next.js build outputs
+# .next/cache/
+
+# Prisma local database & generated client
+prisma/dev.db
+prisma/dev.db-journal # SQLite journal file
+src/generated/prisma/
+
+# Local environment variables
+.env*.local
+.env
+
+# Log files
+*.log
+
+# Editor directories and files
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS generated files
+Thumbs.db
