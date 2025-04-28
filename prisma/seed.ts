@@ -413,21 +413,21 @@ async function main() {
         // Create card and benefits together
         await prisma.predefinedCard.create({
             data: {
-                name: cardData.name,
-                issuer: cardData.issuer,
-                annualFee: cardData.annualFee,
-                imageUrl: cardData.imageUrl,
-                benefits: {
-                    create: cardData.benefits.map(benefit => ({
-                        category: benefit.category,
-                        description: benefit.description,
-                        percentage: benefit.percentage,
-                        maxAmount: benefit.maxAmount,
-                        frequency: benefit.frequency,
-                    })),
-                },
-            },
-        });
+        name: cardData.name,
+        issuer: cardData.issuer,
+        annualFee: cardData.annualFee,
+        imageUrl: cardData.imageUrl,
+        benefits: {
+          create: cardData.benefits.map(benefit => ({
+            category: benefit.category,
+            description: benefit.description,
+            percentage: benefit.percentage,
+            maxAmount: benefit.maxAmount,
+            frequency: benefit.frequency,
+          })),
+        },
+      },
+    });
     }
      console.log(`Finished processing card: ${cardData.name}`);
   }
