@@ -14,8 +14,13 @@ function SuccessMessage() {
   );
 }
 
-// Page component now accepts searchParams
-export default async function NotificationSettingsPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
+// Define the props structure explicitly
+interface NotificationSettingsPageProps {
+  searchParams?: { [key: string]: string | string[] | undefined };
+}
+
+// Use the defined interface
+export default async function NotificationSettingsPage({ searchParams }: NotificationSettingsPageProps) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     redirect('/api/auth/signin?callbackUrl=/notifications');
