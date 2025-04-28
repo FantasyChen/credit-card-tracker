@@ -10,8 +10,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // Add Frequency enum
@@ -93,7 +93,7 @@ model Benefit {
   endDate       DateTime?  // Might represent final expiration
   frequency     BenefitFrequency @default(ONE_TIME)
   creditCardId  String
-  creditCard    CreditCard @relation(fields: [creditCardId], references: [id])
+  creditCard    CreditCard @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
   benefitStatuses BenefitStatus[] // Link to tracking instances
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt

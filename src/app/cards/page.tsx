@@ -1,10 +1,18 @@
-import React from 'react';
+'use client'; // Make this a Client Component because we need interactivity
+
+import React, { useState, useEffect, useTransition } from 'react'; // Add useTransition
 import Link from 'next/link';
 import Image from 'next/image';
+import { deleteCardAction } from './actions'; // Import the delete action
+import type { CreditCard, Benefit } from '@/generated/prisma'; // Import types
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+
+// Types for props - assuming data is fetched server-side and passed down
+// OR fetched client-side (as shown here for simplicity, adjust if needed)
+type UserCard = CreditCard & { benefits: Benefit[] };
 
 // Helper function to get month name
 const getMonthName = (monthNumber: number | null): string => {
@@ -23,24 +31,101 @@ const formatOpenedDate = (date: Date | null): string => {
   return dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 };
 
-export default async function UserCardsPage() {
-  const session = await getServerSession(authOptions);
+// Client Component for displaying a single card with delete functionality
+function CardItem({ card, setCards }: { card: UserCard, setCards: React.Dispatch<React.SetStateAction<UserCard[]>> }) {
+  const [isPending, startTransition] = useTransition();
 
-  if (!session?.user?.id) {
-    // Redirect to login if not authenticated
-    redirect('/api/auth/signin?callbackUrl=/cards');
-  }
+  const handleDelete = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); // Prevent default form submission
 
-  // Fetch the user's cards, including benefits
-  const userCards = await prisma.creditCard.findMany({
-    where: { userId: session.user.id },
-    include: {
-      benefits: true, // Include benefits associated with the card
-    },
-    orderBy: {
-      createdAt: 'desc', // Show newest cards first
-    },
-  });
+    if (confirm(`Are you sure you want to remove the card "${card.name}"? This action cannot be undone.`)) {
+      const formData = new FormData(event.currentTarget);
+      startTransition(async () => {
+        const result = await deleteCardAction(formData);
+        if (result?.success) {
+          // Update client-state on successful deletion
+          setCards(currentCards => currentCards.filter(c => c.id !== card.id));
+          // Optionally show a success message (e.g., using a toast library)
+        } else {
+          // Basic error handling
+          alert(result?.error || 'Failed to delete card. Please try again.');
+        }
+      });
+    }
+  };
+
+  return (
+    <div className="border rounded-lg p-4 shadow-md bg-white flex flex-col justify-between h-full">
+       <div> {/* Content wrapper */}
+        <h2 className="text-xl font-semibold mb-2">{card.name}</h2>
+        <p className="text-gray-600 mb-1">Issuer: {card.issuer}</p>
+        {card.openedDate && (
+           <p className="text-sm text-gray-500 mb-3">Opened: {formatOpenedDate(card.openedDate)}</p>
+        )}
+
+        {card.benefits.length > 0 && (
+          <div className="mt-4 pt-3 border-t">
+            <h3 className="text-md font-medium mb-2">Key Benefits:</h3>
+            <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+              {card.benefits.slice(0, 3).map(benefit => (
+                <li key={benefit.id}>{benefit.description}</li>
+              ))}
+              {card.benefits.length > 3 && <li>...and more</li>}
+            </ul>
+          </div>
+        )}
+       </div>
+
+       {/* Delete Form and Button */}
+       <form onSubmit={handleDelete} className="mt-4 text-right">
+          <input type="hidden" name="cardId" value={card.id} />
+          <button
+             type="submit"
+             disabled={isPending} // Disable button while deleting
+             className={`text-xs px-3 py-1 rounded transition duration-200 ${isPending ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
+           >
+             {isPending ? 'Removing...' : 'Remove'}
+           </button>
+        </form>
+    </div>
+  );
+}
+
+// Main Page Component (remains mostly server-side fetching, passes data to client component)
+export default function UserCardsPage() {
+  const [cards, setCards] = useState<UserCard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fetch cards client-side (alternative to RSC fetch if needed)
+    // You might need to adjust this based on whether session needs to be checked client-side
+    async function fetchUserCards() {
+      try {
+        // This assumes an API route /api/user-cards exists that fetches cards for the logged-in user
+        // Alternatively, if this page MUST remain RSC, fetch data server-side and pass as props.
+        const response = await fetch('/api/user-cards'); // Adjust API route if necessary
+        if (!response.ok) {
+          if (response.status === 401) {
+             // Handle unauthorized - maybe redirect or show login prompt
+             setError("Please sign in to view your cards.");
+          } else {
+             throw new Error('Failed to fetch cards');
+          }
+        }
+        const data: UserCard[] = await response.json();
+        setCards(data);
+      } catch (err: any) {
+        console.error("Error fetching user cards:", err);
+        setError(err.message || "Could not load cards.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchUserCards();
+  }, []);
+
+  // --- Rendering Logic --- 
 
   return (
     <div className="container mx-auto p-4">
@@ -51,42 +136,23 @@ export default async function UserCardsPage() {
         </Link>
       </div>
 
-      {userCards.length === 0 ? (
+      {isLoading && <p className="text-center text-gray-500 mt-10">Loading cards...</p>}
+      
+      {error && <p className="text-center text-red-500 mt-10">Error: {error}</p>}
+
+      {!isLoading && !error && cards.length === 0 && (
         <div className="text-center text-gray-500 mt-10">
           <p>You haven't added any cards yet.</p>
           <Link href="/cards/new" className="text-blue-600 hover:underline mt-2 inline-block">
             Add your first card!
           </Link>
         </div>
-      ) : (
+      )}
+
+      {!isLoading && !error && cards.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {userCards.map((card) => (
-            <div key={card.id} className="border rounded-lg p-4 shadow-md bg-white">
-              <h2 className="text-xl font-semibold mb-2">{card.name}</h2>
-              <p className="text-gray-600 mb-1">Issuer: {card.issuer}</p>
-              {/* Display Opened Date if available */}
-              {card.openedDate && (
-                 <p className="text-sm text-gray-500 mb-3">Opened: {formatOpenedDate(card.openedDate)}</p>
-              )}
-
-              {/* Optionally display benefits */}
-              {card.benefits.length > 0 && (
-                <div className="mt-4 pt-3 border-t">
-                  <h3 className="text-md font-medium mb-2">Key Benefits:</h3>
-                  <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                    {card.benefits.slice(0, 3).map(benefit => ( // Show first 3 benefits
-                      <li key={benefit.id}>{benefit.description}</li>
-                    ))}
-                    {card.benefits.length > 3 && <li>...and more</li>}
-                  </ul>
-                </div>
-              )}
-
-              {/* Add placeholder for future actions like View Details or Remove */}
-              <div className="mt-4 text-right">
-                 <button disabled className="text-xs text-gray-400 cursor-not-allowed">View Details</button>
-              </div>
-            </div>
+          {cards.map((card) => (
+            <CardItem key={card.id} card={card} setCards={setCards} />
           ))}
         </div>
       )}

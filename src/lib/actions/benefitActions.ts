@@ -100,10 +100,8 @@ export async function ensureCurrentBenefitStatuses() {
         console.log(`ensureCurrentBenefitStatuses: Attempting ${upsertPromises.length} upserts.`);
         await Promise.all(upsertPromises);
         console.log('ensureCurrentBenefitStatuses: Upserts completed.');
-        // Revalidate paths that display benefit info after potential updates
-        revalidatePath('/benefits');
-        // Potentially revalidate other paths like dashboard if it shows benefit summaries
-        // revalidatePath('/');
+        // Remove revalidation from here - it should happen in actions that *trigger* changes
+        // revalidatePath('/benefits'); 
     } else {
         console.log('ensureCurrentBenefitStatuses: No benefit statuses needed upserting.');
     }

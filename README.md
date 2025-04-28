@@ -34,3 +34,67 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Seed Data Criteria (Predefined Benefits)
+
+The `prisma/seed.ts` file populates the database with predefined credit cards and their common benefits. The criteria for including a benefit in the seed data are as follows:
+
+1.  **Cyclical Value:** The benefit must offer a specific value (e.g., statement credits, points, free nights, passes) that resets or is awarded on a fixed, trackable cycle (Monthly, Quarterly, Yearly). Examples: `$10 Monthly Uber Cash`, `$300 Annual Travel Credit`, `Annual Free Night Award`.
+2.  **Exclude Always-On Perks:** General perks that are always active and don't have a specific value to track per cycle are excluded. Examples: points multipliers (like 5x on travel), general travel insurance, purchase protection, automatic elite status (like Gold/Platinum status), airport lounge access networks (unless it's a specific pass with an annual renewal like Priority Pass).
+3.  **Distributed Benefits:** Benefits advertised annually but distributed more frequently (e.g., an annual $240 credit given as $20 per month) should be modeled according to their *distribution* frequency and value (e.g., `$20 Monthly Credit` with `MONTHLY` frequency).
+4.  **Verification Source:** Benefit details should be verified against a reliable source, preferably [US Credit Card Guide](https://www.uscreditcardguide.com/).
+
+This focus ensures the tracker helps users manage benefits they need to actively use within specific timeframes.
+
+## Managing Card Images
+
+This project includes a script to automatically search for and download credit card images using the SerpApi Google Images search.
+
+### Prerequisites
+
+1.  **SerpApi Account:** You need an API key from [serpapi.com](https://serpapi.com/).
+2.  **Environment Variable:** Add your API key to the `.env` file in the project root:
+    ```env
+    SERPAPI_API_KEY=YOUR_ACTUAL_API_KEY_HERE
+    ```
+
+### Usage
+
+Run the script from the project root using Node.js, providing the card name with the `--name` (or `-n`) flag:
+
+```bash
+node scripts/download-card-image.js --name "Chase Sapphire Preferred"
+# or
+node scripts/download-card-image.js -n "American Express Gold Card"
+```
+
+The script will search for the card image, download the first medium-sized result, and save it to the `public/images/cards/` directory with a filename generated from the card name (e.g., `chase-sapphire-preferred.jpg`).
+
+## Adding a New Credit Card
+
+Follow these steps to add a new predefined credit card to the application:
+
+1.  **Gather Card Information:**
+    *   Find the exact card name, issuer, and current annual fee.
+    *   Identify its cyclical benefits (monthly/quarterly/yearly credits, free nights, etc.), verifying amounts and frequencies against a reliable source like [US Credit Card Guide](https://www.uscreditcardguide.com/). Remember to adhere to the [Seed Data Criteria](#seed-data-criteria-predefined-benefits).
+
+2.  **Download Card Image:**
+    *   Run the image download script described in [Managing Card Images](#managing-card-images) using the exact card name.
+    *   `node scripts/download-card-image.js --name "Your Card Name Here"`
+    *   Verify the image was downloaded correctly to `public/images/cards/` and note the filename (e.g., `your-card-name-here.png`).
+
+3.  **Update Seed File (`prisma/seed.ts`):**
+    *   Open the `prisma/seed.ts` file.
+    *   Add a new object entry to the `cards` array for the new card.
+    *   Fill in the `name`, `issuer`, and `annualFee`.
+    *   Set the `imageUrl` field to the correct path relative to the `public` directory (e.g., `/images/cards/your-card-name-here.png`).
+    *   Define the `benefits` array, adding objects for each cyclical benefit identified in Step 1. Ensure `category`, `description`, `maxAmount`, and `frequency` are set correctly based on the established criteria.
+
+4.  **Re-seed the Database:**
+    *   Run the seed command to update the database with the new card and its benefits:
+    ```bash
+    npx prisma db seed
+    ```
+
+5.  **Commit Changes:**
+    *   Commit the updated `prisma/seed.ts` file and the newly added image file in `public/images/cards/` to your version control system.

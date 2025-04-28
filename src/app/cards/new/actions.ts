@@ -37,6 +37,13 @@ export async function addCardAction(formData: FormData) {
     throw new Error('Please provide both month and year or leave both blank.');
   }
 
+  // If no date was provided, default to Jan 1st of the current year (UTC)
+  if (!openedDate) {
+    const currentYear = new Date().getUTCFullYear();
+    openedDate = new Date(Date.UTC(currentYear, 0, 1));
+    console.log('No opened date provided, defaulting to:', openedDate.toISOString());
+  }
+
   console.log('--- Starting Add Card Action ---');
   console.log('User ID:', userId);
   console.log('Predefined Card ID:', predefinedCardId);
