@@ -2,25 +2,11 @@
 
 import React, { useState, useEffect, useTransition } from 'react'; // Add useTransition
 import Link from 'next/link';
-import Image from 'next/image';
 import { deleteCardAction } from './actions'; // Import the delete action
-import type { CreditCard, Benefit } from '@/generated/prisma'; // Import types
-import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { redirect } from 'next/navigation';
+import type { CreditCard, Benefit } from '@/generated/prisma'; // Removed unused PredefinedCard
 
-// Types for props - assuming data is fetched server-side and passed down
-// OR fetched client-side (as shown here for simplicity, adjust if needed)
+// Correctly type the card data fetched/used client-side
 type UserCard = CreditCard & { benefits: Benefit[] };
-
-// Helper function to get month name
-const getMonthName = (monthNumber: number | null): string => {
-  if (monthNumber === null || monthNumber < 1 || monthNumber > 12) return 'N/A';
-  const date = new Date();
-  date.setMonth(monthNumber - 1);
-  return date.toLocaleString('en-US', { month: 'long' });
-};
 
 // Helper function to format Date as "Month Year" or return 'N/A'
 const formatOpenedDate = (date: Date | null): string => {
@@ -109,15 +95,18 @@ export default function UserCardsPage() {
           if (response.status === 401) {
              // Handle unauthorized - maybe redirect or show login prompt
              setError("Please sign in to view your cards.");
+             // Set cards to empty array or handle appropriately
+             setCards([]); 
+             return; // Stop execution for this case
           } else {
              throw new Error('Failed to fetch cards');
           }
         }
         const data: UserCard[] = await response.json();
         setCards(data);
-      } catch (err: any) {
+      } catch (err: unknown) { // Use unknown for caught errors
         console.error("Error fetching user cards:", err);
-        setError(err.message || "Could not load cards.");
+        setError(err instanceof Error ? err.message : "Could not load cards."); // Use type guard for error
       } finally {
         setIsLoading(false);
       }
@@ -125,6 +114,13 @@ export default function UserCardsPage() {
     fetchUserCards();
   }, []);
 
+  // Get searchParams client-side if modal logic is active
+  // const searchParams = useSearchParams(); 
+  // const isModalOpen = searchParams?.get('addCard') === 'true'; 
+  
+  // Fetch predefined cards if modal logic is active
+  // const allPredefinedCards: PredefinedCard[] = []; 
+  
   // --- Rendering Logic --- 
 
   return (
@@ -141,10 +137,12 @@ export default function UserCardsPage() {
       {error && <p className="text-center text-red-500 mt-10">Error: {error}</p>}
 
       {!isLoading && !error && cards.length === 0 && (
-        <div className="text-center text-gray-500 mt-10">
-          <p>You haven't added any cards yet.</p>
-          <Link href="/cards/new" className="text-blue-600 hover:underline mt-2 inline-block">
-            Add your first card!
+        <div className="text-center py-10 px-4 border border-dashed rounded-lg">
+          <p className="text-gray-500 mb-4">
+            You haven&apos;t added any cards yet. Get started by adding your first card!
+          </p>
+          <Link href="/cards?addCard=true" className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200">
+             Add Card
           </Link>
         </div>
       )}
@@ -156,6 +154,12 @@ export default function UserCardsPage() {
           ))}
         </div>
       )}
+
+      {/* Render AddCardModal conditionally, ensure correct import/definition */}
+      {/* <AddCardModal
+        isOpen={isModalOpen}
+        predefinedCards={allPredefinedCards} // Pass predefined cards here
+      /> */}
     </div>
   );
 } 

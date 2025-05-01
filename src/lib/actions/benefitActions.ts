@@ -5,7 +5,6 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { BenefitFrequency } from '@/generated/prisma';
 import { calculateBenefitCycle } from '@/lib/benefit-cycle';
-import { revalidatePath } from 'next/cache';
 
 /**
  * Ensures that BenefitStatus records exist for the current cycle
@@ -32,7 +31,7 @@ export async function ensureCurrentBenefitStatuses() {
       },
     });
 
-    const upsertPromises: Promise<any>[] = [];
+    const upsertPromises: Promise<unknown>[] = [];
 
     // Iterate through cards and their benefits
     userCardsWithBenefits.forEach(card => {
@@ -42,7 +41,7 @@ export async function ensureCurrentBenefitStatuses() {
 
         // Yearly benefits require an openedDate for anniversary calculation.
         // Monthly/Quarterly can use calendar periods even without openedDate.
-        let cardOpenedDateForCalc: Date | null = card.openedDate;
+        const cardOpenedDateForCalc: Date | null = card.openedDate;
         if (benefit.frequency === BenefitFrequency.YEARLY && !card.openedDate) {
              console.warn(`Skipping YEARLY benefit cycle generation for benefit ${benefit.id} as card ${card.id} has no openedDate.`);
              return; // Cannot calculate anniversary year without opened date

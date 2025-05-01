@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signIn, signOut, useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 
 const Navbar = () => {
   const pathname = usePathname();
   const { data: session } = useSession();
 
   const navigation = [
-    { name: 'Dashboard', href: '/' },
+    { name: 'Dashboard', href: '/', current: pathname === '/' },
     { name: 'Cards', href: '/cards' },
     { name: 'Benefits', href: '/benefits' },
     { name: 'Notifications', href: '/settings/notifications' },

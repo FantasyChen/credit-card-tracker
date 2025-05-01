@@ -1,9 +1,10 @@
 'use client';
 
+import React from 'react';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
-export default function SignIn() {
+function SignInContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
 
@@ -47,5 +48,13 @@ export default function SignIn() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <React.Suspense fallback={<div>Loading...</div>}>
+      <SignInContent />
+    </React.Suspense>
   );
 } 

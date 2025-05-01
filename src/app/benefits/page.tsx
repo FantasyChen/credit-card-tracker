@@ -1,12 +1,11 @@
 import React from 'react';
-import Link from 'next/link';
+import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { BenefitFrequency, BenefitStatus, Benefit, CreditCard } from '@/generated/prisma'; // Import types
+import { BenefitStatus, Benefit, CreditCard } from '@/generated/prisma';
 import { toggleBenefitStatusAction } from './actions';
-import { formatDate } from '@/lib/dateUtils'; // Import the shared formatter
+import { formatDate } from '@/lib/dateUtils';
 
 // Type combining BenefitStatus with Benefit and Card details for display
 interface DisplayBenefitStatus extends BenefitStatus {
