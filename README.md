@@ -131,9 +131,3 @@ Follow these steps to add a new predefined credit card to the application:
 
 5.  **Commit Changes:**
     *   Commit the updated `prisma/seed.ts` file and the newly added image file in `public/images/cards/` to your version control system.
-
-## TODOs
-* Rename to coupon book
-* Make sure the coupon cycle works. 
-* Update coupon, ensure they are correct for each credit card. 
-* Add support for flights / hotel points expiration

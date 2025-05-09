@@ -120,7 +120,7 @@ export default function UserCardsPage() {
   
   // Fetch predefined cards if modal logic is active
   // const allPredefinedCards: PredefinedCard[] = []; 
-  
+
   // --- Rendering Logic --- 
 
   return (
