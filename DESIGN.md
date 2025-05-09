@@ -1,8 +1,8 @@
-# Credit Card Tracker - Design Document
+# CouponCycle - Design Document
 
 ## 1. Overview
 
-This document outlines the design and development plan for the Credit Card Tracker web application. The primary goal is to help users track their credit card benefits, understand their usage cycles (monthly, quarterly, yearly), mark them as completed, and receive timely notifications about upcoming or expiring benefits.
+This document outlines the design and development plan for the CouponCycle web application. The primary goal is to help users track their credit card benefits (coupons, credits, etc.), understand their usage cycles (monthly, quarterly, yearly), mark them as completed, and receive timely notifications about upcoming or expiring benefits.
 
 ## 2. Current State (as of 2025-05-08)
 
@@ -41,7 +41,7 @@ This document outlines the design and development plan for the Credit Card Track
 ### 3.1. Core User Flow (Updated Priorities)
 
 1.  **Verify Production Setup (Vercel):**
-    *   Ensure Google OAuth is fully functional on the deployed Vercel application (`https://credit-card-tracker-tawny.vercel.app/`).
+    *   Ensure Google OAuth is fully functional on the deployed Vercel application (`https://coupon-cycle.vercel.app/`).
     *   Confirm the production database is correctly configured, accessible, and migrations have been applied (`npx prisma migrate deploy`).
     *   Thoroughly test the "Add Card" functionality end-to-end on Vercel to ensure it interacts correctly with the production database.
 2.  **Seed Database:** Populate `PredefinedCard` and `PredefinedBenefit` tables with initial data using `npx prisma db seed`. This is crucial for the "Add Card" flow.
@@ -77,7 +77,7 @@ This document outlines the design and development plan for the Credit Card Track
 
 ## 4. Future Considerations
 
-* Rename to card coupon tracker.
+* Rename to CouponCycle.
 *   Allowing users to add custom cards/benefits not in the predefined list.
 *   More sophisticated tracking (e.g., tracking partial usage of a benefit amount).
 *   Adding spending categories and linking transactions (more complex).

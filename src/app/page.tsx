@@ -21,7 +21,7 @@ export default async function Home() {
           <div>
             {/* You might want to add a logo here */}
             <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              Welcome to CardTracker
+              Welcome to CouponCycle
             </h2>
             <p className="mt-2 text-center text-sm text-gray-600">
               Track your credit cards and maximize your rewards.

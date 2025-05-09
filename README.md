@@ -59,10 +59,10 @@ When deploying to Vercel, ensure the following:
     *   `GOOGLE_CLIENT_ID`: Your Google Cloud OAuth Client ID.
     *   `GOOGLE_CLIENT_SECRET`: Your Google Cloud OAuth Client Secret.
     *   `DATABASE_URL`: Connection string for your **production** PostgreSQL database (e.g., from Vercel Postgres, Neon, Supabase).
-    *   `NEXTAUTH_URL`: Your production app URL (e.g., `https://your-app-name.vercel.app`).
+    *   `NEXTAUTH_URL`: Your production app URL (e.g., `https://coupon-cycle.vercel.app`).
     *   `NEXTAUTH_SECRET`: A strong, randomly generated secret for NextAuth.js.
 2.  **Google OAuth Configuration:**
-    *   In your Google Cloud Console, ensure `https://your-app-name.vercel.app` is an authorized JavaScript origin and `https://your-app-name.vercel.app/api/auth/callback/google` is an authorized redirect URI.
+    *   In your Google Cloud Console, ensure `https://coupon-cycle.vercel.app` is an authorized JavaScript origin and `https://coupon-cycle.vercel.app/api/auth/callback/google` is an authorized redirect URI.
 3.  **Prisma Query Engine:**
     *   The `prisma/schema.prisma` file has been configured with `binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]` and `engineType = "library"` to ensure compatibility with Vercel's runtime environment. Regenerate the Prisma client (`npx prisma generate`) if you modify the schema.
 4.  **Database Migrations:**

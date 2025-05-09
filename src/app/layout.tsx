@@ -10,8 +10,8 @@ const geistSans = GeistSans;
 const geistMono = GeistMono;
 
 export const metadata: Metadata = {
-  title: "CardTracker",
-  description: "Track credit card benefits and cycles",
+  title: "CouponCycle",
+  description: "Track your card benefits and coupons with CouponCycle",
 };
 
 export default async function RootLayout({
