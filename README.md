@@ -2,7 +2,13 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+First, ensure all dependencies are installed:
+
+```bash
+npm install
+```
+
+Then, run the development server:
 
 ```bash
 npm run dev
@@ -15,6 +21,12 @@ bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+To create a production build, run:
+```bash
+npm run build
+```
+This command is now verified to work correctly after resolving initial linting and type errors.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
@@ -34,6 +46,27 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## ESLint Configuration
+
+This project uses ESLint with a flat configuration file (`eslint.config.mjs`). Prisma generated files located in `src/generated/**` are ignored by this configuration to prevent build failures due to linting issues in auto-generated code.
+
+## Vercel Deployment Considerations
+
+When deploying to Vercel, ensure the following:
+
+1.  **Environment Variables:**
+    *   `GOOGLE_CLIENT_ID`: Your Google Cloud OAuth Client ID.
+    *   `GOOGLE_CLIENT_SECRET`: Your Google Cloud OAuth Client Secret.
+    *   `DATABASE_URL`: Connection string for your **production** PostgreSQL database (e.g., from Vercel Postgres, Neon, Supabase).
+    *   `NEXTAUTH_URL`: Your production app URL (e.g., `https://your-app-name.vercel.app`).
+    *   `NEXTAUTH_SECRET`: A strong, randomly generated secret for NextAuth.js.
+2.  **Google OAuth Configuration:**
+    *   In your Google Cloud Console, ensure `https://your-app-name.vercel.app` is an authorized JavaScript origin and `https://your-app-name.vercel.app/api/auth/callback/google` is an authorized redirect URI.
+3.  **Prisma Query Engine:**
+    *   The `prisma/schema.prisma` file has been configured with `binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]` and `engineType = "library"` to ensure compatibility with Vercel's runtime environment. Regenerate the Prisma client (`npx prisma generate`) if you modify the schema.
+4.  **Database Migrations:**
+    *   Run `npx prisma migrate deploy` (or your project's equivalent) against your production database to ensure its schema is up-to-date.
 
 ## Seed Data Criteria (Predefined Benefits)
 
