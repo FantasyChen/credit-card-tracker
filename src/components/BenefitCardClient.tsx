@@ -21,7 +21,7 @@ export default function BenefitCardClient({ status }: { status: DisplayBenefitSt
       <div>
         <p className="font-medium text-lg">{status.benefit.description}</p>
         <p className="text-sm text-gray-600">
-          Card: {status.benefit.creditCard.name} ({status.benefit.creditCard.issuer})
+          Card: {status.benefit.creditCard.displayName} ({status.benefit.creditCard.issuer})
         </p>
         <p className="text-sm text-gray-500">
           Current Cycle Ends: {formatDate(status.cycleEndDate)}

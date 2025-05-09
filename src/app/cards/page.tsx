@@ -1,12 +1,20 @@
 'use client'; // Make this a Client Component because we need interactivity
 
-import React, { useState, useEffect, useTransition } from 'react'; // Add useTransition
+import React, { useState, useEffect, useTransition, useMemo } from 'react'; // Add useMemo
 import Link from 'next/link';
 import { deleteCardAction } from './actions'; // Import the delete action
 import type { CreditCard, Benefit } from '@/generated/prisma'; // Removed unused PredefinedCard
 
+// Type for cards fetched from the API, assuming benefits are included
+interface FetchedUserCard extends CreditCard {
+  benefits: Benefit[];
+}
+
 // Correctly type the card data fetched/used client-side
-type UserCard = CreditCard & { benefits: Benefit[] };
+// Add displayName for indexed card names
+interface DisplayUserCard extends FetchedUserCard { // Inherit from FetchedUserCard
+  displayName?: string; 
+}
 
 // Helper function to format Date as "Month Year" or return 'N/A'
 const formatOpenedDate = (date: Date | null): string => {
@@ -18,22 +26,18 @@ const formatOpenedDate = (date: Date | null): string => {
 };
 
 // Client Component for displaying a single card with delete functionality
-function CardItem({ card, setCards }: { card: UserCard, setCards: React.Dispatch<React.SetStateAction<UserCard[]>> }) {
+function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.Dispatch<React.SetStateAction<FetchedUserCard[]>> }) {
   const [isPending, startTransition] = useTransition();
 
   const handleDelete = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); // Prevent default form submission
-
-    if (confirm(`Are you sure you want to remove the card "${card.name}"? This action cannot be undone.`)) {
+    event.preventDefault();
+    if (confirm(`Are you sure you want to remove the card "${card.displayName || card.name}"? This action cannot be undone.`)) {
       const formData = new FormData(event.currentTarget);
       startTransition(async () => {
         const result = await deleteCardAction(formData);
         if (result?.success) {
-          // Update client-state on successful deletion
-          setCards(currentCards => currentCards.filter(c => c.id !== card.id));
-          // Optionally show a success message (e.g., using a toast library)
+          setCards(currentRawCards => currentRawCards.filter(c => c.id !== card.id));
         } else {
-          // Basic error handling
           alert(result?.error || 'Failed to delete card. Please try again.');
         }
       });
@@ -43,7 +47,7 @@ function CardItem({ card, setCards }: { card: UserCard, setCards: React.Dispatch
   return (
     <div className="border rounded-lg p-4 shadow-md bg-white flex flex-col justify-between h-full">
        <div> {/* Content wrapper */}
-        <h2 className="text-xl font-semibold mb-2">{card.name}</h2>
+        <h2 className="text-xl font-semibold mb-2">{card.displayName || card.name}</h2> {/* Use displayName */}
         <p className="text-gray-600 mb-1">Issuer: {card.issuer}</p>
         {card.openedDate && (
            <p className="text-sm text-gray-500 mb-3">Opened: {formatOpenedDate(card.openedDate)}</p>
@@ -79,7 +83,7 @@ function CardItem({ card, setCards }: { card: UserCard, setCards: React.Dispatch
 
 // Main Page Component (remains mostly server-side fetching, passes data to client component)
 export default function UserCardsPage() {
-  const [cards, setCards] = useState<UserCard[]>([]);
+  const [rawCards, setRawCards] = useState<FetchedUserCard[]>([]); // Store raw cards from fetch
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,14 +100,14 @@ export default function UserCardsPage() {
              // Handle unauthorized - maybe redirect or show login prompt
              setError("Please sign in to view your cards.");
              // Set cards to empty array or handle appropriately
-             setCards([]); 
+             setRawCards([]); 
              return; // Stop execution for this case
           } else {
              throw new Error('Failed to fetch cards');
           }
         }
-        const data: UserCard[] = await response.json();
-        setCards(data);
+        const data: FetchedUserCard[] = await response.json();
+        setRawCards(data);
       } catch (err: unknown) { // Use unknown for caught errors
         console.error("Error fetching user cards:", err);
         setError(err instanceof Error ? err.message : "Could not load cards."); // Use type guard for error
@@ -113,6 +117,28 @@ export default function UserCardsPage() {
     }
     fetchUserCards();
   }, []);
+
+  // Process cards to add displayName for duplicates
+  const cards = useMemo(() => {
+    const cardCounts: { [key: string]: number } = {};
+    const cardIndices: { [key: string]: number } = {};
+
+    // First pass: count occurrences of each card name (name + issuer might be better for uniqueness)
+    rawCards.forEach(card => {
+      const cardKey = `${card.name}-${card.issuer}`;
+      cardCounts[cardKey] = (cardCounts[cardKey] || 0) + 1;
+    });
+
+    // Second pass: assign displayName if duplicates exist
+    return rawCards.map(card => {
+      const cardKey = `${card.name}-${card.issuer}`;
+      if (cardCounts[cardKey] > 1) {
+        cardIndices[cardKey] = (cardIndices[cardKey] || 0) + 1;
+        return { ...card, displayName: `${card.name} #${cardIndices[cardKey]}` };
+      }
+      return { ...card }; // card is FetchedUserCard
+    });
+  }, [rawCards]);
 
   // Get searchParams client-side if modal logic is active
   // const searchParams = useSearchParams(); 
@@ -150,7 +176,7 @@ export default function UserCardsPage() {
       {!isLoading && !error && cards.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cards.map((card) => (
-            <CardItem key={card.id} card={card} setCards={setCards} />
+            <CardItem key={card.id} card={card} setCards={setRawCards} />
           ))}
         </div>
       )}

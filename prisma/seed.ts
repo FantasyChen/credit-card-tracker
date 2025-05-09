@@ -1,11 +1,20 @@
-import { PrismaClient, BenefitFrequency } from '../src/generated/prisma'; // Adjust path if necessary
+import { PrismaClient, BenefitFrequency, CreditCard as PrismaCreditCard, PredefinedCard as PrismaPredefinedCard } from '../src/generated/prisma'; // Adjust path if necessary
 
 const prisma = new PrismaClient();
+
+// Define the structure for benefit objects in the seed data
+interface BenefitInput {
+  category: string;
+  description: string;
+  percentage: number;
+  maxAmount: number;
+  frequency: BenefitFrequency;
+}
 
 async function main() {
   console.log(`Start seeding ...`);
 
-  const cards = [
+  const predefinedCardsData: Array<Omit<PrismaPredefinedCard, 'id' | 'createdAt' | 'updatedAt'> & { benefits: BenefitInput[] }> = [
     {
       name: 'Chase Sapphire Preferred',
       issuer: 'Chase',
@@ -13,18 +22,25 @@ async function main() {
       imageUrl: '/images/cards/chase-sapphire-preferred.png',
       benefits: [
         {
+          description: '$50 Annual Hotel Credit', // Booked through Chase Travel
           category: 'Travel',
-          description: '$50 Annual Hotel Credit',
-          percentage: 0,
           maxAmount: 50,
           frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
         },
         {
-          category: 'Membership',
-          description: 'DoorDash DashPass Subscription',
+          description: '$10 Monthly Gopuff Credit',
+          category: 'Food Delivery',
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
+        },
+        {
+          description: 'DoorDash DashPass Subscription', // Free for at least 1 year
+          category: 'Membership',
           maxAmount: 0, // Value is the subscription itself
           frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
         },
       ],
     },
@@ -35,345 +51,393 @@ async function main() {
       imageUrl: '/images/cards/american-express-gold-card.png',
       benefits: [
         {
-          category: 'Travel',
           description: '$10 Monthly Uber Cash',
-          percentage: 0,
+          category: 'Travel',
           maxAmount: 10,
           frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
         },
         {
+          description: '$10 Monthly Dining Credit (e.g., Grubhub, Cheesecake Factory)',
           category: 'Dining',
-          description: '$10 Monthly Dining Credit',
-          percentage: 0,
           maxAmount: 10,
           frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        // Removed $7 Dunkin, $50 Resy as these are often promotional / opt-in and not as universal as Uber/Dining. Kept it simple for now.
+      ],
+    },
+    {
+      name: 'Capital One Venture X',
+      issuer: 'Capital One',
+      annualFee: 395,
+      imageUrl: '/images/cards/capital-one-venture-x.png',
+      benefits: [
+        {
+          description: '$300 Annual Travel Credit (via Capital One Travel)',
+          category: 'Travel',
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '10,000 Anniversary Bonus Miles',
+          category: 'Bonus',
+          maxAmount: 0, // Value is in miles
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
         },
       ],
     },
     {
-        name: 'Capital One Venture X',
-        issuer: 'Capital One',
-        annualFee: 395,
-        imageUrl: '/images/cards/capital-one-venture-x.png',
-        benefits: [
-            {
-              category: 'Travel',
-              description: '$300 Annual Travel Credit',
-              percentage: 0,
-              maxAmount: 300,
-              frequency: BenefitFrequency.YEARLY,
-            },
-            {
-              category: 'Points',
-              description: '10,000 Anniversary Miles',
-              percentage: 0,
-              maxAmount: 10000,
-              frequency: BenefitFrequency.YEARLY,
-            }
-        ]
+      name: 'Chase Sapphire Reserve',
+      issuer: 'Chase',
+      annualFee: 550,
+      imageUrl: '/images/cards/chase-sapphire-reserve.jpg',
+      benefits: [
+        {
+          description: '$300 Annual Travel Credit',
+          category: 'Travel',
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: 'Priority Pass Select Membership',
+          category: 'Travel',
+          maxAmount: 0, // Value is the membership
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$5 Monthly DoorDash Credit',
+          category: 'Food Delivery',
+          maxAmount: 5,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+      ],
     },
     {
-        name: 'Chase Sapphire Reserve',
-        issuer: 'Chase',
-        annualFee: 550,
-        imageUrl: '/images/cards/chase-sapphire-reserve.jpg',
-        benefits: [
-            {
-                category: 'Travel',
-                description: '$300 Annual Travel Credit',
-                percentage: 0,
-                maxAmount: 300,
-                frequency: BenefitFrequency.YEARLY,
-            },
-            {
-                category: 'Travel',
-                description: 'Priority Pass Select Membership',
-                percentage: 0,
-                maxAmount: 0, // Value is the membership
-                frequency: BenefitFrequency.YEARLY,
-            },
-        ]
+      name: 'Chase Ink Business Preferred',
+      issuer: 'Chase',
+      annualFee: 95,
+      imageUrl: '/images/cards/chase-ink-business-preferred.png',
+      benefits: [
+        // No purely "coupon-book" style cyclical monetary credits identified.
+        // Primary benefits are points earning and travel/purchase protections.
+      ],
     },
     {
-        name: 'Chase Ink Business Preferred',
-        issuer: 'Chase',
-        annualFee: 95,
-        imageUrl: '/images/cards/chase-ink-business-preferred.png',
-        benefits: [], // No relevant cyclical benefits found
+      name: 'American Express Platinum Card',
+      issuer: 'American Express',
+      annualFee: 695,
+      imageUrl: '/images/cards/american-express-platinum-card.png',
+      benefits: [
+        {
+          description: '$200 Airline Fee Credit (Incidental Fees, select one airline)',
+          category: 'Travel',
+          maxAmount: 200,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$15 Monthly Uber Cash ($35 in December)', // Base amount
+          category: 'Travel',
+          maxAmount: 15, // Monthly base
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$20 Additional Uber Cash (December)', // December Bonus
+          category: 'Travel',
+          maxAmount: 20,
+          frequency: BenefitFrequency.YEARLY, // This specific bonus amount is once a year in Dec
+          percentage: 0,
+        },
+        {
+          description: '$50 Saks Fifth Avenue Credit (Jan-Jun)',
+          category: 'Shopping',
+          maxAmount: 50,
+          frequency: BenefitFrequency.YEARLY, // This specific window is once per year
+          percentage: 0,
+        },
+        {
+          description: '$50 Saks Fifth Avenue Credit (Jul-Dec)',
+          category: 'Shopping',
+          maxAmount: 50,
+          frequency: BenefitFrequency.YEARLY, // This specific window is once per year
+          percentage: 0,
+        },
+        {
+          description: '$20 Monthly Digital Entertainment Credit',
+          category: 'Entertainment',
+          maxAmount: 20,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$300 Equinox Credit (Annual or $25/month)',
+          category: 'Wellness',
+          maxAmount: 300, // Representing as annual, user can track monthly usage
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$13 Monthly Walmart+ Credit (covers monthly membership)',
+          category: 'Membership',
+          maxAmount: 13, // Approx. $12.95 + tax
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$200 Annual Hotel Credit (FHR/THC prepaid bookings)',
+          category: 'Travel',
+          maxAmount: 200,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$189 CLEAR Plus Credit (Annual Statement Credit)',
+          category: 'Travel',
+          maxAmount: 189,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+      ],
     },
     {
-        name: 'American Express Platinum Card',
-        issuer: 'American Express',
-        annualFee: 695,
-        imageUrl: '/images/cards/american-express-platinum-card.png',
-        benefits: [
-            {
-                category: 'Travel',
-                description: '$15 Monthly Uber Cash', // $200 Annually = $15/mo ($35 Dec)
-                percentage: 0,
-                maxAmount: 15,
-                frequency: BenefitFrequency.MONTHLY,
-            },
-            {
-                category: 'Entertainment',
-                description: '$20 Monthly Digital Entertainment Credit', // $240 Annually
-                percentage: 0,
-                maxAmount: 20,
-                frequency: BenefitFrequency.MONTHLY,
-            },
-            {
-                category: 'Travel',
-                description: '$200 Annual Airline Fee Credit',
-                percentage: 0,
-                maxAmount: 200,
-                frequency: BenefitFrequency.YEARLY,
-            },
-             {
-                category: 'Shopping',
-                description: '$100 Annual Saks Credit (Distributed $50 semi-annually)',
-                percentage: 0,
-                maxAmount: 100,
-                frequency: BenefitFrequency.YEARLY,
-            },
-             {
-                category: 'Travel',
-                description: '$189 CLEAR Plus Credit',
-                percentage: 0,
-                maxAmount: 189,
-                frequency: BenefitFrequency.YEARLY,
-            },
-             {
-                category: 'Wellness',
-                description: '$300 Annual Equinox Credit',
-                percentage: 0,
-                maxAmount: 300,
-                frequency: BenefitFrequency.YEARLY,
-            },
-             {
-                category: 'Membership',
-                description: '$155 Annual Walmart+ Credit', // Covers monthly membership
-                percentage: 0,
-                maxAmount: 155,
-                frequency: BenefitFrequency.YEARLY,
-            },
-        ]
+      name: 'American Express Business Platinum Card',
+      issuer: 'American Express',
+      annualFee: 695,
+      imageUrl: '/images/cards/american-express-business-platinum-card.png',
+      benefits: [
+        {
+          description: '$200 Airline Fee Credit',
+          category: 'Travel',
+          maxAmount: 200,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$200 Dell Credit (Jan-Jun)',
+          category: 'Electronics',
+          maxAmount: 200,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$200 Dell Credit (Jul-Dec)',
+          category: 'Electronics',
+          maxAmount: 200,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$10 Monthly Wireless Credit',
+          category: 'Utilities',
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$90 Quarterly Indeed Credit',
+          category: 'Business Services',
+          maxAmount: 90,
+          frequency: BenefitFrequency.QUARTERLY,
+          percentage: 0,
+        },
+        {
+          description: '$150 Annual Adobe Credit (select products)',
+          category: 'Software',
+          maxAmount: 150,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$189 CLEAR Plus Credit',
+          category: 'Travel',
+          maxAmount: 189,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+      ],
     },
     {
-        name: 'American Express Business Platinum Card',
-        issuer: 'American Express',
-        annualFee: 695,
-        imageUrl: '/images/cards/american-express-business-platinum-card.png',
-        benefits: [
-            {
-                category: 'Business',
-                description: '$400 Dell Credit ($200 semi-annually)',
-                percentage: 0,
-                maxAmount: 400,
-                frequency: BenefitFrequency.YEARLY,
-            },
-            {
-                category: 'Business',
-                description: '$90 Indeed Credit ($360 annually)',
-                percentage: 0,
-                maxAmount: 360,
-                frequency: BenefitFrequency.QUARTERLY,
-            },
-            {
-                category: 'Business',
-                description: '$150 Adobe Credit',
-                percentage: 0,
-                maxAmount: 150,
-                frequency: BenefitFrequency.YEARLY,
-            },
-            {
-                category: 'Phone',
-                description: '$10 Wireless Credit',
-                percentage: 0,
-                maxAmount: 120,
-                frequency: BenefitFrequency.MONTHLY,
-            },
-            {
-                category: 'Travel',
-                description: '$200 Annual Airline Fee Credit',
-                percentage: 0,
-                maxAmount: 200,
-                frequency: BenefitFrequency.YEARLY,
-            },
-            {
-                category: 'Travel',
-                description: '$50 Quarterly Hilton Credit',
-                percentage: 0,
-                maxAmount: 200,
-                frequency: BenefitFrequency.QUARTERLY,
-            },
-            {
-                category: 'Membership',
-                description: '$189 CLEAR Plus Credit',
-                percentage: 0,
-                maxAmount: 189,
-                frequency: BenefitFrequency.YEARLY,
-            },
-            {
-                category: 'Travel',
-                description: '$100 Global Entry/TSA PreCheck Credit',
-                percentage: 0,
-                maxAmount: 100,
-                frequency: BenefitFrequency.YEARLY, // Simplification for infrequent credit
-            },
-        ]
-    },
-     {
-        name: 'American Express Business Gold Card',
-        issuer: 'American Express',
-        annualFee: 295,
-        imageUrl: '/images/cards/american-express-business-gold-card.png',
-        benefits: [
-            {
-                category: 'Business',
-                description: '$20 Monthly Flexible Business Credit',
-                percentage: 0,
-                maxAmount: 240,
-                frequency: BenefitFrequency.MONTHLY,
-            },
-            {
-                category: 'Membership',
-                description: '$155 Annual Walmart+ Credit',
-                percentage: 0,
-                maxAmount: 155, // Based on $12.95/month + tax
-                frequency: BenefitFrequency.YEARLY,
-            },
-        ]
+      name: 'American Express Business Gold Card',
+      issuer: 'American Express',
+      annualFee: 375, // Fee increased from $295
+      imageUrl: '/images/cards/american-express-business-gold-card.png',
+      benefits: [
+        {
+          description: '$20 Monthly Flexible Business Credit (FedEx, Grubhub, Office Supply)',
+          category: 'Business',
+          maxAmount: 20,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$155 Annual Walmart+ Membership Credit (Covers annual membership cost)',
+          category: 'Membership',
+          maxAmount: 155,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+      ],
     },
     {
-        name: 'Hilton Honors American Express Aspire Card',
-        issuer: 'American Express',
-        annualFee: 550,
-        imageUrl: '/images/cards/hilton-honors-american-express-aspire-card.png',
-        benefits: [
-            {
-                category: 'Travel',
-                description: 'Annual Weekend Night Reward',
-                percentage: 0,
-                maxAmount: 0, // Represents the free night
-                frequency: BenefitFrequency.YEARLY,
-            },
-            {
-                category: 'Travel',
-                description: '$400 Hilton Resort Credit ($200 semi-annually)',
-                percentage: 0,
-                maxAmount: 400,
-                frequency: BenefitFrequency.YEARLY,
-            },
-             {
-                category: 'Travel',
-                description: '$50 Flight Credit',
-                percentage: 0,
-                maxAmount: 200,
-                frequency: BenefitFrequency.QUARTERLY,
-            },
-            {
-                category: 'Membership',
-                description: '$189 CLEAR Plus Credit',
-                percentage: 0,
-                maxAmount: 189,
-                frequency: BenefitFrequency.YEARLY,
-            },
-        ]
+      name: 'Hilton Honors American Express Aspire Card',
+      issuer: 'American Express',
+      annualFee: 550,
+      imageUrl: '/images/cards/hilton-honors-american-express-aspire-card.png',
+      benefits: [
+        {
+          description: 'Hilton Diamond Status',
+          category: 'Travel',
+          maxAmount: 0, // Status itself
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: 'Annual Free Night Reward',
+          category: 'Travel',
+          maxAmount: 0, // Represents the free night
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$50 Quarterly Flight Credit',
+          category: 'Travel',
+          maxAmount: 50,
+          frequency: BenefitFrequency.QUARTERLY,
+          percentage: 0,
+        },
+        {
+          description: '$200 Hilton Resort Credit (Statement Credit, 1st Half of Year)',
+          category: 'Travel',
+          maxAmount: 200, // Value of credit per half
+          frequency: BenefitFrequency.YEARLY, // For this specific semi-annual portion
+          percentage: 0,
+        },
+        {
+          description: '$200 Hilton Resort Credit (Statement Credit, 2nd Half of Year)',
+          category: 'Travel',
+          maxAmount: 200, // Value of credit per half
+          frequency: BenefitFrequency.YEARLY, // For this specific semi-annual portion
+          percentage: 0,
+        },
+        {
+          description: '$189 CLEAR Plus Credit',
+          category: 'Travel',
+          maxAmount: 189,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+      ],
     },
     {
-        name: 'Hilton Honors American Express Surpass Card',
-        issuer: 'American Express',
-        annualFee: 150,
-        imageUrl: '/images/cards/hilton-honors-american-express-surpass-card.png',
-        benefits: [ /* No purely cyclical credits */ ]
+      name: 'Hilton Honors American Express Surpass Card',
+      issuer: 'American Express',
+      annualFee: 150,
+      imageUrl: '/images/cards/hilton-honors-american-express-surpass-card.png',
+      benefits: [
+        {
+          description: '$50 Quarterly Hilton Credit ($200 annual)',
+          category: 'Travel',
+          maxAmount: 50,
+          frequency: BenefitFrequency.QUARTERLY,
+          percentage: 0,
+        },
+        // Free Night Reward after $15k spend is conditional, not a direct cyclical benefit.
+      ],
     },
     {
-        name: 'IHG One Rewards Premier Credit Card',
-        issuer: 'Chase',
-        annualFee: 99,
-        imageUrl: '/images/cards/ihg-one-rewards-premier-credit-card.jpg',
-        benefits: [
-            {
-                category: 'Travel',
-                description: 'Annual Anniversary Free Night',
-                percentage: 0,
-                maxAmount: 1,
-                frequency: BenefitFrequency.YEARLY,
-            },
-        ]
+      name: 'IHG One Rewards Premier Credit Card',
+      issuer: 'Chase',
+      annualFee: 99,
+      imageUrl: '/images/cards/ihg-one-rewards-premier-credit-card.jpg',
+      benefits: [
+        {
+          description: 'Annual Anniversary Free Night (up to 40k points)',
+          category: 'Travel',
+          maxAmount: 0, // Represents the free night
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+      ],
     },
     {
-        name: 'IHG One Rewards Premier Business Credit Card',
-        issuer: 'Chase',
-        annualFee: 99,
-        imageUrl: '/images/cards/ihg-one-rewards-premier-business-credit-card.jpg',
-        benefits: [
-             {
-                category: 'Travel',
-                description: 'Annual Anniversary Free Night',
-                percentage: 0,
-                maxAmount: 1,
-                frequency: BenefitFrequency.YEARLY,
-            },
-        ]
+      name: 'IHG One Rewards Premier Business Credit Card',
+      issuer: 'Chase',
+      annualFee: 99,
+      imageUrl: '/images/cards/ihg-one-rewards-premier-business-credit-card.jpg',
+      benefits: [
+        {
+          description: 'Annual Anniversary Free Night (up to 40k points)',
+          category: 'Travel',
+          maxAmount: 0, // Represents the free night
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+      ],
     },
     {
-        name: 'Marriott Bonvoy Brilliant American Express Card',
-        issuer: 'American Express',
-        annualFee: 650,
-        imageUrl: '/images/cards/marriott-bonvoy-brilliant-american-express-card.png',
-        benefits: [
-            {
-                category: 'Travel',
-                description: 'Annual Free Night Award (up to 85k points)',
-                percentage: 0,
-                maxAmount: 0, // Represents the free night
-                frequency: BenefitFrequency.YEARLY,
-            },
-            {
-                category: 'Dining',
-                description: '$25 Monthly Dining Credit',
-                percentage: 0,
-                maxAmount: 300,
-                frequency: BenefitFrequency.MONTHLY,
-            },
-        ]
+      name: 'Marriott Bonvoy Brilliant American Express Card',
+      issuer: 'American Express',
+      annualFee: 650,
+      imageUrl: '/images/cards/marriott-bonvoy-brilliant-american-express-card.png',
+      benefits: [
+        {
+          description: 'Annual Free Night Award (up to 85k points)',
+          category: 'Travel',
+          maxAmount: 0, // Represents the free night
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$25 Monthly Dining Credit',
+          category: 'Dining',
+          maxAmount: 25,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+      ],
     },
     {
-        name: 'Marriott Bonvoy Boundless Credit Card',
-        issuer: 'Chase',
-        annualFee: 95,
-        imageUrl: '/images/cards/marriott-bonvoy-boundless-credit-card.png',
-        benefits: [
-            {
-                category: 'Travel',
-                description: 'Annual Free Night Award',
-                percentage: 0,
-                maxAmount: 1,
-                frequency: BenefitFrequency.YEARLY,
-            },
-        ]
+      name: 'Marriott Bonvoy Boundless Credit Card',
+      issuer: 'Chase',
+      annualFee: 95,
+      imageUrl: '/images/cards/marriott-bonvoy-boundless-credit-card.png',
+      benefits: [
+        {
+          description: 'Annual Free Night Award (up to 35k points)',
+          category: 'Travel',
+          maxAmount: 0, // Represents the free night
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+      ],
     },
-     {
-        name: 'Alaska Airlines Visa Signature® credit card',
-        issuer: 'Bank of America',
-        annualFee: 95,
-        imageUrl: '/images/cards/alaska-airlines-visa-signature-credit-card.jpeg',
-        benefits: [
-            {
-                category: 'Travel',
-                description: "Alaska's Famous Companion Fare™",
-                percentage: 0,
-                maxAmount: 1, // Represents the fare benefit
-                frequency: BenefitFrequency.YEARLY,
-            },
-        ]
+    {
+      name: 'Alaska Airlines Visa Signature® credit card',
+      issuer: 'Bank of America',
+      annualFee: 95,
+      imageUrl: '/images/cards/alaska-airlines-visa-signature-credit-card.jpeg',
+      benefits: [
+        {
+          description: "Alaska's Famous Companion Fare™ (from $122)",
+          category: 'Travel',
+          maxAmount: 0, // Represents the fare benefit itself, cost varies
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+      ],
     },
   ];
 
   // --- Upsert Logic (ensure benefits are deleted/recreated or updated properly) ---
   console.log('Starting upsert process...');
-  for (const cardData of cards) {
+  for (const cardData of predefinedCardsData) {
     console.log(`Processing card: ${cardData.name}`);
     const existingCard = await prisma.predefinedCard.findUnique({
         where: { name: cardData.name },
