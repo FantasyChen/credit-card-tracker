@@ -1,14 +1,16 @@
-import React from 'react';
+import React from 'react'; // useTransition will be in the client component
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { BenefitStatus, Benefit, CreditCard } from '@/generated/prisma';
-import { toggleBenefitStatusAction } from './actions';
 import { formatDate } from '@/lib/dateUtils';
+import BenefitCardClient from '@/components/BenefitCardClient'; // Import the new client component
+// We will create a new client component for the list and cards
+// import BenefitListClient from '@/components/BenefitListClient'; 
 
 // Type combining BenefitStatus with Benefit and Card details for display
-interface DisplayBenefitStatus extends BenefitStatus {
+export interface DisplayBenefitStatus extends BenefitStatus { // Export for use in client component
   benefit: Benefit & { creditCard: CreditCard };
 }
 
@@ -50,60 +52,25 @@ export default async function BenefitsDashboardPage() {
       {/* Upcoming Benefits Section */} 
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4 border-b pb-2">Upcoming / Pending Benefits</h2>
-        {upcomingBenefits.length === 0 ? (
-          <p className="text-gray-500">No upcoming benefits found for the current cycles.</p>
-        ) : (
-          <div className="space-y-4">
-            {upcomingBenefits.map(status => (
-              <BenefitCard key={status.id} status={status} />
-            ))}
-          </div>
-        )}
+        {/* Replace with client component, passing upcomingBenefits */}
+        {/* <BenefitListClient benefits={upcomingBenefits} listTitle="Upcoming / Pending Benefits" /> */}
+        {/* For now, let's put the direct map here and move BenefitCard to a new file */}
+        {upcomingBenefits.length === 0 ? <p className="text-gray-500">No upcoming benefits found.</p> : 
+          upcomingBenefits.map(status => <BenefitCardClient key={status.id} status={status} />)
+        }
       </section>
 
       {/* Completed Benefits Section */} 
       <section>
         <h2 className="text-2xl font-semibold mb-4 border-b pb-2">Completed Benefits</h2>
-        {completedBenefits.length === 0 ? (
-          <p className="text-gray-500">No benefits marked as completed yet.</p>
-        ) : (
-          <div className="space-y-4">
-            {completedBenefits.map(status => (
-              <BenefitCard key={status.id} status={status} />
-            ))}
-          </div>
-        )}
+        {/* Replace with client component, passing completedBenefits */}
+        {/* <BenefitListClient benefits={completedBenefits} listTitle="Completed Benefits" /> */}
+        {completedBenefits.length === 0 ? <p className="text-gray-500">No completed benefits.</p> : 
+          completedBenefits.map(status => <BenefitCardClient key={status.id} status={status} />)
+        }
       </section>
     </div>
   );
 }
 
-// --- Sub-component for displaying a benefit card --- 
-function BenefitCard({ status }: { status: DisplayBenefitStatus }) {
-  return (
-    <div className={`border rounded-lg p-4 shadow-sm flex items-center justify-between ${status.isCompleted ? 'bg-green-50' : 'bg-white'}`}>
-      <div>
-        <p className="font-medium text-lg">{status.benefit.description}</p>
-        <p className="text-sm text-gray-600">
-          Card: {status.benefit.creditCard.name} ({status.benefit.creditCard.issuer})
-        </p>
-        <p className="text-sm text-gray-500">
-          Current Cycle Ends: {formatDate(status.cycleEndDate)}
-        </p>
-      </div>
-      <form action={toggleBenefitStatusAction}>
-        <input type="hidden" name="benefitStatusId" value={status.id} />
-        <input type="hidden" name="isCompleted" value={status.isCompleted.toString()} />
-        <button
-          type="submit"
-          className={`py-2 px-4 rounded text-sm font-medium transition duration-150 ease-in-out 
-            ${status.isCompleted
-              ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-              : 'bg-green-500 hover:bg-green-600 text-white'}`}
-        >
-          {status.isCompleted ? 'Mark Pending' : 'Mark Complete'}
-        </button>
-      </form>
-    </div>
-  );
-} 
+// --- BenefitCard will be moved to BenefitCardClient.tsx --- 
