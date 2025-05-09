@@ -4,8 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { BenefitStatus, Benefit, CreditCard as PrismaCreditCard } from '@/generated/prisma';
-import { formatDate } from '@/lib/dateUtils';
-import BenefitCardClient from '@/components/BenefitCardClient'; // Import the new client component
+import BenefitsDisplayClient from '@/components/BenefitsDisplayClient'; // Import the new client component
 // We will create a new client component for the list and cards
 // import BenefitListClient from '@/components/BenefitListClient'; 
 
@@ -95,32 +94,23 @@ export default async function BenefitsDashboardPage() {
   const upcomingBenefits = allStatuses.filter(status => !status.isCompleted);
   const completedBenefits = allStatuses.filter(status => status.isCompleted);
 
+  // Calculate total values
+  const totalUnusedValue = upcomingBenefits.reduce((sum, status) => {
+    return sum + (status.benefit.maxAmount || 0);
+  }, 0);
+
+  const totalUsedValue = completedBenefits.reduce((sum, status) => {
+    return sum + (status.benefit.maxAmount || 0);
+  }, 0);
+
   // --- Render Component --- 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">Benefits Dashboard</h1>
-
-      {/* Upcoming Benefits Section */} 
-      <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-4 border-b pb-2">Upcoming / Pending Benefits</h2>
-        {/* Replace with client component, passing upcomingBenefits */}
-        {/* <BenefitListClient benefits={upcomingBenefits} listTitle="Upcoming / Pending Benefits" /> */}
-        {/* For now, let's put the direct map here and move BenefitCard to a new file */}
-        {upcomingBenefits.length === 0 ? <p className="text-gray-500">No upcoming benefits found.</p> : 
-          upcomingBenefits.map(status => <BenefitCardClient key={status.id} status={status} />)
-        }
-      </section>
-
-      {/* Completed Benefits Section */} 
-      <section>
-        <h2 className="text-2xl font-semibold mb-4 border-b pb-2">Completed Benefits</h2>
-        {/* Replace with client component, passing completedBenefits */}
-        {/* <BenefitListClient benefits={completedBenefits} listTitle="Completed Benefits" /> */}
-        {completedBenefits.length === 0 ? <p className="text-gray-500">No completed benefits.</p> : 
-          completedBenefits.map(status => <BenefitCardClient key={status.id} status={status} />)
-        }
-      </section>
-    </div>
+    <BenefitsDisplayClient
+      upcomingBenefits={upcomingBenefits}
+      completedBenefits={completedBenefits}
+      totalUnusedValue={totalUnusedValue}
+      totalUsedValue={totalUsedValue}
+    />
   );
 }
 

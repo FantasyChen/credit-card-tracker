@@ -77,10 +77,8 @@ This document outlines the design and development plan for the CouponCycle web a
 
 ## 4. Future Considerations
 
-* Rename to CouponCycle.
 *   Allowing users to add custom cards/benefits not in the predefined list.
 *   More sophisticated tracking (e.g., tracking partial usage of a benefit amount).
-*   Adding spending categories and linking transactions (more complex).
 *   Visualizations and reporting.
 *   Admin interface for managing predefined cards/benefits. 
 *  Organize the seed data. 
