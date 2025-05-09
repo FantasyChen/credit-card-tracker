@@ -46,6 +46,7 @@ next-env.d.ts
 # Prisma local database & generated client
 prisma/dev.db
 prisma/dev.db-journal # SQLite journal file
+src/generated/prisma/
 
 # Local environment variables
 .env*.local
