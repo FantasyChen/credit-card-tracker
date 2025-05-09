@@ -135,3 +135,5 @@ Follow these steps to add a new predefined credit card to the application:
 ## TODOs
 * Rename to coupon book
 * Make sure the coupon cycle works. 
+* Update coupon, ensure they are correct for each credit card. 
+* Add support for flights / hotel points expiration
