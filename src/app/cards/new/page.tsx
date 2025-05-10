@@ -32,7 +32,7 @@ function PredefinedCardForm({ card }: { card: PredefinedCard }) {
   return (
     <form onSubmit={handleSubmit}> 
       <input type="hidden" name="predefinedCardId" value={card.id} />
-      <div className="border rounded-lg p-4 shadow-md flex flex-col justify-between h-full">
+      <div className="border rounded-lg p-4 shadow-md flex flex-col justify-between h-full bg-white dark:bg-gray-800 dark:border-gray-700 dark:shadow-lg dark:shadow-indigo-500/20">
         <div>
           {card.imageUrl && (
             <div className="relative h-40 w-full mb-4 rounded overflow-hidden">
@@ -45,13 +45,13 @@ function PredefinedCardForm({ card }: { card: PredefinedCard }) {
               />
             </div>
           )}
-          <h2 className="text-xl font-semibold mb-2">{card.name}</h2>
-          <p className="text-gray-600 mb-1">Issuer: {card.issuer}</p>
-          <p className="text-gray-600 mb-4">Annual Fee: ${card.annualFee}</p>
+          <h2 className="text-xl font-semibold mb-2 dark:text-gray-100">{card.name}</h2>
+          <p className="text-gray-600 mb-1 dark:text-gray-300">Issuer: {card.issuer}</p>
+          <p className="text-gray-600 mb-4 dark:text-gray-300">Annual Fee: ${card.annualFee}</p>
 
           {/* --- Add Opened Month and Year Select --- */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-100">
               Date Card Opened (Optional)
             </label>
             <div className="flex space-x-2">
@@ -59,7 +59,7 @@ function PredefinedCardForm({ card }: { card: PredefinedCard }) {
               <select
                 id={`openedMonth-${card.id}`}
                 name="openedMonth"
-                className="mt-1 block w-1/2 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                className="mt-1 block w-1/2 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
                 defaultValue=""
               >
                 <option value="" disabled>Month...</option>
@@ -71,7 +71,7 @@ function PredefinedCardForm({ card }: { card: PredefinedCard }) {
               <select
                 id={`openedYear-${card.id}`}
                 name="openedYear"
-                className="mt-1 block w-1/2 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                className="mt-1 block w-1/2 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
                 defaultValue=""
               >
                 <option value="" disabled>Year...</option>
@@ -80,10 +80,10 @@ function PredefinedCardForm({ card }: { card: PredefinedCard }) {
                 ))}
               </select>
             </div>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Helps track annual fees/benefits. Check your credit report (
-              <a href="https://www.creditkarma.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Credit Karma</a>,
-              <a href="https://www.experian.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Experian</a>, etc.)
+              <a href="https://www.creditkarma.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">Credit Karma</a>,
+              <a href="https://www.experian.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">Experian</a>, etc.)
                if unsure.
             </p>
           </div>
@@ -92,7 +92,7 @@ function PredefinedCardForm({ card }: { card: PredefinedCard }) {
         <button
           type="submit"
           disabled={isPending}
-          className={`mt-auto w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`mt-auto w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {isPending ? 'Adding...' : 'Add Card'}
         </button>
@@ -137,19 +137,19 @@ export default function AddNewCardPage() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Select a Card to Add</h1>
+      <h1 className="text-2xl font-bold mb-6 dark:text-white">Select a Card to Add</h1>
       <div className="mb-6">
         <input 
           type="text"
           placeholder="Search by card name or issuer..."
-          className="w-full p-2 border border-gray-300 rounded-md"
+          className="w-full p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
       {isLoading ? (
-         <p>Loading cards...</p> // Basic loading indicator
+         <p className="dark:text-gray-400">Loading cards...</p> // Basic loading indicator
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCards.map((card) => (

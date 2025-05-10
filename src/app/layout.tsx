@@ -4,14 +4,15 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Providers from "@/components/Providers";
+import Footer from "@/components/Footer";
 // import { ensureCurrentBenefitStatuses } from "@/lib/actions/benefitActions"; // Keep import commented out or remove
 
 const geistSans = GeistSans;
 const geistMono = GeistMono;
 
 export const metadata: Metadata = {
-  title: "CouponCycle",
-  description: "Track your card benefits and coupons with CouponCycle",
+  title: "CouponCycle - Maximize Your Card Benefits",
+  description: "Never miss a credit card benefit again. CouponCycle helps you track every perk and maximize your annual fees.",
 };
 
 export default async function RootLayout({
@@ -22,15 +23,18 @@ export default async function RootLayout({
   // ensureCurrentBenefitStatuses(); // <-- REMOVE THIS CALL
 
   return (
-    <html lang="en">
+    <html lang="en" className="h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
       >
         <Providers>
-          <Navbar />
-          <main className="container mx-auto px-4 py-8">
-            {children}
-          </main>
+          <div className="flex min-h-full flex-col bg-gray-50 dark:bg-gray-950">
+            <Navbar />
+            <main className="container mx-auto flex-grow px-4 py-8">
+              {children}
+            </main>
+            <Footer />
+          </div>
         </Providers>
       </body>
     </html>

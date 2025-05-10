@@ -41,12 +41,12 @@ export default async function NotificationSettingsPage() {
 
   return (
     <div className="container mx-auto p-4 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6">Notification Settings</h1>
+      <h1 className="text-3xl font-bold mb-6 dark:text-white">Notification Settings</h1>
 
       {/* Optional: Display status message after form submission */} 
       {/* <FormStatus message={formState?.message} success={formState?.success} /> */}
 
-      <form action={updateNotificationSettingsAction} className="space-y-6 bg-white p-6 rounded-lg shadow">
+      <form action={updateNotificationSettingsAction} className="space-y-6 bg-white p-6 rounded-lg shadow dark:bg-gray-800 dark:shadow-lg dark:shadow-indigo-500/20">
         
         {/* New Benefit Notification Setting */}
         <div className="flex items-start">
@@ -56,14 +56,14 @@ export default async function NotificationSettingsPage() {
               name="notifyNewBenefit"
               type="checkbox"
               defaultChecked={user.notifyNewBenefit} // Set initial state from fetched data
-              className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+              className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800"
             />
           </div>
           <div className="ml-3 text-sm">
-            <label htmlFor="notifyNewBenefit" className="font-medium text-gray-700">
+            <label htmlFor="notifyNewBenefit" className="font-medium text-gray-700 dark:text-gray-100">
               New Benefit Notifications
             </label>
-            <p className="text-gray-500">Send an email when a new benefit cycle becomes available (e.g., start of month/quarter/year).</p>
+            <p className="text-gray-500 dark:text-gray-400">Send an email when a new benefit cycle becomes available (e.g., start of month/quarter/year).</p>
           </div>
         </div>
 
@@ -75,21 +75,21 @@ export default async function NotificationSettingsPage() {
               name="notifyBenefitExpiration"
               type="checkbox"
               defaultChecked={user.notifyBenefitExpiration} // Set initial state
-              className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+              className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800"
             />
           </div>
           <div className="ml-3 text-sm">
-            <label htmlFor="notifyBenefitExpiration" className="font-medium text-gray-700">
+            <label htmlFor="notifyBenefitExpiration" className="font-medium text-gray-700 dark:text-gray-100">
               Benefit Expiration Reminder
             </label>
-            <p className="text-gray-500">Send an email reminder before a benefit cycle is about to expire.</p>
+            <p className="text-gray-500 dark:text-gray-400">Send an email reminder before a benefit cycle is about to expire.</p>
           </div>
         </div>
 
         {/* Expiration Days Setting (conditionally relevant) */} 
         {/* You might want to hide/disable this if notifyBenefitExpiration is unchecked using client-side JS if needed */}
         <div>
-          <label htmlFor="notifyExpirationDays" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="notifyExpirationDays" className="block text-sm font-medium text-gray-700 dark:text-gray-100">
             Days Before Expiration to Notify
           </label>
           <div className="mt-1">
@@ -100,10 +100,10 @@ export default async function NotificationSettingsPage() {
               min="1" // Ensure positive number
               defaultValue={user.notifyExpirationDays} // Set initial value
               required // Good practice
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm max-w-xs"
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm max-w-xs dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-500 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
             />
           </div>
-           <p className="mt-1 text-xs text-gray-500">Enter the number of days before the cycle end date to receive the reminder.</p>
+           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter the number of days before the cycle end date to receive the reminder.</p>
         </div>
 
         {/* Submit Button */} 
@@ -111,7 +111,7 @@ export default async function NotificationSettingsPage() {
           <button
             type="submit"
             // disabled // Enable the button
-            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:focus:ring-offset-gray-800"
           >
             Save Settings
           </button>

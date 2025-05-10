@@ -2,12 +2,13 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { BenefitStatus, Benefit, CreditCard } from '@/generated/prisma';
+import { BenefitStatus, Benefit, CreditCard as PrismaCreditCard } from '@/generated/prisma';
 import { formatDate } from '@/lib/dateUtils';
+import { CreditCardIcon } from '@heroicons/react/24/outline';
 
 // Define a type for the upcoming benefits data
 interface UpcomingBenefit extends BenefitStatus {
-  benefit: Benefit & { creditCard: CreditCard };
+  benefit: Benefit & { creditCard: PrismaCreditCard };
 }
 
 export default async function Home() {
@@ -16,32 +17,34 @@ export default async function Home() {
   if (!session?.user?.id) {
     // If not signed in, show a landing page with a sign-in button
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8 text-center">
-          <div>
-            {/* You might want to add a logo here */}
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              Welcome to CouponCycle
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-600">
-              Track your credit cards and maximize your rewards.
+      <section className="bg-gray-100 dark:bg-gray-900">
+        <div className="container mx-auto grid min-h-screen max-w-screen-xl px-4 py-8 lg:grid-cols-12 lg:gap-8 lg:py-16 xl:gap-0">
+          <div className="mr-auto place-self-center lg:col-span-7">
+            <h1 className="mb-4 max-w-2xl text-4xl font-extrabold leading-none tracking-tight text-gray-900 dark:text-white md:text-5xl xl:text-6xl">
+              Never Miss a Credit Card Benefit Again.
+            </h1>
+            <p className="mb-6 max-w-2xl font-light text-gray-500 dark:text-gray-300 md:text-lg lg:mb-8 lg:text-xl">
+              CouponCycle helps you track every perk, understand your benefit cycles, and maximize the value from your annual fees.
             </p>
+            <Link
+              href="/api/auth/signin"
+              className="mb-2 mr-2 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-3 text-center text-base font-medium text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-900"
+            >
+              Get Started - Sign In
+              <svg className="ml-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"></path>
+              </svg>
+            </Link>
+            {/* Optional: Secondary CTA if you add a features section later */}
+            {/* <Link href="#features" className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:ring-gray-100 dark:text-white dark:border-gray-700 dark:hover:bg-gray-700 dark:focus:ring-gray-800">
+              Learn More
+            </Link> */}
           </div>
-          <div className="mt-8 space-y-6">
-             <p className="text-center text-sm text-gray-600">
-              Sign in to manage your cards and benefits.
-            </p>
-            <div>
-              <Link
-                href="/api/auth/signin"
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Sign in
-              </Link>
-            </div>
+          <div className="hidden lg:col-span-5 lg:mt-0 lg:flex lg:items-center lg:justify-center">
+            <img src="/hero-image.jpg" alt="CouponCycle - Maximize your credit card benefits" className="rounded-lg object-contain w-full h-auto max-h-[70vh]" />
           </div>
         </div>
-      </div>
+      </section>
     );
   }
 
@@ -77,10 +80,10 @@ export default async function Home() {
     <div>
       <div className="sm:flex sm:items-center sm:justify-between">
         <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold leading-6 text-gray-900">
+          <h1 className="text-2xl font-semibold leading-6 text-gray-900 dark:text-white">
             Dashboard
           </h1>
-          <p className="mt-2 text-sm text-gray-700">
+          <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
             A quick overview of your cards and upcoming benefits.
           </p>
         </div>
@@ -96,28 +99,25 @@ export default async function Home() {
 
       {/* Card Summary Section */}
       <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="overflow-hidden rounded-lg bg-white shadow">
+        <div className="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
           <div className="p-6">
              <div className="flex items-center">
                 <div className="flex-shrink-0">
-                    {/* Placeholder icon, replace with a suitable one */}
-                    <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
-                    </svg>
+                    <CreditCardIcon className="h-8 w-8 text-indigo-500 dark:text-indigo-400" aria-hidden="true" />
                 </div>
                 <div className="ml-5 w-0 flex-1">
                     <dl>
-                        <dt className="truncate text-sm font-medium text-gray-500">Total Cards</dt>
+                        <dt className="truncate text-sm font-medium text-gray-500 dark:text-gray-400">Total Cards</dt>
                         <dd>
-                            <div className="text-lg font-medium text-gray-900">{cardCount}</div>
+                            <div className="text-lg font-medium text-gray-900 dark:text-white">{cardCount}</div>
                         </dd>
                     </dl>
                 </div>
             </div>
           </div>
-           <div className="bg-gray-50 px-6 py-3">
+           <div className="bg-gray-50 dark:bg-gray-700 px-6 py-3">
                 <div className="text-sm">
-                    <Link href="/cards" className="font-medium text-indigo-600 hover:text-indigo-500">
+                    <Link href="/cards" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
                         View all cards
                     </Link>
                 </div>
@@ -129,33 +129,33 @@ export default async function Home() {
       {/* Upcoming Benefits Section */}
       <div className="mt-8">
         <div className="sm:flex sm:items-center sm:justify-between">
-            <h2 className="text-lg font-medium leading-6 text-gray-900">
+            <h2 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
               Upcoming Benefits
             </h2>
              <div className="mt-3 sm:ml-4 sm:mt-0">
-                <Link href="/benefits" className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                <Link href="/benefits" className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600">
                     View all benefits
                 </Link>
             </div>
         </div>
         
         {upcomingBenefits.length === 0 ? (
-           <div className="mt-4 rounded-lg border border-dashed border-gray-200 p-8 text-center">
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No upcoming benefits</h3>
-                <p className="mt-1 text-sm text-gray-500">Add cards with benefits or check back later.</p>
+           <div className="mt-4 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 p-8 text-center">
+                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No upcoming benefits</h3>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Add cards with benefits or check back later.</p>
            </div>
         ) : (
           <div className="mt-4 overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-             <ul role="list" className="divide-y divide-gray-200 bg-white">
+             <ul role="list" className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                 {upcomingBenefits.map((status) => (
-                    <li key={status.id} className="px-6 py-4">
+                    <li key={status.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <div className="flex items-center justify-between">
                             <div className="truncate">
-                                <p className="truncate text-sm font-medium text-indigo-600">{status.benefit.description}</p>
-                                <p className="mt-1 truncate text-sm text-gray-500">Card: {status.benefit.creditCard.name}</p>
+                                <p className="truncate text-sm font-medium text-indigo-600 dark:text-indigo-400">{status.benefit.description}</p>
+                                <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">Card: {status.benefit.creditCard.name}</p>
                             </div>
                             <div className="ml-4 flex-shrink-0">
-                                <p className="text-sm text-gray-900">Due: {formatDate(status.cycleEndDate)}</p>
+                                <p className="text-sm text-gray-900 dark:text-white">Due: {formatDate(status.cycleEndDate)}</p>
                                 {/* Optionally add a quick action link here */} 
                             </div>
                         </div>

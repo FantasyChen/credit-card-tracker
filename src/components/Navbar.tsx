@@ -3,13 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
+import { useState } from 'react';
+import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const Navbar = () => {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navigation = [
-    { name: 'Dashboard', href: '/', current: pathname === '/' },
+    { name: 'Dashboard', href: '/' },
     { name: 'Cards', href: '/cards' },
     { name: 'Benefits', href: '/benefits' },
     { name: 'Notifications', href: '/settings/notifications' },
@@ -17,15 +20,16 @@ const Navbar = () => {
   ];
 
   return (
-    <nav className="bg-white shadow-sm">
+    <nav className="bg-white shadow-sm dark:bg-gray-800">
       <div className="container mx-auto px-4">
-        <div className="flex h-16 justify-between">
-          <div className="flex">
-            <div className="flex flex-shrink-0 items-center">
-              <Link href="/" className="text-xl font-bold text-gray-900">
+        <div className="flex h-16 items-center justify-between">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Link href="/" className="text-xl font-bold text-gray-900 dark:text-white">
                 CouponCycle
               </Link>
             </div>
+            {/* Desktop navigation links */}
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               {navigation.map((item) => (
                 <Link
@@ -33,34 +37,95 @@ const Navbar = () => {
                   href={item.href}
                   className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
                     pathname === item.href
-                      ? 'border-indigo-500 text-gray-900'
-                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      ? 'border-indigo-500 text-gray-900 dark:text-indigo-400 dark:border-indigo-400'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:text-gray-100'
                   }`}
+                  onClick={() => setIsMobileMenuOpen(false)} // Close mobile menu on desktop nav click (good practice)
                 >
                   {item.name}
                 </Link>
               ))}
             </div>
           </div>
-          <div className="hidden sm:ml-6 sm:flex sm:items-center">
-            {session ? (
+          <div className="flex items-center">
+            {/* Desktop Sign in/out button */}
+            <div className="hidden sm:ml-6 sm:block">
+              {session ? (
+                <button
+                  onClick={() => signOut()}
+                  className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
+                >
+                  Sign out
+                </button>
+              ) : (
+                <Link
+                  href="/api/auth/signin"
+                  className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                >
+                  Sign in
+                </Link>
+              )}
+            </div>
+            {/* Mobile menu button */}
+            <div className="ml-4 flex items-center sm:hidden">
               <button
-                onClick={() => signOut()}
-                className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:focus:ring-indigo-400"
+                aria-expanded={isMobileMenuOpen}
               >
-                Sign out
+                <span className="sr-only">Open main menu</span>
+                {isMobileMenuOpen ? (
+                  <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
+                ) : (
+                  <Bars3Icon className="block h-6 w-6" aria-hidden="true" />
+                )}
               </button>
-            ) : (
-              <Link
-                href="/auth/signin"
-                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-              >
-                Sign in
-              </Link>
-            )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Mobile menu, show/hide based on menu state. */}
+      {isMobileMenuOpen && (
+        <div className="sm:hidden" id="mobile-menu">
+          <div className="space-y-1 px-2 pb-3 pt-2">
+            {navigation.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`block rounded-md px-3 py-2 text-base font-medium ${
+                  pathname === item.href
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-gray-900 dark:text-indigo-400'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+                }`}
+                aria-current={pathname === item.href ? 'page' : undefined}
+                onClick={() => setIsMobileMenuOpen(false)} // Close menu on item click
+              >
+                {item.name}
+              </Link>
+            ))}
+            {/* Mobile Sign in/out button */}
+            <div className="border-t border-gray-200 pt-4 mt-4 dark:border-gray-700">
+              {session ? (
+                  <button
+                    onClick={() => { signOut(); setIsMobileMenuOpen(false); }}
+                    className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                  >
+                    Sign out
+                  </button>
+                ) : (
+                  <Link
+                    href="/api/auth/signin"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="block w-full rounded-md bg-indigo-600 px-3 py-2 text-center text-base font-medium text-white shadow-sm hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                  >
+                    Sign in
+                  </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };
