@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
@@ -25,7 +26,14 @@ const Navbar = () => {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Link href="/" className="text-xl font-bold text-gray-900 dark:text-white">
+              <Link href="/" className="flex items-center text-xl font-bold text-gray-900 dark:text-white">
+                <Image 
+                  src="/favicon.png"
+                  alt="CouponCycle Logo" 
+                  width={32}
+                  height={32}
+                  className="mr-2"
+                />
                 CouponCycle
               </Link>
             </div>

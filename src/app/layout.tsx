@@ -13,6 +13,12 @@ const geistMono = GeistMono;
 export const metadata: Metadata = {
   title: "CouponCycle - Maximize Your Card Benefits",
   description: "Never miss a credit card benefit again. CouponCycle helps you track every perk and maximize your annual fees.",
+  icons: {
+    icon: {
+      url: "/favicon.png",
+      sizes: "any", // Hint that the icon can be scaled
+    },
+  },
 };
 
 export default async function RootLayout({
