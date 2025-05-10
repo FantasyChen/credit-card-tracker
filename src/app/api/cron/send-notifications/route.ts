@@ -4,6 +4,7 @@ import { sendEmail } from '@/lib/email';
 import { BenefitStatus, User, Benefit, CreditCard } from '@/generated/prisma';
 
 // Extend Prisma types to ensure relations are included for type safety
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface UserWithNotificationPrefs extends User {}
 interface BenefitStatusWithDetails extends BenefitStatus {
   benefit: Benefit & { creditCard: CreditCard };
