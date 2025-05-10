@@ -43,12 +43,6 @@ export default async function NotificationSettingsPage() {
     <div className="container mx-auto p-4 max-w-2xl">
       <h1 className="text-3xl font-bold mb-6">Notification Settings</h1>
 
-      {/* Coming Soon Banner */}
-      <div className="mb-6 p-4 bg-blue-100 border-l-4 border-blue-500 text-blue-700">
-        <p className="font-bold">Feature Coming Soon!</p>
-        <p>Email notifications are currently under development. You can set your preferences now, but emails will not be sent until this feature is launched.</p>
-      </div>
-
       {/* Optional: Display status message after form submission */} 
       {/* <FormStatus message={formState?.message} success={formState?.success} /> */}
 
@@ -116,10 +110,10 @@ export default async function NotificationSettingsPage() {
         <div>
           <button
             type="submit"
-            disabled // Disable the button
+            // disabled // Enable the button
             className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Save Settings (Coming Soon)
+            Save Settings
           </button>
         </div>
       </form>

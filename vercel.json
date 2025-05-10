@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/check-benefits",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/send-notifications",
+      "schedule": "15 5 * * *"
     }
   ]
 } 

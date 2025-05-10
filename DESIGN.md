@@ -4,7 +4,7 @@
 
 This document outlines the design and development plan for the CouponCycle web application. The primary goal is to help users track their credit card benefits (coupons, credits, etc.), understand their usage cycles (monthly, quarterly, yearly), mark them as completed, and receive timely notifications about upcoming or expiring benefits.
 
-## 2. Current State (as of 2025-05-08)
+## 2. Current State (as of 2025-05-10)
 
 ### 2.1. Technology Stack
 
@@ -27,7 +27,11 @@ This document outlines the design and development plan for the CouponCycle web a
 ### 2.3. Implemented Features
 
 *   **User Authentication:** Basic setup using NextAuth.js is in place with Google provider.
-*   **Database Schema:** Prisma schema defines the core models and their relationships.
+*   **Database Schema:** Prisma schema defines the core models and their relationships, including fields for advanced benefit cycle alignment (`cycleAlignment`, `fixedCycleStartMonth`, `fixedCycleDurationMonths`).
+*   **Benefit Cycle Logic:** Core logic in `calculateBenefitCycle` handles various frequencies and alignments (card anniversary, calendar-fixed).
+*   **Card Management:** Users can add cards based on predefined templates; benefits and initial statuses are created.
+*   **Benefit Dashboard:** Displays active and completed benefits for the user. UI filtering improved to show only currently active cycles in the main list.
+*   **Automated Benefit Cycle Refresh:** A daily cron job (`/api/cron/check-benefits`), configured via `vercel.json` and secured with `CRON_SECRET`, proactively updates `BenefitStatus` records for all users and their recurring benefits. This ensures data is current for upcoming notifications and general display.
 *   **Notification Settings UI:** A page (`/settings/notifications`) allows users to configure preferences for receiving notifications about new benefit cycles and upcoming expirations (`src/app/settings/notifications/page.tsx`). The backend action (`updateNotificationSettingsAction`) to save these settings is also implemented.
 *   **Stable Build Process:** Resolved initial linting, type, and build errors. `npm run build` completes successfully.
 *   **Vercel Deployment Configuration:**
