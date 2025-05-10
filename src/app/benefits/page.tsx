@@ -26,7 +26,7 @@ export default async function BenefitsDashboardPage() {
     redirect('/api/auth/signin?callbackUrl=/benefits');
   }
   const userId = session.user.id;
-  const now = new Date(); // Define now at the top for consistent use
+  const now = new Date(); // Revert to actual system time
 
   // 1. Fetch all user's cards to determine display names
   const userCards = await prisma.creditCard.findMany({
@@ -99,7 +99,13 @@ export default async function BenefitsDashboardPage() {
     return cycleStartDate <= now;
   });
 
-  const upcomingBenefits = activeOrPastCycleStatuses.filter(status => !status.isCompleted);
+  // Only show benefits where now is within the cycle and not completed
+  const upcomingBenefits = activeOrPastCycleStatuses.filter(status => {
+    const cycleStartDate = new Date(status.cycleStartDate);
+    const cycleEndDate = new Date(status.cycleEndDate);
+    return !status.isCompleted && cycleStartDate <= now && now <= cycleEndDate;
+  });
+
   const completedBenefits = activeOrPastCycleStatuses.filter(status => status.isCompleted);
 
   // Calculate total values based on filtered, active/past cycle statuses
