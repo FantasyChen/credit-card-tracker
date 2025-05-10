@@ -1,4 +1,4 @@
-import { PrismaClient, BenefitFrequency, CreditCard as PrismaCreditCard, PredefinedCard as PrismaPredefinedCard } from '../src/generated/prisma'; // Adjust path if necessary
+import { PrismaClient, BenefitFrequency, CreditCard as PrismaCreditCard, PredefinedCard as PrismaPredefinedCard, BenefitCycleAlignment } from '../src/generated/prisma'; // Adjust path if necessary
 
 const prisma = new PrismaClient();
 
@@ -9,6 +9,9 @@ interface BenefitInput {
   percentage: number;
   maxAmount: number;
   frequency: BenefitFrequency;
+  cycleAlignment?: BenefitCycleAlignment; // Optional
+  fixedCycleStartMonth?: number;          // Optional, 1-12
+  fixedCycleDurationMonths?: number;     // Optional
 }
 
 async function main() {
@@ -22,25 +25,12 @@ async function main() {
       imageUrl: '/images/cards/chase-sapphire-preferred.png',
       benefits: [
         {
-          description: '$50 Annual Hotel Credit', // Booked through Chase Travel
+          description: '$50 Annual Hotel Credit (Booked through Chase Travel)',
           category: 'Travel',
           maxAmount: 50,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
-        },
-        {
-          description: '$10 Monthly Gopuff Credit',
-          category: 'Food Delivery',
-          maxAmount: 10,
-          frequency: BenefitFrequency.MONTHLY,
-          percentage: 0,
-        },
-        {
-          description: 'DoorDash DashPass Subscription', // Free for at least 1 year
-          category: 'Membership',
-          maxAmount: 0, // Value is the subscription itself
-          frequency: BenefitFrequency.YEARLY,
-          percentage: 0,
+          // cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY (default)
         },
       ],
     },
@@ -64,7 +54,33 @@ async function main() {
           frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
-        // Removed $7 Dunkin, $50 Resy as these are often promotional / opt-in and not as universal as Uber/Dining. Kept it simple for now.
+        {
+          description: '$7 Monthly Dunkin Credit',
+          category: 'Dining',
+          maxAmount: 7,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$50 Resy Credit (Jan-Jun)',
+          category: 'Dining',
+          maxAmount: 50,
+          frequency: BenefitFrequency.YEARLY, // This specific credit occurs once a year in this window
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          description: '$50 Resy Credit (Jul-Dec)',
+          category: 'Dining',
+          maxAmount: 50,
+          frequency: BenefitFrequency.YEARLY, // This specific credit occurs once a year in this window
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7, // July
+          fixedCycleDurationMonths: 6,
+        },
       ],
     },
     {
@@ -83,7 +99,7 @@ async function main() {
         {
           description: '10,000 Anniversary Bonus Miles',
           category: 'Bonus',
-          maxAmount: 0, // Value is in miles
+          maxAmount: 0, 
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -103,13 +119,6 @@ async function main() {
           percentage: 0,
         },
         {
-          description: 'Priority Pass Select Membership',
-          category: 'Travel',
-          maxAmount: 0, // Value is the membership
-          frequency: BenefitFrequency.YEARLY,
-          percentage: 0,
-        },
-        {
           description: '$5 Monthly DoorDash Credit',
           category: 'Food Delivery',
           maxAmount: 5,
@@ -123,10 +132,7 @@ async function main() {
       issuer: 'Chase',
       annualFee: 95,
       imageUrl: '/images/cards/chase-ink-business-preferred.png',
-      benefits: [
-        // No purely "coupon-book" style cyclical monetary credits identified.
-        // Primary benefits are points earning and travel/purchase protections.
-      ],
+      benefits: [],
     },
     {
       name: 'American Express Platinum Card',
@@ -142,32 +148,41 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$15 Monthly Uber Cash ($35 in December)', // Base amount
+          description: '$15 Monthly Uber Cash ($35 in December)', 
           category: 'Travel',
-          maxAmount: 15, // Monthly base
+          maxAmount: 15, 
           frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
         {
-          description: '$20 Additional Uber Cash (December)', // December Bonus
+          description: '$20 Additional Uber Cash (December)', 
           category: 'Travel',
           maxAmount: 20,
-          frequency: BenefitFrequency.YEARLY, // This specific bonus amount is once a year in Dec
+          frequency: BenefitFrequency.YEARLY, 
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED, // Specific to December
+          fixedCycleStartMonth: 12, // December
+          fixedCycleDurationMonths: 1, // For the month of December
         },
         {
           description: '$50 Saks Fifth Avenue Credit (Jan-Jun)',
           category: 'Shopping',
           maxAmount: 50,
-          frequency: BenefitFrequency.YEARLY, // This specific window is once per year
+          frequency: BenefitFrequency.YEARLY, 
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 6,
         },
         {
           description: '$50 Saks Fifth Avenue Credit (Jul-Dec)',
           category: 'Shopping',
           maxAmount: 50,
-          frequency: BenefitFrequency.YEARLY, // This specific window is once per year
+          frequency: BenefitFrequency.YEARLY, 
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7,
+          fixedCycleDurationMonths: 6,
         },
         {
           description: '$20 Monthly Digital Entertainment Credit',
@@ -177,16 +192,16 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$300 Equinox Credit (Annual or $25/month)',
+          description: '$300 Equinox Credit (Annual or $25/month option)',
           category: 'Wellness',
-          maxAmount: 300, // Representing as annual, user can track monthly usage
+          maxAmount: 300, 
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
         {
-          description: '$13 Monthly Walmart+ Credit (covers monthly membership)',
+          description: '$13 Monthly Walmart+ Credit (Covers monthly membership cost)',
           category: 'Membership',
-          maxAmount: 13, // Approx. $12.95 + tax
+          maxAmount: 13, 
           frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
@@ -225,6 +240,9 @@ async function main() {
           maxAmount: 200,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 6,
         },
         {
           description: '$200 Dell Credit (Jul-Dec)',
@@ -232,6 +250,9 @@ async function main() {
           maxAmount: 200,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7,
+          fixedCycleDurationMonths: 6,
         },
         {
           description: '$10 Monthly Wireless Credit',
@@ -266,7 +287,7 @@ async function main() {
     {
       name: 'American Express Business Gold Card',
       issuer: 'American Express',
-      annualFee: 375, // Fee increased from $295
+      annualFee: 375,
       imageUrl: '/images/cards/american-express-business-gold-card.png',
       benefits: [
         {
@@ -292,16 +313,9 @@ async function main() {
       imageUrl: '/images/cards/hilton-honors-american-express-aspire-card.png',
       benefits: [
         {
-          description: 'Hilton Diamond Status',
-          category: 'Travel',
-          maxAmount: 0, // Status itself
-          frequency: BenefitFrequency.YEARLY,
-          percentage: 0,
-        },
-        {
           description: 'Annual Free Night Reward',
           category: 'Travel',
-          maxAmount: 0, // Represents the free night
+          maxAmount: 0,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -313,18 +327,24 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$200 Hilton Resort Credit (Statement Credit, 1st Half of Year)',
+          description: '$200 Semi-Annual Hilton Resort Credit (Jan-Jun)',
           category: 'Travel',
-          maxAmount: 200, // Value of credit per half
-          frequency: BenefitFrequency.YEARLY, // For this specific semi-annual portion
+          maxAmount: 200,
+          frequency: BenefitFrequency.YEARLY, 
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 6,
         },
         {
-          description: '$200 Hilton Resort Credit (Statement Credit, 2nd Half of Year)',
+          description: '$200 Semi-Annual Hilton Resort Credit (Jul-Dec)',
           category: 'Travel',
-          maxAmount: 200, // Value of credit per half
-          frequency: BenefitFrequency.YEARLY, // For this specific semi-annual portion
+          maxAmount: 200,
+          frequency: BenefitFrequency.YEARLY, 
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7,
+          fixedCycleDurationMonths: 6,
         },
         {
           description: '$189 CLEAR Plus Credit',
@@ -348,7 +368,6 @@ async function main() {
           frequency: BenefitFrequency.QUARTERLY,
           percentage: 0,
         },
-        // Free Night Reward after $15k spend is conditional, not a direct cyclical benefit.
       ],
     },
     {
@@ -360,7 +379,7 @@ async function main() {
         {
           description: 'Annual Anniversary Free Night (up to 40k points)',
           category: 'Travel',
-          maxAmount: 0, // Represents the free night
+          maxAmount: 0, 
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -375,7 +394,7 @@ async function main() {
         {
           description: 'Annual Anniversary Free Night (up to 40k points)',
           category: 'Travel',
-          maxAmount: 0, // Represents the free night
+          maxAmount: 0, 
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -390,7 +409,7 @@ async function main() {
         {
           description: 'Annual Free Night Award (up to 85k points)',
           category: 'Travel',
-          maxAmount: 0, // Represents the free night
+          maxAmount: 0, 
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -412,7 +431,7 @@ async function main() {
         {
           description: 'Annual Free Night Award (up to 35k points)',
           category: 'Travel',
-          maxAmount: 0, // Represents the free night
+          maxAmount: 0, 
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -425,9 +444,9 @@ async function main() {
       imageUrl: '/images/cards/alaska-airlines-visa-signature-credit-card.jpeg',
       benefits: [
         {
-          description: "Alaska's Famous Companion Fare™ (from $122)",
+          description: "Alaska\'s Famous Companion Fare™ (from $122)",
           category: 'Travel',
-          maxAmount: 0, // Represents the fare benefit itself, cost varies
+          maxAmount: 0, 
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -457,7 +476,6 @@ async function main() {
         });
 
         // Simple approach: Delete existing benefits and recreate them
-        // More complex: Diff and update/create/delete individual benefits
         console.log(`Deleting ${existingCard.benefits.length} old benefits for ${cardData.name}`);
         await prisma.predefinedBenefit.deleteMany({
             where: { predefinedCardId: existingCard.id },
@@ -467,8 +485,16 @@ async function main() {
         if (cardData.benefits.length > 0) {
           await prisma.predefinedBenefit.createMany({
               data: cardData.benefits.map(benefit => ({
-                  ...benefit,
+                  // Explicitly map all fields for PredefinedBenefit
                   predefinedCardId: existingCard.id,
+                  category: benefit.category,
+                  description: benefit.description,
+                  percentage: benefit.percentage,
+                  maxAmount: benefit.maxAmount,
+                  frequency: benefit.frequency,
+                  cycleAlignment: benefit.cycleAlignment, // Explicitly map
+                  fixedCycleStartMonth: benefit.fixedCycleStartMonth, // Explicitly map
+                  fixedCycleDurationMonths: benefit.fixedCycleDurationMonths, // Explicitly map
               })),
           });
         }
@@ -477,21 +503,25 @@ async function main() {
         // Create card and benefits together
         await prisma.predefinedCard.create({
             data: {
-        name: cardData.name,
-        issuer: cardData.issuer,
-        annualFee: cardData.annualFee,
-        imageUrl: cardData.imageUrl,
-        benefits: {
-          create: cardData.benefits.map(benefit => ({
-            category: benefit.category,
-            description: benefit.description,
-            percentage: benefit.percentage,
-            maxAmount: benefit.maxAmount,
-            frequency: benefit.frequency,
-          })),
-        },
-      },
-    });
+              name: cardData.name,
+              issuer: cardData.issuer,
+              annualFee: cardData.annualFee,
+              imageUrl: cardData.imageUrl,
+              benefits: {
+                create: cardData.benefits.map(benefit => ({
+                  // Ensure all fields are explicitly mapped here too for consistency
+                  category: benefit.category,
+                  description: benefit.description,
+                  percentage: benefit.percentage,
+                  maxAmount: benefit.maxAmount,
+                  frequency: benefit.frequency,
+                  cycleAlignment: benefit.cycleAlignment,
+                  fixedCycleStartMonth: benefit.fixedCycleStartMonth,
+                  fixedCycleDurationMonths: benefit.fixedCycleDurationMonths,
+                })),
+              },
+            },
+        });
     }
      console.log(`Finished processing card: ${cardData.name}`);
   }

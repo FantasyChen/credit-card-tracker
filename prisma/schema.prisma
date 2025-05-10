@@ -24,6 +24,12 @@ enum BenefitFrequency {
   ONE_TIME // For sign-up bonuses, etc.
 }
 
+// New enum for benefit cycle alignment
+enum BenefitCycleAlignment {
+  CARD_ANNIVERSARY // Default, aligns with card opened/anniversary date
+  CALENDAR_FIXED   // Aligns with fixed calendar periods (e.g., Jan-Jun)
+}
+
 model User {
   id            String         @id @default(cuid())
   name          String?
@@ -94,6 +100,12 @@ model Benefit {
   startDate     DateTime   // Might represent initial start or general validity
   endDate       DateTime?  // Might represent final expiration
   frequency     BenefitFrequency @default(ONE_TIME)
+  
+  // Cycle alignment fields
+  cycleAlignment           BenefitCycleAlignment? @default(CARD_ANNIVERSARY)
+  fixedCycleStartMonth     Int?                   // 1-12, relevant if CALENDAR_FIXED
+  fixedCycleDurationMonths Int?                   // e.g., 6 for semi-annual, relevant if CALENDAR_FIXED
+
   creditCardId  String
   creditCard    CreditCard @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
   benefitStatuses BenefitStatus[] // Link to tracking instances
@@ -121,6 +133,12 @@ model PredefinedBenefit {
   percentage        Float
   maxAmount         Float?
   frequency         BenefitFrequency @default(ONE_TIME)
+
+  // Cycle alignment fields
+  cycleAlignment           BenefitCycleAlignment? @default(CARD_ANNIVERSARY)
+  fixedCycleStartMonth     Int?                   // 1-12, relevant if CALENDAR_FIXED
+  fixedCycleDurationMonths Int?                   // e.g., 6 for semi-annual, relevant if CALENDAR_FIXED
+
   predefinedCardId  String
   predefinedCard    PredefinedCard @relation(fields: [predefinedCardId], references: [id])
   createdAt         DateTime       @default(now())

@@ -26,6 +26,7 @@ export default async function BenefitsDashboardPage() {
     redirect('/api/auth/signin?callbackUrl=/benefits');
   }
   const userId = session.user.id;
+  const now = new Date(); // Define now at the top for consistent use
 
   // 1. Fetch all user's cards to determine display names
   const userCards = await prisma.creditCard.findMany({
@@ -76,7 +77,7 @@ export default async function BenefitsDashboardPage() {
   });
 
   // 3. Augment statuses with card displayName
-  const allStatuses: DisplayBenefitStatus[] = allStatusesRaw.map(status => {
+  const allStatusesAugmented: DisplayBenefitStatus[] = allStatusesRaw.map(status => {
     const cardOriginal = status.benefit.creditCard;
     const resolvedDisplayName = cardDisplayNameMap.get(cardOriginal.id) || cardOriginal.name;
     return {
@@ -91,10 +92,17 @@ export default async function BenefitsDashboardPage() {
     };
   });
 
-  const upcomingBenefits = allStatuses.filter(status => !status.isCompleted);
-  const completedBenefits = allStatuses.filter(status => status.isCompleted);
+  // Filter for statuses whose cycle has actually started
+  const activeOrPastCycleStatuses = allStatusesAugmented.filter(status => {
+    // Ensure cycleStartDate is treated as a Date object for comparison
+    const cycleStartDate = new Date(status.cycleStartDate);
+    return cycleStartDate <= now;
+  });
 
-  // Calculate total values
+  const upcomingBenefits = activeOrPastCycleStatuses.filter(status => !status.isCompleted);
+  const completedBenefits = activeOrPastCycleStatuses.filter(status => status.isCompleted);
+
+  // Calculate total values based on filtered, active/past cycle statuses
   const totalUnusedValue = upcomingBenefits.reduce((sum, status) => {
     return sum + (status.benefit.maxAmount || 0);
   }, 0);

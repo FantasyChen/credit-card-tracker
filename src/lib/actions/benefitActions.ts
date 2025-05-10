@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { BenefitFrequency } from '@/generated/prisma';
+import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
 import { calculateBenefitCycle } from '@/lib/benefit-cycle';
 
 /**
@@ -39,12 +39,16 @@ export async function ensureCurrentBenefitStatuses() {
         // Skip ONE_TIME benefits as they don't have recurring cycles
         if (benefit.frequency === BenefitFrequency.ONE_TIME) return;
 
-        // Yearly benefits require an openedDate for anniversary calculation.
-        // Monthly/Quarterly can use calendar periods even without openedDate.
+        // For CARD_ANNIVERSARY alignment, YEARLY benefits require an openedDate.
+        // CALENDAR_FIXED benefits do not strictly need it for their cycle calculation but it's good to be aware.
         const cardOpenedDateForCalc: Date | null = card.openedDate;
-        if (benefit.frequency === BenefitFrequency.YEARLY && !card.openedDate) {
-             console.warn(`Skipping YEARLY benefit cycle generation for benefit ${benefit.id} as card ${card.id} has no openedDate.`);
-             return; // Cannot calculate anniversary year without opened date
+        if (
+          benefit.cycleAlignment !== BenefitCycleAlignment.CALENDAR_FIXED && // only check for non-fixed alignment
+          benefit.frequency === BenefitFrequency.YEARLY && 
+          !card.openedDate
+        ) {
+             console.warn(`Skipping YEARLY (anniversary based) benefit cycle for ${benefit.id} as card ${card.id} has no openedDate.`);
+             return; 
         }
 
         // Calculate the expected dates for the *current* cycle based on 'now'
@@ -52,7 +56,10 @@ export async function ensureCurrentBenefitStatuses() {
           const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
             benefit.frequency,
             now, // Reference date is now
-            cardOpenedDateForCalc
+            cardOpenedDateForCalc,
+            benefit.cycleAlignment, // Pass new field
+            benefit.fixedCycleStartMonth, // Pass new field
+            benefit.fixedCycleDurationMonths // Pass new field
           );
 
           // Optional: Add a check to avoid creating statuses for cycles that ended long ago?

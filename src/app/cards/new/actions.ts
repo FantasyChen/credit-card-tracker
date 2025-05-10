@@ -6,7 +6,8 @@ import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { calculateBenefitCycle, calculateOneTimeBenefitLifetime } from '@/lib/benefit-cycle';
-import { BenefitFrequency } from '@/generated/prisma';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
 
 export async function addCardAction(formData: FormData) {
   const session = await getServerSession(authOptions);
@@ -62,7 +63,22 @@ export async function addCardAction(formData: FormData) {
     // Fetch the predefined card
     const predefinedCard = await prisma.predefinedCard.findUnique({
       where: { id: predefinedCardId },
-      include: { benefits: true },
+      include: {
+        benefits: {
+          select: { // Explicitly select all fields needed from PredefinedBenefit
+            id: true,
+            category: true,
+            description: true,
+            percentage: true,
+            maxAmount: true,
+            frequency: true,
+            cycleAlignment: true,
+            fixedCycleStartMonth: true,
+            fixedCycleDurationMonths: true,
+            // Add any other fields from PredefinedBenefit that are directly copied or used
+          }
+        }
+      },
     });
 
     if (!predefinedCard) {
@@ -98,6 +114,8 @@ export async function addCardAction(formData: FormData) {
     // 2. Create benefits one by one
     for (const predefBenefit of predefinedCard.benefits) {
       console.log(`Processing benefit: ${predefBenefit.description}`);
+      // Log the predefBenefit object to inspect its contents, especially alignment fields
+      console.log('addCardAction - predefBenefit details:', predefBenefit);
       
       const now = new Date();
       // Ensure we have a valid frequency by using the enum directly
@@ -126,6 +144,10 @@ export async function addCardAction(formData: FormData) {
           maxAmount: predefBenefit.maxAmount,
           frequency: frequency,
           startDate: now,
+          // Copy cycle alignment fields from predefined benefit
+          cycleAlignment: predefBenefit.cycleAlignment,
+          fixedCycleStartMonth: predefBenefit.fixedCycleStartMonth,
+          fixedCycleDurationMonths: predefBenefit.fixedCycleDurationMonths,
           // endDate is optional, so we can omit it
         }
       });
@@ -143,8 +165,15 @@ export async function addCardAction(formData: FormData) {
           cycleInfo = calculateBenefitCycle(
             newBenefit.frequency,
             now, // Reference date for initial calculation is now
-            openedDate
+            openedDate,
+            newBenefit.cycleAlignment, // Pass new field
+            newBenefit.fixedCycleStartMonth, // Pass new field
+            newBenefit.fixedCycleDurationMonths // Pass new field
           );
+          console.log(`addCardAction - CycleInfo for benefit '${newBenefit.description}':`, {
+            startDate: cycleInfo.cycleStartDate.toISOString(),
+            endDate: cycleInfo.cycleEndDate.toISOString()
+          });
         }
 
         await prisma.benefitStatus.create({

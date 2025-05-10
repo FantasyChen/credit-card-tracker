@@ -167,7 +167,7 @@ export default function UserCardsPage() {
           <p className="text-gray-500 mb-4">
             You haven&apos;t added any cards yet. Get started by adding your first card!
           </p>
-          <Link href="/cards?addCard=true" className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200">
+          <Link href="/cards/new" className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200">
              Add Card
           </Link>
         </div>
