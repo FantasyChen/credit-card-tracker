@@ -1,11 +1,11 @@
 {
   "crons": [
     {
-      "path": "/api/cron/check-benefits?secret=${CRON_SECRET}",
+      "path": "/api/cron/check-benefits?secret=${process.env.CRON_SECRET}",
       "schedule": "0 5 * * *"
     },
     {
-      "path": "/api/cron/send-notifications?secret=${CRON_SECRET}",
+      "path": "/api/cron/send-notifications?secret=${process.env.CRON_SECRET}",
       "schedule": "15 5 * * *"
     }
   ]
