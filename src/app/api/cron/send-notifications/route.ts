@@ -132,7 +132,11 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
           <a href="${process.env.NEXTAUTH_URL}/benefits">View Your Benefits</a>
         `;
         const success = await sendEmail({ to: user.email, subject, html: htmlBody });
-        if (success) emailsSent++;
+        if (success) {
+          emailsSent++;
+        } else {
+          console.warn(`Failed to send '${subject}' email to ${user.email}. sendEmail returned false.`);
+        }
       }
 
       if (expiringBenefitsToNotify.length > 0) {
@@ -153,7 +157,11 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
           <a href="${process.env.NEXTAUTH_URL}/benefits">View Your Benefits</a>
         `;
         const success = await sendEmail({ to: user.email, subject, html: htmlBody });
-        if (success) emailsSent++;
+        if (success) {
+          emailsSent++;
+        } else {
+          console.warn(`Failed to send '${subject}' email to ${user.email}. sendEmail returned false.`);
+        }
       }
     }
 

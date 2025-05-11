@@ -111,10 +111,24 @@ async function runCheckBenefitsLogic() {
 }
 
 // GET handler for Vercel Cron (defaults to GET)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function GET(_request: Request) {
-  console.log("Simplified check-benefits GET handler invoked.");
-  return NextResponse.json({ message: "Simplified GET received for check-benefits" }, { status: 200 });
+export async function GET(request: Request) {
+  const authorizationHeader = request.headers.get('x-vercel-cron-authorization');
+  const expectedSecret = process.env.CRON_SECRET;
+
+  console.log(`check-benefits GET: Received x-vercel-cron-authorization header: "${authorizationHeader}"`);
+  console.log(`check-benefits GET: Expected CRON_SECRET from env: "${expectedSecret}"`);
+
+  if (!expectedSecret) {
+    console.error('CRON_SECRET is not set for GET handler.');
+    return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
+  }
+
+  if (authorizationHeader !== `Bearer ${expectedSecret}`) {
+    console.warn('Unauthorized GET cron job attempt for check-benefits.');
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+  console.log("Authorized GET request for check-benefits. Running core logic...");
+  return await runCheckBenefitsLogic();
 }
 
 // POST handler for manual trigger or other services
