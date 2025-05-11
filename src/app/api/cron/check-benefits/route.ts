@@ -147,23 +147,30 @@ export async function POST(request: Request) {
 // Optional: Add a GET handler for easy testing via browser if needed,
 // but ensure it's also protected or only enabled in development.
 // For production, POST with secret is recommended for cron.
-// export async function GET(request: Request) {
-//   // Implement similar logic as POST, perhaps without a body but with query param secret
-//   // OR just call the POST handler internally after auth.
-//   // This is mainly for convenience during development.
-//   const url = new URL(request.url);
-//   const secret = url.searchParams.get('secret');
-//   const expectedSecret = process.env.CRON_SECRET;
+export async function GET(request: Request) {
+  // Implement similar logic as POST, perhaps without a body but with query param secret
+  // OR just call the POST handler internally after auth.
+  // This is mainly for convenience during development.
+  const url = new URL(request.url);
+  const secret = url.searchParams.get('secret');
+  const expectedSecret = process.env.CRON_SECRET;
 
-//   if (!expectedSecret || secret !== expectedSecret) {
-//     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-//   }
-//   // Simulate a POST request for testing or call a shared internal function
-//   // This is a simplified example; consider refactoring to a shared function if GET is needed
-//   console.log("Cron GET request received, calling POST logic internally for testing.");
-//   const pseudoPostRequest = new Request(request.url, {
-//       method: 'POST',
-//       headers: new Headers({ 'Authorization': `Bearer ${expectedSecret}`})
-//   });
-//   return await POST(pseudoPostRequest);
-// } 
+  if (!expectedSecret) {
+    console.error('CRON_SECRET is not set in GET handler of check-benefits.');
+    return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
+  }
+  
+  if (secret !== expectedSecret) {
+    console.warn('Unauthorized cron GET attempt to check-benefits.');
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+  // Simulate a POST request for testing or call a shared internal function
+  // This is a simplified example; consider refactoring to a shared function if GET is needed
+  console.log("Cron GET request received for check-benefits, calling POST logic internally.");
+  const pseudoPostRequest = new Request(request.url, { // Use request.url to preserve original URL info if needed by POST logic
+      method: 'POST',
+      headers: new Headers({ 'Authorization': `Bearer ${expectedSecret}`}) // Pass the validated secret
+      // No body is needed as the POST handler for check-benefits doesn't use it.
+  });
+  return await POST(pseudoPostRequest);
+} 

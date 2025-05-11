@@ -1,14 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/cron/check-benefits",
-      "schedule": "0 5 * * *",
-      "method": "POST"
+      "path": "/api/cron/check-benefits?secret=${CRON_SECRET}",
+      "schedule": "0 5 * * *"
     },
     {
-      "path": "/api/cron/send-notifications",
-      "schedule": "15 5 * * *",
-      "method": "POST"
+      "path": "/api/cron/send-notifications?secret=${CRON_SECRET}",
+      "schedule": "15 5 * * *"
     }
   ]
 } 
