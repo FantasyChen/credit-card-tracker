@@ -26,19 +26,31 @@ This document outlines the design and development plan for the CouponCycle web a
 
 ### 2.3. Implemented Features
 
-*   **User Authentication:** Basic setup using NextAuth.js is in place with Google provider.
-*   **Database Schema:** Prisma schema defines the core models and their relationships, including fields for advanced benefit cycle alignment (`cycleAlignment`, `fixedCycleStartMonth`, `fixedCycleDurationMonths`).
-*   **Benefit Cycle Logic:** Core logic in `calculateBenefitCycle` handles various frequencies and alignments (card anniversary, calendar-fixed).
-*   **Card Management:** Users can add cards based on predefined templates; benefits and initial statuses are created.
-*   **Benefit Dashboard:** Displays active and completed benefits for the user. UI filtering improved to show only currently active cycles in the main list.
-*   **Automated Benefit Cycle Refresh:** A daily cron job (`/api/cron/check-benefits`), configured via `vercel.json` and secured with `CRON_SECRET`, proactively updates `BenefitStatus` records for all users and their recurring benefits. This ensures data is current for upcoming notifications and general display.
-*   **Notification Settings UI:** A page (`/settings/notifications`) allows users to configure preferences for receiving notifications about new benefit cycles and upcoming expirations (`src/app/settings/notifications/page.tsx`). The backend action (`updateNotificationSettingsAction`) to save these settings is also implemented.
-*   **Stable Build Process:** Resolved initial linting, type, and build errors. `npm run build` completes successfully.
+*   **User Authentication:** Solid NextAuth.js setup with Google provider and correctly typed session/JWT including user ID.
+*   **Database & Schema:** Robust Prisma schema with advanced benefit cycle alignment fields (`cycleAlignment`, `fixedCycleStartMonth`, `fixedCycleDurationMonths`). Seed data (`prisma/seed.ts`) significantly overhauled for accuracy.
+*   **Core Benefit Cycle Logic:** `calculateBenefitCycle` in `lib/benefit-cycle.ts` accurately handles various frequencies and `CALENDAR_FIXED` / card anniversary alignments.
+*   **Card Management:** Users can add cards from predefined templates; benefits and initial statuses are created. UI includes indexed card names.
+*   **Benefit Dashboard (`/benefits`):** Displays active and completed benefits. Features total unused/used value widgets, a tabbed layout ("Upcoming", "Claimed") via `BenefitsDisplayClient.tsx`, and improved UI responsiveness.
+*   **Automated Cron Jobs (Vercel):**
+    *   **Benefit Cycle Refresh (`/api/cron/check-benefits`):** Daily cron job proactively updates `BenefitStatus` for all users. Secured via `x-vercel-cron-authorization` header and `CRON_SECRET`.
+    *   **Email Notifications (`/api/cron/send-notifications`):** Daily cron job sends summary emails for new benefit cycles and upcoming expirations using Resend (`lib/email.ts`). Also secured via `x-vercel-cron-authorization` and includes `mockDate` support for testing.
+*   **Notification Settings UI (`/settings/notifications`):** Users can configure email notification preferences. "Save Settings" functionality is implemented.
+*   **UI/UX Enhancements:**
+    *   Significant improvements to UI responsiveness (e.g., `useTransition`, client components).
+    *   Redesigned logged-out homepage with hero section, image, and clear CTAs.
+    *   Mobile-responsive Navbar with hamburger menu.
+    *   Site-wide Footer.
+    *   Improved iconography (favicon, dashboard icons).
+    *   Consistent dark theme applied across most pages and components.
+    *   User-friendly "Sign In" prompts for protected content.
+    *   "Contact" page added.
+*   **Stable Build Process:** `npm run build` completes successfully, incorporating ESLint fixes and Prisma client generation.
 *   **Vercel Deployment Configuration:**
-    *   Prisma query engine compatibility for Vercel (Linux/OpenSSL) addressed by updating `binaryTargets` and `engineType` in `prisma.schema`.
+    *   Prisma query engine (`rhel-openssl-3.0.x`) and `engineType` correctly configured in `schema.prisma`.
+    *   `@prisma/nextjs-monorepo-workaround-plugin` added to `next.config.ts`.
+    *   `vercel.json` configured for cron jobs (defaulting to `GET` method, secured via headers in API routes).
     *   ESLint configured to ignore `src/generated/**`.
-    *   NextAuth.js session and JWT types augmented to include user ID correctly.
-    *   Suspense boundary added for `useSearchParams` on client-side pages (e.g., sign-in page).
+    *   Suspense boundary for `useSearchParams` on client pages.
 
 ## 3. Next Steps & Action Plan
 

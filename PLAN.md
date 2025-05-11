@@ -23,218 +23,70 @@ This document outlines the key next steps and implementation priorities for the 
     *   Group/sort by card and expiration date.
     *   Clearly indicate benefits nearing expiration or newly started cycles.
     *   Allow users to mark a `BenefitStatus` cycle as "completed" (action `toggleBenefitStatusAction` exists, UI uses it).
+    *   **DONE (Partially):** UI significantly enhanced with tabs, value widgets (`BenefitsDisplayClient.tsx`). Data fetching relies on cron job population.
 5.  **Benefit Cycle Management (`ensureCurrentBenefitStatuses`):
     *   **DONE:** A Vercel Cron Job (`/api/cron/check-benefits`) has been implemented to run daily. This job iterates through all users and their recurring benefits, calculating the current cycle dates and using `prisma.benefitStatus.upsert` to create or update the status. This replaces the need for `ensureCurrentBenefitStatuses` to be called on user load for cycle creation.
 6.  **Notifications:**
-    *   Integrate an email sending service (e.g., Resend, SendGrid).
-    *   Implement logic (likely triggered alongside benefit cycle management or by a separate cron job querying updated statuses) to query users based on their notification preferences and send relevant emails:
-        *   When a new `BenefitStatus` cycle starts.
-        *   When a `BenefitStatus` cycle is nearing its `cycleEndDate`.
+    *   **DONE:** Integrated Resend for email sending (`lib/email.ts`).
+    *   **DONE:** Implemented a Vercel Cron Job (`/api/cron/send-notifications`) to query users and statuses, and send summary emails for new cycles and expirations. Secured and includes mock date testing.
 
 ### 1.2. Implementation Steps (Consolidated & Prioritized)
 
 1.  **Verify Production Deployment & Core Functionality:** Complete all checks in section 1.1.1.
 2.  **Seed Production Database:** Run `npx prisma db seed` against the production DB after verifying migrations.
 3.  **Complete "Add Card" Feature:** Fully implement the server-side logic for adding a user's card (based on predefined cards) and linking benefits. Ensure UI at `/cards/new` correctly uses this logic.
-4.  **Enhance Benefit Dashboard (`/benefits`):** Ensure the page correctly displays fetched `BenefitStatus` data with proper grouping/sorting and UI for completion status, reflecting the data maintained by the cron job.
+4.  **Enhance Benefit Dashboard (`/benefits`):** **DONE (Largely):** Page displays fetched `BenefitStatus` data, reflecting data maintained by the cron job. Further refinements for grouping/sorting could be future work.
 5.  **~~Implement Benefit Cycle Automation: Set up a Vercel Cron Job or other mechanism to run `ensureCurrentBenefitStatuses` periodically.~~** (This is now DONE, see 1.1.5)
-6.  **Develop Notification Service:** Integrate email sending and implement notification logic. 
+6.  **~~Develop Notification Service: Integrate email sending and implement notification logic.~~** **DONE** (see 1.1.6)
 
 ## 2. Implementation Details
 
-### 2.1. Vercel Cron Job for Benefit Cycle Management
+### 2.1. Vercel Cron Job for Benefit Cycle Management (and Notifications)
 
-The Vercel Cron Job for benefit cycle management is implemented using a Next.js API route. The implementation details are as follows:
+Both Vercel Cron Jobs (`/api/cron/check-benefits` and `/api/cron/send-notifications`) are implemented as Next.js API routes. Key details:
 
-1. **Cron Job Handler:**
-   * The cron job handler is implemented in the `[...next-cron].ts` file.
-   * The handler uses the `@next/server` module to handle POST requests.
-   * The handler verifies the cron job secret and then processes the benefit cycle management logic.
+1.  **Invocation:** Vercel Cron jobs are configured in `vercel.json` to call these API routes. Vercel defaults to using the `GET` HTTP method.
+2.  **Handlers:** Each route (`route.ts`) implements an `async function GET(request: Request)` to handle invocations from Vercel Cron.
+    *   A corresponding `async function POST(request: Request)` is also implemented in each route for manual triggering (e.g., via `curl` for testing) or potential future use by other services.
+3.  **Security:**
+    *   Both `GET` and `POST` handlers are secured by checking the `x-vercel-cron-authorization` request header.
+    *   The value of this header must be `Bearer ${process.env.CRON_SECRET}`.
+    *   If the header is missing or invalid, the route returns a 401 Unauthorized response.
+    *   `CRON_SECRET` must be set as an environment variable in Vercel.
+4.  **Core Logic:** The actual work (checking benefits, sending notifications) is encapsulated in shared internal functions within each route file, called by both `GET` and `POST` handlers after successful authorization.
+5.  **Error Handling:** Each cron job includes `try...catch` blocks to handle errors during processing and returns appropriate JSON responses (200 for success, 500 for internal errors).
+6.  **Testing (`send-notifications`):** The `send-notifications` cron includes a `mockDate` query parameter in its core logic that can be used (in non-production environments) via the `request.url` to simulate different dates for testing notification triggers.
 
-2. **Logic:**
-   * The handler fetches all user credit cards with their benefits that are recurring.
-   * For each card, it calculates the benefit cycle based on the card's frequency and cycle alignment.
-   * It then upserts the benefit status for each calculated cycle.
+*(The previous detailed code example for the cron job handler is now outdated due to the GET handler implementation and security model. Refer to the actual `route.ts` files in `src/app/api/cron/*` for the current implementation.)*
 
-3. **Error Handling:**
-   * The handler includes error handling to ensure that the cron job can continue processing even if one benefit cycle calculation fails.
-   * If the cron job fails, it returns a 500 status with an error message.
+## 3. Future Considerations & Next Agent Onboarding
 
-4. **Optional GET Handler:**
-   * The handler includes an optional GET handler for easy testing via browser.
-   * This is mainly for convenience during development and should be removed or protected in production.
+With the core functionality of benefit tracking, automated cycle updates, and email notifications now in place and robustly deployed on Vercel, the application has a solid foundation. The next developer can focus on the following:
 
-### 2.2. Implementation Code
+*   **Production Hardening & Monitoring:**
+    *   Review and refine production logging. Consider a structured logging service.
+    *   Set up monitoring/alerting for cron job failures or high error rates on Vercel.
+    *   Thoroughly test all user flows on the production deployment with the actual production database.
+*   **UI/UX Refinements:**
+    *   Address the `<img>` vs `next/image` warning on the homepage for LCP optimization.
+    *   Continue to iterate on dark theme consistency if any minor gaps are found.
+    *   Consider more advanced sorting/filtering options on the Benefits Dashboard.
+    *   Gather user feedback on the overall UX and make adjustments.
+*   **Feature Enhancements (from original `DESIGN.MD` future considerations):**
+    *   Allowing users to add custom cards/benefits not in the predefined list.
+    *   More sophisticated tracking (e.g., tracking partial usage of a benefit amount).
+    *   Visualizations and reporting.
+    *   Admin interface for managing predefined cards/benefits.
+*   **Code Quality & Maintenance:**
+    *   Periodically review and refactor code for clarity and efficiency.
+    *   Keep dependencies updated.
+    *   Ensure `prisma/seed.ts` remains current with popular card benefits.
 
-The implementation code for the Vercel Cron Job is as follows:
+The primary focus initially should be on ensuring the existing features are completely stable and well-monitored in production. After that, UI refinements and new feature development can proceed based on priority.
 
-```
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
-import { calculateBenefitCycle } from '@/lib/benefit-cycle';
+The Vercel cron job setup (`vercel.json` and the API route handlers in `src/app/api/cron/`) is a critical piece of infrastructure to understand. The security model relies on the `x-vercel-cron-authorization` header and the `CRON_SECRET` environment variable.
 
-// This function will handle POST requests from the cron job.
-// Vercel Cron Jobs can send POST requests.
-export async function POST(request: Request) {
-  // 1. Verify Cron Secret
-  // The secret should be passed in the Authorization header, e.g., "Bearer YOUR_CRON_SECRET"
-  // Or as a query parameter if your cron service prefers that.
-  // For Vercel Cron, you can set an environment variable and check it.
-  const authorizationHeader = request.headers.get('Authorization');
-  const expectedSecret = process.env.CRON_SECRET;
 
-  if (!expectedSecret) {
-    console.error('CRON_SECRET is not set in environment variables.');
-    return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
-  }
 
-  if (authorizationHeader !== `Bearer ${expectedSecret}`) {
-    console.warn('Unauthorized cron job attempt.');
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-  // const now = new Date(); // Original line
-  const now = new Date(); // Revert to actual system time for production
-  // const now = new Date('2025-07-05T12:00:00Z'); // Previous test date
-  console.log(`Cron job /api/cron/check-benefits started at: ${now.toISOString()}`);
-
-  try {
-    // 2. Fetch all user credit cards with their benefits that are recurring
-    const allUserCardsWithBenefits = await prisma.creditCard.findMany({
-      include: {
-        benefits: {
-          where: {
-            frequency: {
-              not: BenefitFrequency.ONE_TIME,
-            },
-          },
-          // Select necessary fields from Benefit for cycle calculation
-          select: {
-            id: true,
-            frequency: true,
-            cycleAlignment: true,
-            fixedCycleStartMonth: true,
-            fixedCycleDurationMonths: true,
-            // We don't need benefit.startDate or endDate here as cycle is based on 'now'
-          }
-        },
-        // Select necessary fields from CreditCard
-        user: {
-            select: {
-                id: true, // We need the userId
-            }
-        }
-      },
-    });
-
-    const upsertPromises: Promise<unknown>[] = [];
-    let benefitsProcessed = 0;
-
-    for (const card of allUserCardsWithBenefits) {
-      if (!card.user?.id) { // Should always have a user, but good to check
-        console.warn(`Card ${card.id} is missing user information. Skipping its benefits.`);
-        continue;
-      }
-      const userId = card.user.id;
-
-      for (const benefit of card.benefits) {
-        benefitsProcessed++;
-        // For CARD_ANNIVERSARY alignment, YEARLY benefits require an openedDate.
-        // CALENDAR_FIXED benefits do not strictly need it for their cycle calculation.
-        const cardOpenedDateForCalc: Date | null = card.openedDate; // card.openedDate is already included by default on CreditCard
-        
-        if (
-          benefit.cycleAlignment !== BenefitCycleAlignment.CALENDAR_FIXED &&
-          benefit.frequency === BenefitFrequency.YEARLY &&
-          !card.openedDate // Check the actual card's openedDate
-        ) {
-          console.warn(`Skipping YEARLY (anniversary based) benefit cycle for benefit ${benefit.id} on card ${card.id} as card has no openedDate.`);
-          continue;
-        }
-
-        try {
-          const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
-            benefit.frequency,
-            now, // Reference date is now
-            cardOpenedDateForCalc,
-            benefit.cycleAlignment,
-            benefit.fixedCycleStartMonth,
-            benefit.fixedCycleDurationMonths
-          );
-
-          // Upsert the status: Create if not exists for this cycle start date
-          upsertPromises.push(
-            prisma.benefitStatus.upsert({
-              where: {
-                benefitId_userId_cycleStartDate: {
-                  benefitId: benefit.id,
-                  userId: userId,
-                  cycleStartDate: cycleStartDate,
-                },
-              },
-              update: {
-                // Ensure end date is updated if calculation logic changes
-                cycleEndDate: cycleEndDate,
-                // We don't touch isCompleted or completedAt here,
-                // new cycles are created as false by default in the 'create' block.
-                // If an old status is found, its completion status is preserved.
-              },
-              create: {
-                benefitId: benefit.id,
-                userId: userId,
-                cycleStartDate: cycleStartDate,
-                cycleEndDate: cycleEndDate,
-                isCompleted: false, // New cycles start as not completed
-              },
-            })
-          );
-        } catch (error) {
-          console.error(`Error calculating cycle for benefit ${benefit.id} (user: ${userId}, card: ${card.id}):`, error instanceof Error ? error.message : error);
-          // Continue with other benefits even if one fails
-        }
-      }
-    }
-
-    // Execute all upsert operations
-    if (upsertPromises.length > 0) {
-      console.log(`Cron job: Attempting ${upsertPromises.length} benefit status upserts out of ${benefitsProcessed} benefits processed.`);
-      await Promise.all(upsertPromises);
-      console.log(`Cron job: ${upsertPromises.length} benefit status upserts completed.`);
-    } else if (benefitsProcessed > 0) {
-      console.log(`Cron job: ${benefitsProcessed} benefits processed, but no new benefit statuses needed upserting.`);
-    } else {
-      console.log('Cron job: No recurring benefits found to process.');
-    }
-
-    return NextResponse.json({ message: 'Cron job executed successfully.', upsertsAttempted: upsertPromises.length, benefitsProcessed }, { status: 200 });
-
-  } catch (error) {
-    console.error('Cron job /api/cron/check-benefits failed:', error instanceof Error ? error.message : error, error instanceof Error ? error.stack : '');
-    return NextResponse.json({ message: 'Cron job failed.', error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
-  }
-}
-
-// Optional: Add a GET handler for easy testing via browser if needed,
-// but ensure it's also protected or only enabled in development.
-// For production, POST with secret is recommended for cron.
-// export async function GET(request: Request) {
-//   // Implement similar logic as POST, perhaps without a body but with query param secret
-//   // OR just call the POST handler internally after auth.
-//   // This is mainly for convenience during development.
-//   const url = new URL(request.url);
-//   const secret = url.searchParams.get('secret');
-//   const expectedSecret = process.env.CRON_SECRET;
-
-//   if (!expectedSecret || secret !== expectedSecret) {
-//     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-//   }
-//   // Simulate a POST request for testing or call a shared internal function
-//   // This is a simplified example; consider refactoring to a shared function if GET is needed
-//   console.log("Cron GET request received, calling POST logic internally for testing.");
-//   const pseudoPostRequest = new Request(request.url, {
-//       method: 'POST',
-//       headers: new Headers({ 'Authorization': `Bearer ${expectedSecret}`})
-//   });
-//   return await POST(pseudoPostRequest);
-// } 
+### TODO
+1. Publish the website (domain)

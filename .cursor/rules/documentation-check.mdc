@@ -1,5 +1,11 @@
 ---
-description:
-globs:
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
+# .cursor/rules/documentation-check.mdc
+# This rule reminds to update key documentation files.
+
+when: before:commit
+description: "Reminder: Have you updated README.md, DESIGN.md, and PLAN.md if your recent changes affect project overview, scope, design, setup, or the development plan?"
+# This rule is a reminder and does not automatically run any commands or fail the commit.

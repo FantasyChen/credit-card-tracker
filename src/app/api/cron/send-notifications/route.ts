@@ -28,7 +28,7 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
     }
   }
 
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
   console.log(`Core send-notifications logic started for date: ${today.toISOString()}`);
 
   let emailsSent = 0;
@@ -93,9 +93,9 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
         const reminderDate = new Date(today);
         reminderDate.setDate(today.getDate() + user.notifyExpirationDays);
         const reminderDateStart = new Date(reminderDate);
-        reminderDateStart.setHours(0,0,0,0);
+        reminderDateStart.setUTCHours(0,0,0,0);
         const reminderDateEnd = new Date(reminderDate);
-        reminderDateEnd.setHours(23,59,59,999);
+        reminderDateEnd.setUTCHours(23,59,59,999);
 
         const expiringStatuses = await prisma.benefitStatus.findMany({
           where: {
@@ -119,7 +119,7 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
         const benefitsListHtml = newBenefitCyclesToNotify.map(status => 
           `<li>
              <strong>${status.benefit.description}</strong> on your ${status.benefit.creditCard.name} card.
-             Cycle: ${status.cycleStartDate.toLocaleDateString()} - ${status.cycleEndDate.toLocaleDateString()}.
+             Cycle: ${status.cycleStartDate.toLocaleDateString('en-US', { timeZone: 'UTC' })} - ${status.cycleEndDate.toLocaleDateString('en-US', { timeZone: 'UTC' })}.
            </li>`
         ).join('');
 
@@ -144,7 +144,7 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
         const benefitsListHtml = expiringBenefitsToNotify.map(status => 
           `<li>
              <strong>${status.benefit.description}</strong> on your ${status.benefit.creditCard.name} card,
-             expiring on ${status.cycleEndDate.toLocaleDateString()} (in ${user.notifyExpirationDays} day(s)).
+             expiring on ${status.cycleEndDate.toLocaleDateString('en-US', { timeZone: 'UTC' })} (in ${user.notifyExpirationDays} day(s)).
            </li>`
         ).join('');
         
