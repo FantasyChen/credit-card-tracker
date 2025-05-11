@@ -12,10 +12,18 @@ interface BenefitStatusWithDetails extends BenefitStatus {
 }
 
 export async function POST(request: Request) {
-  const authorizationHeader = request.headers.get('Authorization');
+  const authorizationHeader = request.headers.get('x-vercel-cron-authorization');
   const expectedSecret = process.env.CRON_SECRET;
 
-  if (!expectedSecret || authorizationHeader !== `Bearer ${expectedSecret}`) {
+  console.log(`send-notifications: Received x-vercel-cron-authorization header: "${authorizationHeader}"`);
+  console.log(`send-notifications: Expected CRON_SECRET from env: "${expectedSecret}"`);
+
+  if (!expectedSecret) {
+    console.error('CRON_SECRET is not set in send-notifications POST handler.');
+    return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
+  }
+
+  if (authorizationHeader !== `Bearer ${expectedSecret}`) {
     console.warn('Unauthorized cron job attempt for send-notifications.');
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
@@ -26,7 +34,6 @@ export async function POST(request: Request) {
 
   if (process.env.NODE_ENV !== 'production' && mockDateString) {
     const parsedMockDate = new Date(mockDateString);
-    // Check if parsedMockDate is a valid date
     if (!isNaN(parsedMockDate.getTime())) {
       today = parsedMockDate;
       console.log(`Using mock date for send-notifications: ${today.toISOString()}`);
@@ -184,36 +191,4 @@ export async function POST(request: Request) {
     console.error('Error executing send-notifications cron job:', error);
     return NextResponse.json({ message: 'Error executing cron job.' }, { status: 500 });
   }
-}
-
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const secret = url.searchParams.get('secret');
-  const expectedSecret = process.env.CRON_SECRET;
-
-  if (!expectedSecret) {
-    console.error('CRON_SECRET is not set in GET handler of send-notifications.');
-    return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
-  }
-
-  if (secret !== expectedSecret) {
-    console.warn('Unauthorized cron GET attempt to send-notifications.');
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-  console.log("Cron GET request received for send-notifications, calling POST logic internally.");
-  
-  // Preserve mockDate if present in the original GET request for testing purposes
-  const mockDate = url.searchParams.get('mockDate');
-  let postRequestUrl = url.pathname; // Base path for POST, e.g., /api/cron/send-notifications
-  if (mockDate) {
-    postRequestUrl += `?mockDate=${encodeURIComponent(mockDate)}`;
-  }
-
-  const pseudoPostRequest = new Request(new URL(postRequestUrl, url.origin), { 
-      method: 'POST',
-      headers: new Headers({ 'Authorization': `Bearer ${expectedSecret}`})
-      // No body needed, as the POST handler for send-notifications gets mockDate from query params if present.
-  });
-  return await POST(pseudoPostRequest);
 }

@@ -6,12 +6,12 @@ import { calculateBenefitCycle } from '@/lib/benefit-cycle';
 // This function will handle POST requests from the cron job.
 // Vercel Cron Jobs can send POST requests.
 export async function POST(request: Request) {
-  // 1. Verify Cron Secret
-  // The secret should be passed in the Authorization header, e.g., "Bearer YOUR_CRON_SECRET"
-  // Or as a query parameter if your cron service prefers that.
-  // For Vercel Cron, you can set an environment variable and check it.
-  const authorizationHeader = request.headers.get('Authorization');
+  const authorizationHeader = request.headers.get('x-vercel-cron-authorization'); // Changed to x-vercel-cron-authorization
   const expectedSecret = process.env.CRON_SECRET;
+
+  // Logging the received header for debugging this specific Vercel header
+  console.log(`check-benefits: Received x-vercel-cron-authorization header: "${authorizationHeader}"`);
+  console.log(`check-benefits: Expected CRON_SECRET from env: "${expectedSecret}"`);
 
   if (!expectedSecret) {
     console.error('CRON_SECRET is not set in environment variables.');
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   }
 
   if (authorizationHeader !== `Bearer ${expectedSecret}`) {
-    console.warn('Unauthorized cron job attempt.');
+    console.warn('Unauthorized cron job attempt for check-benefits.');
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
@@ -143,6 +143,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Cron job failed.', error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
+
+// Removed GET handler
 
 // Optional: Add a GET handler for easy testing via browser if needed,
 // but ensure it's also protected or only enabled in development.
