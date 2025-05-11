@@ -3,33 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
 import { calculateBenefitCycle } from '@/lib/benefit-cycle';
 
-// This function will handle POST requests from the cron job.
-// Vercel Cron Jobs can send POST requests.
-export async function POST(request: Request) {
-  const authorizationHeader = request.headers.get('x-vercel-cron-authorization'); // Changed to x-vercel-cron-authorization
-  const expectedSecret = process.env.CRON_SECRET;
-
-  // Logging the received header for debugging this specific Vercel header
-  console.log(`check-benefits: Received x-vercel-cron-authorization header: "${authorizationHeader}"`);
-  console.log(`check-benefits: Expected CRON_SECRET from env: "${expectedSecret}"`);
-
-  if (!expectedSecret) {
-    console.error('CRON_SECRET is not set in environment variables.');
-    return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
-  }
-
-  if (authorizationHeader !== `Bearer ${expectedSecret}`) {
-    console.warn('Unauthorized cron job attempt for check-benefits.');
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-  const now = new Date(); // Revert to actual system time for production
-  // const now = new Date('2025-05-10T12:00:00Z'); // Previous test date
-  // const now = new Date('2025-07-05T12:00:00Z'); // TESTING: July 05, 2025. Use a consistent 'now' for all calculations in this run
-  console.log(`Cron job /api/cron/check-benefits started at: ${now.toISOString()}`);
-
+// Shared core logic for the cron job
+async function runCheckBenefitsLogic() {
+  const now = new Date(); 
+  console.log(`Core check-benefits logic started at: ${now.toISOString()}`);
   try {
-    // 2. Fetch all user credit cards with their benefits that are recurring
     const allUserCardsWithBenefits = await prisma.creditCard.findMany({
       include: {
         benefits: {
@@ -38,20 +16,17 @@ export async function POST(request: Request) {
               not: BenefitFrequency.ONE_TIME,
             },
           },
-          // Select necessary fields from Benefit for cycle calculation
           select: {
             id: true,
             frequency: true,
             cycleAlignment: true,
             fixedCycleStartMonth: true,
             fixedCycleDurationMonths: true,
-            // We don't need benefit.startDate or endDate here as cycle is based on 'now'
           }
         },
-        // Select necessary fields from CreditCard
         user: {
             select: {
-                id: true, // We need the userId
+                id: true, 
             }
         }
       },
@@ -61,7 +36,7 @@ export async function POST(request: Request) {
     let benefitsProcessed = 0;
 
     for (const card of allUserCardsWithBenefits) {
-      if (!card.user?.id) { // Should always have a user, but good to check
+      if (!card.user?.id) { 
         console.warn(`Card ${card.id} is missing user information. Skipping its benefits.`);
         continue;
       }
@@ -69,14 +44,12 @@ export async function POST(request: Request) {
 
       for (const benefit of card.benefits) {
         benefitsProcessed++;
-        // For CARD_ANNIVERSARY alignment, YEARLY benefits require an openedDate.
-        // CALENDAR_FIXED benefits do not strictly need it for their cycle calculation.
-        const cardOpenedDateForCalc: Date | null = card.openedDate; // card.openedDate is already included by default on CreditCard
+        const cardOpenedDateForCalc: Date | null = card.openedDate;
         
         if (
           benefit.cycleAlignment !== BenefitCycleAlignment.CALENDAR_FIXED &&
           benefit.frequency === BenefitFrequency.YEARLY &&
-          !card.openedDate // Check the actual card's openedDate
+          !card.openedDate 
         ) {
           console.warn(`Skipping YEARLY (anniversary based) benefit cycle for benefit ${benefit.id} on card ${card.id} as card has no openedDate.`);
           continue;
@@ -85,14 +58,13 @@ export async function POST(request: Request) {
         try {
           const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
             benefit.frequency,
-            now, // Reference date is now
+            now, 
             cardOpenedDateForCalc,
             benefit.cycleAlignment,
             benefit.fixedCycleStartMonth,
             benefit.fixedCycleDurationMonths
           );
 
-          // Upsert the status: Create if not exists for this cycle start date
           upsertPromises.push(
             prisma.benefitStatus.upsert({
               where: {
@@ -103,45 +75,65 @@ export async function POST(request: Request) {
                 },
               },
               update: {
-                // Ensure end date is updated if calculation logic changes
                 cycleEndDate: cycleEndDate,
-                // We don't touch isCompleted or completedAt here,
-                // new cycles are created as false by default in the 'create' block.
-                // If an old status is found, its completion status is preserved.
               },
               create: {
                 benefitId: benefit.id,
                 userId: userId,
                 cycleStartDate: cycleStartDate,
                 cycleEndDate: cycleEndDate,
-                isCompleted: false, // New cycles start as not completed
+                isCompleted: false, 
               },
             })
           );
         } catch (error) {
           console.error(`Error calculating cycle for benefit ${benefit.id} (user: ${userId}, card: ${card.id}):`, error instanceof Error ? error.message : error);
-          // Continue with other benefits even if one fails
         }
       }
     }
 
-    // Execute all upsert operations
     if (upsertPromises.length > 0) {
-      console.log(`Cron job: Attempting ${upsertPromises.length} benefit status upserts out of ${benefitsProcessed} benefits processed.`);
+      console.log(`Core logic: Attempting ${upsertPromises.length} benefit status upserts out of ${benefitsProcessed} benefits processed.`);
       await Promise.all(upsertPromises);
-      console.log(`Cron job: ${upsertPromises.length} benefit status upserts completed.`);
+      console.log(`Core logic: ${upsertPromises.length} benefit status upserts completed.`);
     } else if (benefitsProcessed > 0) {
-      console.log(`Cron job: ${benefitsProcessed} benefits processed, but no new benefit statuses needed upserting.`);
+      console.log(`Core logic: ${benefitsProcessed} benefits processed, but no new benefit statuses needed upserting.`);
     } else {
-      console.log('Cron job: No recurring benefits found to process.');
+      console.log('Core logic: No recurring benefits found to process.');
     }
 
     return NextResponse.json({ message: 'Cron job executed successfully.', upsertsAttempted: upsertPromises.length, benefitsProcessed }, { status: 200 });
 
   } catch (error) {
-    console.error('Cron job /api/cron/check-benefits failed:', error instanceof Error ? error.message : error, error instanceof Error ? error.stack : '');
+    console.error('Core check-benefits logic failed:', error instanceof Error ? error.message : error, error instanceof Error ? error.stack : '');
     return NextResponse.json({ message: 'Cron job failed.', error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
-// The following GET handler is being removed. 
+// GET handler for Vercel Cron (defaults to GET)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function GET(_request: Request) {
+  console.log("Simplified check-benefits GET handler invoked.");
+  return NextResponse.json({ message: "Simplified GET received for check-benefits" }, { status: 200 });
+}
+
+// POST handler for manual trigger or other services
+export async function POST(request: Request) {
+  const authorizationHeader = request.headers.get('x-vercel-cron-authorization'); 
+  const expectedSecret = process.env.CRON_SECRET;
+
+  console.log(`check-benefits POST: Received x-vercel-cron-authorization header: "${authorizationHeader}"`);
+  console.log(`check-benefits POST: Expected CRON_SECRET from env: "${expectedSecret}"`);
+
+  if (!expectedSecret) {
+    console.error('CRON_SECRET is not set for POST handler.');
+    return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
+  }
+
+  if (authorizationHeader !== `Bearer ${expectedSecret}`) {
+    console.warn('Unauthorized POST cron job attempt for check-benefits.');
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+  console.log("Authorized POST request for check-benefits. Running core logic...");
+  return await runCheckBenefitsLogic();
+} 
