@@ -155,6 +155,10 @@ export async function GET(request: Request) {
   const secret = url.searchParams.get('secret');
   const expectedSecret = process.env.CRON_SECRET;
 
+  // Temporary logging for debugging
+  console.log(`Cron GET: Received secret from URL: "${secret}"`);
+  console.log(`Cron GET: Expected secret from env: "${expectedSecret}"`);
+
   if (!expectedSecret) {
     console.error('CRON_SECRET is not set in GET handler of check-benefits.');
     return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
