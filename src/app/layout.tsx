@@ -3,8 +3,9 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import Providers from "@/components/Providers";
+// import Providers from "@/components/Providers"; // Now wrapped by ThemeProviders
 import Footer from "@/components/Footer";
+import { ThemeProviders } from "@/components/ThemeProviders"; // Import the new ThemeProviders
 // import { ensureCurrentBenefitStatuses } from "@/lib/actions/benefitActions"; // Keep import commented out or remove
 
 const geistSans = GeistSans;
@@ -29,11 +30,11 @@ export default async function RootLayout({
   // ensureCurrentBenefitStatuses(); // <-- REMOVE THIS CALL
 
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
       >
-        <Providers>
+        <ThemeProviders>
           <div className="flex min-h-full flex-col bg-gray-50 dark:bg-gray-950">
             <Navbar />
             <main className="container mx-auto flex-grow px-4 py-8">
@@ -41,7 +42,7 @@ export default async function RootLayout({
             </main>
             <Footer />
           </div>
-        </Providers>
+        </ThemeProviders>
       </body>
     </html>
   );
