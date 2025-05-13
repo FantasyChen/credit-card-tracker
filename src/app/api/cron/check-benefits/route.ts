@@ -112,10 +112,10 @@ async function runCheckBenefitsLogic() {
 
 // GET handler for Vercel Cron (defaults to GET)
 export async function GET(request: Request) {
-  const authorizationHeader = request.headers.get('x-vercel-cron-authorization');
+  const authorizationHeader = request.headers.get('authorization');
   const expectedSecret = process.env.CRON_SECRET;
 
-  console.log(`check-benefits GET: Received x-vercel-cron-authorization header: "${authorizationHeader}"`);
+  console.log(`check-benefits GET: Received authorization header: "${authorizationHeader}"`);
   console.log(`check-benefits GET: Expected CRON_SECRET from env: "${expectedSecret}"`);
 
   if (!expectedSecret) {
@@ -133,10 +133,10 @@ export async function GET(request: Request) {
 
 // POST handler for manual trigger or other services
 export async function POST(request: Request) {
-  const authorizationHeader = request.headers.get('x-vercel-cron-authorization'); 
+  const authorizationHeader = request.headers.get('authorization');
   const expectedSecret = process.env.CRON_SECRET;
 
-  console.log(`check-benefits POST: Received x-vercel-cron-authorization header: "${authorizationHeader}"`);
+  console.log(`check-benefits POST: Received authorization header: "${authorizationHeader}"`);
   console.log(`check-benefits POST: Expected CRON_SECRET from env: "${expectedSecret}"`);
 
   if (!expectedSecret) {

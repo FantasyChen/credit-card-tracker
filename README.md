@@ -55,20 +55,21 @@ This project uses ESLint with a flat configuration file (`eslint.config.mjs`). P
 
 When deploying to Vercel, ensure the following:
 
-1.  **Environment Variables:**
+1.  **Automatic Deployment:** Pushing changes to the main GitHub branch will automatically trigger a new production deployment on Vercel.
+2.  **Environment Variables:**
     *   `GOOGLE_CLIENT_ID`: Your Google Cloud OAuth Client ID.
     *   `GOOGLE_CLIENT_SECRET`: Your Google Cloud OAuth Client Secret.
     *   `DATABASE_URL`: Connection string for your **production** PostgreSQL database (e.g., from Vercel Postgres, Neon, Supabase).
     *   `NEXTAUTH_URL`: Your production app URL (e.g., `https://coupon-cycle.vercel.app`).
     *   `NEXTAUTH_SECRET`: A strong, randomly generated secret for NextAuth.js.
     *   `CRON_SECRET`: A strong, randomly generated secret used to authorize requests to the cron job API endpoint (`/api/cron/check-benefits`).
-2.  **Google OAuth Configuration:**
+3.  **Google OAuth Configuration:**
     *   In your Google Cloud Console, ensure `https://coupon-cycle.vercel.app` is an authorized JavaScript origin and `https://coupon-cycle.vercel.app/api/auth/callback/google` is an authorized redirect URI.
-3.  **Prisma Query Engine:**
+4.  **Prisma Query Engine:**
     *   The `prisma/schema.prisma` file has been configured with `binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]` and `engineType = "library"` to ensure compatibility with Vercel's runtime environment. Regenerate the Prisma client (`npx prisma generate`) if you modify the schema.
-4.  **Database Migrations:**
+5.  **Database Migrations:**
     *   Run `npx prisma migrate deploy` (or your project's equivalent) against your production database to ensure its schema is up-to-date.
-5.  **Cron Job for Benefit Cycles:**
+6.  **Cron Job for Benefit Cycles:**
     *   A daily cron job is configured in `vercel.json` to call the `/api/cron/check-benefits` endpoint. This job proactively updates benefit statuses for all users.
     *   Ensure the `CRON_SECRET` environment variable is set in your Vercel project settings to authorize these cron job requests.
 
