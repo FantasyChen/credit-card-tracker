@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
-import { ThemeToggle } from '@/components/ThemeToggle';
 
 const Navbar = () => {
   const pathname = usePathname();
@@ -57,10 +56,6 @@ const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center">
-            {/* Theme Toggle for Desktop */}
-            <div className="hidden sm:ml-4 sm:block">
-              <ThemeToggle />
-            </div>
             {/* Desktop Sign in/out button */}
             <div className="hidden sm:ml-4 sm:block">
               {session ? (
@@ -81,7 +76,6 @@ const Navbar = () => {
             </div>
             {/* Mobile menu button & Theme Toggle */}
             <div className="ml-2 flex items-center sm:hidden">
-              <ThemeToggle />
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="ml-2 inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:focus:ring-indigo-400"

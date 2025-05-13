@@ -41,7 +41,7 @@ This document outlines the design and development plan for the CouponCycle web a
     *   Mobile-responsive Navbar with hamburger menu.
     *   Site-wide Footer.
     *   Improved iconography (favicon, dashboard icons).
-    *   Theme switching (light/dark/system) implemented using `next-themes`, Tailwind CSS (`darkMode: 'class'`), and a toggle button in the Navbar.
+    *   Theme (light/dark) automatically matches system preference via Tailwind CSS (`darkMode: 'media'`).
     *   User-friendly "Sign In" prompts for protected content.
     *   "Contact" page added.
 *   **Stable Build Process:** `npm run build` completes successfully, incorporating ESLint fixes and Prisma client generation.
