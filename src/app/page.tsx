@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
+import Image from 'next/image';
 import { BenefitStatus, Benefit, CreditCard as PrismaCreditCard } from '@/generated/prisma';
 import { formatDate } from '@/lib/dateUtils';
 import { CreditCardIcon } from '@heroicons/react/24/outline';
@@ -40,8 +41,14 @@ export default async function Home() {
               Learn More
             </Link> */}
           </div>
-          <div className="hidden lg:col-span-5 lg:mt-0 lg:flex lg:items-center lg:justify-center">
-            <img src="/hero-image.jpg" alt="CouponCycle - Maximize your credit card benefits" className="rounded-lg object-contain w-full h-auto max-h-[70vh]" />
+          <div className="hidden lg:col-span-5 lg:mt-0 lg:flex lg:items-center lg:justify-center relative">
+            <Image 
+              src="/hero-image.jpg" 
+              alt="CouponCycle - Maximize your credit card benefits" 
+              fill
+              className="rounded-lg object-contain"
+              priority
+            />
           </div>
         </div>
       </section>
