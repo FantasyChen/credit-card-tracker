@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const Navbar = () => {
   const pathname = usePathname();
@@ -56,8 +57,12 @@ const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center">
+            {/* Theme Toggle for Desktop */}
+            <div className="hidden sm:ml-4 sm:block">
+              <ThemeToggle />
+            </div>
             {/* Desktop Sign in/out button */}
-            <div className="hidden sm:ml-6 sm:block">
+            <div className="hidden sm:ml-4 sm:block">
               {session ? (
                 <button
                   onClick={() => signOut()}
@@ -74,11 +79,12 @@ const Navbar = () => {
                 </Link>
               )}
             </div>
-            {/* Mobile menu button */}
-            <div className="ml-4 flex items-center sm:hidden">
+            {/* Mobile menu button & Theme Toggle */}
+            <div className="ml-2 flex items-center sm:hidden">
+              <ThemeToggle />
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:focus:ring-indigo-400"
+                className="ml-2 inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:focus:ring-indigo-400"
                 aria-expanded={isMobileMenuOpen}
               >
                 <span className="sr-only">Open main menu</span>
@@ -112,25 +118,26 @@ const Navbar = () => {
                 {item.name}
               </Link>
             ))}
-            {/* Mobile Sign in/out button */}
-            <div className="border-t border-gray-200 pt-4 mt-4 dark:border-gray-700">
-              {session ? (
-                  <button
-                    onClick={() => { signOut(); setIsMobileMenuOpen(false); }}
-                    className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
-                  >
-                    Sign out
-                  </button>
-                ) : (
-                  <Link
-                    href="/api/auth/signin"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="block w-full rounded-md bg-indigo-600 px-3 py-2 text-center text-base font-medium text-white shadow-sm hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-                  >
-                    Sign in
-                  </Link>
-              )}
-            </div>
+            {/* Mobile Sign in/out button and Theme Toggle are now outside the main nav items, in the mobile header*/}
+          </div>
+           {/* Sign in/out button now part of the header for mobile too */}
+           <div className="border-t border-gray-200 px-2 pt-3 pb-3 dark:border-gray-700">
+            {session ? (
+                <button
+                  onClick={() => { signOut(); setIsMobileMenuOpen(false); }}
+                  className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                >
+                  Sign out
+                </button>
+              ) : (
+                <Link
+                  href="/api/auth/signin"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block w-full rounded-md bg-indigo-600 px-3 py-2 text-center text-base font-medium text-white shadow-sm hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                >
+                  Sign in
+                </Link>
+            )}
           </div>
         </div>
       )}
