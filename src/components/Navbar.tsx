@@ -4,21 +4,38 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+
+interface NavItem {
+  name: string;
+  href: string;
+  authRequired?: boolean; // Optional: true if link requires authentication
+}
 
 const Navbar = () => {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const navigation = [
+  const baseNavigation: NavItem[] = useMemo(() => [
     { name: 'Dashboard', href: '/' },
     { name: 'Cards', href: '/cards' },
     { name: 'Benefits', href: '/benefits' },
-    { name: 'Notifications', href: '/settings/notifications' },
+    { name: 'Notifications', href: '/settings/notifications', authRequired: true },
+    { name: 'Data Management', href: '/settings/data', authRequired: true },
     { name: 'Contact', href: '/contact' },
-  ];
+  ], []); // Empty dependency array as baseNavigation is static
+
+  // Filter navigation items based on authentication status
+  const navigation = useMemo(() => {
+    return baseNavigation.filter(item => {
+      if (item.authRequired && !session) {
+        return false; // Don't show auth-required links if not logged in
+      }
+      return true;
+    });
+  }, [session, baseNavigation]);
 
   return (
     <nav className="bg-white shadow-sm dark:bg-gray-800">
