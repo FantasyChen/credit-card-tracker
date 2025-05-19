@@ -5,6 +5,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Providers from "@/components/Providers"; // Reinstate original Providers
 import Footer from "@/components/Footer";
+import { Analytics } from '@vercel/analytics/next';
 // import { ThemeProviders } from "@/components/ThemeProviders"; // Removed
 // import { ensureCurrentBenefitStatuses } from "@/lib/actions/benefitActions"; // Keep import commented out or remove
 
@@ -44,6 +45,7 @@ export default async function RootLayout({
               {children}
             </main>
             <Footer />
+            <Analytics />
           </div>
         </body>
       </Providers>

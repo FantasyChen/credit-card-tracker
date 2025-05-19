@@ -90,3 +90,5 @@ The Vercel cron job setup (`vercel.json` and the API route handlers in `src/app/
 
 ### TODO
 1. Publish the website (domain)
+2. Increase server capability
+3. Buy coffee?
