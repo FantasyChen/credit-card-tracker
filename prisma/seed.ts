@@ -452,6 +452,51 @@ async function main() {
         },
       ],
     },
+    {
+      name: 'HSBC Elite Credit Card',
+      issuer: 'HSBC',
+      annualFee: 495,
+      imageUrl: '/images/cards/hsbc-elite-credit-card.jpg',
+      benefits: [
+        {
+          description: '$400 Annual Travel Credit (HSBC Travel bookings)',
+          category: 'Travel',
+          maxAmount: 400,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$10 Monthly Rideshare Credit',
+          category: 'Transportation',
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$10 Monthly Instacart+ Credit (second order)',
+          category: 'Grocery',
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$5 Monthly Lyft Credit (after 3 rides)',
+          category: 'Transportation',
+          maxAmount: 5,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$120 Security Screening Credit (Global Entry/TSA PreCheck, every 4.5 years)',
+          category: 'Travel',
+          maxAmount: 120,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
+          fixedCycleDurationMonths: 54, // 4.5 years = 54 months
+        },
+      ],
+    },
   ];
 
   // --- Upsert Logic (ensure benefits are deleted/recreated or updated properly) ---
