@@ -81,6 +81,22 @@ export default async function BenefitsDashboardPage() {
     ],
   });
 
+  // Calculate total annual fees for user's cards (same logic as dashboard)
+  const totalAnnualFees = await prisma.creditCard.findMany({
+    where: { userId },
+    select: { name: true }
+  }).then(cards => {
+    return prisma.predefinedCard.findMany({
+      where: {
+        name: {
+          in: cards.map(card => card.name)
+        }
+      }
+    }).then(predefinedCards => {
+      return predefinedCards.reduce((total, card) => total + card.annualFee, 0);
+    });
+  });
+
   // 3. Augment statuses with card displayName
   const allStatusesAugmented: DisplayBenefitStatus[] = allStatusesRaw.map(status => {
     const cardOriginal = status.benefit.creditCard;
@@ -129,6 +145,7 @@ export default async function BenefitsDashboardPage() {
       completedBenefits={completedBenefits}
       totalUnusedValue={totalUnusedValue}
       totalUsedValue={totalUsedValue}
+      totalAnnualFees={totalAnnualFees}
     />
   );
 }

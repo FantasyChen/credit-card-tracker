@@ -108,6 +108,86 @@ node scripts/download-card-image.js -n "American Express Gold Card"
 
 The script will search for the card image, download the first medium-sized result, and save it to the `public/images/cards/` directory with a filename generated from the card name (e.g., `chase-sapphire-preferred.jpg`).
 
+## Benefit Reordering Feature
+
+The application includes a drag-and-drop feature that allows users to customize the order in which their benefits appear on the Benefits Dashboard. This order is saved to the database and persists across sessions.
+
+### How to Use
+
+1.  **Navigate to Benefits Dashboard:** Go to `/benefits` in your browser.
+2.  **Enable Reorder Mode:** Click the "Reorder Benefits" button in the top-right corner.
+3.  **Drag and Drop:** Click and drag any benefit card to rearrange the order. Visual indicators (dots) appear on the left side of each card during reorder mode.
+4.  **Save Changes:** Click "Done Reordering" to exit reorder mode. Changes are saved automatically as you drag.
+5.  **Verify Persistence:** Refresh the page or navigate away and back to confirm your custom order is maintained.
+
+### Technical Implementation
+
+- **Database:** Uses an `orderIndex` field in the `BenefitStatus` model to store user preferences
+- **Frontend:** Built with `@dnd-kit` libraries for accessible, keyboard-navigable drag-and-drop
+- **Persistence:** Server actions automatically save the new order to the database
+- **Fallback:** Benefits without custom order fall back to sorting by cycle end date
+
+### Testing the Feature
+
+A test script is available to verify the functionality:
+
+```bash
+node scripts/test-drag-drop.cjs
+```
+
+This script will check for existing benefit data and simulate reordering operations to ensure the database integration works correctly.
+
+## Annual Fee ROI Tracking
+
+The application automatically calculates and displays your Return on Investment (ROI) for credit card annual fees, helping you understand if you're getting value from your cards.
+
+### How It Works
+
+The ROI calculation compares:
+- **Annual Fees:** Total annual fees for all your credit cards (from predefined card data)
+- **Benefits Claimed:** Total value of benefits you've marked as completed
+- **Net ROI:** Benefits claimed minus annual fees
+
+### Where to Find ROI Information
+
+1. **Benefits Dashboard (`/benefits`):** 
+   - Third widget shows "Annual Fee ROI"
+   - Green indicates profitable (benefits > fees)
+   - Orange indicates unprofitable (fees > benefits)
+   - Shows breakdown: "X earned vs Y fees"
+
+2. **Main Dashboard (`/`):**
+   - "Annual Fee ROI" card in the summary section
+   - Same color coding and breakdown as benefits page
+   - Quick overview alongside other key metrics
+
+### ROI Calculation Details
+
+- **Automatic:** No manual input required - calculated from your card data and benefit usage
+- **Real-time:** Updates immediately when you mark benefits as completed
+- **Accurate:** Uses actual annual fees from predefined card database
+- **Comprehensive:** Includes all cards and all claimed benefits
+
+### Testing ROI Calculations
+
+A test script is available to verify ROI calculations:
+
+```bash
+node scripts/test-annual-fee-roi.cjs
+```
+
+This script will:
+- Show annual fee breakdown by card
+- List claimed benefits and their values
+- Calculate current ROI and profitability
+- Show potential ROI from unclaimed benefits
+
+### Understanding Your ROI
+
+- **Positive ROI:** You've earned back more than your annual fees - great job!
+- **Negative ROI:** You need to claim more benefits to justify the annual fees
+- **Potential Analysis:** The test script shows how much you could earn from remaining benefits
+
 ## Adding a New Credit Card
 
 Follow these steps to add a new predefined credit card to the application:

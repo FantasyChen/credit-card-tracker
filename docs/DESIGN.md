@@ -31,6 +31,8 @@ This document outlines the design and development plan for the CouponCycle web a
 *   **Core Benefit Cycle Logic:** `calculateBenefitCycle` in `lib/benefit-cycle.ts` accurately handles various frequencies and `CALENDAR_FIXED` / card anniversary alignments.
 *   **Card Management:** Users can add cards from predefined templates; benefits and initial statuses are created. UI includes indexed card names.
 *   **Benefit Dashboard (`/benefits`):** Displays active and completed benefits. Features total unused/used value widgets, a tabbed layout ("Upcoming", "Claimed") via `BenefitsDisplayClient.tsx`, and improved UI responsiveness.
+*   **Benefit Reordering:** Drag-and-drop functionality allows users to customize benefit display order. Uses `@dnd-kit` libraries for accessibility, with `orderIndex` field in `BenefitStatus` model for persistence. Includes visual drag indicators and automatic saving.
+*   **Annual Fee ROI Tracking:** Automatically calculates and displays Return on Investment for credit card annual fees. Shows total annual fees vs. claimed benefits value on both the main dashboard and benefits page. Uses color-coded widgets (green for profitable, orange for unprofitable) with detailed breakdowns.
 *   **Automated Cron Jobs (Vercel):**
     *   **Benefit Cycle Refresh (`/api/cron/check-benefits`):** Daily cron job proactively updates `BenefitStatus` for all users. Secured via `x-vercel-cron-authorization` header and `CRON_SECRET`.
     *   **Email Notifications (`/api/cron/send-notifications`):** Daily cron job sends summary emails for new benefit cycles and upcoming expirations using Resend (`lib/email.ts`). Also secured via `x-vercel-cron-authorization` and includes `mockDate` support for testing.

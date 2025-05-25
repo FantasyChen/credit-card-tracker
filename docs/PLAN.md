@@ -73,6 +73,7 @@ With the core functionality of benefit tracking, automated cycle updates, and em
     *   Consider more advanced sorting/filtering options on the Benefits Dashboard.
     *   Gather user feedback on the overall UX and make adjustments.
 *   **Feature Enhancements (from original `DESIGN.MD` future considerations):**
+    *   ~~Annual Fee ROI Dashboard~~ **COMPLETED:** Added ROI tracking widgets to both main dashboard and benefits page showing annual fees vs. claimed benefits with color-coded profitability indicators.
     *   Allowing users to add custom cards/benefits not in the predefined list.
     *   More sophisticated tracking (e.g., tracking partial usage of a benefit amount).
     *   Visualizations and reporting.
