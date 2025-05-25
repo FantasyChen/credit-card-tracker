@@ -156,6 +156,7 @@ model BenefitStatus {
   cycleEndDate  DateTime // End date of the specific cycle (e.g., Dec 31st, 2024)
   isCompleted   Boolean   @default(false) // Tracks completion
   completedAt   DateTime? // Optional: when it was marked complete
+  orderIndex    Int?      // User's preferred order for displaying benefits (nullable for backward compatibility)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

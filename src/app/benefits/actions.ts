@@ -51,4 +51,37 @@ export async function toggleBenefitStatusAction(formData: FormData) {
   }
 
   // No redirect needed, revalidation handles the UI update
+}
+
+export async function updateBenefitOrderAction(benefitStatusIds: string[]) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated.');
+  }
+
+  try {
+    // Update the orderIndex for each benefit status
+    const updatePromises = benefitStatusIds.map((id, index) =>
+      prisma.benefitStatus.updateMany({
+        where: {
+          id: id,
+          userId: session.user.id, // Ensure user owns this status record
+        },
+        data: {
+          orderIndex: index,
+        },
+      })
+    );
+
+    await Promise.all(updatePromises);
+
+    console.log(`Updated order for ${benefitStatusIds.length} benefit statuses`);
+
+    // Revalidate the benefits page to show the change
+    revalidatePath('/benefits');
+
+  } catch (error) {
+    console.error('Error updating benefit order:', error);
+    throw new Error('Failed to update benefit order.');
+  }
 } 

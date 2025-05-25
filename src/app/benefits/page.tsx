@@ -71,9 +71,14 @@ export default async function BenefitsDashboardPage() {
         },
       },
     },
-    orderBy: {
-      cycleEndDate: 'asc',
-    },
+    orderBy: [
+      {
+        orderIndex: 'asc', // Primary sort by user's preferred order
+      },
+      {
+        cycleEndDate: 'asc', // Secondary sort by cycle end date
+      },
+    ],
   });
 
   // 3. Augment statuses with card displayName
