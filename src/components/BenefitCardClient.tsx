@@ -5,14 +5,28 @@ import { formatDate } from '@/lib/dateUtils';
 import { toggleBenefitStatusAction } from '@/app/benefits/actions'; // Ensure this path is correct
 import type { DisplayBenefitStatus } from '@/app/benefits/page'; // Import the shared type
 
-export default function BenefitCardClient({ status }: { status: DisplayBenefitStatus }) {
+interface BenefitCardClientProps {
+  status: DisplayBenefitStatus;
+  onStatusChange?: (statusId: string, newIsCompleted: boolean) => void;
+}
+
+export default function BenefitCardClient({ status, onStatusChange }: BenefitCardClientProps) {
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    startTransition(() => {
-      toggleBenefitStatusAction(formData);
+    const newIsCompleted = !status.isCompleted;
+    
+    startTransition(async () => {
+      try {
+        await toggleBenefitStatusAction(formData);
+        // Call the callback to update parent state
+        onStatusChange?.(status.id, newIsCompleted);
+      } catch (error) {
+        console.error('Failed to toggle benefit status:', error);
+        // You might want to show an error message to the user here
+      }
     });
   };
 

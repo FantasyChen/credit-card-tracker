@@ -41,6 +41,8 @@ export default function BenefitsDisplayClient({
   const [isDragMode, setIsDragMode] = useState(false);
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
+  const [localTotalUnusedValue, setLocalTotalUnusedValue] = useState(totalUnusedValue);
+  const [localTotalUsedValue, setLocalTotalUsedValue] = useState(totalUsedValue);
   const [isPending, startTransition] = useTransition();
 
   const sensors = useSensors(
@@ -49,6 +51,36 @@ export default function BenefitsDisplayClient({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  const handleStatusChange = (statusId: string, newIsCompleted: boolean) => {
+    if (newIsCompleted) {
+      // Moving from upcoming to completed
+      const benefitToMove = localUpcomingBenefits.find(b => b.id === statusId);
+      if (benefitToMove) {
+        const updatedBenefit = { ...benefitToMove, isCompleted: true, completedAt: new Date() };
+        setLocalUpcomingBenefits(prev => prev.filter(b => b.id !== statusId));
+        setLocalCompletedBenefits(prev => [...prev, updatedBenefit]);
+        
+        // Update totals
+        const benefitValue = benefitToMove.benefit.maxAmount || 0;
+        setLocalTotalUnusedValue(prev => prev - benefitValue);
+        setLocalTotalUsedValue(prev => prev + benefitValue);
+      }
+    } else {
+      // Moving from completed to upcoming
+      const benefitToMove = localCompletedBenefits.find(b => b.id === statusId);
+      if (benefitToMove) {
+        const updatedBenefit = { ...benefitToMove, isCompleted: false, completedAt: null };
+        setLocalCompletedBenefits(prev => prev.filter(b => b.id !== statusId));
+        setLocalUpcomingBenefits(prev => [...prev, updatedBenefit]);
+        
+        // Update totals
+        const benefitValue = benefitToMove.benefit.maxAmount || 0;
+        setLocalTotalUsedValue(prev => prev - benefitValue);
+        setLocalTotalUnusedValue(prev => prev + benefitValue);
+      }
+    }
+  };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -126,6 +158,7 @@ export default function BenefitsDisplayClient({
                   key={status.id}
                   status={status}
                   isDragMode={isDragMode}
+                  onStatusChange={handleStatusChange}
                 />
               ))}
             </div>
@@ -137,7 +170,7 @@ export default function BenefitsDisplayClient({
     return (
       <div className="space-y-4">
         {benefits.map(status => (
-          <BenefitCardClient key={status.id} status={status} />
+          <BenefitCardClient key={status.id} status={status} onStatusChange={handleStatusChange} />
         ))}
       </div>
     );
@@ -177,7 +210,7 @@ export default function BenefitsDisplayClient({
                 <dl>
                   <dt className="truncate text-sm font-medium text-blue-600 dark:text-blue-300">Total Value of Upcoming Benefits</dt>
                   <dd>
-                    <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">${totalUnusedValue.toFixed(2)}</div>
+                    <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">${localTotalUnusedValue.toFixed(2)}</div>
                   </dd>
                 </dl>
               </div>
@@ -200,7 +233,7 @@ export default function BenefitsDisplayClient({
                 <dl>
                   <dt className="truncate text-sm font-medium text-green-600 dark:text-green-300">Total Value of Claimed Benefits</dt>
                   <dd>
-                    <div className="text-2xl font-bold text-green-900 dark:text-green-100">${totalUsedValue.toFixed(2)}</div>
+                    <div className="text-2xl font-bold text-green-900 dark:text-green-100">${localTotalUsedValue.toFixed(2)}</div>
                   </dd>
                 </dl>
               </div>
@@ -210,7 +243,7 @@ export default function BenefitsDisplayClient({
 
         {/* Annual Fee ROI Widget */}
         <div className={`group overflow-hidden rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border ${
-          totalUsedValue >= totalAnnualFees 
+          localTotalUsedValue >= totalAnnualFees 
             ? 'bg-gradient-to-br from-emerald-50 to-green-100 dark:from-emerald-900/20 dark:to-green-800/20 border-emerald-200 dark:border-emerald-700' 
             : 'bg-gradient-to-br from-orange-50 to-red-100 dark:from-orange-900/20 dark:to-red-800/20 border-orange-200 dark:border-orange-700'
         }`}>
@@ -218,11 +251,11 @@ export default function BenefitsDisplayClient({
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className={`p-3 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 ${
-                  totalUsedValue >= totalAnnualFees 
+                  localTotalUsedValue >= totalAnnualFees 
                     ? 'bg-emerald-500' 
                     : 'bg-orange-500'
                 }`}>
-                  {totalUsedValue >= totalAnnualFees ? (
+                  {localTotalUsedValue >= totalAnnualFees ? (
                     <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -236,7 +269,7 @@ export default function BenefitsDisplayClient({
               <div className="ml-5 w-0 flex-1">
                 <dl>
                   <dt className={`truncate text-sm font-medium ${
-                    totalUsedValue >= totalAnnualFees 
+                    localTotalUsedValue >= totalAnnualFees 
                       ? 'text-emerald-600 dark:text-emerald-300' 
                       : 'text-orange-600 dark:text-orange-300'
                   }`}>
@@ -245,18 +278,18 @@ export default function BenefitsDisplayClient({
                   <dd>
                     <div className="space-y-1">
                       <div className={`text-2xl font-bold ${
-                        totalUsedValue >= totalAnnualFees 
+                        localTotalUsedValue >= totalAnnualFees 
                           ? 'text-emerald-900 dark:text-emerald-100' 
                           : 'text-orange-900 dark:text-orange-100'
                       }`}>
-                        ${(totalUsedValue - totalAnnualFees).toFixed(2)}
+                        ${(localTotalUsedValue - totalAnnualFees).toFixed(2)}
                       </div>
                       <div className={`text-xs ${
-                        totalUsedValue >= totalAnnualFees 
+                        localTotalUsedValue >= totalAnnualFees 
                           ? 'text-emerald-600 dark:text-emerald-300' 
                           : 'text-orange-600 dark:text-orange-300'
                       }`}>
-                        ${totalUsedValue.toFixed(2)} earned vs ${totalAnnualFees.toFixed(2)} fees
+                        ${localTotalUsedValue.toFixed(2)} earned vs ${totalAnnualFees.toFixed(2)} fees
                       </div>
                     </div>
                   </dd>

@@ -9,9 +9,10 @@ import type { DisplayBenefitStatus } from '@/app/benefits/page';
 interface DraggableBenefitCardProps {
   status: DisplayBenefitStatus;
   isDragMode: boolean;
+  onStatusChange?: (statusId: string, newIsCompleted: boolean) => void;
 }
 
-export default function DraggableBenefitCard({ status, isDragMode }: DraggableBenefitCardProps) {
+export default function DraggableBenefitCard({ status, isDragMode, onStatusChange }: DraggableBenefitCardProps) {
   const {
     attributes,
     listeners,
@@ -48,7 +49,7 @@ export default function DraggableBenefitCard({ status, isDragMode }: DraggableBe
         </div>
       )}
       <div className={isDragMode ? 'pl-6' : ''}>
-        <BenefitCardClient status={status} />
+        <BenefitCardClient status={status} onStatusChange={onStatusChange} />
       </div>
     </div>
   );
