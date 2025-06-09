@@ -90,13 +90,12 @@ export default async function Home() {
     return statuses.reduce((total, status) => total + (status.benefit.maxAmount || 0), 0);
   });
 
-  // Fetch upcoming benefits (not completed, ordered by cycle end date, limit 5)
+  // Fetch upcoming benefits (not completed, not expired, ordered by cycle end date, limit 5)
   const upcomingBenefits = await prisma.benefitStatus.findMany({
     where: {
       userId: userId,
       isCompleted: false,
-      // Optional: Add a filter for cycleEndDate if needed, e.g., only show benefits ending soon
-      // cycleEndDate: { gte: new Date() } 
+      cycleEndDate: { gte: new Date() }, // Exclude expired benefits
     },
     include: {
       benefit: {
