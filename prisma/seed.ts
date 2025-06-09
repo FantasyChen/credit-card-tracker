@@ -32,6 +32,13 @@ async function main() {
           percentage: 0,
           // cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY (default)
         },
+        {
+          description: '$10 Monthly DoorDash Credit',
+          category: 'Food Delivery',
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
       ],
     },
     {
