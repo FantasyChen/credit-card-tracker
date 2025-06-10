@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { BenefitStatus, Benefit, CreditCard as PrismaCreditCard } from '@/generated/prisma';
 import { formatDate } from '@/lib/dateUtils';
 import { CreditCardIcon } from '@heroicons/react/24/outline';
+import SupportedCreditCards from '@/components/SupportedCreditCards';
 
 // Define a type for the upcoming benefits data
 interface UpcomingBenefit extends BenefitStatus {
@@ -18,40 +19,45 @@ export default async function Home() {
   if (!session?.user?.id) {
     // If not signed in, show a landing page with a sign-in button
     return (
-      <section className="bg-gray-100 dark:bg-gray-900">
-        <div className="container mx-auto grid min-h-screen max-w-screen-xl px-4 py-8 lg:grid-cols-12 lg:gap-8 lg:py-16 xl:gap-0">
-          <div className="mr-auto place-self-center lg:col-span-7">
-            <h1 className="mb-4 max-w-2xl text-4xl font-extrabold leading-none tracking-tight text-gray-900 dark:text-white md:text-5xl xl:text-6xl">
-              Never Miss a Credit Card Benefit Again.
-            </h1>
-            <p className="mb-6 max-w-2xl font-light text-gray-500 dark:text-gray-300 md:text-lg lg:mb-8 lg:text-xl">
-              CouponCycle helps you track every perk, understand your benefit cycles, and maximize the value from your annual fees.
-            </p>
-            <Link
-              href="/api/auth/signin"
-              className="mb-2 mr-2 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-3 text-center text-base font-medium text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-900"
-            >
-              Get Started - Sign In
-              <svg className="ml-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"></path>
-              </svg>
-            </Link>
-            {/* Optional: Secondary CTA if you add a features section later */}
-            {/* <Link href="#features" className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:ring-gray-100 dark:text-white dark:border-gray-700 dark:hover:bg-gray-700 dark:focus:ring-gray-800">
-              Learn More
-            </Link> */}
+      <div>
+        <section className="bg-gray-100 dark:bg-gray-900">
+          <div className="container mx-auto grid min-h-screen max-w-screen-xl px-4 py-8 lg:grid-cols-12 lg:gap-8 lg:py-16 xl:gap-0">
+            <div className="mr-auto place-self-center lg:col-span-7">
+              <h1 className="mb-4 max-w-2xl text-4xl font-extrabold leading-none tracking-tight text-gray-900 dark:text-white md:text-5xl xl:text-6xl">
+                Never Miss a Credit Card Benefit Again.
+              </h1>
+              <p className="mb-6 max-w-2xl font-light text-gray-500 dark:text-gray-300 md:text-lg lg:mb-8 lg:text-xl">
+                CouponCycle helps you track every perk, understand your benefit cycles, and maximize the value from your annual fees.
+              </p>
+              <Link
+                href="/api/auth/signin"
+                className="mb-2 mr-2 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-3 text-center text-base font-medium text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-900"
+              >
+                Get Started - Sign In
+                <svg className="ml-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                  <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"></path>
+                </svg>
+              </Link>
+              {/* Optional: Secondary CTA if you add a features section later */}
+              {/* <Link href="#features" className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:ring-gray-100 dark:text-white dark:border-gray-700 dark:hover:bg-gray-700 dark:focus:ring-gray-800">
+                Learn More
+              </Link> */}
+            </div>
+            <div className="hidden lg:col-span-5 lg:mt-0 lg:flex lg:items-center lg:justify-center relative">
+              <Image 
+                src="/hero-image.jpg" 
+                alt="CouponCycle - Maximize your credit card benefits" 
+                fill
+                className="rounded-lg object-contain"
+                priority
+              />
+            </div>
           </div>
-          <div className="hidden lg:col-span-5 lg:mt-0 lg:flex lg:items-center lg:justify-center relative">
-            <Image 
-              src="/hero-image.jpg" 
-              alt="CouponCycle - Maximize your credit card benefits" 
-              fill
-              className="rounded-lg object-contain"
-              priority
-            />
-          </div>
-        </div>
-      </section>
+        </section>
+
+        {/* Add the Supported Credit Cards section */}
+        <SupportedCreditCards />
+      </div>
     );
   }
 
@@ -68,14 +74,23 @@ export default async function Home() {
     select: { name: true }
   });
 
+  // Count the quantity of each card type
+  const cardCounts = userCards.reduce((acc, card) => {
+    acc[card.name] = (acc[card.name] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
   const totalAnnualFees = await prisma.predefinedCard.findMany({
     where: {
       name: {
-        in: userCards.map(card => card.name)
+        in: Object.keys(cardCounts)
       }
     }
   }).then(predefinedCards => {
-    return predefinedCards.reduce((total, card) => total + card.annualFee, 0);
+    return predefinedCards.reduce((total, card) => {
+      const quantity = cardCounts[card.name] || 1;
+      return total + (card.annualFee * quantity);
+    }, 0);
   });
 
   const totalClaimedValue = await prisma.benefitStatus.findMany({

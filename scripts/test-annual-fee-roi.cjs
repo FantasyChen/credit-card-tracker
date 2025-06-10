@@ -28,16 +28,24 @@ async function testAnnualFeeROI() {
     console.log(`👤 Testing with user: ${sampleUser.email}`);
     console.log(`💳 User has ${sampleUser.creditCards.length} cards`);
 
-    // Calculate annual fees for user's cards
+    // Calculate annual fees for user's cards, accounting for quantity
     const userCardNames = sampleUser.creditCards.map(card => card.name);
+    
+    // Count the quantity of each card type
+    const cardCounts = sampleUser.creditCards.reduce((acc, card) => {
+      acc[card.name] = (acc[card.name] || 0) + 1;
+      return acc;
+    }, {});
+    
     const predefinedCards = await prisma.predefinedCard.findMany({
       where: {
-        name: { in: userCardNames }
+        name: { in: Object.keys(cardCounts) }
       }
     });
 
     const totalAnnualFees = predefinedCards.reduce((total, card) => {
-      return total + card.annualFee;
+      const quantity = cardCounts[card.name] || 1;
+      return total + (card.annualFee * quantity);
     }, 0);
 
     console.log('\n💰 Annual Fee Breakdown:');

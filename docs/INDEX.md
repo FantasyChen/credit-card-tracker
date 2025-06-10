@@ -9,6 +9,9 @@ Welcome to the CouponCycle documentation! This folder contains all the project d
 - **[DESIGN.md](./DESIGN.md)** - Technical design document and architecture overview
 - **[PLAN.md](./PLAN.md)** - Development roadmap and implementation priorities
 
+### Marketing & Growth
+- **[MARKETING.md](./MARKETING.md)** - Marketing strategies, Reddit campaigns, and growth tactics
+
 ### Operational Guides
 - **[safe-migration-guide.md](./safe-migration-guide.md)** - Database migration best practices and recovery procedures
 
@@ -17,7 +20,8 @@ Welcome to the CouponCycle documentation! This folder contains all the project d
 1. **New to the project?** Start with [README.md](./README.md)
 2. **Want to understand the architecture?** Read [DESIGN.md](./DESIGN.md)
 3. **Planning development work?** Check [PLAN.md](./PLAN.md)
-4. **Working with database migrations?** Review [safe-migration-guide.md](./safe-migration-guide.md)
+4. **Working on marketing/growth?** Review [MARKETING.md](./MARKETING.md)
+5. **Working with database migrations?** Review [safe-migration-guide.md](./safe-migration-guide.md)
 
 ## 📋 Document Summaries
 
@@ -40,6 +44,13 @@ Welcome to the CouponCycle documentation! This folder contains all the project d
 - Vercel cron job details
 - Future considerations
 
+### MARKETING.md
+- Successful Reddit marketing strategies
+- Filter-safe posting techniques
+- Alternative marketing channels
+- Community building approaches
+- Performance tracking and metrics
+
 ### safe-migration-guide.md
 - Database migration best practices
 - Data recovery procedures
@@ -53,7 +64,8 @@ When making significant changes to the project:
 1. **Update README.md** for new features or setup changes
 2. **Update DESIGN.md** for architectural changes
 3. **Update PLAN.md** for roadmap adjustments
-4. **Add to safe-migration-guide.md** for new operational procedures
+4. **Update MARKETING.md** for new campaigns and strategies
+5. **Add to safe-migration-guide.md** for new operational procedures
 
 ---
 
