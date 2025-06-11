@@ -1,8 +1,17 @@
 {
   "name": "coupon-cycle",
   "version": "0.1.0",
-  "private": true,
+  "description": "A smart credit card benefits tracking application that helps you maximize your rewards and never miss valuable perks",
   "type": "module",
+  "keywords": ["credit-cards", "benefits", "tracking", "rewards", "next.js", "react"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FantasyChen/credit-card-tracker.git"
+  },
+  "homepage": "https://github.com/FantasyChen/credit-card-tracker#readme",
+  "bugs": {
+    "url": "https://github.com/FantasyChen/credit-card-tracker/issues"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",

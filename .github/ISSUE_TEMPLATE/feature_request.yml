@@ -1,0 +1,103 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for CouponCycle
+title: "[FEATURE] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please fill out the details below to help us understand your request.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature Summary
+      description: A brief, clear summary of the feature you'd like to see
+      placeholder: What feature would you like to see added?
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What pain point are you experiencing?
+      placeholder: Describe the problem this feature would solve...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your ideal solution in detail
+      placeholder: How would you like this feature to work?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Have you considered any alternative approaches or workarounds?
+      placeholder: What alternatives have you considered?
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      description: How important is this feature to you?
+      options:
+        - Low - Nice to have
+        - Medium - Would be helpful
+        - High - Important for my workflow
+        - Critical - Blocking my usage
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      description: What area of the application does this feature relate to?
+      options:
+        - User Interface/Experience
+        - Credit Card Management
+        - Benefit Tracking
+        - Notifications
+        - Analytics/Reporting
+        - Authentication/Security
+        - Data Import/Export
+        - Mobile Experience
+        - Other
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups/Screenshots
+      description: If you have any mockups, wireframes, or examples, please attach them here
+
+  - type: textarea
+    id: use_cases
+    attributes:
+      label: Use Cases
+      description: Provide specific examples of how you would use this feature
+      placeholder: |
+        1. As a user, I want to...
+        2. In this scenario, I would...
+
+  - type: checkboxes
+    id: implementation
+    attributes:
+      label: Implementation Considerations
+      description: Check any that apply to your feature request
+      options:
+        - label: This feature would require database changes
+        - label: This feature would need new API endpoints
+        - label: This feature involves third-party integrations
+        - label: This feature affects user privacy/security
+        - label: I'm willing to help implement this feature
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context, examples, or references about the feature request here 
