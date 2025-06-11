@@ -94,12 +94,12 @@ export default async function BenefitsDashboardPage() {
   }, {} as Record<string, number>);
 
   const totalAnnualFees = await prisma.predefinedCard.findMany({
-    where: {
-      name: {
+      where: {
+        name: {
         in: Object.keys(cardCountsForFees)
+        }
       }
-    }
-  }).then(predefinedCards => {
+    }).then(predefinedCards => {
     return predefinedCards.reduce((total, card) => {
       const quantity = cardCountsForFees[card.name] || 1;
       return total + (card.annualFee * quantity);

@@ -1,4 +1,4 @@
-import { PrismaClient, BenefitFrequency, CreditCard as PrismaCreditCard, PredefinedCard as PrismaPredefinedCard, BenefitCycleAlignment } from '../src/generated/prisma'; // Adjust path if necessary
+import { PrismaClient, BenefitFrequency, CreditCard as PrismaCreditCard, PredefinedCard as PrismaPredefinedCard, BenefitCycleAlignment, LoyaltyProgramType } from '../src/generated/prisma'; // Adjust path if necessary
 
 const prisma = new PrismaClient();
 
@@ -579,6 +579,148 @@ async function main() {
   }
   console.log('Upsert process finished.');
 
+  // --- Seed Loyalty Programs (only ones with expiration) ---
+  console.log('Seeding loyalty programs...');
+  
+  const loyaltyPrograms = [
+    // Airlines (with expiration)
+    {
+      name: 'american_aadvantage',
+      displayName: 'American Airlines AAdvantage',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'American Airlines',
+      expirationMonths: 24,
+      hasExpiration: true,
+      website: 'https://www.aa.com/aadvantage',
+      description: 'Points expire 24 months after earning or redeeming activity'
+    },
+    {
+      name: 'alaska_mileage_plan',
+      displayName: 'Alaska Mileage Plan',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'Alaska Airlines',
+      expirationMonths: 24,
+      hasExpiration: true,
+      website: 'https://www.alaskaair.com/mileageplan',
+      description: 'Miles expire 24 months after earning or redeeming activity'
+    },
+
+    // Hotels (with expiration)
+    {
+      name: 'marriott_bonvoy',
+      displayName: 'Marriott Bonvoy',
+      type: LoyaltyProgramType.HOTEL,
+      company: 'Marriott International',
+      expirationMonths: 24,
+      hasExpiration: true,
+      website: 'https://www.marriott.com/bonvoy',
+      description: 'Points expire 24 months after last qualifying activity'
+    },
+    {
+      name: 'hilton_honors',
+      displayName: 'Hilton Honors',
+      type: LoyaltyProgramType.HOTEL,
+      company: 'Hilton Worldwide',
+      expirationMonths: 24,
+      hasExpiration: true,
+      website: 'https://www.hilton.com/honors',
+      description: 'Points expire 24 months after last earning or redemption activity'
+    },
+    {
+      name: 'ihg_rewards',
+      displayName: 'IHG One Rewards',
+      type: LoyaltyProgramType.HOTEL,
+      company: 'InterContinental Hotels Group',
+      expirationMonths: 12,
+      hasExpiration: true,
+      website: 'https://www.ihg.com/rewardsclub',
+      description: 'Points expire 12 months after last qualifying activity'
+    },
+    {
+      name: 'hyatt_world',
+      displayName: 'World of Hyatt',
+      type: LoyaltyProgramType.HOTEL,
+      company: 'Hyatt Hotels Corporation',
+      expirationMonths: 24,
+      hasExpiration: true,
+      website: 'https://www.hyatt.com/world-of-hyatt',
+      description: 'Points expire 24 months after last qualifying activity'
+    },
+    {
+      name: 'choice_privileges',
+      displayName: 'Choice Privileges',
+      type: LoyaltyProgramType.HOTEL,
+      company: 'Choice Hotels',
+      expirationMonths: 18,
+      hasExpiration: true,
+      website: 'https://www.choicehotels.com/choice-privileges',
+      description: 'Points expire 18 months after last qualifying activity'
+    },
+    {
+      name: 'accor_live_limitless',
+      displayName: 'Accor Live Limitless (ALL)',
+      type: LoyaltyProgramType.HOTEL,
+      company: 'Accor',
+      expirationMonths: 12,
+      hasExpiration: true,
+      website: 'https://all.accor.com',
+      description: 'Points expire 12 months after last earning activity'
+    },
+
+    // Rental Cars (with expiration)
+    {
+      name: 'hertz_gold_plus_rewards',
+      displayName: 'Hertz Gold Plus Rewards',
+      type: LoyaltyProgramType.RENTAL_CAR,
+      company: 'Hertz',
+      expirationMonths: 12,
+      hasExpiration: true,
+      website: 'https://www.hertz.com/goldplusrewards',
+      description: 'Points expire 12 months after last earning activity'
+    },
+    {
+      name: 'enterprise_plus',
+      displayName: 'Enterprise Plus',
+      type: LoyaltyProgramType.RENTAL_CAR,
+      company: 'Enterprise Rent-A-Car',
+      expirationMonths: 36,
+      hasExpiration: true,
+      website: 'https://www.enterprise.com/plus',
+      description: 'Points expire 36 months after last earning activity'
+    },
+    {
+      name: 'avis_preferred',
+      displayName: 'Avis Preferred',
+      type: LoyaltyProgramType.RENTAL_CAR,
+      company: 'Avis',
+      expirationMonths: 24,
+      hasExpiration: true,
+      website: 'https://www.avis.com/avispreferred',
+      description: 'Points expire 24 months after last earning activity'
+    },
+
+    // Credit Cards (with expiration)
+    {
+      name: 'bank_of_america_rewards',
+      displayName: 'Bank of America Travel Rewards',
+      type: LoyaltyProgramType.CREDIT_CARD,
+      company: 'Bank of America',
+      expirationMonths: 24,
+      hasExpiration: true,
+      website: 'https://www.bankofamerica.com/credit-cards/rewards/',
+      description: 'Points expire 24 months after earning'
+    }
+  ];
+
+  for (const program of loyaltyPrograms) {
+    await prisma.loyaltyProgram.upsert({
+      where: { name: program.name },
+      update: program,
+      create: program,
+    });
+  }
+
+  console.log(`✅ Seeded ${loyaltyPrograms.length} loyalty programs (only those with expiration)`);
   console.log(`Seeding finished.`);
 }
 

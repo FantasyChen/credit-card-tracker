@@ -28,6 +28,8 @@ export default async function NotificationSettingsPage() {
       notifyNewBenefit: true,
       notifyBenefitExpiration: true,
       notifyExpirationDays: true,
+      notifyPointsExpiration: true,
+      pointsExpirationDays: true,
     },
   });
 
@@ -86,24 +88,61 @@ export default async function NotificationSettingsPage() {
           </div>
         </div>
 
-        {/* Expiration Days Setting (conditionally relevant) */} 
-        {/* You might want to hide/disable this if notifyBenefitExpiration is unchecked using client-side JS if needed */}
+        {/* Benefit Expiration Days Setting */}
         <div>
           <label htmlFor="notifyExpirationDays" className="block text-sm font-medium text-gray-700 dark:text-gray-100">
-            Days Before Expiration to Notify
+            Days Before Benefit Expiration to Notify
           </label>
           <div className="mt-1">
             <input
               type="number"
               id="notifyExpirationDays"
               name="notifyExpirationDays"
-              min="1" // Ensure positive number
-              defaultValue={user.notifyExpirationDays} // Set initial value
-              required // Good practice
+              min="1"
+              defaultValue={user.notifyExpirationDays}
+              required
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm max-w-xs dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-500 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
             />
           </div>
-           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter the number of days before the cycle end date to receive the reminder.</p>
+           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter the number of days before the benefit cycle end date to receive the reminder.</p>
+        </div>
+
+        {/* Loyalty Points Expiration Notification Setting */}
+        <div className="flex items-start">
+          <div className="flex items-center h-5">
+            <input
+              id="notifyPointsExpiration"
+              name="notifyPointsExpiration"
+              type="checkbox"
+              defaultChecked={user.notifyPointsExpiration ?? true}
+              className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800"
+            />
+          </div>
+          <div className="ml-3 text-sm">
+            <label htmlFor="notifyPointsExpiration" className="font-medium text-gray-700 dark:text-gray-100">
+              Loyalty Points Expiration Notifications
+            </label>
+            <p className="text-gray-500 dark:text-gray-400">Send an email reminder before your loyalty program points/miles are about to expire.</p>
+          </div>
+        </div>
+
+        {/* Points Expiration Days Setting */}
+        <div>
+          <label htmlFor="pointsExpirationDays" className="block text-sm font-medium text-gray-700 dark:text-gray-100">
+            Days Before Points Expiration to Notify
+          </label>
+          <div className="mt-1">
+            <input
+              type="number"
+              id="pointsExpirationDays"
+              name="pointsExpirationDays"
+              min="1"
+              defaultValue={user.pointsExpirationDays ?? 30}
+              required
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm max-w-xs dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-500 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
+            />
+          </div>
+           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter the number of days before your points/miles expire to receive the reminder.</p>
         </div>
 
         {/* Submit Button */} 

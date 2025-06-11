@@ -14,15 +14,21 @@ export async function updateNotificationSettingsAction(formData: FormData) {
   // Extract data - checkboxes send 'on' when checked, null/undefined otherwise
   const notifyNewBenefit = formData.get('notifyNewBenefit') === 'on';
   const notifyBenefitExpiration = formData.get('notifyBenefitExpiration') === 'on';
+  const notifyPointsExpiration = formData.get('notifyPointsExpiration') === 'on';
   const notifyExpirationDaysString = formData.get('notifyExpirationDays') as string;
+  const pointsExpirationDaysString = formData.get('pointsExpirationDays') as string;
 
   // Validate days input
   let notifyExpirationDays = parseInt(notifyExpirationDaysString, 10);
   if (isNaN(notifyExpirationDays) || notifyExpirationDays < 1) {
-    // Use a default or throw error if invalid. Let's default back to 7 for safety.
-    // Consider adding user feedback about the invalid input.
-    console.warn('Invalid expiration days provided, defaulting to 7.');
+    console.warn('Invalid benefit expiration days provided, defaulting to 7.');
     notifyExpirationDays = 7;
+  }
+
+  let pointsExpirationDays = parseInt(pointsExpirationDaysString, 10);
+  if (isNaN(pointsExpirationDays) || pointsExpirationDays < 1) {
+    console.warn('Invalid points expiration days provided, defaulting to 30.');
+    pointsExpirationDays = 30;
   }
 
   try {
@@ -33,6 +39,8 @@ export async function updateNotificationSettingsAction(formData: FormData) {
         notifyNewBenefit,
         notifyBenefitExpiration,
         notifyExpirationDays,
+        notifyPointsExpiration,
+        pointsExpirationDays,
       },
     });
 
