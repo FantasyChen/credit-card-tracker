@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
-import { BenefitStatus, User, Benefit, CreditCard } from '@/generated/prisma';
+import { BenefitStatus, User, Benefit, CreditCard, LoyaltyAccount, LoyaltyProgram } from '@/generated/prisma';
 
 // Extend Prisma types to ensure relations are included for type safety
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -9,6 +9,9 @@ interface UserWithNotificationPrefs extends User {}
 interface BenefitStatusWithDetails extends BenefitStatus {
   benefit: Benefit & { creditCard: CreditCard };
   user: UserWithNotificationPrefs;
+}
+interface LoyaltyAccountWithDetails extends LoyaltyAccount {
+  loyaltyProgram: LoyaltyProgram;
 }
 
 // Shared core logic for sending notifications
@@ -42,6 +45,7 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
             OR: [
               { notifyNewBenefit: true },
               { notifyBenefitExpiration: true },
+              { notifyPointsExpiration: true },
             ],
           },
           {
@@ -56,6 +60,8 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
         notifyNewBenefit: true,
         notifyBenefitExpiration: true,
         notifyExpirationDays: true,
+        notifyPointsExpiration: true,
+        pointsExpirationDays: true,
       },
     });
 
@@ -70,6 +76,7 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
 
       const newBenefitCyclesToNotify: BenefitStatusWithDetails[] = [];
       const expiringBenefitsToNotify: BenefitStatusWithDetails[] = [];
+      const expiringLoyaltyAccountsToNotify: LoyaltyAccountWithDetails[] = [];
 
       if (user.notifyNewBenefit) {
         const newBenefitStatuses = await prisma.benefitStatus.findMany({
@@ -114,6 +121,32 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
         expiringBenefitsToNotify.push(...expiringStatuses);
       }
 
+      // Check for expiring loyalty program points
+      if (user.notifyPointsExpiration && user.pointsExpirationDays && user.pointsExpirationDays > 0) {
+        const loyaltyReminderDate = new Date(today);
+        loyaltyReminderDate.setDate(today.getDate() + user.pointsExpirationDays);
+        const loyaltyReminderDateStart = new Date(loyaltyReminderDate);
+        loyaltyReminderDateStart.setUTCHours(0,0,0,0);
+        const loyaltyReminderDateEnd = new Date(loyaltyReminderDate);
+        loyaltyReminderDateEnd.setUTCHours(23,59,59,999);
+
+        const expiringLoyaltyAccounts = await prisma.loyaltyAccount.findMany({
+          where: {
+            userId: user.id,
+            isActive: true,
+            expirationDate: {
+              not: null, // Only accounts with expiration dates
+              gte: loyaltyReminderDateStart,
+              lte: loyaltyReminderDateEnd
+            }
+          },
+          include: {
+            loyaltyProgram: true
+          },
+        }) as LoyaltyAccountWithDetails[];
+        expiringLoyaltyAccountsToNotify.push(...expiringLoyaltyAccounts);
+      }
+
       if (newBenefitCyclesToNotify.length > 0) {
         const subject = "Your New Benefit Cycles Have Started!";
         const benefitsListHtml = newBenefitCyclesToNotify.map(status => 
@@ -155,6 +188,35 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
           <ul>${benefitsListHtml}</ul>
           <p>Don\'t miss out!</p>
           <a href="${process.env.NEXTAUTH_URL}/benefits">View Your Benefits</a>
+        `;
+        const success = await sendEmail({ to: user.email, subject, html: htmlBody });
+        if (success) {
+          emailsSent++;
+        } else {
+          console.warn(`Failed to send '${subject}' email to ${user.email}. sendEmail returned false.`);
+        }
+      }
+
+      if (expiringLoyaltyAccountsToNotify.length > 0) {
+        const subject = "Loyalty Points Expiring Soon!";
+        const loyaltyListHtml = expiringLoyaltyAccountsToNotify.map(account => {
+          const expirationDateStr = account.expirationDate 
+            ? account.expirationDate.toLocaleDateString('en-US', { timeZone: 'UTC' })
+            : 'Unknown';
+          return `<li>
+             <strong>${account.loyaltyProgram.displayName}</strong> points
+             expiring on ${expirationDateStr} (in ${user.pointsExpirationDays} day(s)).
+             ${account.accountNumber ? `Account: ${account.accountNumber}` : ''}
+           </li>`;
+        }).join('');
+        
+        const htmlBody = `
+          <h1>Loyalty Points Expiring Soon!</h1>
+          <p>Hi ${user.name || 'there'},</p>
+          <p>The following loyalty program points are expiring soon:</p>
+          <ul>${loyaltyListHtml}</ul>
+          <p>Consider earning or redeeming points to prevent expiration!</p>
+          <a href="${process.env.NEXTAUTH_URL}/loyalty">Manage Your Loyalty Accounts</a>
         `;
         const success = await sendEmail({ to: user.email, subject, html: htmlBody });
         if (success) {

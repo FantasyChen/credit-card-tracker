@@ -9,6 +9,7 @@ jest.mock('@/lib/prisma', () => ({
   prisma: {
     user: { findMany: jest.fn() },
     benefitStatus: { findMany: jest.fn() },
+    loyaltyAccount: { findMany: jest.fn() },
   },
 }));
 
@@ -46,6 +47,7 @@ describe('/api/cron/send-notifications', () => {
 
     (prisma.user.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.benefitStatus.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.loyaltyAccount.findMany as jest.Mock).mockResolvedValue([]);
     (sendEmail as jest.Mock).mockResolvedValue(true); // Default successful email send
     (NextResponse.json as jest.Mock).mockClear();
   });
@@ -64,19 +66,19 @@ describe('/api/cron/send-notifications', () => {
     describe(`${methodName} Authorization`, () => {
       it('should return 500 if CRON_SECRET is not set', async () => {
         delete process.env.CRON_SECRET;
-        const req = new Request('http://localhost', { headers: { 'x-vercel-cron-authorization': 'Bearer test' } });
+        const req = new Request('http://localhost', { headers: { 'authorization': 'Bearer test' } });
         await handler(req);
         expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Cron secret not configured.' }, { status: 500 });
       });
       it('should return 401 if auth header is wrong', async () => {
         process.env.CRON_SECRET = 'secret';
-        const req = new Request('http://localhost', { headers: { 'x-vercel-cron-authorization': 'Bearer wrong' } });
+        const req = new Request('http://localhost', { headers: { 'authorization': 'Bearer wrong' } });
         await handler(req);
         expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Unauthorized' }, { status: 401 });
       });
       it('should proceed if auth is correct', async () => {
         process.env.CRON_SECRET = 'secret';
-        const req = new Request('http://localhost', { headers: { 'x-vercel-cron-authorization': 'Bearer secret' } });
+        const req = new Request('http://localhost', { headers: { 'authorization': 'Bearer secret' } });
         await handler(req);
         expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'No users to notify.' }), { status: 200 });
       });
@@ -89,7 +91,7 @@ describe('/api/cron/send-notifications', () => {
         process.env.CRON_SECRET = 'test-secret'; // Ensure authorized
     });
     const createMockReq = (urlParams = '') => new Request(`http://localhost/api/cron/send-notifications${urlParams}`, { 
-        headers: { 'x-vercel-cron-authorization': 'Bearer test-secret' } 
+        headers: { 'authorization': 'Bearer test-secret' } 
     });
 
     it('should do nothing if no users have notification prefs', async () => {
@@ -106,11 +108,14 @@ describe('/api/cron/send-notifications', () => {
         notifyNewBenefit?: boolean;
         notifyBenefitExpiration?: boolean;
         notifyExpirationDays?: number;
+        notifyPointsExpiration?: boolean;
+        pointsExpirationDays?: number;
     }
 
     const mockUser = (prefs: PartialUserPrefs = {}) => ({
         id: 'user1', email: 'user1@example.com', name: 'Test User',
         notifyNewBenefit: true, notifyBenefitExpiration: true, notifyExpirationDays: 7,
+        notifyPointsExpiration: true, pointsExpirationDays: 30,
         ...prefs
     });
 
@@ -126,6 +131,27 @@ describe('/api/cron/send-notifications', () => {
             cycleStartDate: startDate, cycleEndDate: endDate, isCompleted: false,
             benefit: benefitDetails,
             user: mockUser({ id: userId })
+        };
+    };
+
+    const mockLoyaltyAccount = (id: string, programName: string, expirationDate: Date, userId = 'user1', accountNumber?: string) => {
+        return {
+            id: `loyalty-${id}`,
+            userId,
+            loyaltyProgramId: `program-${id}`,
+            accountNumber,
+            lastActivityDate: new Date('2023-01-01'),
+            expirationDate,
+            isActive: true,
+            loyaltyProgram: {
+                id: `program-${id}`,
+                name: programName.toLowerCase().replace(/\s+/g, '_'),
+                displayName: programName,
+                type: 'AIRLINE',
+                company: programName.split(' ')[0],
+                expirationMonths: 18,
+                hasExpiration: true
+            }
         };
     };
 
@@ -245,6 +271,59 @@ describe('/api/cron/send-notifications', () => {
             to: 'user1@example.com',
             subject: 'Benefit Expiration Reminders',
             html: expect.stringContaining(`expiring on ${actualReminderDateEnd.toLocaleDateString('en-US', {timeZone: 'UTC'})}`)
+        }));
+        expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Notification cron job executed.', usersProcessed: 1, emailsSent: 1 }, { status: 200 });
+    });
+
+    it('should send email for expiring loyalty program points', async () => {
+        const systemTime = utcDate(2023, 8, 15, 11, 0, 0); 
+        const queryToday = utcDate(2023, 8, 15); // Aug 15, 00:00:00 UTC
+
+        const userNotifyDays = 30;
+        
+        // Calculate loyalty reminder dates
+        const loyaltyReminderDateBase = utcDate(queryToday.getUTCFullYear(), queryToday.getUTCMonth() + 1, queryToday.getUTCDate() + userNotifyDays);
+        const actualLoyaltyReminderDateStart = new Date(loyaltyReminderDateBase);
+        actualLoyaltyReminderDateStart.setUTCHours(0,0,0,0);
+        const actualLoyaltyReminderDateEnd = new Date(loyaltyReminderDateBase);
+        actualLoyaltyReminderDateEnd.setUTCHours(23,59,59,999);
+
+        jest.useFakeTimers().setSystemTime(systemTime);
+        (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({ pointsExpirationDays: userNotifyDays })]);
+        
+        // Mock benefit status queries to return empty (no credit card benefits)
+        (prisma.benefitStatus.findMany as jest.Mock)
+            .mockImplementationOnce(async () => []) // New benefits
+            .mockImplementationOnce(async () => []); // Expiring benefits
+        
+        // Mock loyalty account query
+        (prisma.loyaltyAccount.findMany as jest.Mock)
+            .mockImplementationOnce(async (args) => {
+                const userIdMatch = args.where.userId === 'user1';
+                const isActiveMatch = args.where.isActive === true;
+                const expirationDateExists = !!args.where.expirationDate;
+                const notNullMatch = args.where.expirationDate?.not === null;
+                const gteExists = !!args.where.expirationDate?.gte;
+                const gteTimeMatch = args.where.expirationDate?.gte?.getTime() === actualLoyaltyReminderDateStart.getTime();
+                const lteExists = !!args.where.expirationDate?.lte;
+                const lteTimeMatch = args.where.expirationDate?.lte?.getTime() === actualLoyaltyReminderDateEnd.getTime();
+
+                if (userIdMatch && isActiveMatch && expirationDateExists && notNullMatch && gteExists && gteTimeMatch && lteExists && lteTimeMatch) {
+                    return [mockLoyaltyAccount('expiring', 'American Airlines', actualLoyaltyReminderDateEnd, 'user1', 'AA123456')];
+                }
+                return [];
+            });
+        
+        await GET(createMockReq());
+
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+        expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            to: 'user1@example.com',
+            subject: 'Loyalty Points Expiring Soon!',
+            html: expect.stringContaining('American Airlines')
+        }));
+        expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            html: expect.stringContaining(`expiring on ${actualLoyaltyReminderDateEnd.toLocaleDateString('en-US', {timeZone: 'UTC'})}`)
         }));
         expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Notification cron job executed.', usersProcessed: 1, emailsSent: 1 }, { status: 200 });
     });
