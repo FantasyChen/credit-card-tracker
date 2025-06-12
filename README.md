@@ -7,9 +7,10 @@ A smart credit card benefits tracking application that helps you maximize your r
 ## 🚀 Features
 
 - **📊 Automated Benefit Tracking** - Track monthly, quarterly, and yearly credit card benefits
+- **🏆 Loyalty Program Management** - Track 12+ major loyalty programs with expiration monitoring
 - **💰 ROI Analysis** - See if your annual fees are worth it with real-time ROI calculations  
-- **🔔 Smart Notifications** - Get email reminders before benefits expire
-- **📱 Responsive Design** - Works beautifully on desktop and mobile
+- **🔔 Smart Notifications** - Get email reminders before benefits and loyalty points expire
+- **📱 Progressive Web App** - Install as native app on iPhone and Android devices
 - **🌙 Dark Mode** - Automatic theme switching based on system preference
 - **🎯 Drag & Drop** - Customize benefit order with intuitive reordering
 - **🔒 Secure** - Google OAuth authentication with NextAuth.js
@@ -159,12 +160,27 @@ npm start
 - **Styling:** Tailwind CSS with custom components
 - **Testing:** Jest with Testing Library
 
+## 📱 Mobile Installation
+
+### iPhone/iPad (Safari)
+1. Open the website in Safari
+2. Tap the Share button (square with arrow up)
+3. Scroll down and tap "Add to Home Screen"
+4. Tap "Add"
+
+### Android (Chrome)
+1. Open the website in Chrome
+2. Tap the three dots menu (⋮)
+3. Tap "Add to Home screen" or "Install app"
+4. Tap "Add" or "Install"
+
 ## 🗺️ Roadmap
 
+- [x] Loyalty program tracking and notifications
+- [x] Progressive Web App support
 - [ ] Custom card and benefit creation
 - [ ] Data export/import functionality  
 - [ ] Advanced analytics and reporting
-- [ ] Mobile app (React Native)
 - [ ] Bank account integration
 - [ ] Multi-user households
 

@@ -4,7 +4,7 @@
 
 This document outlines the design and development plan for the CouponCycle web application. The primary goal is to help users track their credit card benefits (coupons, credits, etc.), understand their usage cycles (monthly, quarterly, yearly), mark them as completed, and receive timely notifications about upcoming or expiring benefits.
 
-## 2. Current State (as of 2025-05-10)
+## 2. Current State (as of 2025-01-11)
 
 ### 2.1. Technology Stack
 
@@ -23,6 +23,8 @@ This document outlines the design and development plan for the CouponCycle web a
 *   `BenefitStatus`: Tracks the status of *each cycle* of a recurring `Benefit` for a specific `User`. Links to `Benefit` and `User`, includes cycle start/end dates, and a completion flag (`isCompleted`).
 *   `PredefinedCard`: Stores template information for common credit cards (name, issuer, annual fee, image).
 *   `PredefinedBenefit`: Stores template benefit information linked to a `PredefinedCard`.
+*   `LoyaltyProgram`: Stores predefined loyalty programs with expiration policies and qualifying activities.
+*   `LoyaltyAccount`: User's individual loyalty program accounts with last activity dates and calculated expiration dates.
 
 ### 2.3. Implemented Features
 
@@ -35,8 +37,9 @@ This document outlines the design and development plan for the CouponCycle web a
 *   **Annual Fee ROI Tracking:** Automatically calculates and displays Return on Investment for credit card annual fees. Shows total annual fees vs. claimed benefits value on both the main dashboard and benefits page. Uses color-coded widgets (green for profitable, orange for unprofitable) with detailed breakdowns.
 *   **Automated Cron Jobs (Vercel):**
     *   **Benefit Cycle Refresh (`/api/cron/check-benefits`):** Daily cron job proactively updates `BenefitStatus` for all users. Secured via `x-vercel-cron-authorization` header and `CRON_SECRET`.
-    *   **Email Notifications (`/api/cron/send-notifications`):** Daily cron job sends summary emails for new benefit cycles and upcoming expirations using Resend (`lib/email.ts`). Also secured via `x-vercel-cron-authorization` and includes `mockDate` support for testing.
-*   **Notification Settings UI (`/settings/notifications`):** Users can configure email notification preferences. "Save Settings" functionality is implemented.
+    *   **Email Notifications (`/api/cron/send-notifications`):** Daily cron job sends summary emails for new benefit cycles, upcoming benefit expirations, and loyalty program point expirations using Resend (`lib/email.ts`). Also secured via `authorization` header and includes `mockDate` support for testing.
+*   **Loyalty Program Management (`/loyalty`):** Complete system for tracking loyalty program accounts with expiration monitoring. Features dashboard with status widgets, add/edit/delete modals, and automatic expiration date calculation based on program rules.
+*   **Notification Settings UI (`/settings/notifications`):** Users can configure email notification preferences including loyalty program point expiration alerts. "Save Settings" functionality is implemented.
 *   **UI/UX Enhancements:**
     *   Significant improvements to UI responsiveness (e.g., `useTransition`, client components).
     *   Redesigned logged-out homepage with hero section, image, and clear CTAs.
@@ -53,6 +56,11 @@ This document outlines the design and development plan for the CouponCycle web a
     *   `vercel.json` configured for cron jobs (defaulting to `GET` method, secured via headers in API routes).
     *   ESLint configured to ignore `src/generated/**`.
     *   Suspense boundary for `useSearchParams` on client pages.
+*   **Progressive Web App (PWA) Support:**
+    *   Web app manifest (`/manifest.json`) for native app installation on mobile devices.
+    *   iOS Safari and Android Chrome compatibility for "Add to Home Screen" functionality.
+    *   Standalone mode with app-like experience when installed.
+    *   Optimized viewport and theme color configuration.
 
 ## 3. Next Steps & Action Plan
 
