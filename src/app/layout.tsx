@@ -20,7 +20,28 @@ export const metadata: Metadata = {
       url: "/favicon.png",
       sizes: "any", // Hint that the icon can be scaled
     },
+    apple: {
+      url: "/favicon.png",
+      sizes: "180x180",
+    },
   },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "CouponCycle",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#3b82f6",
 };
 
 export default async function RootLayout({
@@ -34,6 +55,17 @@ export default async function RootLayout({
     // Remove suppressHydrationWarning if not needed by original Providers
     // <html lang="en" className="h-full" suppressHydrationWarning>
     <html lang="en" className="h-full">
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="CouponCycle" />
+        <meta name="application-name" content="CouponCycle" />
+        <meta name="msapplication-TileColor" content="#3b82f6" />
+        <meta name="msapplication-tap-highlight" content="no" />
+        <link rel="apple-touch-icon" href="/favicon.png" />
+        <link rel="shortcut icon" href="/favicon.png" />
+      </head>
       {/* <ThemeProviders> */}
       <Providers>{/* Use original Providers */}
         <body
