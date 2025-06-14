@@ -1,0 +1,38 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Database Safety Rules
+# This rule prevents dangerous database operations that could wipe production data.
+
+when: always
+description: "CRITICAL: Never run destructive database commands that could affect production data. Always verify environment and use safe alternatives."
+
+## Forbidden Commands (NEVER RUN):
+- `npx prisma migrate reset` - Wipes ALL data including production
+- `npx prisma migrate reset --force` - Force wipes ALL data 
+- `npx prisma db push --force-reset` - Force resets database schema
+- `DROP DATABASE` or similar SQL commands
+- Any command with `--force-reset` flag
+
+## Safe Alternatives:
+- For local development: Check DATABASE_URL points to local/dev database first
+- For schema changes: Use `npx prisma migrate dev` (creates migration files)
+- For production: Use `npx prisma migrate deploy` (applies migrations safely)
+- For local reset: Verify you're in development environment first
+
+## Before ANY database operation:
+1. Check DATABASE_URL environment variable
+2. Confirm you're NOT connected to production database
+3. Use migration files instead of reset commands
+4. Always backup production data before schema changes
+
+## Emergency Protocol:
+If production data is accidentally affected:
+1. Immediately stop all database operations
+2. Check if database backups are available
+3. Contact database administrator
+4. Document the incident for post-mortem
+
+Remember: Production data is irreplaceable. When in doubt, don't run the command.
