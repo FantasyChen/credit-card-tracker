@@ -49,6 +49,31 @@ function PredefinedCardForm({ card }: { card: PredefinedCard }) {
           <p className="text-gray-600 mb-1 dark:text-gray-300">Issuer: {card.issuer}</p>
           <p className="text-gray-600 mb-4 dark:text-gray-300">Annual Fee: ${card.annualFee}</p>
 
+          {/* --- Add Last 4 Digits Field --- */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-100">
+              Last 4 Digits (Optional)
+            </label>
+            <input
+              type="text"
+              id={`lastFourDigits-${card.id}`}
+              name="lastFourDigits"
+              maxLength={4}
+              pattern="[0-9]{4}"
+              placeholder="1234"
+              className="mt-1 block w-full pl-3 pr-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 dark:placeholder-gray-400"
+              onInput={(e) => {
+                // Only allow numbers
+                const target = e.target as HTMLInputElement;
+                target.value = target.value.replace(/[^0-9]/g, '');
+              }}
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Helps identify your specific card if you have multiple of the same type
+            </p>
+          </div>
+          {/* --- End Last 4 Digits Field --- */}
+
           {/* --- Add Opened Month and Year Select --- */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-100">

@@ -11,6 +11,7 @@ interface ImportCardEntry {
   predefinedCardName: string;
   predefinedCardIssuer: string;
   openedDate: string | null; // Expecting YYYY-MM-DD format
+  lastFourDigits?: string | null; // Optional last 4 digits
 }
 
 interface ImportData {
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
 
     for (const cardEntry of importData.userCards) {
       try {
-        const { predefinedCardName, predefinedCardIssuer, openedDate } = cardEntry;
+        const { predefinedCardName, predefinedCardIssuer, openedDate, lastFourDigits } = cardEntry;
 
         // Validate date format (YYYY-MM-DD) if provided
         let parsedOpenedDate: Date | null = null;
@@ -100,12 +101,23 @@ export async function POST(request: Request) {
           continue; // Skip if already exists
         }
 
+        // Validate last 4 digits if provided
+        let processedLastFourDigits: string | null = null;
+        if (lastFourDigits && lastFourDigits.trim()) {
+          const trimmed = lastFourDigits.trim();
+          if (trimmed.length !== 4 || !/^\d{4}$/.test(trimmed)) {
+            throw new Error(`Invalid last 4 digits for card "${predefinedCardName}": must be exactly 4 numeric digits.`);
+          }
+          processedLastFourDigits = trimmed;
+        }
+
         // --- Use the actual Add Card Logic ---
         console.log(`Attempting to import card: ${predefinedCard.name} for user ${userId}`);
         const addResult = await createCardForUser(
           userId,
           predefinedCard.id,
-          parsedOpenedDate // Pass the parsed Date object or null
+          parsedOpenedDate, // Pass the parsed Date object or null
+          processedLastFourDigits // Pass the last 4 digits
         );
 
         if (!addResult.success) {

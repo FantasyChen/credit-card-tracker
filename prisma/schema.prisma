@@ -57,17 +57,18 @@ model Session {
 }
 
 model CreditCard {
-  id         String    @id @default(cuid())
-  name       String
-  issuer     String
-  cardNumber String?
-  expiryDate DateTime?
-  openedDate DateTime?
-  userId     String
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  benefits   Benefit[]
-  user       User      @relation(fields: [userId], references: [id])
+  id             String    @id @default(cuid())
+  name           String
+  issuer         String
+  cardNumber     String?
+  lastFourDigits String?   // New field for last 4 digits identifier
+  expiryDate     DateTime?
+  openedDate     DateTime?
+  userId         String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  benefits       Benefit[]
+  user           User      @relation(fields: [userId], references: [id])
 }
 
 model Benefit {

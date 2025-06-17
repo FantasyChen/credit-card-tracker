@@ -49,6 +49,9 @@ function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.D
        <div> {/* Content wrapper */}
         <h2 className="text-xl font-semibold mb-2 dark:text-gray-100">{card.displayName || card.name}</h2> {/* Use displayName */}
         <p className="text-gray-600 mb-1 dark:text-gray-300">Issuer: {card.issuer}</p>
+        {card.lastFourDigits && (
+           <p className="text-sm text-gray-500 mb-1 dark:text-gray-400">Last 4 digits: ****{card.lastFourDigits}</p>
+        )}
         {card.openedDate && (
            <p className="text-sm text-gray-500 mb-3 dark:text-gray-400">Opened: {formatOpenedDate(card.openedDate)}</p>
         )}
@@ -66,17 +69,25 @@ function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.D
         )}
        </div>
 
-       {/* Delete Form and Button */}
-       <form onSubmit={handleDelete} className="mt-4 text-right">
-          <input type="hidden" name="cardId" value={card.id} />
-          <button
-             type="submit"
-             disabled={isPending} // Disable button while deleting
-             className={`text-xs px-3 py-1 rounded transition duration-200 ${isPending ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400' : 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-800/40'}`}
-           >
-             {isPending ? 'Removing...' : 'Remove'}
-           </button>
-        </form>
+       {/* Action Buttons */}
+       <div className="mt-4 flex justify-between items-center">
+          <Link
+            href={`/cards/${card.id}/edit`}
+            className="text-xs px-3 py-1 rounded transition duration-200 bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-800/40"
+          >
+            Edit
+          </Link>
+          <form onSubmit={handleDelete} className="inline">
+            <input type="hidden" name="cardId" value={card.id} />
+            <button
+               type="submit"
+               disabled={isPending} // Disable button while deleting
+               className={`text-xs px-3 py-1 rounded transition duration-200 ${isPending ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400' : 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-800/40'}`}
+             >
+               {isPending ? 'Removing...' : 'Remove'}
+             </button>
+          </form>
+       </div>
     </div>
   );
 }

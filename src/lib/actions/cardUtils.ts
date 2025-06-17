@@ -15,7 +15,8 @@ interface CreateCardResult {
 export async function createCardForUser(
   userId: string,
   predefinedCardId: string,
-  openedDateInput: Date | null
+  openedDateInput: Date | null,
+  lastFourDigits?: string | null
 ): Promise<CreateCardResult> {
   console.log('--- Running createCardForUser ---');
   console.log('User ID:', userId);
@@ -66,6 +67,7 @@ export async function createCardForUser(
         issuer: predefinedCard.issuer,
         userId: userId,
         openedDate: openedDate, // Use the determined openedDate
+        lastFourDigits: lastFourDigits || null, // Include last 4 digits if provided
       },
     });
     console.log('createCardForUser: Created CreditCard ID:', newCreditCard.id);
