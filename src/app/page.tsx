@@ -150,18 +150,18 @@ export default async function Home() {
       <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {/* Total Cards Widget */}
         <div className="group overflow-hidden rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300 dark:from-indigo-900/20 dark:to-indigo-800/20 border border-indigo-200 dark:border-indigo-700">
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
              <div className="flex items-center">
                 <div className="flex-shrink-0">
-                    <div className="p-3 bg-indigo-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
-                      <CreditCardIcon className="h-6 w-6 text-white" aria-hidden="true" />
+                    <div className="p-2 sm:p-3 bg-indigo-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                      <CreditCardIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white" aria-hidden="true" />
                     </div>
                 </div>
-                <div className="ml-5 w-0 flex-1">
+                <div className="ml-3 sm:ml-4 flex-1 min-w-0">
                     <dl>
-                        <dt className="truncate text-sm font-medium text-indigo-600 dark:text-indigo-300">Total Cards</dt>
+                        <dt className="text-sm font-medium text-indigo-600 dark:text-indigo-300">Total Cards</dt>
                         <dd>
-                            <div className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">{cardCount}</div>
+                            <div className="text-lg sm:text-2xl font-bold text-indigo-900 dark:text-indigo-100">{cardCount}</div>
                         </dd>
                     </dl>
                 </div>
@@ -181,20 +181,20 @@ export default async function Home() {
 
         {/* Benefits Claimed Widget */}
         <div className="group overflow-hidden rounded-xl bg-gradient-to-br from-green-50 to-emerald-100 shadow-lg hover:shadow-xl transition-all duration-300 dark:from-green-900/20 dark:to-emerald-800/20 border border-green-200 dark:border-green-700">
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
              <div className="flex items-center">
                 <div className="flex-shrink-0">
-                    <div className="p-3 bg-green-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
-                      <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="p-2 sm:p-3 bg-green-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                       </svg>
                     </div>
                 </div>
-                <div className="ml-5 w-0 flex-1">
+                <div className="ml-3 sm:ml-4 flex-1 min-w-0">
                     <dl>
-                        <dt className="truncate text-sm font-medium text-green-600 dark:text-green-300">Benefits Claimed</dt>
+                        <dt className="text-sm font-medium text-green-600 dark:text-green-300">Benefits Claimed</dt>
                         <dd>
-                            <div className="text-2xl font-bold text-green-900 dark:text-green-100">${totalClaimedValue.toFixed(2)}</div>
+                            <div className="text-lg sm:text-2xl font-bold text-green-900 dark:text-green-100">${totalClaimedValue.toFixed(2)}</div>
                         </dd>
                     </dl>
                 </div>
@@ -218,28 +218,28 @@ export default async function Home() {
             ? 'bg-gradient-to-br from-emerald-50 to-green-100 dark:from-emerald-900/20 dark:to-green-800/20 border-emerald-200 dark:border-emerald-700' 
             : 'bg-gradient-to-br from-orange-50 to-red-100 dark:from-orange-900/20 dark:to-red-800/20 border-orange-200 dark:border-orange-700'
         }`}>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
              <div className="flex items-center">
                 <div className="flex-shrink-0">
-                    <div className={`p-3 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 ${
+                    <div className={`p-2 sm:p-3 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 ${
                       totalClaimedValue >= totalAnnualFees 
                         ? 'bg-emerald-500' 
                         : 'bg-orange-500'
                     }`}>
                       {totalClaimedValue >= totalAnnualFees ? (
-                        <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       ) : (
-                        <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                         </svg>
                       )}
                     </div>
                 </div>
-                <div className="ml-5 w-0 flex-1">
+                <div className="ml-3 sm:ml-4 flex-1 min-w-0">
                     <dl>
-                        <dt className={`truncate text-sm font-medium ${
+                        <dt className={`text-sm font-medium ${
                           totalClaimedValue >= totalAnnualFees 
                             ? 'text-emerald-600 dark:text-emerald-300' 
                             : 'text-orange-600 dark:text-orange-300'
@@ -247,7 +247,7 @@ export default async function Home() {
                           Annual Fee ROI
                         </dt>
                         <dd>
-                            <div className={`text-2xl font-bold ${
+                            <div className={`text-lg sm:text-2xl font-bold ${
                               totalClaimedValue >= totalAnnualFees 
                                 ? 'text-emerald-900 dark:text-emerald-100' 
                                 : 'text-orange-900 dark:text-orange-100'
@@ -322,9 +322,9 @@ export default async function Home() {
              <ul role="list" className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                 {upcomingBenefits.map((status) => (
                     <li key={status.id} className="group px-6 py-5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4 flex-1 min-w-0">
-                                <div className="flex-shrink-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                            <div className="flex items-start space-x-3 flex-1 min-w-0">
+                                <div className="flex-shrink-0 mt-0.5">
                                   <div className="p-2 bg-indigo-100 rounded-lg dark:bg-indigo-800/30">
                                     <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -332,34 +332,34 @@ export default async function Home() {
                                   </div>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-base font-semibold text-indigo-600 dark:text-indigo-400 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors">
+                                    <p className="text-sm sm:text-base font-semibold text-indigo-600 dark:text-indigo-400 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors leading-tight">
                                       {status.benefit.description}
                                     </p>
-                                    <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                                      <span className="flex items-center">
-                                        <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div className="mt-1 space-y-1">
+                                      <div className="flex items-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                                        <svg className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                         </svg>
-                                        {status.benefit.creditCard.name}
-                                      </span>
+                                        <span className="truncate">{status.benefit.creditCard.name}</span>
+                                      </div>
                                       {status.benefit.maxAmount && (
-                                        <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                                        <div className="text-xs sm:text-sm font-semibold text-indigo-600 dark:text-indigo-400">
                                           ${status.benefit.maxAmount.toFixed(2)}
-                                        </span>
+                                        </div>
                                       )}
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center space-x-4">
-                                <div className="text-right">
-                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            <div className="flex items-center justify-between sm:justify-end sm:space-x-3">
+                                <div className="text-left sm:text-right">
+                                  <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
                                     Due: {formatDate(status.cycleEndDate)}
                                   </p>
                                   <p className="text-xs text-gray-500 dark:text-gray-400">
                                     {Math.ceil((new Date(status.cycleEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
                                   </p>
                                 </div>
-                                <svg className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors flex-shrink-0 sm:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                             </div>

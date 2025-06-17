@@ -178,12 +178,12 @@ export default function BenefitsDisplayClient({
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold dark:text-white">Benefits Dashboard</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold dark:text-white">Benefits Dashboard</h1>
         <button
           onClick={toggleDragMode}
           disabled={isPending}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors self-start sm:self-auto ${
             isDragMode
               ? 'bg-green-600 hover:bg-green-700 text-white'
               : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -206,11 +206,11 @@ export default function BenefitsDisplayClient({
                   </svg>
                 </div>
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-4 sm:ml-5 flex-1 min-w-0">
                 <dl>
-                  <dt className="truncate text-sm font-medium text-blue-600 dark:text-blue-300">Total Value of Upcoming Benefits</dt>
+                  <dt className="text-sm font-medium text-blue-600 dark:text-blue-300">Total Value of Upcoming Benefits</dt>
                   <dd>
-                    <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">${localTotalUnusedValue.toFixed(2)}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-blue-900 dark:text-blue-100">${localTotalUnusedValue.toFixed(2)}</div>
                   </dd>
                 </dl>
               </div>
@@ -229,11 +229,11 @@ export default function BenefitsDisplayClient({
                   </svg>
                 </div>
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-4 sm:ml-5 flex-1 min-w-0">
                 <dl>
-                  <dt className="truncate text-sm font-medium text-green-600 dark:text-green-300">Total Value of Claimed Benefits</dt>
+                  <dt className="text-sm font-medium text-green-600 dark:text-green-300">Total Value of Claimed Benefits</dt>
                   <dd>
-                    <div className="text-2xl font-bold text-green-900 dark:text-green-100">${localTotalUsedValue.toFixed(2)}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-green-900 dark:text-green-100">${localTotalUsedValue.toFixed(2)}</div>
                   </dd>
                 </dl>
               </div>
@@ -266,9 +266,9 @@ export default function BenefitsDisplayClient({
                   )}
                 </div>
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-4 sm:ml-5 flex-1 min-w-0">
                 <dl>
-                  <dt className={`truncate text-sm font-medium ${
+                  <dt className={`text-sm font-medium ${
                     localTotalUsedValue >= totalAnnualFees 
                       ? 'text-emerald-600 dark:text-emerald-300' 
                       : 'text-orange-600 dark:text-orange-300'
@@ -277,7 +277,7 @@ export default function BenefitsDisplayClient({
                   </dt>
                   <dd>
                     <div className="space-y-1">
-                      <div className={`text-2xl font-bold ${
+                      <div className={`text-xl sm:text-2xl font-bold ${
                         localTotalUsedValue >= totalAnnualFees 
                           ? 'text-emerald-900 dark:text-emerald-100' 
                           : 'text-orange-900 dark:text-orange-100'
@@ -309,27 +309,29 @@ export default function BenefitsDisplayClient({
       )}
 
       {/* Tabs */}
-      <div className="mb-4 border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+      <div className="mb-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+        <nav className="-mb-px flex space-x-4 sm:space-x-8 min-w-max" aria-label="Tabs">
           <button
             onClick={() => setActiveTab('upcoming')}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm 
+            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm 
               ${activeTab === 'upcoming' 
                 ? 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' 
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}
             `}
           >
-            Upcoming / Pending Benefits ({localUpcomingBenefits.length})
+            <span className="hidden sm:inline">Upcoming / Pending Benefits ({localUpcomingBenefits.length})</span>
+            <span className="sm:hidden">Upcoming ({localUpcomingBenefits.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('completed')}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm 
+            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm 
               ${activeTab === 'completed' 
                 ? 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' 
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}
             `}
           >
-            Claimed Benefits ({localCompletedBenefits.length})
+            <span className="hidden sm:inline">Claimed Benefits ({localCompletedBenefits.length})</span>
+            <span className="sm:hidden">Claimed ({localCompletedBenefits.length})</span>
           </button>
         </nav>
       </div>
