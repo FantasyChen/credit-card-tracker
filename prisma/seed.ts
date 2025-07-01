@@ -262,6 +262,13 @@ async function main() {
           fixedCycleDurationMonths: 6,
         },
         {
+          description: '$50 Quarterly Hilton Credit ($200 annual)',
+          category: 'Travel',
+          maxAmount: 50,
+          frequency: BenefitFrequency.QUARTERLY,
+          percentage: 0,
+        },
+        {
           description: '$10 Monthly Wireless Credit',
           category: 'Utilities',
           maxAmount: 10,
