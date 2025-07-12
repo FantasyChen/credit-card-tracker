@@ -1,8 +1,27 @@
 # Safe Database Migration Guide
 
+## 🚨 CRITICAL WARNING - READ FIRST 🚨
+
+**NEVER RUN THESE COMMANDS:**
+- `npx prisma migrate reset` - Wipes ALL data including production
+- `npx prisma migrate reset --force` - Force wipes ALL data 
+- `npx prisma db push --force-reset` - Force resets database schema
+- `DROP DATABASE` or similar SQL commands
+- Any command with `--force-reset` flag
+
+**INCIDENT REPORT: 2024-12-19**
+During feature development, `npx prisma db push --force-reset` was accidentally run, which **completely wiped all user data** from the database. This happened despite having clear workspace rules against such commands.
+
+**Before ANY database operation:**
+1. ✅ Check DATABASE_URL environment variable
+2. ✅ Confirm you're NOT connected to production database
+3. ✅ Ask users to export their data if this affects production
+4. ✅ Use migration files instead of reset commands
+5. ✅ Always backup production data before schema changes
+
 ## What Happened
 
-The recent addition of the `orderIndex` field to the `BenefitStatus` model required a database migration. Unfortunately, due to a database drift issue, we ran `npx prisma migrate reset --force` which completely wiped all user data.
+The recent addition of the `isNotUsable` field to the `BenefitStatus` model required a database migration. Unfortunately, due to a database drift issue, we ran `npx prisma db push --force-reset` which completely wiped all user data.
 
 **The migration itself was safe** - it only added a nullable column. The data loss was caused by the reset command.
 
@@ -25,6 +44,16 @@ If no export is available, you'll need to manually re-add your credit cards:
 3. Benefits will be automatically created and tracked
 
 ## For Developers: Safe Migration Practices
+
+### MANDATORY Pre-Migration Checklist
+
+Before running ANY database command, you MUST:
+
+- [ ] Verify DATABASE_URL points to development database
+- [ ] Check if there's any important user data that would be lost
+- [ ] Notify users to export their data if this could affect production
+- [ ] Never use commands with `--force-reset` in production
+- [ ] Use `npx prisma migrate dev` instead of `db push` for schema changes
 
 ### Before Running Migrations
 
@@ -53,11 +82,14 @@ npx prisma migrate dev --name descriptive_migration_name
 # ✅ SAFE: Apply existing migrations to production
 npx prisma migrate deploy
 
+# ✅ SAFE: Check what would change without applying
+npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma
+
 # ❌ DESTRUCTIVE: Only use in development with no important data
 npx prisma migrate reset --force
 
-# ✅ SAFE: Check what would change without applying
-npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma
+# ❌ EXTREMELY DESTRUCTIVE: NEVER USE THIS
+npx prisma db push --force-reset
 ```
 
 ### Handling Drift
@@ -77,6 +109,7 @@ When you encounter drift (schema doesn't match migrations):
 3. **Only reset as last resort in development:**
    ```bash
    # Make sure users export their data first!
+   # Double-check DATABASE_URL first!
    npx prisma migrate reset --force
    ```
 

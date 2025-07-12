@@ -2,15 +2,16 @@
 
 import React, { useTransition } from 'react';
 import { formatDate } from '@/lib/dateUtils';
-import { toggleBenefitStatusAction } from '@/app/benefits/actions'; // Ensure this path is correct
+import { toggleBenefitStatusAction, markBenefitAsNotUsableAction } from '@/app/benefits/actions'; // Ensure this path is correct
 import type { DisplayBenefitStatus } from '@/app/benefits/page'; // Import the shared type
 
 interface BenefitCardClientProps {
   status: DisplayBenefitStatus;
   onStatusChange?: (statusId: string, newIsCompleted: boolean) => void;
+  onNotUsableChange?: (statusId: string, newIsNotUsable: boolean) => void;
 }
 
-export default function BenefitCardClient({ status, onStatusChange }: BenefitCardClientProps) {
+export default function BenefitCardClient({ status, onStatusChange, onNotUsableChange }: BenefitCardClientProps) {
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -30,18 +31,38 @@ export default function BenefitCardClient({ status, onStatusChange }: BenefitCar
     });
   };
 
+  const handleNotUsableSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const newIsNotUsable = !status.isNotUsable;
+    
+    startTransition(async () => {
+      try {
+        await markBenefitAsNotUsableAction(formData);
+        // Call the callback to update parent state
+        onNotUsableChange?.(status.id, newIsNotUsable);
+      } catch (error) {
+        console.error('Failed to mark benefit as not usable:', error);
+        // You might want to show an error message to the user here
+      }
+    });
+  };
+
   const isCompleted = status.isCompleted;
+  const isNotUsable = status.isNotUsable;
   const benefitAmount = status.benefit.maxAmount || 0;
 
   return (
     <div className={`group relative overflow-hidden rounded-xl border transition-all duration-300 hover:shadow-lg ${
       isCompleted 
         ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-700' 
-        : 'bg-white border-gray-200 hover:border-indigo-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:border-indigo-600'
+        : isNotUsable
+          ? 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200 dark:from-gray-900/20 dark:to-slate-900/20 dark:border-gray-700'
+          : 'bg-white border-gray-200 hover:border-indigo-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:border-indigo-600'
     }`}>
       {/* Status indicator */}
       <div className={`absolute top-0 left-0 w-1 h-full ${
-        isCompleted ? 'bg-green-500' : 'bg-indigo-500'
+        isCompleted ? 'bg-green-500' : isNotUsable ? 'bg-gray-500' : 'bg-indigo-500'
       }`} />
       
       <div className="p-4 sm:p-6">
@@ -52,11 +73,17 @@ export default function BenefitCardClient({ status, onStatusChange }: BenefitCar
             <div className={`flex-shrink-0 p-2 rounded-lg ${
               isCompleted 
                 ? 'bg-green-100 dark:bg-green-800/30' 
-                : 'bg-indigo-100 dark:bg-indigo-800/30'
+                : isNotUsable
+                  ? 'bg-gray-100 dark:bg-gray-800/30'
+                  : 'bg-indigo-100 dark:bg-indigo-800/30'
             }`}>
               {isCompleted ? (
                 <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : isNotUsable ? (
+                <svg className="h-5 w-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
                 </svg>
               ) : (
                 <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -72,7 +99,9 @@ export default function BenefitCardClient({ status, onStatusChange }: BenefitCar
                 <p className={`text-lg sm:text-xl font-bold mt-1 ${
                   isCompleted 
                     ? 'text-green-600 dark:text-green-400' 
-                    : 'text-indigo-600 dark:text-indigo-400'
+                    : isNotUsable
+                      ? 'text-gray-600 dark:text-gray-400'
+                      : 'text-indigo-600 dark:text-indigo-400'
                 }`}>
                   ${benefitAmount.toFixed(2)}
                 </p>
@@ -105,49 +134,96 @@ export default function BenefitCardClient({ status, onStatusChange }: BenefitCar
             </div>
           </div>
           
-          {/* Action button - full width on mobile, fixed width on larger screens */}
+          {/* Action buttons - full width on mobile, fixed width on larger screens */}
           <div className="pl-11">
-            <form onSubmit={handleSubmit}>
-              <input type="hidden" name="benefitStatusId" value={status.id} />
-              <input type="hidden" name="isCompleted" value={status.isCompleted.toString()} />
-              <button
-                type="submit"
-                disabled={isPending}
-                className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                  isCompleted
-                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-lg hover:shadow-xl focus:ring-yellow-500 dark:bg-yellow-600 dark:hover:bg-yellow-700'
-                    : 'bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl focus:ring-green-500 dark:bg-green-600 dark:hover:bg-green-700'
-                } ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
-              >
-                {isPending ? (
-                  <div className="flex items-center justify-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Updating...
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center">
-                    {isCompleted ? (
-                      <>
-                        <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <div className="flex flex-col sm:flex-row gap-2">
+              <form onSubmit={handleSubmit}>
+                <input type="hidden" name="benefitStatusId" value={status.id} />
+                <input type="hidden" name="isCompleted" value={status.isCompleted.toString()} />
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                    isCompleted
+                      ? 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-lg hover:shadow-xl focus:ring-yellow-500 dark:bg-yellow-600 dark:hover:bg-yellow-700'
+                      : 'bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl focus:ring-green-500 dark:bg-green-600 dark:hover:bg-green-700'
+                  } ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                >
+                  {isPending ? (
+                    <div className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Updating...
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      {isCompleted ? (
+                        <>
+                          <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Mark Pending
+                        </>
+                      ) : (
+                        <>
+                          <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Mark Complete
+                        </>
+                      )}
+                    </div>
+                  )}
+                </button>
+              </form>
+              
+              {/* Not Usable button - only show for upcoming benefits */}
+              {!isCompleted && (
+                <form onSubmit={handleNotUsableSubmit}>
+                  <input type="hidden" name="benefitStatusId" value={status.id} />
+                  <input type="hidden" name="isNotUsable" value={status.isNotUsable.toString()} />
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                      isNotUsable
+                        ? 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-lg hover:shadow-xl focus:ring-indigo-500 dark:bg-indigo-600 dark:hover:bg-indigo-700'
+                        : 'bg-gray-500 hover:bg-gray-600 text-white shadow-lg hover:shadow-xl focus:ring-gray-500 dark:bg-gray-600 dark:hover:bg-gray-700'
+                    } ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                  >
+                    {isPending ? (
+                      <div className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Mark Pending
-                      </>
+                        Updating...
+                      </div>
                     ) : (
-                      <>
-                        <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Mark Complete
-                      </>
+                      <div className="flex items-center justify-center">
+                        {isNotUsable ? (
+                          <>
+                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Mark Usable
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                            Not Usable
+                          </>
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </button>
-            </form>
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       </div>

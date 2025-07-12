@@ -53,6 +53,50 @@ export async function toggleBenefitStatusAction(formData: FormData) {
   // No redirect needed, revalidation handles the UI update
 }
 
+export async function markBenefitAsNotUsableAction(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated.');
+  }
+
+  const benefitStatusId = formData.get('benefitStatusId') as string;
+  const currentIsNotUsable = formData.get('isNotUsable') === 'true';
+
+  if (!benefitStatusId) {
+    throw new Error('Benefit Status ID is missing.');
+  }
+
+  const newIsNotUsable = !currentIsNotUsable;
+
+  try {
+    // Verify the status belongs to the current user before updating
+    const updatedStatus = await prisma.benefitStatus.updateMany({
+      where: {
+        id: benefitStatusId,
+        userId: session.user.id, // Ensure user owns this status record
+      },
+      data: {
+        isNotUsable: newIsNotUsable,
+        // If marking as not usable, also ensure it's not marked as completed
+        ...(newIsNotUsable && { isCompleted: false, completedAt: null }),
+      },
+    });
+
+    if (updatedStatus.count === 0) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
+
+    console.log(`Benefit status ${benefitStatusId} marked as not usable: ${newIsNotUsable}`);
+
+    // Revalidate the benefits page to show the change
+    revalidatePath('/benefits');
+
+  } catch (error) {
+    console.error('Error marking benefit as not usable:', error);
+    throw new Error('Failed to update benefit status.');
+  }
+}
+
 export async function updateBenefitOrderAction(benefitStatusIds: string[]) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {

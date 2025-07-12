@@ -10,9 +10,10 @@ interface DraggableBenefitCardProps {
   status: DisplayBenefitStatus;
   isDragMode: boolean;
   onStatusChange?: (statusId: string, newIsCompleted: boolean) => void;
+  onNotUsableChange?: (statusId: string, newIsNotUsable: boolean) => void;
 }
 
-export default function DraggableBenefitCard({ status, isDragMode, onStatusChange }: DraggableBenefitCardProps) {
+export default function DraggableBenefitCard({ status, isDragMode, onStatusChange, onNotUsableChange }: DraggableBenefitCardProps) {
   const {
     attributes,
     listeners,
@@ -49,7 +50,7 @@ export default function DraggableBenefitCard({ status, isDragMode, onStatusChang
         </div>
       )}
       <div className={isDragMode ? 'pl-6' : ''}>
-        <BenefitCardClient status={status} onStatusChange={onStatusChange} />
+        <BenefitCardClient status={status} onStatusChange={onStatusChange} onNotUsableChange={onNotUsableChange} />
       </div>
     </div>
   );

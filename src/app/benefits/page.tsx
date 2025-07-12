@@ -129,14 +129,16 @@ export default async function BenefitsDashboardPage() {
     return cycleStartDate <= now;
   });
 
-  // Only show benefits where now is within the cycle and not completed
+  // Separate benefits into categories
   const upcomingBenefits = activeOrPastCycleStatuses.filter(status => {
     const cycleStartDate = new Date(status.cycleStartDate);
     const cycleEndDate = new Date(status.cycleEndDate);
-    return !status.isCompleted && cycleStartDate <= now && now <= cycleEndDate;
+    return !status.isCompleted && !status.isNotUsable && cycleStartDate <= now && now <= cycleEndDate;
   });
 
   const completedBenefits = activeOrPastCycleStatuses.filter(status => status.isCompleted);
+
+  const notUsableBenefits = activeOrPastCycleStatuses.filter(status => status.isNotUsable);
 
   // Calculate total values based on filtered, active/past cycle statuses
   const totalUnusedValue = upcomingBenefits.reduce((sum, status) => {
@@ -147,13 +149,19 @@ export default async function BenefitsDashboardPage() {
     return sum + (status.benefit.maxAmount || 0);
   }, 0);
 
+  const totalNotUsableValue = notUsableBenefits.reduce((sum, status) => {
+    return sum + (status.benefit.maxAmount || 0);
+  }, 0);
+
   // --- Render Component --- 
   return (
     <BenefitsDisplayClient
       upcomingBenefits={upcomingBenefits}
       completedBenefits={completedBenefits}
+      notUsableBenefits={notUsableBenefits}
       totalUnusedValue={totalUnusedValue}
       totalUsedValue={totalUsedValue}
+      totalNotUsableValue={totalNotUsableValue}
       totalAnnualFees={totalAnnualFees}
     />
   );

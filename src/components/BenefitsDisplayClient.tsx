@@ -25,24 +25,30 @@ import Link from 'next/link';
 interface BenefitsDisplayProps {
   upcomingBenefits: DisplayBenefitStatus[];
   completedBenefits: DisplayBenefitStatus[];
+  notUsableBenefits: DisplayBenefitStatus[];
   totalUnusedValue: number;
   totalUsedValue: number;
+  totalNotUsableValue: number;
   totalAnnualFees: number;
 }
 
 export default function BenefitsDisplayClient({
   upcomingBenefits,
   completedBenefits,
+  notUsableBenefits,
   totalUnusedValue,
   totalUsedValue,
+  totalNotUsableValue,
   totalAnnualFees,
 }: BenefitsDisplayProps) {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isDragMode, setIsDragMode] = useState(false);
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
+  const [localNotUsableBenefits, setLocalNotUsableBenefits] = useState(notUsableBenefits);
   const [localTotalUnusedValue, setLocalTotalUnusedValue] = useState(totalUnusedValue);
   const [localTotalUsedValue, setLocalTotalUsedValue] = useState(totalUsedValue);
+  const [localTotalNotUsableValue, setLocalTotalNotUsableValue] = useState(totalNotUsableValue);
   const [isPending, startTransition] = useTransition();
 
   const sensors = useSensors(
@@ -82,6 +88,36 @@ export default function BenefitsDisplayClient({
     }
   };
 
+  const handleNotUsableChange = (statusId: string, newIsNotUsable: boolean) => {
+    if (newIsNotUsable) {
+      // Moving from upcoming to not usable
+      const benefitToMove = localUpcomingBenefits.find(b => b.id === statusId);
+      if (benefitToMove) {
+        const updatedBenefit = { ...benefitToMove, isNotUsable: true, isCompleted: false, completedAt: null };
+        setLocalUpcomingBenefits(prev => prev.filter(b => b.id !== statusId));
+        setLocalNotUsableBenefits(prev => [...prev, updatedBenefit]);
+        
+        // Update totals
+        const benefitValue = benefitToMove.benefit.maxAmount || 0;
+        setLocalTotalUnusedValue(prev => prev - benefitValue);
+        setLocalTotalNotUsableValue(prev => prev + benefitValue);
+      }
+    } else {
+      // Moving from not usable back to upcoming
+      const benefitToMove = localNotUsableBenefits.find(b => b.id === statusId);
+      if (benefitToMove) {
+        const updatedBenefit = { ...benefitToMove, isNotUsable: false };
+        setLocalNotUsableBenefits(prev => prev.filter(b => b.id !== statusId));
+        setLocalUpcomingBenefits(prev => [...prev, updatedBenefit]);
+        
+        // Update totals
+        const benefitValue = benefitToMove.benefit.maxAmount || 0;
+        setLocalTotalNotUsableValue(prev => prev - benefitValue);
+        setLocalTotalUnusedValue(prev => prev + benefitValue);
+      }
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -90,8 +126,26 @@ export default function BenefitsDisplayClient({
     }
 
     const isUpcomingTab = activeTab === 'upcoming';
-    const items = isUpcomingTab ? localUpcomingBenefits : localCompletedBenefits;
-    const setItems = isUpcomingTab ? setLocalUpcomingBenefits : setLocalCompletedBenefits;
+    const isCompletedTab = activeTab === 'completed';
+    const isNotUsableTab = activeTab === 'not-usable';
+    
+    let items: DisplayBenefitStatus[] = [];
+    let setItems: React.Dispatch<React.SetStateAction<DisplayBenefitStatus[]>>;
+    
+    if (isUpcomingTab) {
+      items = localUpcomingBenefits;
+      setItems = setLocalUpcomingBenefits;
+    } else if (isCompletedTab) {
+      items = localCompletedBenefits;
+      setItems = setLocalCompletedBenefits;
+    } else if (isNotUsableTab) {
+      items = localNotUsableBenefits;
+      setItems = setLocalNotUsableBenefits;
+    } else {
+      // Fallback to avoid the setItems error
+      items = localUpcomingBenefits;
+      setItems = setLocalUpcomingBenefits;
+    }
 
     const oldIndex = items.findIndex((item) => item.id === active.id);
     const newIndex = items.findIndex((item) => item.id === over.id);
@@ -121,12 +175,16 @@ export default function BenefitsDisplayClient({
             </svg>
           </div>
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-            {activeTab === 'upcoming' ? 'No upcoming benefits' : 'No completed benefits yet'}
+            {activeTab === 'upcoming' ? 'No upcoming benefits' : 
+             activeTab === 'completed' ? 'No completed benefits yet' : 
+             'No not usable benefits'}
           </h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
             {activeTab === 'upcoming' 
               ? 'Add credit cards with benefits to start tracking your rewards and credits.'
-              : 'Mark benefits as complete when you use them to track your ROI.'
+              : activeTab === 'completed' 
+                ? 'Mark benefits as complete when you use them to track your ROI.'
+                : 'Benefits marked as not usable will appear here.'
             }
           </p>
           {activeTab === 'upcoming' && (
@@ -159,6 +217,7 @@ export default function BenefitsDisplayClient({
                   status={status}
                   isDragMode={isDragMode}
                   onStatusChange={handleStatusChange}
+                  onNotUsableChange={handleNotUsableChange}
                 />
               ))}
             </div>
@@ -170,7 +229,7 @@ export default function BenefitsDisplayClient({
     return (
       <div className="space-y-4">
         {benefits.map(status => (
-          <BenefitCardClient key={status.id} status={status} onStatusChange={handleStatusChange} />
+          <BenefitCardClient key={status.id} status={status} onStatusChange={handleStatusChange} onNotUsableChange={handleNotUsableChange} />
         ))}
       </div>
     );
@@ -194,7 +253,7 @@ export default function BenefitsDisplayClient({
       </div>
 
       {/* Summary Widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         {/* Upcoming Benefits Widget */}
         <div className="group overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300 dark:from-blue-900/20 dark:to-indigo-800/20 border border-blue-200 dark:border-blue-700">
           <div className="p-6">
@@ -208,7 +267,7 @@ export default function BenefitsDisplayClient({
               </div>
               <div className="ml-4 sm:ml-5 flex-1 min-w-0">
                 <dl>
-                  <dt className="text-sm font-medium text-blue-600 dark:text-blue-300">Total Value of Upcoming Benefits</dt>
+                  <dt className="text-sm font-medium text-blue-600 dark:text-blue-300">Upcoming Benefits</dt>
                   <dd>
                     <div className="text-xl sm:text-2xl font-bold text-blue-900 dark:text-blue-100">${localTotalUnusedValue.toFixed(2)}</div>
                   </dd>
@@ -231,9 +290,32 @@ export default function BenefitsDisplayClient({
               </div>
               <div className="ml-4 sm:ml-5 flex-1 min-w-0">
                 <dl>
-                  <dt className="text-sm font-medium text-green-600 dark:text-green-300">Total Value of Claimed Benefits</dt>
+                  <dt className="text-sm font-medium text-green-600 dark:text-green-300">Claimed Benefits</dt>
                   <dd>
                     <div className="text-xl sm:text-2xl font-bold text-green-900 dark:text-green-100">${localTotalUsedValue.toFixed(2)}</div>
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Not Usable Benefits Widget */}
+        <div className="group overflow-hidden rounded-xl bg-gradient-to-br from-gray-50 to-slate-100 shadow-lg hover:shadow-xl transition-all duration-300 dark:from-gray-900/20 dark:to-slate-800/20 border border-gray-200 dark:border-gray-700">
+          <div className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="p-3 bg-gray-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                </div>
+              </div>
+              <div className="ml-4 sm:ml-5 flex-1 min-w-0">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-600 dark:text-gray-300">Not Usable</dt>
+                  <dd>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">${localTotalNotUsableValue.toFixed(2)}</div>
                   </dd>
                 </dl>
               </div>
@@ -319,7 +401,7 @@ export default function BenefitsDisplayClient({
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}
             `}
           >
-            <span className="hidden sm:inline">Upcoming / Pending Benefits ({localUpcomingBenefits.length})</span>
+            <span className="hidden sm:inline">Upcoming ({localUpcomingBenefits.length})</span>
             <span className="sm:hidden">Upcoming ({localUpcomingBenefits.length})</span>
           </button>
           <button
@@ -330,8 +412,19 @@ export default function BenefitsDisplayClient({
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}
             `}
           >
-            <span className="hidden sm:inline">Claimed Benefits ({localCompletedBenefits.length})</span>
+            <span className="hidden sm:inline">Claimed ({localCompletedBenefits.length})</span>
             <span className="sm:hidden">Claimed ({localCompletedBenefits.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('not-usable')}
+            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm 
+              ${activeTab === 'not-usable' 
+                ? 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}
+            `}
+          >
+            <span className="hidden sm:inline">Not Usable ({localNotUsableBenefits.length})</span>
+            <span className="sm:hidden">Not Usable ({localNotUsableBenefits.length})</span>
           </button>
         </nav>
       </div>
@@ -346,6 +439,11 @@ export default function BenefitsDisplayClient({
         {activeTab === 'completed' && (
           <section>
             {renderBenefitsList(localCompletedBenefits)}
+          </section>
+        )}
+        {activeTab === 'not-usable' && (
+          <section>
+            {renderBenefitsList(localNotUsableBenefits)}
           </section>
         )}
       </div>

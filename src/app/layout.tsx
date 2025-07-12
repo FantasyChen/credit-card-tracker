@@ -6,6 +6,8 @@ import Navbar from "@/components/Navbar";
 import Providers from "@/components/Providers"; // Reinstate original Providers
 import Footer from "@/components/Footer";
 import { Analytics } from '@vercel/analytics/next';
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 // import { ThemeProviders } from "@/components/ThemeProviders"; // Removed
 // import { ensureCurrentBenefitStatuses } from "@/lib/actions/benefitActions"; // Keep import commented out or remove
 
@@ -51,6 +53,9 @@ export default async function RootLayout({
 }>) {
   // ensureCurrentBenefitStatuses(); // <-- REMOVE THIS CALL
 
+  // Get the session server-side to prevent authentication flash
+  const session = await getServerSession(authOptions);
+
   return (
     // Remove suppressHydrationWarning if not needed by original Providers
     // <html lang="en" className="h-full" suppressHydrationWarning>
@@ -67,7 +72,7 @@ export default async function RootLayout({
         <link rel="shortcut icon" href="/favicon.png" />
       </head>
       {/* <ThemeProviders> */}
-      <Providers>{/* Use original Providers */}
+      <Providers session={session}>{/* Use original Providers */}
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
         >

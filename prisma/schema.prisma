@@ -11,23 +11,23 @@ datasource db {
 }
 
 model User {
-  id                      String          @id @default(cuid())
+  id                      String           @id @default(cuid())
   name                    String?
-  email                   String          @unique
+  email                   String           @unique
   emailVerified           DateTime?
   image                   String?
-  notifyNewBenefit        Boolean         @default(false)
-  notifyBenefitExpiration Boolean         @default(false)
-  notifyExpirationDays    Int             @default(7)
-  notifyPointsExpiration  Boolean?        @default(true)  // New optional field
-  pointsExpirationDays    Int?            @default(30)    // New optional field
-  createdAt               DateTime        @default(now())
-  updatedAt               DateTime        @updatedAt
+  notifyNewBenefit        Boolean          @default(false)
+  notifyBenefitExpiration Boolean          @default(false)
+  notifyExpirationDays    Int              @default(7)
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+  notifyPointsExpiration  Boolean?         @default(true)
+  pointsExpirationDays    Int?             @default(30)
   accounts                Account[]
   benefitStatuses         BenefitStatus[]
   creditCards             CreditCard[]
+  loyaltyAccounts         LoyaltyAccount[]
   sessions                Session[]
-  loyaltyAccounts         LoyaltyAccount[] // New relation
 }
 
 model Account {
@@ -61,12 +61,12 @@ model CreditCard {
   name           String
   issuer         String
   cardNumber     String?
-  lastFourDigits String?   // New field for last 4 digits identifier
   expiryDate     DateTime?
   openedDate     DateTime?
   userId         String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  lastFourDigits String?
   benefits       Benefit[]
   user           User      @relation(fields: [userId], references: [id])
 }
@@ -125,6 +125,7 @@ model BenefitStatus {
   cycleEndDate   DateTime
   isCompleted    Boolean   @default(false)
   completedAt    DateTime?
+  isNotUsable    Boolean   @default(false)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   orderIndex     Int?
@@ -138,6 +139,40 @@ model playing_with_neon {
   id    Int    @id @default(autoincrement())
   name  String
   value Float? @db.Real
+}
+
+model LoyaltyProgram {
+  id                   String             @id @default(cuid())
+  name                 String             @unique
+  displayName          String
+  type                 LoyaltyProgramType
+  company              String
+  expirationMonths     Int?
+  hasExpiration        Boolean            @default(true)
+  website              String?
+  logoUrl              String?
+  description          String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  qualifyingActivities String?
+  userAccounts         LoyaltyAccount[]
+}
+
+model LoyaltyAccount {
+  id               String         @id @default(cuid())
+  userId           String
+  loyaltyProgramId String
+  accountNumber    String?
+  lastActivityDate DateTime
+  expirationDate   DateTime?
+  isActive         Boolean        @default(true)
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  loyaltyProgram   LoyaltyProgram @relation(fields: [loyaltyProgramId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, loyaltyProgramId])
 }
 
 enum BenefitFrequency {
@@ -157,48 +192,4 @@ enum LoyaltyProgramType {
   HOTEL
   RENTAL_CAR
   CREDIT_CARD
-}
-
-// Predefined loyalty programs with their expiration policies
-model LoyaltyProgram {
-  id                    String              @id @default(cuid())
-  name                  String              @unique // e.g., "marriott_bonvoy", "american_aadvantage"
-  displayName           String              // e.g., "Marriott Bonvoy", "American Airlines AAdvantage"
-  type                  LoyaltyProgramType
-  company               String              // e.g., "Marriott", "American Airlines"
-  expirationMonths      Int?                // Number of months after last activity (null = no expiration)
-  hasExpiration         Boolean             @default(true) // False for programs like Delta, United
-  website               String?
-  logoUrl               String?
-  description           String?             // Brief description of expiration policy
-  qualifyingActivities  String?             // Detailed list of activities that reset expiration (JSON array format)
-  
-  // User accounts linked to this program
-  userAccounts          LoyaltyAccount[]
-  
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-}
-
-// User's individual loyalty program accounts
-model LoyaltyAccount {
-  id                    String              @id @default(cuid())
-  
-  // Relationships
-  userId                String
-  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  loyaltyProgramId      String
-  loyaltyProgram        LoyaltyProgram      @relation(fields: [loyaltyProgramId], references: [id], onDelete: Cascade)
-  
-  // Account details
-  accountNumber         String?             // Optional account/member number
-  lastActivityDate      DateTime            // When user last had activity (earning/redeeming)
-  expirationDate        DateTime?           // Calculated expiration date (null if no expiration)
-  isActive              Boolean             @default(true)
-  notes                 String?             // User notes about this account
-  
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  
-  @@unique([userId, loyaltyProgramId]) // One account per user per program
 }
