@@ -22,9 +22,7 @@ const Navbar = () => {
     { name: 'Dashboard', href: '/' },
     { name: 'Cards', href: '/cards' },
     { name: 'Benefits', href: '/benefits' },
-    { name: 'Loyalty Programs', href: '/loyalty', authRequired: true },
     { name: 'Notifications', href: '/settings/notifications', authRequired: true },
-    { name: 'Data Management', href: '/settings/data', authRequired: true },
     { name: 'Contact', href: '/contact' },
   ], []); // Empty dependency array as baseNavigation is static
 

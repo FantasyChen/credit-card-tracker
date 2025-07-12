@@ -132,6 +132,7 @@ export default function AddNewCardPage() {
   const [predefinedCards, setPredefinedCards] = useState<PredefinedCard[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true); // Loading state for fetching predefined cards
+  const [groupByIssuer, setGroupByIssuer] = useState(true); // Toggle for grouping by issuer
 
   // Fetch data using useEffect
   useEffect(() => {
@@ -160,10 +161,36 @@ export default function AddNewCardPage() {
     card.issuer.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Group cards by issuer if groupByIssuer is true
+  const groupedCards = React.useMemo(() => {
+    if (!groupByIssuer) return { 'All Cards': filteredCards };
+    
+    const grouped = filteredCards.reduce((acc, card) => {
+      const issuer = card.issuer;
+      if (!acc[issuer]) {
+        acc[issuer] = [];
+      }
+      acc[issuer].push(card);
+      return acc;
+    }, {} as Record<string, PredefinedCard[]>);
+
+    // Sort issuers alphabetically
+    const sortedGrouped = Object.keys(grouped)
+      .sort()
+      .reduce((acc, issuer) => {
+        acc[issuer] = grouped[issuer];
+        return acc;
+      }, {} as Record<string, PredefinedCard[]>);
+
+    return sortedGrouped;
+  }, [filteredCards, groupByIssuer]);
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6 dark:text-white">Select a Card to Add</h1>
-      <div className="mb-6">
+      
+      {/* Search and Toggle Controls */}
+      <div className="mb-6 space-y-4">
         <input 
           type="text"
           placeholder="Search by card name or issuer..."
@@ -171,15 +198,57 @@ export default function AddNewCardPage() {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+        
+        {/* Toggle for grouping by issuer */}
+        <div className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="groupByIssuer"
+            checked={groupByIssuer}
+            onChange={(e) => setGroupByIssuer(e.target.checked)}
+            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+          />
+          <label htmlFor="groupByIssuer" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Group by Issuing Bank
+          </label>
+        </div>
       </div>
 
       {isLoading ? (
          <p className="dark:text-gray-400">Loading cards...</p> // Basic loading indicator
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCards.map((card) => (
-            <PredefinedCardForm key={card.id} card={card} />
+        <div className="space-y-8">
+          {Object.entries(groupedCards).map(([issuer, cards]) => (
+            <div key={issuer} className="space-y-4">
+              {/* Issuer Header - only show if grouping and not 'All Cards' */}
+              {groupByIssuer && issuer !== 'All Cards' && (
+                <div className="border-b-2 border-gray-200 dark:border-gray-700 pb-2">
+                  <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 flex items-center">
+                    <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm font-medium mr-3">
+                      {cards.length} card{cards.length !== 1 ? 's' : ''}
+                    </span>
+                    {issuer}
+                  </h2>
+                </div>
+              )}
+              
+              {/* Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {cards.map((card) => (
+                  <PredefinedCardForm key={card.id} card={card} />
+                ))}
+              </div>
+            </div>
           ))}
+          
+          {/* No results message */}
+          {Object.keys(groupedCards).length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400">
+                No cards found matching your search criteria.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -440,7 +440,7 @@ async function main() {
       name: 'Marriott Bonvoy Boundless Credit Card',
       issuer: 'Chase',
       annualFee: 95,
-      imageUrl: '/images/cards/marriott-bonvoy-boundless-credit-card.png',
+      imageUrl: '/images/cards/chase-marriott-bonvoy-boundless.jpg',
       benefits: [
         {
           description: 'Annual Free Night Award (up to 35k points)',
@@ -470,7 +470,7 @@ async function main() {
       name: 'HSBC Elite Credit Card',
       issuer: 'HSBC',
       annualFee: 495,
-      imageUrl: '/images/cards/hsbc-elite-credit-card.jpg',
+      imageUrl: '/images/cards/hsbc-elite-world-elite-mastercard.jpg',
       benefits: [
         {
           description: '$400 Annual Travel Credit (HSBC Travel bookings)',
@@ -508,6 +508,51 @@ async function main() {
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
           fixedCycleDurationMonths: 54, // 4.5 years = 54 months
+        },
+      ],
+    },
+    {
+      name: 'The Ritz-Carlton™ Credit Card',
+      issuer: 'Chase',
+      annualFee: 450,
+      imageUrl: '/images/cards/the-ritz-carlton-credit-card.jpg',
+      benefits: [
+        {
+          description: '$300 Annual Travel Credit',
+          category: 'Travel',
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: 'Annual Free Night Award (up to 85,000 points)',
+          category: 'Travel',
+          maxAmount: 0,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '$100 Hotel Credit (The Ritz-Carlton and St. Regis hotels)',
+          category: 'Travel',
+          maxAmount: 100,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: 'Priority Pass Select Membership',
+          category: 'Travel',
+          maxAmount: 0,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: 'Global Entry/TSA PreCheck Credit (every 4 years)',
+          category: 'Travel',
+          maxAmount: 120,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
+          fixedCycleDurationMonths: 48, // 4 years = 48 months
         },
       ],
     },
