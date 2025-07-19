@@ -1,0 +1,56 @@
+<!--#include virtual="/us/config.html" 
+--><!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+<head>
+	<title>American Express Credit Cards, Rewards, Travel and Business Services</title>
+	<meta name="viewport" content="width=1024">
+	<meta content="noindex" name="robots">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta http-equiv="content-language" content="en" charset="UTF-8">
+	<meta name="keywords" content="american express, amex, credit cards, gift cards, credit card, charge cards, travel, rewards, business services, financial services, corporate cards, insurance, personal savings">
+	<meta name="description" content="American Express offers world-class Charge and Credit Cards, Gift Cards, Rewards, Travel, Personal Savings, Business Services, Insurance and more.">
+	<meta name="title" content="American Express Credit Cards, Rewards, Travel and Business Services">	
+	<link rel="stylesheet" media="all" type="text/css" href="/home/fallback/ak/css/homepage.fallback.src.css" />
+	<link rel="image_src" href="https://www.aexp-static.com/nav/ngn/img/logo_bluebox.gif" />
+	<link rel="canonical" href="https://www.americanexpress.com" />
+</head>
+<!--[if lt IE 7]><body class="ie6 us-en AXP_CenterContent"><![endif]-->
+<!--[if IE 7]><body class="ie7 us-en AXP_CenterContent"><![endif]-->
+<!--[if IE 8]> <body class="ie8 us-en AXP_CenterContent"><![endif]-->
+<!--[if IE 9]> <body class="ie9 us-en AXP_CenterContent"><![endif]-->
+<!--[if !IE]>--><body class="us-en AXP_CenterContent AXP_Responsive"><!--<![endif]-->
+	<div id="site-container">
+			<div id="header">
+				<div class="container">				
+					<p id="amex-logo">
+						<a href="">American Express Logo</a>
+					</p>
+					<div id="card-selector">					
+					</div>					
+				</div>				
+			</div>				
+		<div class="iNavShadow"></div>	
+		<div id="main-panel">
+			<div id="mobile-header">
+				<p id="mobile-amex-logo"><a href="index.shtml">American Express</a></p>
+			</div>
+			<div id="article-fallback">					
+				<div class="container">
+					<div class="contentArea">								
+						<h1 class="fallbackH1" tabindex="0">SITE HELP</h1>
+						<h2 class="fallbackH2" tabindex="0">Thank You for Visiting American Express</h2>
+						<p class="fallbackMessage" tabindex="0">
+							We're sorry. We are momentarily experiencing technical difficulties. We are working on bringing our services back online.<br>
+							For immediate assistance, please call the number on your card or statement. We apologize for any inconvenience.<br>
+							Thank you for visiting AmericanExpress.com.
+						</p>
+						<p class="copyright" tabindex="0">&copy; 2013 American Express Company. All Rights Reserved. Users of this site agree to be bound by the terms of the American Express Web Site Rules and Regulations. </p>
+					</div>							
+				</div>	
+			</div>
+		</div>
+	</div>
+<script src="/home/fallback/ak/js/homepage.deviceBucketer.dyn.js" type="text/javascript"></script>		
+<script type="text/javascript"  src="/2UyKoePZ/tXi/U-8/nKVCCU-9Pl/XaiJDX2Jc8mkfr/TVhVX1U/BHg5Ilh/5DlIB"></script></body>
+</html>
+
