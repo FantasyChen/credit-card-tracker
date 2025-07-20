@@ -44,7 +44,7 @@ async function main() {
     {
       name: 'American Express Gold Card',
       issuer: 'American Express',
-      annualFee: 250,
+      annualFee: 325,
       imageUrl: '/images/cards/american-express-gold-card.png',
       benefits: [
         {
