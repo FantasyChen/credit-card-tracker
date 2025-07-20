@@ -125,9 +125,9 @@ export async function createCardForUser(
     }
     // Log additional Prisma error details in development
     if (process.env.NODE_ENV === 'development' && error && typeof error === 'object' && 'code' in error) {
-      console.error(`Prisma Error Code: ${(error as any).code}`);
+      console.error(`Prisma Error Code: ${(error as Record<string, unknown>).code}`);
       if ('meta' in error) {
-        console.error('Meta:', (error as any).meta);
+        console.error('Meta:', (error as Record<string, unknown>).meta);
       }
     }
     return { success: false, message: message };

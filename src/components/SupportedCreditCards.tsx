@@ -180,7 +180,7 @@ export default function SupportedCreditCards() {
             {/* Search results count */}
             {searchTerm && (
               <div className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                Found {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} matching "{searchTerm}"
+                                 Found {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} matching &ldquo;{searchTerm}&rdquo;
               </div>
             )}
           </div>

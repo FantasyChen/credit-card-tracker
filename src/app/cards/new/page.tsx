@@ -3,8 +3,7 @@
 import React, { useState, useEffect, useTransition } from 'react'; // Import useTransition
 import Image from 'next/image';
 import { addCardAction } from './actions'; // Import the action from the new file
-import type { PredefinedCard } from '@/generated/prisma'; // Import type
-import { searchCards, getSearchSuggestions, type CardWithBenefits, type SearchResult } from '@/lib/cardSearchUtils';
+import { searchCards, type CardWithBenefits } from '@/lib/cardSearchUtils';
 
 // Helper arrays
 const months = [
@@ -170,7 +169,7 @@ export default function AddNewCardPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true); // Loading state for fetching predefined cards
   const [groupByIssuer, setGroupByIssuer] = useState(true); // Toggle for grouping by issuer
-  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+
 
   // Fetch data using useEffect
   useEffect(() => {
@@ -182,7 +181,6 @@ export default function AddNewCardPage() {
         }
         const data: CardWithBenefits[] = await response.json();
         setPredefinedCards(data);
-        setSearchSuggestions(getSearchSuggestions(data));
       } catch (error) {
         console.error("Error fetching predefined cards:", error);
         // Handle error state if needed (e.g., show error message)
@@ -246,7 +244,7 @@ export default function AddNewCardPage() {
                  {/* Show search results count */}
          {searchTerm && (
            <div className="text-sm text-gray-600 dark:text-gray-400">
-             Found {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} matching "{searchTerm}"
+             Found {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} matching &ldquo;{searchTerm}&rdquo;
            </div>
          )}
          
