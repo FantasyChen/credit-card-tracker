@@ -32,43 +32,127 @@ function slugify(text) {
     .replace(/-+$/, ""); // Trim - from end of text
 }
 
-// Ensure the output directory exists
+// Ensure directory exists
 async function ensureDirectoryExists(dirPath) {
   try {
     await fs.promises.access(dirPath);
   } catch (error) {
     if (error.code === "ENOENT") {
       await fs.promises.mkdir(dirPath, { recursive: true });
-      console.log(`Created directory: ${dirPath}`);
     } else {
-      throw error; // Re-throw other errors
+      throw error;
     }
   }
 }
 
-// Download image from URL
+// Validate if URL looks like an image
+function isValidImageUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname.toLowerCase();
+    
+    // Check if it ends with common image extensions
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+    const hasImageExtension = imageExtensions.some(ext => pathname.endsWith(ext));
+    
+    // Exclude common non-image patterns
+    const invalidPatterns = ['/404', '/error', 'placeholder', 'fallback'];
+    const hasInvalidPattern = invalidPatterns.some(pattern => 
+      urlObj.href.toLowerCase().includes(pattern.toLowerCase())
+    );
+    
+    // Prefer certain domains known to have good images
+    const preferredDomains = ['americanexpress.com', 'chase.com', 'capitalone.com', 'citi.com'];
+    const isPreferredDomain = preferredDomains.some(domain => urlObj.hostname.includes(domain));
+    
+    return {
+      isValid: hasImageExtension && !hasInvalidPattern,
+      isPreferred: isPreferredDomain,
+      extension: imageExtensions.find(ext => pathname.endsWith(ext)) || '.jpg'
+    };
+  } catch (e) {
+    return { isValid: false, isPreferred: false, extension: '.jpg' };
+  }
+}
+
+// Validate downloaded content
+async function isValidImageContent(filepath) {
+  try {
+    const stats = await fs.promises.stat(filepath);
+    
+    // Check file size - too small likely means error page
+    if (stats.size < 1000) {
+      return false;
+    }
+    
+    // Read first few bytes to check for image headers
+    const buffer = Buffer.alloc(20);
+    const fileHandle = await fs.promises.open(filepath, 'r');
+    await fileHandle.read(buffer, 0, 20, 0);
+    await fileHandle.close();
+    
+    // Check for image magic numbers
+    const isPNG = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+    const isJPEG = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+    const isGIF = buffer.toString('ascii', 0, 3) === 'GIF';
+    const isWebP = buffer.toString('ascii', 8, 12) === 'WEBP';
+    
+    // Check for HTML content (common in error pages)
+    const content = buffer.toString('ascii').toLowerCase();
+    const isHTML = content.includes('<html') || content.includes('<!doctype');
+    
+    return (isPNG || isJPEG || isGIF || isWebP) && !isHTML;
+  } catch (error) {
+    console.warn(`Could not validate image content: ${error.message}`);
+    return false;
+  }
+}
+
+// Download image from URL with better error handling
 async function downloadImage(url, filepath) {
   try {
     const response = await axios({
       url,
       method: "GET",
       responseType: "stream",
+      timeout: 30000, // 30 second timeout
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
     });
+
+    // Check content type
+    const contentType = response.headers['content-type'] || '';
+    if (!contentType.startsWith('image/')) {
+      throw new Error(`Invalid content type: ${contentType}`);
+    }
 
     // Ensure the directory exists before writing
     await ensureDirectoryExists(path.dirname(filepath));
 
     const writer = fs.createWriteStream(filepath);
-
     response.data.pipe(writer);
 
     return new Promise((resolve, reject) => {
-      writer.on("finish", resolve);
+      writer.on("finish", async () => {
+        // Validate the downloaded content
+        if (await isValidImageContent(filepath)) {
+          resolve();
+        } else {
+          // Delete invalid file
+          try {
+            await fs.promises.unlink(filepath);
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+          reject(new Error('Downloaded content is not a valid image'));
+        }
+      });
       writer.on("error", reject);
     });
   } catch (error) {
     console.error(`Error downloading image from ${url}:`, error.message);
-    throw error; // Re-throw to indicate failure
+    throw error;
   }
 }
 
@@ -90,11 +174,18 @@ async function main() {
       type: "string",
       demandOption: true, // Make the name argument required
     })
+    .option("max-attempts", {
+      alias: "m",
+      description: "Maximum number of search results to try",
+      type: "number",
+      default: 5,
+    })
     .help()
     .alias("help", "h")
-    .parseSync(); // Use parseSync or handle async parsing if needed
+    .parseSync();
 
   const cardName = argv.name;
+  const maxAttempts = argv["max-attempts"];
   const searchQuery = `${cardName} credit card`;
   console.log(`Searching for image for: ${searchQuery}...`);
 
@@ -105,6 +196,7 @@ async function main() {
       q: searchQuery,
       api_key: API_KEY,
       tbs: "isz:m", // Medium size images are usually good enough
+      num: 20, // Get more results to choose from
     });
 
     if (!response.images_results || response.images_results.length === 0) {
@@ -112,31 +204,69 @@ async function main() {
       process.exit(1);
     }
 
-    // Try to find a suitable image (e.g., the first result)
-    // You might want more sophisticated logic here later to pick the best image
-    const firstResult = response.images_results[0];
-    const imageUrl = firstResult.original; // Get the original image URL
+    console.log(`Found ${response.images_results.length} potential images`);
 
-    let imageExtension = ".jpg"; // Default extension
-    try {
-      imageExtension = path.extname(new URL(imageUrl).pathname) || ".jpg";
-    } catch (e) {
-      console.warn(`Could not parse URL extension from ${imageUrl}, defaulting to .jpg`);
-      // Handle cases where imageUrl might not be a valid URL (less likely from SerpApi)
+    // Sort results by preference (preferred domains first, then valid images)
+    const sortedResults = response.images_results
+      .map(result => ({
+        ...result,
+        validation: isValidImageUrl(result.original)
+      }))
+      .filter(result => result.validation.isValid)
+      .sort((a, b) => {
+        // Prefer images from official sources
+        if (a.validation.isPreferred && !b.validation.isPreferred) return -1;
+        if (!a.validation.isPreferred && b.validation.isPreferred) return 1;
+        return 0;
+      });
+
+    if (sortedResults.length === 0) {
+      console.error("No valid image URLs found in search results");
+      process.exit(1);
     }
 
-    console.log(`Found image: ${imageUrl}`);
+    console.log(`${sortedResults.length} valid image URLs found, trying up to ${maxAttempts}...`);
 
-    // 2. Generate Filename
-    const filename = `${slugify(cardName)}${imageExtension}`;
-    const filepath = path.join(OUTPUT_DIR, filename);
+    // 2. Try downloading images until we succeed
+    let successfulDownload = false;
+    const attempts = Math.min(maxAttempts, sortedResults.length);
 
-    console.log(`Downloading to: ${filepath}...`);
+    for (let i = 0; i < attempts; i++) {
+      const result = sortedResults[i];
+      const imageUrl = result.original;
+      const validation = result.validation;
+      
+      console.log(`\n📁 Attempt ${i + 1}/${attempts}: ${imageUrl}`);
+      if (validation.isPreferred) {
+        console.log("✅ Preferred domain detected");
+      }
 
-    // 3. Download and Save Image
-    await downloadImage(imageUrl, filepath);
+      try {
+        // Generate filename with proper extension
+        const filename = `${slugify(cardName)}${validation.extension}`;
+        const filepath = path.join(OUTPUT_DIR, filename);
 
-    console.log(`✅ Successfully downloaded image for "${cardName}" to ${filepath}`);
+        console.log(`📥 Downloading to: ${filepath}...`);
+        await downloadImage(imageUrl, filepath);
+
+        console.log(`✅ Successfully downloaded image for "${cardName}" to ${filepath}`);
+        successfulDownload = true;
+        break;
+
+      } catch (error) {
+        console.error(`❌ Failed: ${error.message}`);
+        if (i === attempts - 1) {
+          console.error("All download attempts failed");
+        } else {
+          console.log("🔄 Trying next result...");
+        }
+      }
+    }
+
+    if (!successfulDownload) {
+      console.error(`Failed to download a valid image for "${cardName}" after ${attempts} attempts`);
+      process.exit(1);
+    }
 
   } catch (error) {
     console.error("An error occurred during the image download process:", error);
