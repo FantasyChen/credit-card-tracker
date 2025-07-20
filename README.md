@@ -100,13 +100,49 @@ This is a Progressive Web App (PWA), which means you can install it on your phon
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.
 
+### 🔄 Updating Card Information (Community Contributions Welcome!)
+
+Credit card benefits and annual fees change frequently. Help keep our data current!
+
+#### Quick Guide for Card Information Updates:
+
+1. **Find outdated information**: Compare our data with official sources
+2. **Verify with reliable sources**: Use [US Credit Card Guide](https://www.uscreditcardguide.com/) or official bank websites
+3. **Update the seed file**: Edit `prisma/seed.ts` with new information
+4. **Submit a pull request**: We'll review and merge quickly
+
+**What to Update:**
+- Annual fees that have changed
+- Benefits that have been added, removed, or modified
+- New credit cards from major issuers
+- Corrections to benefit amounts or frequencies
+
+**Quick Example:**
+```typescript
+// In prisma/seed.ts, find the card and update:
+{
+  name: 'Chase Sapphire Preferred',
+  issuer: 'Chase',
+  annualFee: 95, // ← Update this if changed
+  benefits: [
+    {
+      description: '$50 Annual Hotel Credit', // ← Update amounts/descriptions
+      maxAmount: 50, // ← Update this value
+      // ... rest of benefit
+    }
+  ]
+}
+```
+
+See our [detailed contribution guide](CONTRIBUTING.md#updating-credit-card-information) for step-by-step instructions.
+
 </details>
 
 ## 💖 A Note from the Creator
 
 Hi, I'm fantasy_c. I'm an indie developer passionate about creating free tools that help people improve their lives. This project was born out of my own frustration with managing credit card benefits, and I'm sharing it with the world in the hopes that it helps you too.
 
-My goal is to build things that are genuinely useful, without ads or hidden costs. If you find this tool valuable, consider [supporting my work](https://www.buymeacoffee.com/your-link-here).
+My goal is to build things that are genuinely useful, without ads or hidden costs. If you find this tool valuable, consider [supporting my work](https://coff.ee/fantasy_c).
 
 ## 🗺️ Roadmap
 

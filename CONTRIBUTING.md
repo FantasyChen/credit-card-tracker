@@ -10,6 +10,7 @@ CouponCycle is a community-driven project, and we welcome contributions from dev
 - [Getting Started](#getting-started)
 - [How to Contribute](#how-to-contribute)
 - [Development Setup](#development-setup)
+- [Updating Credit Card Information](#updating-credit-card-information)
 - [Coding Standards](#coding-standards)
 - [Testing Guidelines](#testing-guidelines)
 - [Submitting Changes](#submitting-changes)
@@ -113,6 +114,156 @@ credit-card-tracker/
 - **Tailwind CSS** - Styling
 - **TypeScript** - Type safety
 - **Jest** - Testing framework
+
+## 🔄 Updating Credit Card Information
+
+**This is one of the most valuable ways to contribute!** Credit card benefits and annual fees change frequently, and community help is essential to keep our data current.
+
+### 📚 Reliable Sources for Card Information
+
+Always verify information with these trusted sources (in order of preference):
+
+1. **Official bank websites** (chase.com, americanexpress.com, etc.)
+2. **[US Credit Card Guide](https://www.uscreditcardguide.com/)** - Excellent for comprehensive benefit details
+3. **[Doctor of Credit](https://www.doctorofcredit.com/)** - Great for tracking changes and updates
+4. **Bank press releases** - For official announcements of changes
+
+### 📋 What Information to Update
+
+#### High Priority Updates:
+- **Annual fee changes** - Banks adjust these regularly
+- **Benefit value changes** - Credit amounts often change
+- **New benefits added** - Cards frequently add perks
+- **Benefits removed** - Important to remove discontinued perks
+- **Benefit frequency changes** - From monthly to quarterly, etc.
+
+#### Medium Priority Updates:
+- **Benefit description clarifications** - More accurate wording
+- **New credit cards** - Major issuers release new cards
+- **Discontinued cards** - Mark cards no longer available
+
+### 🛠️ How to Update Card Information
+
+#### Step 1: Identify Changes
+Compare our current data with official sources:
+
+```bash
+# See what cards we currently have
+node scripts/list-available-cards.cjs
+```
+
+#### Step 2: Locate the Card in Code
+All card data is in `prisma/seed.ts`. Find the card you want to update:
+
+```typescript
+// Example: Finding Chase Sapphire Preferred
+{
+  name: 'Chase Sapphire Preferred',
+  issuer: 'Chase',
+  annualFee: 95,
+  imageUrl: '/images/cards/chase-sapphire-preferred.png',
+  benefits: [
+    // Benefits are listed here
+  ]
+}
+```
+
+#### Step 3: Update the Information
+Make your changes following our data criteria:
+
+**Annual Fee:**
+```typescript
+annualFee: 95, // Update to current fee
+```
+
+**Benefits - Follow These Rules:**
+1. **Only trackable, cyclical benefits** (monthly, quarterly, yearly)
+2. **Specific dollar amounts** - avoid vague benefits
+3. **No always-on perks** (like points multipliers)
+
+```typescript
+benefits: [
+  {
+    description: '$300 Annual Travel Credit', // Clear, specific description
+    category: 'Travel', // Travel, Dining, Entertainment, etc.
+    maxAmount: 300, // Dollar amount per cycle
+    frequency: BenefitFrequency.YEARLY, // MONTHLY, QUARTERLY, YEARLY
+    percentage: 0, // Usually 0 for statement credits
+  }
+]
+```
+
+#### Step 4: Test Your Changes
+```bash
+# Test that the seed data is valid
+npx prisma db seed
+
+# Build the project to ensure no errors
+npm run build
+```
+
+### 📝 Pull Request Guidelines for Card Updates
+
+#### PR Title Format:
+- `Update [Card Name]: [Brief description]`
+- Example: `Update Chase Sapphire Preferred: Increase annual fee to $95`
+
+#### PR Description Template:
+```markdown
+## Card Information Update
+
+**Card**: Chase Sapphire Preferred
+**Issuer**: Chase
+
+### Changes Made:
+- [ ] Annual fee updated ($95 → $120)
+- [ ] New benefit added: $60 Annual DoorDash Credit
+- [ ] Existing benefit modified: Hotel credit increased to $60
+
+### Source Verification:
+- [ ] Verified with official Chase website
+- [ ] Cross-checked with US Credit Card Guide
+- [x] Link to source: https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred
+
+### Testing:
+- [x] Seed data runs without errors
+- [x] Build completes successfully
+```
+
+#### What We'll Review:
+1. **Source verification** - Is the information from a reliable source?
+2. **Data format** - Does it follow our benefit criteria?
+3. **Accuracy** - Are amounts and frequencies correct?
+4. **Completeness** - Are all changes documented?
+
+### 🚀 Quick Start for New Contributors
+
+**First-time contributors can start with:**
+
+1. **Annual fee updates** - These are straightforward and high-impact
+2. **Obvious benefit amount changes** - Easy to verify
+3. **Adding new major issuer cards** - If you see a popular card we're missing
+
+**Example beginner contribution:**
+"I noticed the Chase Sapphire Preferred annual fee increased to $120 on the Chase website, but your seed data shows $95."
+
+### 💡 Tips for Success
+
+- **Start small** - Update one card at a time
+- **Document your sources** - Include links in PR description  
+- **Double-check amounts** - Benefit values must be exact
+- **Ask questions** - Use GitHub Issues if you're unsure
+- **Be patient** - We review card updates carefully for accuracy
+
+### 🎯 High-Impact Contribution Areas
+
+We especially need help with:
+- **American Express cards** - Complex benefit structures
+- **Business credit cards** - Less community coverage
+- **Regional bank cards** - Harder to track changes
+- **Seasonal benefit changes** - Benefits that change by quarter
+
+Thank you for helping keep our credit card data accurate and current! 🎉
 
 ## 📝 Coding Standards
 
