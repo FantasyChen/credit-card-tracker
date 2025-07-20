@@ -1,0 +1,1 @@
+ALTER TABLE "CreditCard" RENAME COLUMN "lastFourDigits" TO "lastDigits"; 

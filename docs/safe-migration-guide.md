@@ -45,15 +45,107 @@ If no export is available, you'll need to manually re-add your credit cards:
 
 ## For Developers: Safe Migration Practices
 
+### 🌟 Recommended: Use Development Branch First
+
+**We now use Neon database branches for safe development.** Always test schema changes on your development branch before touching production.
+
+#### Environment Setup
+
+Your `.env` file should contain:
+
+```bash
+# Production Database (main branch) - DO NOT use for development
+DATABASE_URL="postgresql://REDACTED"
+
+# Development Database (development branch) - USE THIS for development
+DATABASE_URL_DEV="postgresql://REDACTED"
+```
+
+#### Safe Development Workflow
+
+```bash
+# 1. ALWAYS switch to development branch first
+export DATABASE_URL=$DATABASE_URL_DEV
+
+# 2. Verify you're on development branch
+echo "Using database: $DATABASE_URL"
+npx prisma migrate status
+
+# 3. Make your schema changes in prisma/schema.prisma
+
+# 4. Create and test migration on development branch
+npx prisma migrate dev --name your_descriptive_migration_name
+
+# 5. Test your application thoroughly
+npm run dev
+npm test
+
+# 6. When ready for production: commit migrations and push
+git add prisma/migrations/
+git commit -m "Add migration: your_descriptive_migration_name"
+git push origin main
+
+# 7. Vercel automatically applies migrations to production using DATABASE_URL
+```
+
+#### Why This Approach is Safe
+
+- ✅ **Development branch is isolated** from production data
+- ✅ **Easy to reset** if something goes wrong (`npx prisma migrate reset` is safe on dev branch)
+- ✅ **Production data stays untouched** during development and testing
+- ✅ **Vercel handles production deployment** automatically
+- ✅ **Can test with realistic data** (dev branch can have copy of production data)
+
+#### Emergency: Reset Development Branch
+
+If your development branch gets corrupted or you need to start over:
+
+```bash
+# Switch to development branch
+export DATABASE_URL=$DATABASE_URL_DEV
+
+# Reset the development branch (SAFE - only affects development)
+npx prisma migrate reset
+
+# Re-seed with test data
+npx prisma db seed
+```
+
+This will **NOT** affect your production database.
+
+#### Quick Check: Which Database Am I Connected To?
+
+Always verify which database you're connected to before running migrations:
+
+```bash
+# Check current DATABASE_URL
+echo "Current database: $DATABASE_URL"
+
+# Quick check if you're on development branch
+if [[ $DATABASE_URL == *"$DATABASE_URL_DEV"* ]]; then
+  echo "✅ Connected to DEVELOPMENT branch - safe to migrate"
+else
+  echo "⚠️  Connected to PRODUCTION or unknown database - DO NOT MIGRATE"
+  echo "Switch to development: export DATABASE_URL=$DATABASE_URL_DEV"
+fi
+
+# Check migration status
+npx prisma migrate status
+
+# Or use our helper script
+node scripts/check-database-connection.js
+```
+
 ### MANDATORY Pre-Migration Checklist
 
 Before running ANY database command, you MUST:
 
-- [ ] Verify DATABASE_URL points to development database
-- [ ] Check if there's any important user data that would be lost
-- [ ] Notify users to export their data if this could affect production
-- [ ] Never use commands with `--force-reset` in production
-- [ ] Use `npx prisma migrate dev` instead of `db push` for schema changes
+- [ ] **Use development branch first**: `export DATABASE_URL=$DATABASE_URL_DEV`
+- [ ] **Verify you're on development branch**: Check DATABASE_URL doesn't contain production endpoint
+- [ ] **Never run migrations directly on production DATABASE_URL**
+- [ ] **Test thoroughly on development branch** before committing migrations
+- [ ] **Use `npx prisma migrate dev`** instead of `db push` for schema changes
+- [ ] **Commit migration files** and let Vercel handle production deployment
 
 ### Before Running Migrations
 
@@ -76,42 +168,55 @@ Before running ANY database command, you MUST:
 ### Safe Migration Commands
 
 ```bash
-# ✅ SAFE: Create and apply new migration
-npx prisma migrate dev --name descriptive_migration_name
+# ✅ SAFE: Switch to development branch first
+export DATABASE_URL=$DATABASE_URL_DEV
 
-# ✅ SAFE: Apply existing migrations to production
-npx prisma migrate deploy
+# ✅ SAFE: Create and apply new migration on development branch
+npx prisma migrate dev --name descriptive_migration_name
 
 # ✅ SAFE: Check what would change without applying
 npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma
 
-# ❌ DESTRUCTIVE: Only use in development with no important data
-npx prisma migrate reset --force
+# ✅ SAFE: Reset development branch if needed (does NOT affect production)
+npx prisma migrate reset --force  # Only safe when DATABASE_URL=$DATABASE_URL_DEV
 
-# ❌ EXTREMELY DESTRUCTIVE: NEVER USE THIS
+# ✅ SAFE: Production deployment (handled automatically by Vercel)
+git push origin main  # Vercel runs: npx prisma migrate deploy
+
+# ❌ DANGEROUS: Direct production migration (don't do this manually)
+# export DATABASE_URL="production-url" && npx prisma migrate deploy
+
+# ❌ EXTREMELY DESTRUCTIVE: NEVER USE THIS ON ANY ENVIRONMENT
 npx prisma db push --force-reset
 ```
 
 ### Handling Drift
 
-When you encounter drift (schema doesn't match migrations):
+When you encounter drift (schema doesn't match migrations), **always handle this on your development branch first:**
 
-1. **First, try to resolve without reset:**
-   ```bash
-   npx prisma migrate resolve --applied 20250525063552_add_benefit_order_index
-   ```
+```bash
+# 1. Switch to development branch
+export DATABASE_URL=$DATABASE_URL_DEV
 
-2. **If that doesn't work, create a new migration:**
-   ```bash
-   npx prisma migrate dev --name fix_drift_issue
-   ```
+# 2. Try to resolve without reset
+npx prisma migrate resolve --applied 20250525063552_add_benefit_order_index
 
-3. **Only reset as last resort in development:**
-   ```bash
-   # Make sure users export their data first!
-   # Double-check DATABASE_URL first!
-   npx prisma migrate reset --force
-   ```
+# 3. If that doesn't work, create a new migration
+npx prisma migrate dev --name fix_drift_issue
+
+# 4. Only reset as last resort (SAFE on development branch)
+npx prisma migrate reset --force  # This only affects development branch
+
+# 5. Re-seed development data if needed
+npx prisma db seed
+
+# 6. Test your fixes, then commit for production deployment
+git add prisma/migrations/
+git commit -m "Fix drift issue"
+git push origin main
+```
+
+**Important:** Never try to fix drift directly on production. Always use your development branch first.
 
 ## Prevention Measures
 

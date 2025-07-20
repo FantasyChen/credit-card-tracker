@@ -71,3 +71,9 @@ src/generated/prisma/
 
 # OS generated files
 Thumbs.db
+
+# Database backups and migration temporary files
+backups/
+temp-prod-dump.sql
+*.backup
+*.sql.tmp
