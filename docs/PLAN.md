@@ -7,7 +7,7 @@ This document outlines the key next steps and implementation priorities for the 
 ### 1.1. Core User Flow (Updated Priorities)
 
 1.  **Verify Production Setup (Vercel):**
-    *   Ensure Google OAuth is fully functional on the deployed Vercel application (`https://coupon-cycle.site/`).
+    *   Ensure Google OAuth is fully functional on the deployed Vercel application (`https://www.coupon-cycle.site/`).
     *   Confirm the production database is correctly configured, accessible, and migrations have been applied (`npx prisma migrate deploy`).
     *   Thoroughly test the "Add Card" functionality end-to-end on Vercel to ensure it interacts correctly with the production database.
 2.  **Seed Database:** Populate `PredefinedCard` and `PredefinedBenefit` tables with initial data using `npx prisma db seed`. This is crucial for the "Add Card" flow.

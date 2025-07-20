@@ -123,21 +123,14 @@ export function calculateBenefitCycle(
     throw new Error("Calculated cycle end date is not after cycle start date.");
   }
 
-  // Detailed logging before returning
-  console.log('calculateBenefitCycle FINAL:', {
-    inputs: {
-        frequency,
-        referenceDate: referenceDate.toISOString(),
-        cardOpenedDate: cardOpenedDate?.toISOString(),
-        cycleAlignment,
-        fixedCycleStartMonth,
-        fixedCycleDurationMonths
-    },
-    outputs: {
-        cycleStartDate: cycleStartDate.toISOString(),
-        cycleEndDate: cycleEndDate.toISOString()
-    }
-  });
+  // Log cycle calculation in development mode
+  if (process.env.NODE_ENV === 'development') {
+    console.log('calculateBenefitCycle:', {
+      frequency,
+      cycleStartDate: cycleStartDate.toISOString(),
+      cycleEndDate: cycleEndDate.toISOString()
+    });
+  }
 
   return { cycleStartDate, cycleEndDate };
 }

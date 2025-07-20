@@ -1,6 +1,6 @@
-# Marketing and Promotion Strategy for "Credit Card Tracker" and "fantasy_c"
+# Marketing and Promotion Strategy for "CouponCycle" and "fantasy_c"
 
-This document outlines the multi-phase marketing and promotion strategy for the Credit Card Tracker plugin and the personal brand of its developer, fantasy_c. The overarching goal is to establish fantasy_c as a trusted indie developer who creates free tools to enhance efficiency and life value, while driving long-term user growth for this plugin and future applications.
+This document outlines the multi-phase marketing and promotion strategy for the CouponCycle application and the personal brand of its developer, fantasy_c. The overarching goal is to establish fantasy_c as a trusted indie developer who creates free tools to enhance efficiency and life value, while driving long-term user growth for this plugin and future applications.
 
 ## Core Mission
 
@@ -16,7 +16,7 @@ To empower users to maximize the value they get from their credit cards and othe
     *   **Platform:** GitHub Pages, Jekyll, Hugo, Ghost, or Substack.
     *   **Content:**
         *   **About Me:** A page that tells the story of fantasy_c and the mission.
-        *   **Portfolio:** Showcase projects, starting with the Credit Card Tracker.
+        *   **Portfolio:** Showcase projects, starting with CouponCycle.
         *   **Blog:** A platform for "building in public" and sharing valuable content.
         *   **Contact:** A way for people to get in touch.
 *   **Plugin Landing Page (Current App Homepage):**
@@ -105,5 +105,5 @@ To empower users to maximize the value they get from their credit cards and othe
 ### 3. Leveraging the Plugin for Brand Building
 
 *   **In-App Branding:** A subtle "Made with ❤️ by fantasy_c" with a link to the personal website.
-*   **Cross-Promotion:** When new apps are developed, promote them to the existing user base of the Credit Card Tracker.
+*   **Cross-Promotion:** When new apps are developed, promote them to the existing user base of CouponCycle.
 *   **Feedback Loop:** Actively solicit and act on user feedback to show that you are listening and continuously improving the product. This builds immense trust and loyalty. 

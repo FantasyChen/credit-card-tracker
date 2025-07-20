@@ -44,10 +44,7 @@ export async function addCardAction(formData: FormData) {
     throw new Error('Last 4 digits must be exactly 4 numeric digits.');
   }
 
-  console.log('--- addCardAction: Calling createCardForUser ---');
-  console.log('User ID:', userId);
-  console.log('Predefined Card ID:', predefinedCardId);
-  console.log('Parsed Opened Date:', openedDate);
+
 
   try {
     const result = await createCardForUser(userId, predefinedCardId, openedDate, lastFourDigits);
@@ -56,15 +53,14 @@ export async function addCardAction(formData: FormData) {
       throw new Error(result.message || 'Failed to add card in helper function.');
     }
 
-    console.log('addCardAction: Card created successfully via helper. ID:', result.cardId);
+
 
     revalidatePath('/');
     revalidatePath('/cards');
     revalidatePath('/benefits');
 
   } catch (error) {
-    console.error('--- ERROR in addCardAction calling helper ---');
-    console.error('Error:', error instanceof Error ? error.message : error);
+    console.error('addCardAction error:', error instanceof Error ? error.message : error);
     if (error instanceof Error) {
       throw new Error(`Failed to add card: ${error.message}`);
     } else {
@@ -72,6 +68,6 @@ export async function addCardAction(formData: FormData) {
     }
   }
 
-  console.log('--- addCardAction: Redirecting to /benefits ---');
+
   redirect('/benefits');
 } 

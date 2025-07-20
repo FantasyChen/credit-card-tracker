@@ -54,7 +54,7 @@ async function listAvailableCards() {
     });
 
     console.log('\n📝 To add any of these cards:');
-    console.log('   1. Visit https://coupon-cycle.site/cards/new');
+    console.log('   1. Visit https://www.coupon-cycle.site/cards/new');
     console.log('   2. Select the card you want to add');
     console.log('   3. Optionally enter the month/year you opened the card');
     console.log('   4. Benefits will be automatically created and tracked');

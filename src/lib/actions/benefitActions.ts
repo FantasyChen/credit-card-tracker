@@ -14,13 +14,12 @@ import { calculateBenefitCycle } from '@/lib/benefit-cycle';
 export async function ensureCurrentBenefitStatuses() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    console.log('ensureCurrentBenefitStatuses: No session found.');
-    return; // Not logged in
+      return; // Not logged in
   }
   const userId = session.user.id;
   const now = new Date(); // Use a consistent 'now' for all calculations
 
-  console.log(`ensureCurrentBenefitStatuses: Running for user ${userId} at ${now.toISOString()}`);
+
 
   try {
     // Fetch all user cards with their benefits
@@ -103,13 +102,11 @@ export async function ensureCurrentBenefitStatuses() {
 
     // Execute all upsert operations
     if (upsertPromises.length > 0) {
-        console.log(`ensureCurrentBenefitStatuses: Attempting ${upsertPromises.length} upserts.`);
-        await Promise.all(upsertPromises);
-        console.log('ensureCurrentBenefitStatuses: Upserts completed.');
+          await Promise.all(upsertPromises);
         // Remove revalidation from here - it should happen in actions that *trigger* changes
         // revalidatePath('/benefits'); 
     } else {
-        console.log('ensureCurrentBenefitStatuses: No benefit statuses needed upserting.');
+    
     }
 
   } catch (error) {

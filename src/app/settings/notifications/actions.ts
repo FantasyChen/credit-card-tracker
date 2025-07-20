@@ -44,7 +44,7 @@ export async function updateNotificationSettingsAction(formData: FormData) {
       },
     });
 
-    console.log('Notification settings updated for user:', session.user.id);
+
 
     // Revalidate the settings page path
     revalidatePath('/settings/notifications');

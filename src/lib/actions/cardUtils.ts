@@ -18,10 +18,7 @@ export async function createCardForUser(
   openedDateInput: Date | null,
   lastFourDigits?: string | null
 ): Promise<CreateCardResult> {
-  console.log('--- Running createCardForUser ---');
-  console.log('User ID:', userId);
-  console.log('Predefined Card ID:', predefinedCardId);
-  console.log('Opened Date Input:', openedDateInput);
+
 
   // Default openedDate if none provided (used for benefit cycle calculation)
   let openedDate: Date;
@@ -30,7 +27,7 @@ export async function createCardForUser(
   } else {
     const currentYear = new Date().getUTCFullYear();
     openedDate = new Date(Date.UTC(currentYear, 0, 1)); // Default to Jan 1st of current year
-    console.log('Defaulted openedDate to:', openedDate.toISOString());
+
   }
 
   try {
@@ -58,7 +55,7 @@ export async function createCardForUser(
       console.error('createCardForUser: Predefined card not found for ID:', predefinedCardId);
       return { success: false, message: 'Predefined card not found.' };
     }
-    console.log('createCardForUser: Fetched Predefined Card:', predefinedCard.name);
+
 
     // 2. Create the credit card
     const newCreditCard = await prisma.creditCard.create({
@@ -70,7 +67,7 @@ export async function createCardForUser(
         lastFourDigits: lastFourDigits || null, // Include last 4 digits if provided
       },
     });
-    console.log('createCardForUser: Created CreditCard ID:', newCreditCard.id);
+
 
     // 3. Create benefits and initial statuses
     const now = new Date(); // Consistent time for this operation
@@ -117,21 +114,20 @@ export async function createCardForUser(
       });
     }
 
-    console.log('createCardForUser: Successfully created card and benefits.');
+
     return { success: true, cardId: newCreditCard.id };
 
   } catch (error) {
-    console.error('--- ERROR in createCardForUser ---');
-    console.error('Error details:', error);
+    console.error('createCardForUser error:', error);
     let message = 'Failed to create the card.';
     if (error instanceof Error) {
         message = error.message;
     }
-    // Check for specific Prisma errors if needed
-    if (error && typeof error === 'object' && 'code' in error) {
-      console.error(`Prisma Error Code: ${error.code}`);
+    // Log additional Prisma error details in development
+    if (process.env.NODE_ENV === 'development' && error && typeof error === 'object' && 'code' in error) {
+      console.error(`Prisma Error Code: ${(error as any).code}`);
       if ('meta' in error) {
-        console.error('Meta:', error.meta);
+        console.error('Meta:', (error as any).meta);
       }
     }
     return { success: false, message: message };

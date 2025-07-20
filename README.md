@@ -1,12 +1,12 @@
-# Credit Card Tracker 💳
+# CouponCycle 💳
 
 **Tired of losing hundreds of dollars in credit card benefits each year? So was I.** That's why I built this free, open-source tool to help you track your credit card perks and maximize your rewards.
 
-[![Credit Card Tracker Hero Image](public/images/hero-image.jpg)](https://credit-card-tracker.vercel.app/)
+[![CouponCycle Hero Image](public/images/hero-image.jpg)](https://www.coupon-cycle.site/)
 
 *Stop letting your benefits expire. Start tracking them like a pro.*
 
-## ✨ Why Use Credit Card Tracker?
+## ✨ Why Use CouponCycle?
 
 This isn't just another expense tracker. It's a smart benefits management system designed for anyone who wants to get the most out of their credit cards.
 
@@ -18,7 +18,7 @@ This isn't just another expense tracker. It's a smart benefits management system
 
 ## 🚀 Live App & Installation
 
-You can use the live application right now at **[credit-card-tracker.vercel.app](https://credit-card-tracker.vercel.app/)**.
+You can use the live application right now at **[www.coupon-cycle.site](https://www.coupon-cycle.site/)**.
 
 ### For Your Mobile Device (Recommended)
 
