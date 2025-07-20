@@ -4,6 +4,7 @@ import React, { useState, useEffect, useTransition, useMemo } from 'react'; // A
 import Link from 'next/link';
 import { deleteCardAction } from './actions'; // Import the delete action
 import type { CreditCard, Benefit } from '@/generated/prisma'; // Removed unused PredefinedCard
+import { generateCardDisplayNames } from '@/lib/cardDisplayUtils';
 
 // Type for cards fetched from the API, assuming benefits are included
 interface FetchedUserCard extends CreditCard {
@@ -131,24 +132,7 @@ export default function UserCardsPage() {
 
   // Process cards to add displayName for duplicates
   const cards = useMemo(() => {
-    const cardCounts: { [key: string]: number } = {};
-    const cardIndices: { [key: string]: number } = {};
-
-    // First pass: count occurrences of each card name (name + issuer might be better for uniqueness)
-    rawCards.forEach(card => {
-      const cardKey = `${card.name}-${card.issuer}`;
-      cardCounts[cardKey] = (cardCounts[cardKey] || 0) + 1;
-    });
-
-    // Second pass: assign displayName if duplicates exist
-    return rawCards.map(card => {
-      const cardKey = `${card.name}-${card.issuer}`;
-      if (cardCounts[cardKey] > 1) {
-        cardIndices[cardKey] = (cardIndices[cardKey] || 0) + 1;
-        return { ...card, displayName: `${card.name} #${cardIndices[cardKey]}` };
-      }
-      return { ...card }; // card is FetchedUserCard
-    });
+    return generateCardDisplayNames(rawCards);
   }, [rawCards]);
 
   // Get searchParams client-side if modal logic is active

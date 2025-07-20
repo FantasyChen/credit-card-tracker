@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { BenefitStatus, Benefit, CreditCard as PrismaCreditCard } from '@/generated/prisma';
 import BenefitsDisplayClient from '@/components/BenefitsDisplayClient'; // Import the new client component
+import { createCardDisplayNameMap } from '@/lib/cardDisplayUtils';
 // We will create a new client component for the list and cards
 // import BenefitListClient from '@/components/BenefitListClient'; 
 
@@ -31,33 +32,22 @@ export default async function BenefitsDashboardPage() {
   // 1. Fetch all user's cards to determine display names
   const userCards = await prisma.creditCard.findMany({
     where: { userId },
-    // No need to include benefits here, as displayName logic only uses name and issuer
+    select: {
+      id: true,
+      name: true,
+      issuer: true,
+      lastFourDigits: true, // Include lastFourDigits for display name generation
+      createdAt: true,
+      updatedAt: true,
+      userId: true,
+      cardNumber: true,
+      expiryDate: true,
+      openedDate: true,
+    },
   });
 
-  // 2. Calculate displayNames for each card
-  const cardCounts: { [key: string]: number } = {};
-  userCards.forEach(card => {
-    const cardKey = `${card.name}-${card.issuer}`; 
-    cardCounts[cardKey] = (cardCounts[cardKey] || 0) + 1;
-  });
-
-  const cardIndices: { [key: string]: number } = {};
-  const cardsWithDisplayName: CreditCardWithDisplayName[] = userCards.map(card => {
-    const cardKey = `${card.name}-${card.issuer}`;
-    let determinedDisplayName = card.name; // Use a different variable name to avoid conflict with card.displayName if it ever exists
-    if (cardCounts[cardKey] > 1) {
-      cardIndices[cardKey] = (cardIndices[cardKey] || 0) + 1;
-      determinedDisplayName = `${card.name} #${cardIndices[cardKey]}`;
-    }
-    return {
-        ...card, 
-        displayName: determinedDisplayName,
-    };
-  });
-  
-  const cardDisplayNameMap = new Map<string, string>(
-    cardsWithDisplayName.map(card => [card.id, card.displayName])
-  );
+  // 2. Calculate displayNames for each card using the utility function
+  const cardDisplayNameMap = createCardDisplayNameMap(userCards);
 
   // Fetch All Relevant Benefit Statuses for Display
   const allStatusesRaw = await prisma.benefitStatus.findMany({
