@@ -27,6 +27,42 @@ This is a Progressive Web App (PWA), which means you can install it on your phon
 - **iPhone/iPad:** Open the site in Safari, tap the 'Share' button, and select "Add to Home Screen".
 - **Android:** Open the site in Chrome, tap the three-dot menu, and select "Install app".
 
+## 🔄 Updating Card Information (Community Contributions Welcome!)
+
+Credit card benefits and annual fees change frequently. Help keep our data current!
+
+### Quick Guide for Card Information Updates:
+
+1. **Find outdated information**: Compare our data with official sources
+2. **Verify with reliable sources**: Use [US Credit Card Guide](https://www.uscreditcardguide.com/) or official bank websites
+3. **Update the seed file**: Edit `prisma/seed.ts` with new information
+4. **Submit a pull request**: We'll review and merge quickly
+
+**What to Update:**
+- Annual fees that have changed
+- Benefits that have been added, removed, or modified
+- New credit cards from major issuers
+- Corrections to benefit amounts or frequencies
+
+**Quick Example:**
+```typescript
+// In prisma/seed.ts, find the card and update:
+{
+  name: 'Chase Sapphire Preferred',
+  issuer: 'Chase',
+  annualFee: 95, // ← Update this if changed
+  benefits: [
+    {
+      description: '$50 Annual Hotel Credit', // ← Update amounts/descriptions
+      maxAmount: 50, // ← Update this value
+      // ... rest of benefit
+    }
+  ]
+}
+```
+
+See our [detailed contribution guide](CONTRIBUTING.md#updating-credit-card-information) for step-by-step instructions.
+
 ## 🛠️ For Developers: Quick Start & Contribution
 
 <details>
@@ -51,7 +87,7 @@ This is a Progressive Web App (PWA), which means you can install it on your phon
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/FantasyChen/credit-card-tracker.git
+    git clone https://github.com/fantasy-cc/credit-card-tracker.git
     cd credit-card-tracker
     ```
 
@@ -100,42 +136,6 @@ This is a Progressive Web App (PWA), which means you can install it on your phon
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.
 
-### 🔄 Updating Card Information (Community Contributions Welcome!)
-
-Credit card benefits and annual fees change frequently. Help keep our data current!
-
-#### Quick Guide for Card Information Updates:
-
-1. **Find outdated information**: Compare our data with official sources
-2. **Verify with reliable sources**: Use [US Credit Card Guide](https://www.uscreditcardguide.com/) or official bank websites
-3. **Update the seed file**: Edit `prisma/seed.ts` with new information
-4. **Submit a pull request**: We'll review and merge quickly
-
-**What to Update:**
-- Annual fees that have changed
-- Benefits that have been added, removed, or modified
-- New credit cards from major issuers
-- Corrections to benefit amounts or frequencies
-
-**Quick Example:**
-```typescript
-// In prisma/seed.ts, find the card and update:
-{
-  name: 'Chase Sapphire Preferred',
-  issuer: 'Chase',
-  annualFee: 95, // ← Update this if changed
-  benefits: [
-    {
-      description: '$50 Annual Hotel Credit', // ← Update amounts/descriptions
-      maxAmount: 50, // ← Update this value
-      // ... rest of benefit
-    }
-  ]
-}
-```
-
-See our [detailed contribution guide](CONTRIBUTING.md#updating-credit-card-information) for step-by-step instructions.
-
 </details>
 
 ## 💖 A Note from the Creator
@@ -156,7 +156,7 @@ We're just getting started! Here's what's planned:
 - [ ] Bank account integration
 - [ ] Multi-user households
 
-Have an idea? [Open an issue](https://github.com/FantasyChen/credit-card-tracker/issues) and let's talk about it!
+Have an idea? [Open an issue](https://github.com/fantasy-cc/credit-card-tracker/issues) and let's talk about it!
 
 ## 📄 License
 
