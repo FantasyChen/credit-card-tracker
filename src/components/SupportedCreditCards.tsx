@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import type { PredefinedCard, PredefinedBenefit } from '@/generated/prisma';
+import { searchCards } from '@/lib/cardSearchUtils';
 
 // Interface for card with benefits
 interface CardWithBenefits extends PredefinedCard {
@@ -43,11 +44,9 @@ export default function SupportedCreditCards() {
     fetchCards();
   }, []);
 
-  // Filter cards based on search term
-  const filteredCards = cards.filter(card => 
-    card.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    card.issuer.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Enhanced search functionality
+  const searchResults = searchCards(cards, searchTerm);
+  const filteredCards = searchResults.map(result => result.card);
 
   // Show only first 6 cards initially, or all if showAll is true
   const displayedCards = showAll ? filteredCards : filteredCards.slice(0, 6);
@@ -162,14 +161,28 @@ export default function SupportedCreditCards() {
           </div>
 
           {/* Search Bar */}
-          <div className="max-w-md mx-auto mb-8">
-            <input
-              type="text"
-              placeholder="Search cards or issuers..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="max-w-lg mx-auto mb-8 space-y-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search cards, issuers, benefits... Try 'amex', 'travel', 'dining', 'uber'"
+                className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+            
+            {/* Search results count */}
+            {searchTerm && (
+              <div className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                Found {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} matching "{searchTerm}"
+              </div>
+            )}
           </div>
 
           {/* Cards Grid */}
