@@ -45,33 +45,50 @@ async function ensureDirectoryExists(dirPath) {
   }
 }
 
-// Validate if URL looks like an image
-function isValidImageUrl(url) {
+// Validate if URL looks like an image and contains relevant card info
+function isValidImageUrl(url, cardName) {
   try {
     const urlObj = new URL(url);
     const pathname = urlObj.pathname.toLowerCase();
+    const fullUrl = urlObj.href.toLowerCase();
     
     // Check if it ends with common image extensions
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
     const hasImageExtension = imageExtensions.some(ext => pathname.endsWith(ext));
     
     // Exclude common non-image patterns
-    const invalidPatterns = ['/404', '/error', 'placeholder', 'fallback'];
+    const invalidPatterns = ['/404', '/error', 'placeholder', 'fallback', 'logo', 'icon'];
     const hasInvalidPattern = invalidPatterns.some(pattern => 
-      urlObj.href.toLowerCase().includes(pattern.toLowerCase())
+      fullUrl.includes(pattern.toLowerCase())
     );
     
+    // Extract key words from card name for validation
+    const cardWords = cardName.toLowerCase().split(' ').filter(word => 
+      word.length > 2 && !['card', 'credit', 'visa', 'mastercard'].includes(word)
+    );
+    
+    // Check if URL contains relevant card-specific terms
+    const hasRelevantTerms = cardWords.some(word => fullUrl.includes(word));
+    
     // Prefer certain domains known to have good images
-    const preferredDomains = ['americanexpress.com', 'chase.com', 'capitalone.com', 'citi.com'];
+    const preferredDomains = ['americanexpress.com', 'chase.com', 'capitalone.com', 'citi.com', 'discover.com', 'bankofamerica.com'];
     const isPreferredDomain = preferredDomains.some(domain => urlObj.hostname.includes(domain));
+    
+    // Avoid generic or misleading URLs
+    const avoidPatterns = ['freedom-unlimited', 'freedom_unlimited'];
+    if (cardName.toLowerCase().includes('freedom flex')) {
+      const hasAvoidPattern = avoidPatterns.some(pattern => fullUrl.includes(pattern));
+      if (hasAvoidPattern) return { isValid: false, isPreferred: false, extension: '.jpg' };
+    }
     
     return {
       isValid: hasImageExtension && !hasInvalidPattern,
       isPreferred: isPreferredDomain,
+      hasRelevantTerms: hasRelevantTerms,
       extension: imageExtensions.find(ext => pathname.endsWith(ext)) || '.jpg'
     };
   } catch (e) {
-    return { isValid: false, isPreferred: false, extension: '.jpg' };
+    return { isValid: false, isPreferred: false, hasRelevantTerms: false, extension: '.jpg' };
   }
 }
 
@@ -210,13 +227,22 @@ async function main() {
     const sortedResults = response.images_results
       .map(result => ({
         ...result,
-        validation: isValidImageUrl(result.original)
+        validation: isValidImageUrl(result.original, cardName)
       }))
       .filter(result => result.validation.isValid)
       .sort((a, b) => {
-        // Prefer images from official sources
+        // First priority: preferred domains with relevant terms
+        if (a.validation.isPreferred && a.validation.hasRelevantTerms && !(b.validation.isPreferred && b.validation.hasRelevantTerms)) return -1;
+        if (!(a.validation.isPreferred && a.validation.hasRelevantTerms) && b.validation.isPreferred && b.validation.hasRelevantTerms) return 1;
+        
+        // Second priority: preferred domains
         if (a.validation.isPreferred && !b.validation.isPreferred) return -1;
         if (!a.validation.isPreferred && b.validation.isPreferred) return 1;
+        
+        // Third priority: has relevant terms
+        if (a.validation.hasRelevantTerms && !b.validation.hasRelevantTerms) return -1;
+        if (!a.validation.hasRelevantTerms && b.validation.hasRelevantTerms) return 1;
+        
         return 0;
       });
 
@@ -239,6 +265,9 @@ async function main() {
       console.log(`\n📁 Attempt ${i + 1}/${attempts}: ${imageUrl}`);
       if (validation.isPreferred) {
         console.log("✅ Preferred domain detected");
+      }
+      if (validation.hasRelevantTerms) {
+        console.log("🎯 Contains relevant card terms");
       }
 
       try {

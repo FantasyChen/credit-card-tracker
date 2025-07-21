@@ -921,7 +921,7 @@ async function main() {
       name: 'Chase Freedom Flex',
       issuer: 'Chase',
       annualFee: 0,
-      imageUrl: '/images/cards/chase-freedom-flex.jpg',
+      imageUrl: '/images/cards/chase-freedom-flex.png',
       benefits: [
         {
           description: 'Activate 5% Quarterly Categories (up to $1,500 spend)',
