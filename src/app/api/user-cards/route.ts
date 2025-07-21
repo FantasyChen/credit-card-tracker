@@ -23,7 +23,32 @@ export async function GET() {
         createdAt: 'desc', // Show newest cards first
       },
     });
-    return NextResponse.json(userCards);
+
+    // Fetch the corresponding predefined cards to get image URLs
+    const cardNames = userCards.map(card => card.name);
+    const predefinedCards = await prisma.predefinedCard.findMany({
+      where: {
+        name: { in: cardNames }
+      },
+      select: {
+        name: true,
+        issuer: true,
+        imageUrl: true,
+      }
+    });
+
+    // Create a map for quick lookup of image URLs
+    const imageUrlMap = new Map(
+      predefinedCards.map(card => [`${card.name}-${card.issuer}`, card.imageUrl])
+    );
+
+    // Add imageUrl to user cards
+    const userCardsWithImages = userCards.map(card => ({
+      ...card,
+      imageUrl: imageUrlMap.get(`${card.name}-${card.issuer}`) || null
+    }));
+
+    return NextResponse.json(userCardsWithImages);
   } catch (error) {
     console.error("Error fetching user cards:", error);
     return NextResponse.json(
