@@ -873,6 +873,65 @@ async function main() {
         },
       ],
     },
+    {
+      name: 'Marriott Bonvoy Business American Express Card',
+      issuer: 'American Express',
+      annualFee: 125,
+      imageUrl: '/images/cards/marriott-bonvoy-business-american-express-card.png',
+      benefits: [
+        {
+          description: 'Annual Free Night Award (up to 35,000 points)',
+          category: 'Travel',
+          maxAmount: 0,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: '15 Elite Night Credits towards Marriott Bonvoy Elite status',
+          category: 'Travel',
+          maxAmount: 0,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: 'Marriott Bonvoy Gold Elite Status (complimentary)',
+          category: 'Travel',
+          maxAmount: 0,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+      ],
+    },
+    {
+      name: 'Discover it Cash Back',
+      issuer: 'Discover',
+      annualFee: 0,
+      imageUrl: '/images/cards/discover-it-cash-back.png',
+      benefits: [
+        {
+          description: 'Activate 5% Quarterly Categories (up to $1,500 spend)',
+          category: 'Rewards',
+          maxAmount: 75, // 5% of $1,500
+          frequency: BenefitFrequency.QUARTERLY,
+          percentage: 0,
+        },
+      ],
+    },
+    {
+      name: 'Chase Freedom Flex',
+      issuer: 'Chase',
+      annualFee: 0,
+      imageUrl: '/images/cards/chase-freedom-flex.jpg',
+      benefits: [
+        {
+          description: 'Activate 5% Quarterly Categories (up to $1,500 spend)',
+          category: 'Rewards',
+          maxAmount: 75, // 5% of $1,500
+          frequency: BenefitFrequency.QUARTERLY,
+          percentage: 0,
+        },
+      ],
+    },
   ];
 
   // --- Upsert Logic (ensure benefits are deleted/recreated or updated properly) ---

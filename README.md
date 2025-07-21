@@ -2,7 +2,7 @@
 
 **Tired of losing hundreds of dollars in credit card benefits each year? So was I.** That's why I built this free, open-source tool to help you track your credit card perks and maximize your rewards.
 
-[![CouponCycle Hero Image](public/images/hero-image.jpg)](https://www.coupon-cycle.site/)
+[![CouponCycle Hero Image](public/hero-image.jpg)](https://www.coupon-cycle.site/)
 
 *Stop letting your benefits expire. Start tracking them like a pro.*
 
@@ -135,6 +135,84 @@ See our [detailed contribution guide](CONTRIBUTING.md#updating-credit-card-infor
 ### Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.
+
+### Database Recovery with Neon CLI
+
+Since this project uses **Neon Database**, you have powerful recovery and investigation capabilities through the Neon CLI. This is essential for data loss incidents or database investigations.
+
+#### Installation & Setup
+
+```bash
+# Install Neon CLI globally
+npm install -g neonctl
+
+# Authenticate with your Neon account
+neonctl auth
+# Follow the prompts to log in via browser
+```
+
+#### Key Commands for Database Recovery
+
+**List Projects and Branches:**
+```bash
+# List all your projects
+neonctl projects list
+
+# List branches in a specific project
+neonctl branches list --project-id your-project-id
+```
+
+**Point-in-Time Recovery:**
+```bash
+# Create a recovery branch from a specific timestamp
+neonctl branches create \
+  --project-id your-project-id \
+  --name recovery-branch-name \
+  --parent production \
+  --timestamp "2025-07-19T20:30:00Z"
+
+# The connection string will be provided in the output
+```
+
+**Investigation Workflow:**
+1. **Identify the incident time** (when data loss occurred)
+2. **Create branches** at different timestamps around the incident
+3. **Compare data** across branches using the provided connection strings
+4. **Test with your application** by temporarily switching DATABASE_URL
+5. **Recover data** by restoring from the working branch
+
+#### Example Recovery Investigation
+
+```bash
+# Create branches for investigation
+neonctl branches create --project-id abc123 --name before-incident --parent production --timestamp "2025-07-19T19:00:00Z"
+neonctl branches create --project-id abc123 --name during-incident --parent production --timestamp "2025-07-19T20:30:00Z"
+neonctl branches create --project-id abc123 --name after-incident --parent production --timestamp "2025-07-19T21:00:00Z"
+
+# Each branch gives you a unique connection string to test against
+# Use these in temporary scripts or update your .env temporarily
+```
+
+#### Best Practices for Data Recovery
+
+- **Act quickly**: Neon's PITR typically covers 7-30 days
+- **Create branches liberally**: They're free and instant due to copy-on-write
+- **Test thoroughly**: Always verify data integrity before final recovery
+- **Document timestamps**: Keep detailed records of when incidents occurred
+- **Use SQL queries**: Test specific user data with direct database queries
+- **Clean up**: Delete investigation branches after recovery to stay organized
+
+#### Emergency Recovery Steps
+
+1. **Stop the application** to prevent further data corruption
+2. **Identify the last known good timestamp**
+3. **Create a recovery branch** from that timestamp
+4. **Verify data integrity** in the recovery branch
+5. **Switch production** to point to the recovery branch
+6. **Update your main branch** with the recovered data
+7. **Resume application** with verified data
+
+**⚠️ Important**: Always test recovery branches thoroughly before switching production traffic.
 
 </details>
 
