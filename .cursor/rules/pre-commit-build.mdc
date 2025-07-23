@@ -6,8 +6,14 @@ alwaysApply: true
 # .cursor/rules/pre-commit-build.mdc
 # This rule automatically runs a local production build before committing.
 # If the build fails, the commit will be aborted.
+# It also checks with the user before pushing to remote.
 
 when: before:commit
 description: "Run npm run build locally before committing to catch build errors."
 run: terminal: "npm run build"
 fail_if: exit_code_is_not: 0
+
+when: before:push
+description: "Check with user before pushing to remote repository."
+run: confirm: "Are you sure you want to push these commits to the remote repository?"
+fail_if: user_says_no
