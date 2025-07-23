@@ -385,6 +385,21 @@ async function main() {
       ],
     },
     {
+      name: 'Hilton Honors American Express Business Card',
+      issuer: 'American Express',
+      annualFee: 195,
+      imageUrl: '/images/cards/hilton-honors-american-express-business-card.png',
+      benefits: [
+        {
+          description: '$60 Quarterly Hilton Credit ($240 annual)',
+          category: 'Travel',
+          maxAmount: 60,
+          frequency: BenefitFrequency.QUARTERLY,
+          percentage: 0,
+        },
+      ],
+    },
+    {
       name: 'Delta SkyMiles Gold American Express Card',
       issuer: 'American Express',
       annualFee: 150,
