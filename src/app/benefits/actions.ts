@@ -128,4 +128,47 @@ export async function updateBenefitOrderAction(benefitStatusIds: string[]) {
     console.error('Error updating benefit order:', error);
     throw new Error('Failed to update benefit order.');
   }
+}
+
+export async function batchCompleteBenefitsByCategoryAction(category: string, benefitStatusIds: string[]) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated.');
+  }
+
+  if (!category || benefitStatusIds.length === 0) {
+    throw new Error('Category and benefit status IDs are required.');
+  }
+
+  try {
+    const now = new Date();
+    
+    // Update all the benefit statuses in the specified category
+    const updatedStatuses = await prisma.benefitStatus.updateMany({
+      where: {
+        id: { in: benefitStatusIds },
+        userId: session.user.id, // Ensure user owns these status records
+        isCompleted: false, // Only update uncompleted benefits
+        isNotUsable: false, // Don't update benefits marked as not usable
+        benefit: {
+          category: category, // Additional validation that these benefits are in the correct category
+        },
+      },
+      data: {
+        isCompleted: true,
+        completedAt: now,
+      },
+    });
+
+    console.log(`Batch completed ${updatedStatuses.count} benefits in category: ${category}`);
+
+    // Revalidate the benefits page to show the changes
+    revalidatePath('/benefits');
+
+    return { success: true, updatedCount: updatedStatuses.count };
+
+  } catch (error) {
+    console.error('Error batch completing benefits by category:', error);
+    throw new Error('Failed to batch complete benefits.');
+  }
 } 

@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import DraggableBenefitCard from '@/components/DraggableBenefitCard';
 import BenefitCardClient from '@/components/BenefitCardClient';
+import CategoryBenefitsGroup from '@/components/CategoryBenefitsGroup';
 import { updateBenefitOrderAction } from '@/app/benefits/actions';
 import type { DisplayBenefitStatus } from '@/app/benefits/page';
 import Link from 'next/link';
@@ -43,6 +44,7 @@ export default function BenefitsDisplayClient({
 }: BenefitsDisplayProps) {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isDragMode, setIsDragMode] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'category'>('list');
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
   const [localNotUsableBenefits, setLocalNotUsableBenefits] = useState(notUsableBenefits);
@@ -165,6 +167,29 @@ export default function BenefitsDisplayClient({
     setIsDragMode(!isDragMode);
   };
 
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === 'list' ? 'category' : 'list');
+  };
+
+  // Group benefits by category
+  const groupBenefitsByCategory = (benefits: DisplayBenefitStatus[]) => {
+    const grouped = benefits.reduce((acc, benefit) => {
+      const category = benefit.benefit.category;
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(benefit);
+      return acc;
+    }, {} as Record<string, DisplayBenefitStatus[]>);
+
+    // Sort categories by total value (descending)
+    return Object.entries(grouped).sort(([, a], [, b]) => {
+      const aTotal = a.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
+      const bTotal = b.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
+      return bTotal - aTotal;
+    });
+  };
+
   const renderBenefitsList = (benefits: DisplayBenefitStatus[]) => {
     if (benefits.length === 0) {
       return (
@@ -235,21 +260,99 @@ export default function BenefitsDisplayClient({
     );
   };
 
+  const renderCategoryView = (benefits: DisplayBenefitStatus[]) => {
+    if (benefits.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <div className="mx-auto h-24 w-24 text-gray-300 dark:text-gray-600 mb-4">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            {activeTab === 'upcoming' ? 'No upcoming benefits' : 
+             activeTab === 'completed' ? 'No completed benefits yet' : 
+             'No not usable benefits'}
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
+            {activeTab === 'upcoming' 
+              ? 'Add credit cards with benefits to start tracking your rewards and credits.'
+              : activeTab === 'completed' 
+                ? 'Mark benefits as complete when you use them to track your ROI.'
+                : 'Benefits marked as not usable will appear here.'
+            }
+          </p>
+          {activeTab === 'upcoming' && (
+            <Link
+              href="/cards/new"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+            >
+              <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Your First Card
+            </Link>
+          )}
+        </div>
+      );
+    }
+
+    const categorizedBenefits = groupBenefitsByCategory(benefits);
+    
+    return (
+      <div className="space-y-6">
+        {categorizedBenefits.map(([category, categoryBenefits]) => (
+          <CategoryBenefitsGroup
+            key={category}
+            category={category}
+            benefits={categoryBenefits}
+            onStatusChange={handleStatusChange}
+            onNotUsableChange={handleNotUsableChange}
+          />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold dark:text-white">Benefits Dashboard</h1>
-        <button
-          onClick={toggleDragMode}
-          disabled={isPending}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors self-start sm:self-auto ${
-            isDragMode
-              ? 'bg-green-600 hover:bg-green-700 text-white'
-              : 'bg-blue-600 hover:bg-blue-700 text-white'
-          } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          {isPending ? 'Saving...' : isDragMode ? 'Done Reordering' : 'Reorder Benefits'}
-        </button>
+        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          <button
+            onClick={toggleViewMode}
+            className="px-4 py-2 rounded-md text-sm font-medium transition-colors bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            {viewMode === 'list' ? (
+              <>
+                <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H3m16 14H5" />
+                </svg>
+                Group by Category
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+                List View
+              </>
+            )}
+          </button>
+          {viewMode === 'list' && (
+            <button
+              onClick={toggleDragMode}
+              disabled={isPending}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                isDragMode
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {isPending ? 'Saving...' : isDragMode ? 'Done Reordering' : 'Reorder Benefits'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Summary Widgets */}
@@ -433,17 +536,17 @@ export default function BenefitsDisplayClient({
       <div>
         {activeTab === 'upcoming' && (
           <section>
-            {renderBenefitsList(localUpcomingBenefits)}
+            {viewMode === 'list' ? renderBenefitsList(localUpcomingBenefits) : renderCategoryView(localUpcomingBenefits)}
           </section>
         )}
         {activeTab === 'completed' && (
           <section>
-            {renderBenefitsList(localCompletedBenefits)}
+            {viewMode === 'list' ? renderBenefitsList(localCompletedBenefits) : renderCategoryView(localCompletedBenefits)}
           </section>
         )}
         {activeTab === 'not-usable' && (
           <section>
-            {renderBenefitsList(localNotUsableBenefits)}
+            {viewMode === 'list' ? renderBenefitsList(localNotUsableBenefits) : renderCategoryView(localNotUsableBenefits)}
           </section>
         )}
       </div>
