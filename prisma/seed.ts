@@ -153,6 +153,9 @@ async function main() {
           maxAmount: 200,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
         },
         {
           description: '$15 Monthly Uber Cash ($35 in December)', 
@@ -204,6 +207,9 @@ async function main() {
           maxAmount: 300, 
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
         },
         {
           description: '$13 Monthly Walmart+ Credit (Covers monthly membership cost)',
@@ -218,6 +224,9 @@ async function main() {
           maxAmount: 200,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
         },
         {
           description: '$189 CLEAR Plus Credit (Annual Statement Credit)',
@@ -225,6 +234,9 @@ async function main() {
           maxAmount: 189,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
         },
       ],
     },
@@ -240,6 +252,9 @@ async function main() {
           maxAmount: 200,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
         },
         {
           description: '$200 Dell Credit (Jan-Jun)',
@@ -267,6 +282,9 @@ async function main() {
           maxAmount: 50,
           frequency: BenefitFrequency.QUARTERLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 3, // Calendar quarters
         },
         {
           description: '$10 Monthly Wireless Credit',
@@ -281,6 +299,9 @@ async function main() {
           maxAmount: 90,
           frequency: BenefitFrequency.QUARTERLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 3, // Calendar quarters
         },
         {
           description: '$150 Annual Adobe Credit (select products)',
@@ -288,6 +309,9 @@ async function main() {
           maxAmount: 150,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
         },
         {
           description: '$189 CLEAR Plus Credit',
@@ -339,6 +363,9 @@ async function main() {
           maxAmount: 50,
           frequency: BenefitFrequency.QUARTERLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 3, // Calendar quarters
         },
         {
           description: '$200 Semi-Annual Hilton Resort Credit (Jan-Jun)',
@@ -366,6 +393,9 @@ async function main() {
           maxAmount: 189,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
         },
       ],
     },
@@ -552,7 +582,7 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$5 monthly rideshare credit',
+          description: '$5 Monthly rideshare credit',
           category: 'Travel',
           maxAmount: 5,
           frequency: BenefitFrequency.MONTHLY,
@@ -609,10 +639,10 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$60 rideshare credit',
+          description: '$5 Monthly rideshare credit',
           category: 'Travel',
-          maxAmount: 60,
-          frequency: BenefitFrequency.YEARLY,
+          maxAmount: 5,
+          frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
         {
@@ -630,10 +660,10 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$120 Instacart credit',
+          description: '$10 Monthly Instacart credit',
           category: 'Food Delivery',
-          maxAmount: 120,
-          frequency: BenefitFrequency.YEARLY,
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
       ],
@@ -807,10 +837,10 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$60 rideshare credit',
+          description: '$5 Monthly rideshare credit',
           category: 'Travel',
-          maxAmount: 60,
-          frequency: BenefitFrequency.YEARLY,
+          maxAmount: 5,
+          frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
         {
@@ -828,10 +858,10 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$120 Instacart credit',
+          description: '$10 Monthly Instacart credit',
           category: 'Food Delivery',
-          maxAmount: 120,
-          frequency: BenefitFrequency.YEARLY,
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
         {

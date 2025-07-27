@@ -1,25 +1,8 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import DraggableBenefitCard from '@/components/DraggableBenefitCard';
 import BenefitCardClient from '@/components/BenefitCardClient';
 import CategoryBenefitsGroup from '@/components/CategoryBenefitsGroup';
-import { updateBenefitOrderAction } from '@/app/benefits/actions';
 import type { DisplayBenefitStatus } from '@/app/benefits/page';
 import Link from 'next/link';
 
@@ -43,8 +26,8 @@ export default function BenefitsDisplayClient({
   totalAnnualFees,
 }: BenefitsDisplayProps) {
   const [activeTab, setActiveTab] = useState('upcoming');
-  const [isDragMode, setIsDragMode] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'category'>('list');
+
+  const [viewMode, setViewMode] = useState<'list' | 'category' | 'card'>('list');
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
   const [localNotUsableBenefits, setLocalNotUsableBenefits] = useState(notUsableBenefits);
@@ -53,12 +36,7 @@ export default function BenefitsDisplayClient({
   const [localTotalNotUsableValue, setLocalTotalNotUsableValue] = useState(totalNotUsableValue);
   const [isPending, startTransition] = useTransition();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+
 
   const handleStatusChange = (statusId: string, newIsCompleted: boolean) => {
     if (newIsCompleted) {
@@ -120,56 +98,11 @@ export default function BenefitsDisplayClient({
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
 
-    if (!over || active.id === over.id) {
-      return;
-    }
 
-    const isUpcomingTab = activeTab === 'upcoming';
-    const isCompletedTab = activeTab === 'completed';
-    const isNotUsableTab = activeTab === 'not-usable';
-    
-    let items: DisplayBenefitStatus[] = [];
-    let setItems: React.Dispatch<React.SetStateAction<DisplayBenefitStatus[]>>;
-    
-    if (isUpcomingTab) {
-      items = localUpcomingBenefits;
-      setItems = setLocalUpcomingBenefits;
-    } else if (isCompletedTab) {
-      items = localCompletedBenefits;
-      setItems = setLocalCompletedBenefits;
-    } else if (isNotUsableTab) {
-      items = localNotUsableBenefits;
-      setItems = setLocalNotUsableBenefits;
-    } else {
-      // Fallback to avoid the setItems error
-      items = localUpcomingBenefits;
-      setItems = setLocalUpcomingBenefits;
-    }
-
-    const oldIndex = items.findIndex((item) => item.id === active.id);
-    const newIndex = items.findIndex((item) => item.id === over.id);
-
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const newItems = arrayMove(items, oldIndex, newIndex);
-      setItems(newItems);
-
-      // Update the server with the new order
-      startTransition(() => {
-        updateBenefitOrderAction(newItems.map(item => item.id));
-      });
-    }
-  };
-
-  const toggleDragMode = () => {
-    setIsDragMode(!isDragMode);
-  };
-
-  const toggleViewMode = () => {
-    setViewMode(prev => prev === 'list' ? 'category' : 'list');
-  };
+  const setListView = () => setViewMode('list');
+  const setCategoryView = () => setViewMode('category');
+  const setCardView = () => setViewMode('card');
 
   // Group benefits by category
   const groupBenefitsByCategory = (benefits: DisplayBenefitStatus[]) => {
@@ -183,6 +116,25 @@ export default function BenefitsDisplayClient({
     }, {} as Record<string, DisplayBenefitStatus[]>);
 
     // Sort categories by total value (descending)
+    return Object.entries(grouped).sort(([, a], [, b]) => {
+      const aTotal = a.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
+      const bTotal = b.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
+      return bTotal - aTotal;
+    });
+  };
+
+  // Group benefits by credit card
+  const groupBenefitsByCard = (benefits: DisplayBenefitStatus[]) => {
+    const grouped = benefits.reduce((acc, benefit) => {
+      const cardName = benefit.benefit.creditCard.name;
+      if (!acc[cardName]) {
+        acc[cardName] = [];
+      }
+      acc[cardName].push(benefit);
+      return acc;
+    }, {} as Record<string, DisplayBenefitStatus[]>);
+
+    // Sort cards by total value (descending)
     return Object.entries(grouped).sort(([, a], [, b]) => {
       const aTotal = a.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
       const bTotal = b.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
@@ -227,29 +179,7 @@ export default function BenefitsDisplayClient({
       );
     }
 
-    if (isDragMode) {
-      return (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={benefits.map(b => b.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-4">
-              {benefits.map(status => (
-                <DraggableBenefitCard
-                  key={status.id}
-                  status={status}
-                  isDragMode={isDragMode}
-                  onStatusChange={handleStatusChange}
-                  onNotUsableChange={handleNotUsableChange}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      );
-    }
+
 
     return (
       <div className="space-y-4">
@@ -314,44 +244,99 @@ export default function BenefitsDisplayClient({
     );
   };
 
+  const renderCardView = (benefits: DisplayBenefitStatus[]) => {
+    if (benefits.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 bg-gradient-to-br from-gray-50 to-slate-100 rounded-xl border border-gray-200 dark:from-gray-800/50 dark:to-slate-800/50 dark:border-gray-700">
+          <div className="p-4 bg-gray-100 rounded-full dark:bg-gray-700 mb-4">
+            <svg className="h-8 w-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Benefits Available</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-4">
+            {activeTab === 'upcoming' 
+              ? "You don't have any upcoming benefits. Add some credit cards to get started!" 
+              : activeTab === 'completed'
+              ? "No completed benefits yet. Start using your credit card benefits!"
+              : "No unusable benefits found."}
+          </p>
+          {activeTab === 'upcoming' && (
+            <Link
+              href="/cards/new"
+              className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Credit Card
+            </Link>
+          )}
+        </div>
+      );
+    }
+
+    const cardGroupedBenefits = groupBenefitsByCard(benefits);
+    
+    return (
+      <div className="space-y-6">
+        {cardGroupedBenefits.map(([cardName, cardBenefits]) => (
+          <CategoryBenefitsGroup
+            key={cardName}
+            category={cardName}
+            benefits={cardBenefits}
+            onStatusChange={handleStatusChange}
+            onNotUsableChange={handleNotUsableChange}
+          />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold dark:text-white">Benefits Dashboard</h1>
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
           <button
-            onClick={toggleViewMode}
-            className="px-4 py-2 rounded-md text-sm font-medium transition-colors bg-purple-600 hover:bg-purple-700 text-white"
+            onClick={setListView}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'list' 
+                ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200'
+            }`}
           >
-            {viewMode === 'list' ? (
-              <>
-                <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H3m16 14H5" />
-                </svg>
-                Group by Category
-              </>
-            ) : (
-              <>
-                <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                </svg>
-                List View
-              </>
-            )}
+            <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+            List View
           </button>
-          {viewMode === 'list' && (
-            <button
-              onClick={toggleDragMode}
-              disabled={isPending}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                isDragMode
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {isPending ? 'Saving...' : isDragMode ? 'Done Reordering' : 'Reorder Benefits'}
-            </button>
-          )}
+          <button
+            onClick={setCategoryView}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'category' 
+                ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200'
+            }`}
+          >
+            <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H3m16 14H5" />
+            </svg>
+            Group by Category
+          </button>
+          <button
+            onClick={setCardView}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'card' 
+                ? 'bg-green-600 hover:bg-green-700 text-white' 
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200'
+            }`}
+          >
+            <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+            Group by Card
+          </button>
         </div>
       </div>
 
@@ -485,13 +470,7 @@ export default function BenefitsDisplayClient({
         </div>
       </div>
 
-      {isDragMode && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
-          <p className="text-sm text-blue-800 dark:text-blue-200">
-            💡 <strong>Reorder Mode:</strong> Drag and drop benefits to rearrange them. Your order will be saved automatically.
-          </p>
-        </div>
-      )}
+
 
       {/* Tabs */}
       <div className="mb-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
@@ -536,17 +515,23 @@ export default function BenefitsDisplayClient({
       <div>
         {activeTab === 'upcoming' && (
           <section>
-            {viewMode === 'list' ? renderBenefitsList(localUpcomingBenefits) : renderCategoryView(localUpcomingBenefits)}
+            {viewMode === 'list' ? renderBenefitsList(localUpcomingBenefits) : 
+             viewMode === 'category' ? renderCategoryView(localUpcomingBenefits) : 
+             renderCardView(localUpcomingBenefits)}
           </section>
         )}
         {activeTab === 'completed' && (
           <section>
-            {viewMode === 'list' ? renderBenefitsList(localCompletedBenefits) : renderCategoryView(localCompletedBenefits)}
+            {viewMode === 'list' ? renderBenefitsList(localCompletedBenefits) : 
+             viewMode === 'category' ? renderCategoryView(localCompletedBenefits) : 
+             renderCardView(localCompletedBenefits)}
           </section>
         )}
         {activeTab === 'not-usable' && (
           <section>
-            {viewMode === 'list' ? renderBenefitsList(localNotUsableBenefits) : renderCategoryView(localNotUsableBenefits)}
+            {viewMode === 'list' ? renderBenefitsList(localNotUsableBenefits) : 
+             viewMode === 'category' ? renderCategoryView(localNotUsableBenefits) : 
+             renderCardView(localNotUsableBenefits)}
           </section>
         )}
       </div>
