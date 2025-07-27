@@ -534,7 +534,7 @@ async function main() {
     {
       name: 'Chase United Explorer Card',
       issuer: 'Chase',
-      annualFee: 95,
+      annualFee: 150,
       imageUrl: '/images/cards/chase-united-explorer-card.png',
       benefits: [
         {
@@ -552,10 +552,10 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$60 rideshare credit',
+          description: '$5 monthly rideshare credit',
           category: 'Travel',
-          maxAmount: 60,
-          frequency: BenefitFrequency.YEARLY,
+          maxAmount: 5,
+          frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
         {
@@ -573,10 +573,10 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$120 Instacart credit',
+          description: '$10 Monthly Instacart credit',
           category: 'Food Delivery',
-          maxAmount: 120,
-          frequency: BenefitFrequency.YEARLY,
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
       ],
