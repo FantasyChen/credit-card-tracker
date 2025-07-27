@@ -64,7 +64,7 @@ This document outlines the design and development plan for the CouponCycle web a
 
 ## 3. Next Steps & Action Plan
 
-For detailed next steps, implementation priorities, and the ongoing action plan, please refer to the dedicated [PLAN.md](./PLAN.md) file.
+The future roadmap and development priorities are documented in the main CURSOR.md file under the "🔮 Future Roadmap" section.
 
 ## 4. Future Considerations
 
