@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState } from 'react';
 import BenefitCardClient from '@/components/BenefitCardClient';
 import CategoryBenefitsGroup from '@/components/CategoryBenefitsGroup';
 import type { DisplayBenefitStatus } from '@/app/benefits/page';
@@ -34,7 +34,6 @@ export default function BenefitsDisplayClient({
   const [localTotalUnusedValue, setLocalTotalUnusedValue] = useState(totalUnusedValue);
   const [localTotalUsedValue, setLocalTotalUsedValue] = useState(totalUsedValue);
   const [localTotalNotUsableValue, setLocalTotalNotUsableValue] = useState(totalNotUsableValue);
-  const [isPending, startTransition] = useTransition();
 
 
 
