@@ -564,8 +564,8 @@ async function main() {
     {
       name: 'Chase United Explorer Card',
       issuer: 'Chase',
-      annualFee: 95,
-      imageUrl: '/images/cards/explorer.avif',
+      annualFee: 150,
+      imageUrl: '/images/cards/chase-united-explorer-card.png',
       benefits: [
         {
           description: '2 United Club one-time passes',
