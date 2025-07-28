@@ -12,6 +12,7 @@ interface BenefitInput {
   cycleAlignment?: BenefitCycleAlignment; // Optional
   fixedCycleStartMonth?: number;          // Optional, 1-12
   fixedCycleDurationMonths?: number;     // Optional
+  occurrencesInCycle?: number;           // Optional, defaults to 1
 }
 
 async function main() {
@@ -277,11 +278,12 @@ async function main() {
           fixedCycleDurationMonths: 6,
         },
         {
-          description: '$50 Quarterly Hilton Credit ($200 annual)',
+          description: '$25 Quarterly Hilton Credit',
           category: 'Travel',
-          maxAmount: 50,
+          maxAmount: 25,
           frequency: BenefitFrequency.QUARTERLY,
           percentage: 0,
+          occurrencesInCycle: 2,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
           fixedCycleStartMonth: 1, // January
           fixedCycleDurationMonths: 3, // Calendar quarters
@@ -406,11 +408,12 @@ async function main() {
       imageUrl: '/images/cards/hilton-honors-american-express-surpass-card.png',
       benefits: [
         {
-          description: '$50 Quarterly Hilton Credit ($200 annual)',
+          description: '$25 Quarterly Hilton Credit',
           category: 'Travel',
-          maxAmount: 50,
+          maxAmount: 25,
           frequency: BenefitFrequency.QUARTERLY,
           percentage: 0,
+          occurrencesInCycle: 2,
         },
       ],
     },
@@ -575,11 +578,12 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$100 United Hotels credit',
+          description: '$50 United Hotels credit',
           category: 'Travel',
-          maxAmount: 100,
+          maxAmount: 50,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          occurrencesInCycle: 2,
         },
         {
           description: '$5 Monthly rideshare credit',
@@ -830,11 +834,12 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$100 United Hotels credit',
+          description: '$50 United Hotels credit',
           category: 'Travel',
-          maxAmount: 100,
+          maxAmount: 50,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          occurrencesInCycle: 2,
         },
         {
           description: '$5 Monthly rideshare credit',
