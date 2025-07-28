@@ -86,6 +86,7 @@ model Benefit {
   cycleAlignment           BenefitCycleAlignment? @default(CARD_ANNIVERSARY)
   fixedCycleDurationMonths Int?
   fixedCycleStartMonth     Int?
+  occurrencesInCycle       Int                    @default(1)
   creditCard               CreditCard             @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
   benefitStatuses          BenefitStatus[]
 }
@@ -114,6 +115,7 @@ model PredefinedBenefit {
   cycleAlignment           BenefitCycleAlignment? @default(CARD_ANNIVERSARY)
   fixedCycleDurationMonths Int?
   fixedCycleStartMonth     Int?
+  occurrencesInCycle       Int                    @default(1)
   predefinedCard           PredefinedCard         @relation(fields: [predefinedCardId], references: [id])
 }
 
@@ -129,10 +131,11 @@ model BenefitStatus {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   orderIndex     Int?
+  occurrenceIndex Int      @default(0)
   benefit        Benefit   @relation(fields: [benefitId], references: [id], onDelete: Cascade)
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([benefitId, userId, cycleStartDate])
+  @@unique([benefitId, userId, cycleStartDate, occurrenceIndex])
 }
 
 model playing_with_neon {

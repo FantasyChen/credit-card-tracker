@@ -26,7 +26,16 @@ export async function ensureCurrentBenefitStatuses() {
     const userCardsWithBenefits = await prisma.creditCard.findMany({
       where: { userId: userId },
       include: {
-        benefits: true,
+        benefits: {
+          select: {
+            id: true,
+            frequency: true,
+            cycleAlignment: true,
+            fixedCycleStartMonth: true,
+            fixedCycleDurationMonths: true,
+            occurrencesInCycle: true,
+          }
+        },
       },
     });
 
@@ -68,29 +77,36 @@ export async function ensureCurrentBenefitStatuses() {
           //   return;
           // }
 
-          // Upsert the status: Create if not exists for this cycle start date
-          upsertPromises.push(
-            prisma.benefitStatus.upsert({
-              where: {
-                benefitId_userId_cycleStartDate: {
+          // Create multiple BenefitStatus records based on occurrencesInCycle
+          const occurrences = benefit.occurrencesInCycle || 1;
+          
+          for (let occurrenceIndex = 0; occurrenceIndex < occurrences; occurrenceIndex++) {
+            // Upsert the status: Create if not exists for this cycle start date and occurrence
+            upsertPromises.push(
+              prisma.benefitStatus.upsert({
+                where: {
+                  benefitId_userId_cycleStartDate_occurrenceIndex: {
+                    benefitId: benefit.id,
+                    userId: userId,
+                    cycleStartDate: cycleStartDate,
+                    occurrenceIndex: occurrenceIndex,
+                  }
+                },
+                update: {
+                  // Ensure end date is updated if calculation logic changes between runs
+                  cycleEndDate: cycleEndDate,
+                },
+                create: {
                   benefitId: benefit.id,
                   userId: userId,
                   cycleStartDate: cycleStartDate,
-                }
-              },
-              update: {
-                // Ensure end date is updated if calculation logic changes between runs
-                cycleEndDate: cycleEndDate,
-              },
-              create: {
-                benefitId: benefit.id,
-                userId: userId,
-                cycleStartDate: cycleStartDate,
-                cycleEndDate: cycleEndDate,
-                isCompleted: false, // New cycles start as not completed
-              },
-            })
-          );
+                  cycleEndDate: cycleEndDate,
+                  occurrenceIndex: occurrenceIndex,
+                  isCompleted: false, // New cycles start as not completed
+                },
+              })
+            );
+          }
         } catch (error) { // Explicitly type error if possible, otherwise use unknown or any
             // Add type check for error if necessary, e.g., if (error instanceof Error)
             console.error(`Error calculating cycle for benefit ${benefit.id}:`, error instanceof Error ? error.message : error);

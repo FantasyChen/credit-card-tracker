@@ -94,6 +94,11 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
             <div className="flex-1 min-w-0">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight">
                 {status.benefit.description}
+                {status.benefit.occurrencesInCycle && status.benefit.occurrencesInCycle > 1 && (
+                  <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                    ({(status.occurrenceIndex || 0) + 1} of {status.benefit.occurrencesInCycle})
+                  </span>
+                )}
               </h3>
               {benefitAmount > 0 && (
                 <p className={`text-lg sm:text-xl font-bold mt-1 ${

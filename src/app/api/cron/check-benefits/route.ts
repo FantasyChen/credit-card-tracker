@@ -22,6 +22,7 @@ async function runCheckBenefitsLogic() {
             cycleAlignment: true,
             fixedCycleStartMonth: true,
             fixedCycleDurationMonths: true,
+            occurrencesInCycle: true,
           }
         },
         user: {
@@ -65,27 +66,34 @@ async function runCheckBenefitsLogic() {
             benefit.fixedCycleDurationMonths
           );
 
-          upsertPromises.push(
-            prisma.benefitStatus.upsert({
-              where: {
-                benefitId_userId_cycleStartDate: {
+          // Create multiple BenefitStatus records based on occurrencesInCycle
+          const occurrences = benefit.occurrencesInCycle || 1;
+          
+          for (let occurrenceIndex = 0; occurrenceIndex < occurrences; occurrenceIndex++) {
+            upsertPromises.push(
+              prisma.benefitStatus.upsert({
+                where: {
+                  benefitId_userId_cycleStartDate_occurrenceIndex: {
+                    benefitId: benefit.id,
+                    userId: userId,
+                    cycleStartDate: cycleStartDate,
+                    occurrenceIndex: occurrenceIndex,
+                  },
+                },
+                update: {
+                  cycleEndDate: cycleEndDate,
+                },
+                create: {
                   benefitId: benefit.id,
                   userId: userId,
                   cycleStartDate: cycleStartDate,
+                  cycleEndDate: cycleEndDate,
+                  occurrenceIndex: occurrenceIndex,
+                  isCompleted: false, 
                 },
-              },
-              update: {
-                cycleEndDate: cycleEndDate,
-              },
-              create: {
-                benefitId: benefit.id,
-                userId: userId,
-                cycleStartDate: cycleStartDate,
-                cycleEndDate: cycleEndDate,
-                isCompleted: false, 
-              },
-            })
-          );
+              })
+            );
+          }
         } catch (error) {
           console.error(`Error calculating cycle for benefit ${benefit.id} (user: ${userId}, card: ${card.id}):`, error instanceof Error ? error.message : error);
         }
