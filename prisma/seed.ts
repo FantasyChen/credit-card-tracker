@@ -1025,6 +1025,7 @@ async function main() {
                   cycleAlignment: benefit.cycleAlignment, // Explicitly map
                   fixedCycleStartMonth: benefit.fixedCycleStartMonth, // Explicitly map
                   fixedCycleDurationMonths: benefit.fixedCycleDurationMonths, // Explicitly map
+                  occurrencesInCycle: benefit.occurrencesInCycle,
               })),
           });
         }
@@ -1048,6 +1049,7 @@ async function main() {
                   cycleAlignment: benefit.cycleAlignment,
                   fixedCycleStartMonth: benefit.fixedCycleStartMonth,
                   fixedCycleDurationMonths: benefit.fixedCycleDurationMonths,
+                  occurrencesInCycle: benefit.occurrencesInCycle,
                 })),
               },
             },
