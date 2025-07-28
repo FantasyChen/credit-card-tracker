@@ -46,6 +46,7 @@ export async function createCardForUser(
             cycleAlignment: true,
             fixedCycleStartMonth: true,
             fixedCycleDurationMonths: true,
+            occurrencesInCycle: true,
           }
         }
       },
@@ -84,11 +85,12 @@ export async function createCardForUser(
           cycleAlignment: predefBenefit.cycleAlignment,
           fixedCycleStartMonth: predefBenefit.fixedCycleStartMonth,
           fixedCycleDurationMonths: predefBenefit.fixedCycleDurationMonths,
+          occurrencesInCycle: predefBenefit.occurrencesInCycle,
           startDate: now, // Set start date to now
         }
       });
 
-      // Calculate and create initial BenefitStatus
+      // Calculate and create initial BenefitStatus records (multiple if occurrencesInCycle > 1)
       let cycleInfo: { cycleStartDate: Date; cycleEndDate: Date };
       if (newBenefit.frequency === BenefitFrequency.ONE_TIME) {
         cycleInfo = calculateOneTimeBenefitLifetime(newBenefit.startDate);
@@ -103,15 +105,20 @@ export async function createCardForUser(
         );
       }
 
-      await prisma.benefitStatus.create({
-        data: {
-          benefitId: newBenefit.id,
-          userId: userId,
-          cycleStartDate: cycleInfo.cycleStartDate,
-          cycleEndDate: cycleInfo.cycleEndDate,
-          isCompleted: false,
-        }
-      });
+      // Create multiple BenefitStatus records based on occurrencesInCycle
+      const occurrences = newBenefit.occurrencesInCycle || 1;
+      for (let occurrenceIndex = 0; occurrenceIndex < occurrences; occurrenceIndex++) {
+        await prisma.benefitStatus.create({
+          data: {
+            benefitId: newBenefit.id,
+            userId: userId,
+            cycleStartDate: cycleInfo.cycleStartDate,
+            cycleEndDate: cycleInfo.cycleEndDate,
+            occurrenceIndex: occurrenceIndex,
+            isCompleted: false,
+          }
+        });
+      }
     }
 
 
