@@ -236,7 +236,7 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
                   {/* Last Activity */}
                   <div>
                     <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Activity</p>
-                    <p className="text-sm dark:text-white">{new Date(account.lastActivityDate).toLocaleDateString()}</p>
+                    <p className="text-sm dark:text-white">{new Date(account.lastActivityDate).toLocaleDateString('en-US', { timeZone: 'UTC' })}</p>
                   </div>
                   
                   {/* Expiration Status */}

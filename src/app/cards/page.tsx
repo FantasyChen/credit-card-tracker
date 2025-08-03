@@ -25,7 +25,17 @@ const formatOpenedDate = (date: Date | null): string => {
   // Ensure it's a Date object (Prisma might return string)
   const dateObj = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(dateObj.getTime())) return 'N/A'; // Invalid date
-  return dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  
+  // Use UTC methods to avoid timezone conversion issues
+  const utcMonth = dateObj.getUTCMonth();
+  const utcYear = dateObj.getUTCFullYear();
+  
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  
+  return `${monthNames[utcMonth]} ${utcYear}`;
 };
 
 // Client Component for displaying a single card with delete functionality

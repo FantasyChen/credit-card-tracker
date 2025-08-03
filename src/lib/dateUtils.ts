@@ -5,5 +5,11 @@ export const formatDate = (date: Date | null): string => {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(dateObj.getTime())) return 'N/A'; // Invalid date
 
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(dateObj);
+  // Use UTC methods to avoid timezone conversion issues
+  return new Intl.DateTimeFormat('en-US', { 
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric',
+    timeZone: 'UTC' // Force UTC timezone
+  }).format(dateObj);
 }; 

@@ -176,7 +176,7 @@ export function EditLoyaltyAccountModal({
             </p>
             {account.expirationDate && (
               <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                Current expiration: {new Date(account.expirationDate).toLocaleDateString()}
+                Current expiration: {new Date(account.expirationDate).toLocaleDateString('en-US', { timeZone: 'UTC' })}
               </p>
             )}
           </div>
