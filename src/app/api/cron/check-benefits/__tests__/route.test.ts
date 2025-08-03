@@ -73,7 +73,7 @@ describe('/api/cron/check-benefits', () => {
       it('should return 401 if CRON_SECRET is not set in env', async () => {
         const currentCronSecret = process.env.CRON_SECRET;
         delete process.env.CRON_SECRET;
-        const mockRequest = new Request('http://localhost', { headers: { 'x-vercel-cron-authorization': 'Bearer test-secret' } });
+        const mockRequest = new Request('http://localhost', { headers: { 'authorization': 'Bearer test-secret' } });
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const _response = await handler(mockRequest);
         expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Cron secret not configured.' }, { status: 500 });
@@ -93,7 +93,7 @@ describe('/api/cron/check-benefits', () => {
 
       it('should return 401 if authorization header has wrong secret', async () => {
         jest.replaceProperty(process.env, 'CRON_SECRET', 'test-secret');
-        const mockRequest = new Request('http://localhost', { headers: { 'x-vercel-cron-authorization': 'Bearer wrong-secret' } });
+        const mockRequest = new Request('http://localhost', { headers: { 'authorization': 'Bearer wrong-secret' } });
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const _response = await handler(mockRequest);
         expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Unauthorized' }, { status: 401 });
@@ -102,7 +102,7 @@ describe('/api/cron/check-benefits', () => {
       it('should proceed if authorization is correct', async () => {
         jest.replaceProperty(process.env, 'CRON_SECRET', 'test-secret');
         (prisma.creditCard.findMany as jest.Mock).mockResolvedValueOnce([]); // No data, just testing auth
-        const mockRequest = new Request('http://localhost', { headers: { 'x-vercel-cron-authorization': 'Bearer test-secret' } });
+        const mockRequest = new Request('http://localhost', { headers: { 'authorization': 'Bearer test-secret' } });
         await handler(mockRequest);
         expect(prisma.creditCard.findMany).toHaveBeenCalled(); // Core logic was reached
         expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'Cron job executed successfully.' }), { status: 200 });
@@ -117,14 +117,20 @@ describe('/api/cron/check-benefits', () => {
     });
 
     const createMockRequest = () => new Request('http://localhost', { 
-        headers: { 'x-vercel-cron-authorization': 'Bearer test-secret' } 
+        headers: { 'authorization': 'Bearer test-secret' } 
     });
 
     it('should log "No recurring benefits found" if no cards exist', async () => {
         (prisma.creditCard.findMany as jest.Mock).mockResolvedValueOnce([]);
         await GET(createMockRequest());
         expect(consoleLogSpy).toHaveBeenCalledWith('Core logic: No recurring benefits found to process.');
-        expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Cron job executed successfully.', upsertsAttempted: 0, benefitsProcessed: 0 }, { status: 200 });
+        expect(NextResponse.json).toHaveBeenCalledWith({ 
+            message: 'Cron job executed successfully.', 
+            upsertsAttempted: 0, 
+            upsertsSuccessful: 0,
+            upsertsFailed: 0,
+            benefitsProcessed: 0 
+        }, { status: 200 });
     });
 
     it('should process a monthly benefit and call upsert', async () => {
@@ -143,11 +149,17 @@ describe('/api/cron/check-benefits', () => {
 
         expect(prisma.benefitStatus.upsert).toHaveBeenCalledTimes(1);
         expect(prisma.benefitStatus.upsert).toHaveBeenCalledWith({
-            where: { benefitId_userId_cycleStartDate: { benefitId: 'b1', userId: 'user1', cycleStartDate: utcDate(2023,7,1) } },
+            where: { benefitId_userId_cycleStartDate_occurrenceIndex: { benefitId: 'b1', userId: 'user1', cycleStartDate: utcDate(2023,7,1), occurrenceIndex: 0 } },
             update: { cycleEndDate: utcDate(2023,7,31) },
-            create: { benefitId: 'b1', userId: 'user1', cycleStartDate: utcDate(2023,7,1), cycleEndDate: utcDate(2023,7,31), isCompleted: false }
+            create: { benefitId: 'b1', userId: 'user1', cycleStartDate: utcDate(2023,7,1), cycleEndDate: utcDate(2023,7,31), occurrenceIndex: 0, isCompleted: false }
         });
-        expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Cron job executed successfully.', upsertsAttempted: 1, benefitsProcessed: 1 }, { status: 200 });
+        expect(NextResponse.json).toHaveBeenCalledWith({ 
+            message: 'Cron job executed successfully.', 
+            upsertsAttempted: 1, 
+            upsertsSuccessful: 1,
+            upsertsFailed: 0,
+            benefitsProcessed: 1 
+        }, { status: 200 });
     });
 
     it('should skip YEARLY anniversary benefit if card openedDate is missing', async () => {
@@ -159,7 +171,13 @@ describe('/api/cron/check-benefits', () => {
         await GET(createMockRequest());
         expect(prisma.benefitStatus.upsert).not.toHaveBeenCalled();
         expect(consoleWarnSpy).toHaveBeenCalledWith('Skipping YEARLY (anniversary based) benefit cycle for benefit b2 on card card2 as card has no openedDate.');
-        expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Cron job executed successfully.', upsertsAttempted: 0, benefitsProcessed: 1 }, { status: 200 });
+        expect(NextResponse.json).toHaveBeenCalledWith({ 
+            message: 'Cron job executed successfully.', 
+            upsertsAttempted: 0, 
+            upsertsSuccessful: 0,
+            upsertsFailed: 0,
+            benefitsProcessed: 1 
+        }, { status: 200 });
     });
     
     it('should process YEARLY CALENDAR_FIXED benefit even if card openedDate is missing', async () => {
@@ -176,7 +194,13 @@ describe('/api/cron/check-benefits', () => {
         
         await GET(createMockRequest());
         expect(prisma.benefitStatus.upsert).toHaveBeenCalledTimes(1);
-        expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Cron job executed successfully.', upsertsAttempted: 1, benefitsProcessed: 1 }, { status: 200 });
+        expect(NextResponse.json).toHaveBeenCalledWith({ 
+            message: 'Cron job executed successfully.', 
+            upsertsAttempted: 1, 
+            upsertsSuccessful: 1,
+            upsertsFailed: 0,
+            benefitsProcessed: 1 
+        }, { status: 200 });
     });
 
     it('should log and return 500 if prisma.creditCard.findMany fails', async () => {
@@ -205,14 +229,21 @@ describe('/api/cron/check-benefits', () => {
         expect(prisma.benefitStatus.upsert).toHaveBeenCalledTimes(1); // Only bB1 should be upserted
         expect(prisma.benefitStatus.upsert).toHaveBeenCalledWith(expect.objectContaining({
             where: { 
-                benefitId_userId_cycleStartDate: { 
+                benefitId_userId_cycleStartDate_occurrenceIndex: { 
                     benefitId: 'bB1', 
                     userId: 'userB',
-                    cycleStartDate: utcDate(2023,8,1)
+                    cycleStartDate: utcDate(2023,8,1),
+                    occurrenceIndex: 0
                 }
             }
         }));
-        expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Cron job executed successfully.', upsertsAttempted: 1, benefitsProcessed: 2 }, { status: 200 });
+        expect(NextResponse.json).toHaveBeenCalledWith({ 
+            message: 'Cron job executed successfully.', 
+            upsertsAttempted: 1, 
+            upsertsSuccessful: 1,
+            upsertsFailed: 0,
+            benefitsProcessed: 2 
+        }, { status: 200 });
     });
 
     it('should attempt all upserts and log error if one prisma.benefitStatus.upsert fails', async () => {
@@ -232,9 +263,16 @@ describe('/api/cron/check-benefits', () => {
         await GET(createMockRequest());
         
         expect(prisma.benefitStatus.upsert).toHaveBeenCalledTimes(2);
-        // The main error handler for runCheckBenefitsLogic catches Promise.all rejection
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Core check-benefits logic failed:', 'Upsert fail for bD1', expect.any(String));
-        expect(NextResponse.json).toHaveBeenCalledWith({ message: 'Cron job failed.', error: 'Upsert fail for bD1' }, { status: 500 });
+        // With Promise.allSettled, individual failures are logged as warnings, not global failures
+        expect(consoleWarnSpy).toHaveBeenCalledWith('Core logic: 1 benefit status upserts failed:');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('  Upsert 2 failed:', 'Upsert fail for bD1');
+        expect(NextResponse.json).toHaveBeenCalledWith({ 
+            message: 'Cron job executed successfully.', 
+            upsertsAttempted: 2, 
+            upsertsSuccessful: 1,
+            upsertsFailed: 1,
+            benefitsProcessed: 2 
+        }, { status: 200 });
     });
 
     // More tests for runCheckBenefitsLogic will be added here

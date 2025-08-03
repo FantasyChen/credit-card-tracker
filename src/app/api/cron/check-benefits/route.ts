@@ -102,15 +102,51 @@ async function runCheckBenefitsLogic() {
 
     if (upsertPromises.length > 0) {
       console.log(`Core logic: Attempting ${upsertPromises.length} benefit status upserts out of ${benefitsProcessed} benefits processed.`);
-      await Promise.all(upsertPromises);
-      console.log(`Core logic: ${upsertPromises.length} benefit status upserts completed.`);
+      
+      // Use Promise.allSettled instead of Promise.all to handle partial failures
+      const results = await Promise.allSettled(upsertPromises);
+      
+      // Count successes and failures
+      const successful = results.filter(result => result.status === 'fulfilled').length;
+      const failed = results.filter(result => result.status === 'rejected').length;
+      
+      console.log(`Core logic: ${successful} benefit status upserts completed successfully.`);
+      
+      if (failed > 0) {
+        console.warn(`Core logic: ${failed} benefit status upserts failed:`);
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(`  Upsert ${index + 1} failed:`, result.reason instanceof Error ? result.reason.message : result.reason);
+          }
+        });
+      }
+      
+      return NextResponse.json({ 
+        message: 'Cron job executed successfully.', 
+        upsertsAttempted: upsertPromises.length, 
+        upsertsSuccessful: successful,
+        upsertsFailed: failed,
+        benefitsProcessed 
+      }, { status: 200 });
     } else if (benefitsProcessed > 0) {
       console.log(`Core logic: ${benefitsProcessed} benefits processed, but no new benefit statuses needed upserting.`);
+      return NextResponse.json({ 
+        message: 'Cron job executed successfully.', 
+        upsertsAttempted: 0, 
+        upsertsSuccessful: 0,
+        upsertsFailed: 0,
+        benefitsProcessed 
+      }, { status: 200 });
     } else {
       console.log('Core logic: No recurring benefits found to process.');
+      return NextResponse.json({ 
+        message: 'Cron job executed successfully.', 
+        upsertsAttempted: 0, 
+        upsertsSuccessful: 0,
+        upsertsFailed: 0,
+        benefitsProcessed: 0 
+      }, { status: 200 });
     }
-
-    return NextResponse.json({ message: 'Cron job executed successfully.', upsertsAttempted: upsertPromises.length, benefitsProcessed }, { status: 200 });
 
   } catch (error) {
     console.error('Core check-benefits logic failed:', error instanceof Error ? error.message : error, error instanceof Error ? error.stack : '');
