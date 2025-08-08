@@ -98,8 +98,9 @@ See our [detailed contribution guide](CONTRIBUTING.md#updating-credit-card-infor
 
 3.  **Set up environment variables**
     ```bash
-    # Create .env file with your configuration
-    # See Required Environment Variables section below
+    # Create your env file from the template and fill in values
+    cp .env.example .env
+    # Then edit .env with your secrets
     ```
 
 4.  **Set up the database**
@@ -124,13 +125,40 @@ See our [detailed contribution guide](CONTRIBUTING.md#updating-credit-card-infor
 
 ### Required Environment Variables
 
-- `DATABASE_URL` - Your database connection string
+- `DATABASE_URL` - Your database connection string (production or local)
+- `DATABASE_URL_DEV` - Development database branch/instance for safe local work
 - `NEXTAUTH_URL` - Your app URL (http://localhost:3000 for development)
 - `NEXTAUTH_SECRET` - Random secret for NextAuth.js
 - `GOOGLE_CLIENT_ID` - Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
 - `CRON_SECRET` - Secret for securing cron job endpoints
 - `RESEND_API_KEY` - Resend API key for email notifications
+- `SERPAPI_API_KEY` - API key used by card image download script
+
+See `.env.example` for a complete template.
+
+### Cron Jobs: Configure & Test
+
+The project runs two daily cron jobs (configured in `vercel.json`). Both require an Authorization header with your `CRON_SECRET`.
+
+- Endpoint: `/api/cron/check-benefits`
+- Endpoint: `/api/cron/send-notifications`
+
+Example manual trigger (local or remote):
+
+```bash
+# Replace <url> with http://localhost:3000 or your deployed URL
+curl -i -X GET \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  <url>/api/cron/check-benefits
+
+# Notifications cron supports an optional mockDate (non-production only)
+curl -i -X GET \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  "<url>/api/cron/send-notifications?mockDate=2025-08-15"
+```
+
+For safety guidance around cron and database operations, see `docs/safe-migration-guide.md` and `CURSOR.md` → Deployment & Operations.
 
 ### Contributing
 
@@ -229,7 +257,7 @@ We're just getting started! Here's what's planned:
 - [x] Loyalty program tracking and notifications
 - [x] Progressive Web App support
 - [ ] Custom card and benefit creation
-- [ ] Data export/import functionality
+- [x] Data export/import functionality (see `Settings → Data`)
 - [ ] Advanced analytics and reporting
 - [ ] Bank account integration
 - [ ] Multi-user households

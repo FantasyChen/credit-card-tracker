@@ -4,6 +4,8 @@
 
 This document outlines the design and development plan for the CouponCycle web application. The primary goal is to help users track their credit card benefits (coupons, credits, etc.), understand their usage cycles (monthly, quarterly, yearly), mark them as completed, and receive timely notifications about upcoming or expiring benefits.
 
+Note: For the most up-to-date architecture, roadmap, and operational runbooks, see the canonical `CURSOR.md` at the repository root. This file is a historical snapshot (last fully reviewed 2025-01-11).
+
 ## 2. Current State (as of 2025-01-11)
 
 ### 2.1. Technology Stack

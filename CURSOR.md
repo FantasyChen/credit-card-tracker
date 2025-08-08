@@ -243,7 +243,17 @@ node scripts/check-database-connection.js  # Verify database connection
 **Cron Jobs** (configured in `vercel.json`):
 - Daily benefit status updates: `/api/cron/check-benefits`
 - Daily email notifications: `/api/cron/send-notifications`
-- Both secured with `CRON_SECRET` header verification
+- Both require the header `Authorization: Bearer <CRON_SECRET>`
+
+Manual trigger examples:
+
+```bash
+# Replace <url> with http://localhost:3000 or the deployed URL
+curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" <url>/api/cron/check-benefits
+
+# Notifications cron supports an optional mockDate (non-production only)
+curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-notifications?mockDate=2025-08-15"
+```
 
 ### Database Management
 
@@ -262,6 +272,13 @@ node scripts/check-database-connection.js  # Verify database connection
 - **Vercel Analytics**: Built-in performance monitoring
 - **Error Tracking**: Console logging with structured error handling
 - **User Activity**: Email notification delivery tracking
+- **Cron Observability**: Cron routes log attempt time, authorization presence (never log the secret), counts of processed records, and success/failure totals
+
+### Runbooks
+
+- Cron failures: Re-run manually using the commands above; inspect logs for upserts attempted/succeeded/failed; verify `CRON_SECRET` configured in env and Vercel
+- Database incident recovery: Follow the Neon CLI workflow in README (“Database Recovery with Neon CLI”) to branch by timestamp, verify, and switch
+- Notification testing: Use `send-notifications?mockDate=YYYY-MM-DD` locally with `Authorization: Bearer $CRON_SECRET` (mockDate ignored in production)
 
 ---
 
