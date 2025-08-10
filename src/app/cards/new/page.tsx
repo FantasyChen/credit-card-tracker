@@ -311,13 +311,6 @@ export default function AddNewCardPage() {
                         >
                           Suggest an edit
                         </a>
-                        <span className="mx-1 text-gray-400">•</span>
-                        <a
-                          href={`/settings/suggest?type=ADD_BENEFIT&cardName=${encodeURIComponent(card.name)}&issuer=${encodeURIComponent(card.issuer)}`}
-                          className="text-xs text-blue-600 underline"
-                        >
-                          Suggest a benefit
-                        </a>
                       </div>
                     </div>
                   );
