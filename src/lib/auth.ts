@@ -11,6 +11,7 @@ declare module "next-auth" {
     user: {
       /** The user's id. */
       id: string;
+      role?: 'USER' | 'MODERATOR' | 'ADMIN'
     } & DefaultSession["user"]; // Add id to the default user type
   }
 }
@@ -43,15 +44,28 @@ export const authOptions: NextAuthOptions = {
     // The user parameter is only passed on sign-in
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id; // Persist the user id from the User model to the token
+        token.id = user.id; // Persist the user id
+      }
+      // Look up role once per session start or when missing
+      if (!('role' in token) || !token.role) {
+        try {
+          const dbUser = await prisma.user.findUnique({ where: { id: token.id as string }, select: { role: true } });
+          if (dbUser?.role) {
+            (token as Record<string, unknown>).role = dbUser.role;
+          }
+        } catch {
+          // ignore
+        }
       }
       return token;
     },
     // Add the user ID from the token to the session
     async session({ session, token }) {
-      // token.id is available because we added it in the jwt callback
-      session.user.id = token.id; 
-      return session; // Return the session object with the id included
+      session.user.id = token.id as string;
+      if ('role' in token) {
+        session.user.role = token.role as 'USER' | 'MODERATOR' | 'ADMIN';
+      }
+      return session;
     },
   },
   debug: process.env.NODE_ENV === 'development',

@@ -193,6 +193,8 @@ CRON_SECRET="your-cron-secret"
 SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 ```
 
+> Note for Cursor: The `.env` file already exists in this repository and is fully configured. The Cursor agent cannot access it directly due to environment isolation, but local commands and the app will still read from `.env`. Refer to `.env.example` if you need a reference of keys.
+
 ### Database Safety Rules ⚠️
 
 **CRITICAL - NEVER RUN:**

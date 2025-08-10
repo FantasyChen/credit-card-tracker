@@ -77,3 +77,6 @@ backups/
 temp-prod-dump.sql
 *.backup
 *.sql.tmp
+
+# Private marketing and strategy documents
+marketing-lessons-learned.md

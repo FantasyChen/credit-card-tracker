@@ -302,7 +302,17 @@ export default function AddNewCardPage() {
                 {cards.map((card) => {
                   const matchedFields = searchResults.find(result => result.card.id === card.id)?.matchedFields || [];
                   return (
-                    <PredefinedCardForm key={card.id} card={card} matchedFields={matchedFields} />
+                    <div key={card.id}>
+                      <PredefinedCardForm card={card} matchedFields={matchedFields} />
+                      <div className="mt-2 text-right">
+                        <a
+                          href={`/settings/suggest?type=EDIT_CARD&cardName=${encodeURIComponent(card.name)}&issuer=${encodeURIComponent(card.issuer)}`}
+                          className="text-xs text-blue-600 underline"
+                        >
+                          Suggest an edit
+                        </a>
+                      </div>
+                    </div>
                   );
                 })}
               </div>

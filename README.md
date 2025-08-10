@@ -37,8 +37,8 @@ Credit card benefits and annual fees change frequently. Help keep our data curre
 
 1. **Find outdated information**: Compare our data with official sources
 2. **Verify with reliable sources**: Use [US Credit Card Guide](https://www.uscreditcardguide.com/) or official bank websites
-3. **Update the seed file**: Edit `prisma/seed.ts` with new information
-4. **Submit a pull request**: We'll review and merge quickly
+3. **Option A: In-app suggestion (recommended)**: Use `Settings → Suggest` in the app to submit a JSON payload + sources. Moderators review in `Settings → Review`.
+4. **Option B: Code change**: Edit `prisma/seed.ts` with new information and open a PR.
 
 **What to Update:**
 - Annual fees that have changed
@@ -64,6 +64,14 @@ Credit card benefits and annual fees change frequently. Help keep our data curre
 ```
 
 See our [detailed contribution guide](CONTRIBUTING.md#updating-credit-card-information) for step-by-step instructions.
+
+### New Suggestion & Review APIs (non-destructive)
+
+- `POST /api/catalog/suggestions` — submit a suggestion (auth required)
+- `GET /api/catalog/suggestions` — list suggestions (moderator/admin)
+- `PATCH /api/catalog/suggestions/[id]` — approve/reject (moderator/admin)
+
+These features add new tables only and do not modify or delete existing production data automatically.
 
 ## 🛠️ For Developers: Quick Start & Contribution
 

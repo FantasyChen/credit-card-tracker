@@ -1,3 +1,20 @@
+## Description
+Brief description of the changes.
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Documentation update
+- [ ] Refactor
+
+## Checklist
+- [ ] Tests added/updated
+- [ ] Build passes locally (`npm run build`)
+- [ ] Lint passes (`npm run lint`)
+- [ ] Docs updated (README/CONTRIBUTING/CURSOR)
+
+## Related Issues
+Closes #
 ## 📝 Description
 
 Provide a brief description of the changes in this PR.
