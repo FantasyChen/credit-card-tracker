@@ -19,7 +19,7 @@ CouponCycle is a community-driven project, and we welcome contributions from dev
 
 ## 🤝 Code of Conduct
 
-This project follows standard open source community guidelines. Please be respectful, inclusive, and constructive in all interactions. Report any unacceptable behavior to the project maintainers.
+This project follows standard open source community guidelines. Please be respectful, inclusive, and constructive in all interactions. See our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## 🚀 Getting Started
 
@@ -104,6 +104,26 @@ credit-card-tracker/
 ├── public/           # Static assets
 ├── docs/             # Project documentation
 └── scripts/          # Utility scripts
+```
+
+### Helpful Scripts
+
+```bash
+# List available predefined cards
+node scripts/list-available-cards.cjs
+
+# Download a card image into public/images/cards/
+node scripts/download-card-image.js --name "Chase Sapphire Preferred"
+
+# DB connection check and environment verification
+node scripts/check-database-connection.js
+
+# Validate benefit ordering and ROI logic
+node scripts/test-drag-drop.cjs
+node scripts/test-annual-fee-roi.cjs
+
+# Test email sending (requires RESEND_API_KEY)
+node scripts/test-email.cjs
 ```
 
 ### Key Technologies
@@ -325,6 +345,10 @@ npm run test:watch
 # Run tests with coverage
 npm run test:coverage
 ```
+
+### End-to-End (optional)
+
+We are exploring adding Playwright-based smoke tests for auth, benefits dashboard, and cron side-effects. Contributions welcome.
 
 ### Test Structure
 

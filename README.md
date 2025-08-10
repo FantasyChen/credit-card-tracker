@@ -9,6 +9,8 @@
 ## ✨ Why Use CouponCycle?
 
 This isn't just another expense tracker. It's a smart benefits management system designed for anyone who wants to get the most out of their credit cards.
+Note on naming: The public-facing app is called "CouponCycle", and the repository is named `credit-card-tracker`.
+
 
 - **Never Miss a Deadline:** Get automated reminders before your benefits expire.
 - **See Your Real ROI:** Instantly know if your card's annual fee is paying for itself.
@@ -160,6 +162,19 @@ curl -i -X GET \
 
 For safety guidance around cron and database operations, see `docs/safe-migration-guide.md` and `CURSOR.md` → Deployment & Operations.
 
+#### Vercel Cron configuration
+
+The repository includes `vercel.json` with daily schedules. Example:
+
+```json
+{
+  "crons": [
+    { "path": "/api/cron/check-benefits", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/send-notifications", "schedule": "15 5 * * *" }
+  ]
+}
+```
+
 ### Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.
@@ -264,6 +279,34 @@ We're just getting started! Here's what's planned:
 
 Have an idea? [Open an issue](https://github.com/fantasy-cc/credit-card-tracker/issues) and let's talk about it!
 
+## 🧰 Helpful scripts
+
+Common scripts to aid development and verification:
+
+```bash
+# List all predefined cards currently available
+node scripts/list-available-cards.cjs
+
+# Download a card image into public/images/cards/
+node scripts/download-card-image.js --name "Chase Sapphire Preferred"
+
+# Check DB connectivity and which database you are pointing at
+node scripts/check-database-connection.js
+
+# Validate benefit ordering and ROI logic
+node scripts/test-drag-drop.cjs
+node scripts/test-annual-fee-roi.cjs
+
+# Test email sending (requires RESEND_API_KEY)
+node scripts/test-email.cjs
+```
+
+Backfill utilities (for maintainers): see `scripts/august-2025-backfill-analysis.cjs` and `scripts/august-2025-backfill-executor.cjs` and `BACKFILL_REQUEST.md`.
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
+
+Also see:
+- [PRIVACY.md](PRIVACY.md)
+- [TERMS.md](TERMS.md)
