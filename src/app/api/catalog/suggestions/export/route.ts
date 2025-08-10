@@ -15,6 +15,8 @@ export async function GET(request: Request) {
   const status = (url.searchParams.get('status') || 'APPROVED').toUpperCase();
   const format = (url.searchParams.get('format') || 'json').toLowerCase();
   const limitParam = url.searchParams.get('limit');
+  const idsParam = url.searchParams.get('ids');
+  const ids = idsParam ? idsParam.split(',').map((s) => s.trim()).filter(Boolean) : [];
   let take: number | undefined = undefined;
   if (limitParam) {
     const parsed = Number(limitParam);
@@ -24,12 +26,12 @@ export async function GET(request: Request) {
     take = parsed;
   }
 
-  if (!['APPROVED', 'REJECTED', 'PENDING'].includes(status)) {
+  if (ids.length === 0 && !['APPROVED', 'REJECTED', 'PENDING'].includes(status)) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
 
   const suggestions = await prisma.catalogSuggestion.findMany({
-    where: { status: status as any },
+    where: ids.length > 0 ? { id: { in: ids } } : { status: status as any },
     orderBy: { updatedAt: 'desc' },
     take,
     include: {
@@ -48,6 +50,7 @@ export async function GET(request: Request) {
       id: s.id,
       type: s.type,
       status: s.status,
+      exportedAt: s.exportedAt ? s.exportedAt.toISOString() : undefined,
       payloadJson: s.payloadJson,
       sources: s.sources,
       reviewNote: s.reviewNote || undefined,
@@ -62,6 +65,10 @@ export async function GET(request: Request) {
 
   if (format === 'ndjson') {
     const nd = plan.items.map(i => JSON.stringify(i)).join('\n');
+    // Optionally mark exported
+    if (ids.length > 0 || status === 'APPROVED') {
+      await prisma.catalogSuggestion.updateMany({ where: { id: { in: suggestions.map(s => s.id) } }, data: { exportedAt: new Date() } });
+    }
     return new NextResponse(nd, {
       headers: {
         'Content-Type': 'application/x-ndjson',
@@ -70,6 +77,10 @@ export async function GET(request: Request) {
     });
   }
 
+  // JSON response
+  if (ids.length > 0 || status === 'APPROVED') {
+    await prisma.catalogSuggestion.updateMany({ where: { id: { in: suggestions.map(s => s.id) } }, data: { exportedAt: new Date() } });
+  }
   return NextResponse.json(plan, {
     headers: {
       'Content-Disposition': `attachment; filename=${filename}`,

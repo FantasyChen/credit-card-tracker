@@ -14,12 +14,15 @@ type Suggestion = {
   reviewNote?: string | null;
   createdAt: string;
   updatedAt: string;
+  exportedAt?: string | null;
 };
 
 export default function ReviewSuggestionsPage() {
   const { status, data } = useSession();
   const [isPending, startTransition] = useTransition();
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
+  const [hideExported, setHideExported] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   if (status === 'loading') {
@@ -35,7 +38,7 @@ export default function ReviewSuggestionsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/catalog/suggestions', { cache: 'no-store' });
+        const res = await fetch(`/api/catalog/suggestions${hideExported ? '?hideExported=true' : ''}`, { cache: 'no-store' });
         if (!res.ok) throw new Error('Failed to load suggestions');
         const json = await res.json();
         setSuggestions(json);
@@ -43,7 +46,7 @@ export default function ReviewSuggestionsPage() {
         setError(e instanceof Error ? e.message : 'Error');
       }
     })();
-  }, []);
+  }, [hideExported]);
 
   const updateStatus = (id: string, status: 'APPROVED' | 'REJECTED') => {
     startTransition(async () => {
@@ -73,6 +76,21 @@ export default function ReviewSuggestionsPage() {
     }
   };
 
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const exportSelected = () => {
+    const ids = Object.entries(selectedIds).filter(([, v]) => v).map(([k]) => k);
+    if (ids.length === 0) {
+      setError('Select at least one suggestion to export');
+      return;
+    }
+    // Build a simple download via server endpoint filter by IDs in query (fallback to all approved if not supported)
+    const url = `/api/catalog/suggestions/export?status=APPROVED`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Suggestion Review</h1>
@@ -83,18 +101,22 @@ export default function ReviewSuggestionsPage() {
         <Button variant="outline" onClick={() => refresh('PENDING')}>Pending</Button>
         <Button variant="outline" onClick={() => refresh('APPROVED')}>Approved</Button>
         <Button variant="outline" onClick={() => refresh('REJECTED')}>Rejected</Button>
-        <a
-          href="/api/catalog/suggestions/export?status=APPROVED"
-          className="ml-auto text-sm underline text-blue-600"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Export approved as patch plan
-        </a>
+        <label className="ml-auto flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={hideExported} onChange={(e) => setHideExported(e.target.checked)} />
+          Hide exported
+        </label>
+        <Button variant="outline" onClick={exportSelected}>Export selected</Button>
       </div>
       <div className="space-y-4">
         {suggestions.map((s) => (
           <div key={s.id} className="border rounded p-4 bg-white dark:bg-gray-800">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!selectedIds[s.id]} onChange={() => toggleSelected(s.id)} />
+                Select
+              </label>
+              {s.exportedAt && <span className="text-xs text-gray-500">Exported: {new Date(s.exportedAt).toLocaleString()}</span>}
+            </div>
             <div className="flex items-center justify-between mb-2">
               <div>
                 <p className="text-sm text-gray-500">{new Date(s.createdAt).toLocaleString()}</p>

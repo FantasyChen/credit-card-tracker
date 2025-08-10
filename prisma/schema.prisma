@@ -193,6 +193,7 @@ model CatalogSuggestion {
   updatedAt    DateTime          @updatedAt
   createdById  String
   reviewedById String?
+  exportedAt   DateTime?
 
   createdBy    User              @relation("UserCreatedSuggestions", fields: [createdById], references: [id], onDelete: Cascade)
   reviewedBy   User?             @relation("UserReviewedSuggestions", fields: [reviewedById], references: [id])

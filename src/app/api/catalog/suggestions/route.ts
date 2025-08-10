@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const status = url.searchParams.get('status') as 'PENDING' | 'APPROVED' | 'REJECTED' | null;
     const type = url.searchParams.get('type');
+    const hideExported = url.searchParams.get('hideExported') === 'true';
     const aggregate = url.searchParams.get('aggregate');
     const limitParam = url.searchParams.get('limit');
 
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
     const where: any = {};
     if (status) where.status = status;
     if (type) where.type = type;
+    if (hideExported) where.exportedAt = null;
 
     if (aggregate === 'count') {
       const count = await prisma.catalogSuggestion.count({ where });
