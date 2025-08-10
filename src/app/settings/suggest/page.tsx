@@ -47,8 +47,7 @@ export default function SuggestPage() {
   const [issuer, setIssuer] = useState<string>(defaultIssuer);
   const [annualFee, setAnnualFee] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string>('');
-  const [imageDataUrl, setImageDataUrl] = useState<string>('');
-  const [imageAttachError, setImageAttachError] = useState<string>('');
+  // Image uploads removed per product decision; only URL allowed
   const [benefitCategory, setBenefitCategory] = useState<string>('');
   const [benefitDescription, setBenefitDescription] = useState<string>('');
   const [benefitPercentage, setBenefitPercentage] = useState<string>('');
@@ -128,7 +127,7 @@ export default function SuggestPage() {
       case 'DEPRECATE_BENEFIT':
         return { card: selectedCard ? { name: selectedCard.name, issuer: selectedCard.issuer } : { name: cardName, issuer }, benefit: { description: benefitDescription }, reason: reason || undefined, effectiveDate: effectiveDate || undefined };
       case 'IMAGE_UPDATE':
-        return { card: selectedCard ? { name: selectedCard.name, issuer: selectedCard.issuer } : { name: cardName, issuer }, imageUrl: imageUrl || undefined, imageDataUrl: imageDataUrl || undefined };
+        return { card: selectedCard ? { name: selectedCard.name, issuer: selectedCard.issuer } : { name: cardName, issuer }, imageUrl: imageUrl || undefined };
       default:
         return {};
     }
@@ -303,48 +302,9 @@ export default function SuggestPage() {
 
         {type === 'IMAGE_UPDATE' && (
           <div className="space-y-2">
-            <label className="block text-sm font-medium">Upload a new card image (optional)</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={async (e) => {
-                setImageAttachError('');
-                const file = e.target.files?.[0];
-                if (!file) { setImageDataUrl(''); return; }
-                try {
-                  // Compress client-side to keep payload small
-                  const bitmap = await createImageBitmap(file);
-                  const maxDim = 800;
-                  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-                  const canvas = document.createElement('canvas');
-                  canvas.width = Math.round(bitmap.width * scale);
-                  canvas.height = Math.round(bitmap.height * scale);
-                  const ctx = canvas.getContext('2d');
-                  if (!ctx) throw new Error('Canvas not supported');
-                  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-                  const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                  if (dataUrl.length > 95_000) {
-                    setImageAttachError('Image is too large after compression. Please choose a smaller image.');
-                    setImageDataUrl('');
-                  } else {
-                    setImageDataUrl(dataUrl);
-                  }
-                } catch {
-                  setImageAttachError('Failed to process image. Try a different file.');
-                }
-              }}
-            />
-            {!!imageDataUrl && (
-              <div className="mt-2">
-                <img src={imageDataUrl} alt="Preview" className="max-h-40 rounded border" />
-                <p className="text-xs text-gray-500 mt-1">A compressed preview is attached to your suggestion.</p>
-              </div>
-            )}
-            {imageAttachError && <p className="text-xs text-red-600">{imageAttachError}</p>}
-            <div>
-              <label className="block text-sm font-medium mb-1">Or provide a public image URL</label>
-              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://.../image.png" />
-            </div>
+            <label className="block text-sm font-medium mb-1">Public Image URL</label>
+            <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://.../image.png" />
+            <p className="text-xs text-gray-500">Please provide a direct URL to the card image (PNG/JPG). We do not accept file uploads.</p>
           </div>
         )}
         <div>
