@@ -83,6 +83,14 @@ export default function ReviewSuggestionsPage() {
         <Button variant="outline" onClick={() => refresh('PENDING')}>Pending</Button>
         <Button variant="outline" onClick={() => refresh('APPROVED')}>Approved</Button>
         <Button variant="outline" onClick={() => refresh('REJECTED')}>Rejected</Button>
+        <a
+          href="/api/catalog/suggestions/export?status=APPROVED"
+          className="ml-auto text-sm underline text-blue-600"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Export approved as patch plan
+        </a>
       </div>
       <div className="space-y-4">
         {suggestions.map((s) => (
