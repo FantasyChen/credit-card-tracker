@@ -56,9 +56,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const body = await request.json();
     const { type, payloadJson, sources } = body as { type: string; payloadJson: unknown; sources?: string[] };
@@ -111,12 +108,25 @@ export async function POST(request: Request) {
       sourceList = Array.from(unique);
     }
 
+    // Determine creator (allow anonymous submissions)
+    let createdById = session?.user?.id;
+    if (!createdById) {
+      const anonEmail = 'public@couponcycle.local';
+      const anon = await prisma.user.upsert({
+        where: { email: anonEmail },
+        update: {},
+        create: { email: anonEmail, name: 'Public Suggestions' },
+        select: { id: true },
+      });
+      createdById = anon.id;
+    }
+
     const created = await prisma.catalogSuggestion.create({
       data: {
         type: type as any,
         payloadJson,
         sources: sourceList,
-        createdById: session.user.id,
+        createdById,
       },
     });
 

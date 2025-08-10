@@ -24,7 +24,7 @@ const Navbar = () => {
     { name: 'Benefits', href: '/benefits' },
     { name: 'Notifications', href: '/settings/notifications', authRequired: true },
     { name: 'Contact', href: '/contact' },
-    { name: 'Suggest', href: '/settings/suggest', authRequired: true },
+    { name: 'Suggest', href: '/settings/suggest' },
   ], []); // Empty dependency array as baseNavigation is static
 
   // Filter navigation items based on authentication status
