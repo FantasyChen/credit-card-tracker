@@ -47,6 +47,8 @@ export default function SuggestPage() {
   const [issuer, setIssuer] = useState<string>(defaultIssuer);
   const [annualFee, setAnnualFee] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [imageDataUrl, setImageDataUrl] = useState<string>('');
+  const [imageAttachError, setImageAttachError] = useState<string>('');
   const [benefitCategory, setBenefitCategory] = useState<string>('');
   const [benefitDescription, setBenefitDescription] = useState<string>('');
   const [benefitPercentage, setBenefitPercentage] = useState<string>('');
@@ -126,7 +128,7 @@ export default function SuggestPage() {
       case 'DEPRECATE_BENEFIT':
         return { card: selectedCard ? { name: selectedCard.name, issuer: selectedCard.issuer } : { name: cardName, issuer }, benefit: { description: benefitDescription }, reason: reason || undefined, effectiveDate: effectiveDate || undefined };
       case 'IMAGE_UPDATE':
-        return { card: selectedCard ? { name: selectedCard.name, issuer: selectedCard.issuer } : { name: cardName, issuer }, imageUrl };
+        return { card: selectedCard ? { name: selectedCard.name, issuer: selectedCard.issuer } : { name: cardName, issuer }, imageUrl: imageUrl || undefined, imageDataUrl: imageDataUrl || undefined };
       default:
         return {};
     }
@@ -175,15 +177,15 @@ export default function SuggestPage() {
       )}
       <form action={submit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Type</label>
+          <label className="block text-sm font-medium mb-1">What would you like to do?</label>
           <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="w-full border rounded p-2">
-            <option>ADD_CARD</option>
-            <option>EDIT_CARD</option>
-            <option>ADD_BENEFIT</option>
-            <option>EDIT_BENEFIT</option>
-            <option>DEPRECATE_CARD</option>
-            <option>DEPRECATE_BENEFIT</option>
-            <option>IMAGE_UPDATE</option>
+            <option value="ADD_CARD">Add a new card</option>
+            <option value="EDIT_CARD">Suggest changes to a card</option>
+            <option value="ADD_BENEFIT">Add a benefit to a card</option>
+            <option value="EDIT_BENEFIT">Update an existing benefit</option>
+            <option value="DEPRECATE_CARD">Remove/deprecate a card</option>
+            <option value="DEPRECATE_BENEFIT">Remove/deprecate a benefit</option>
+            <option value="IMAGE_UPDATE">Update the card image</option>
           </select>
         </div>
 
@@ -230,6 +232,17 @@ export default function SuggestPage() {
 
         {(type === 'ADD_BENEFIT' || type === 'EDIT_BENEFIT' || type === 'DEPRECATE_BENEFIT') && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {(type === 'EDIT_BENEFIT' || type === 'DEPRECATE_BENEFIT') && selectedCard && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1">Choose an existing benefit</label>
+                <select value={benefitDescription ? benefitDescription : ''} onChange={(e) => setBenefitDescription(e.target.value)} className="w-full border rounded p-2">
+                  <option value="">-- Select a benefit --</option>
+                  {selectedCard.benefits?.map((b) => (
+                    <option key={b.id} value={b.description}>{b.description}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {type !== 'DEPRECATE_BENEFIT' && (
               <div>
                 <label className="block text-sm font-medium mb-1">Benefit Category</label>
@@ -284,6 +297,53 @@ export default function SuggestPage() {
             <div>
               <label className="block text-sm font-medium mb-1">Effective Date (optional)</label>
               <Input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {type === 'IMAGE_UPDATE' && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">Upload a new card image (optional)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                setImageAttachError('');
+                const file = e.target.files?.[0];
+                if (!file) { setImageDataUrl(''); return; }
+                try {
+                  // Compress client-side to keep payload small
+                  const bitmap = await createImageBitmap(file);
+                  const maxDim = 800;
+                  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+                  const canvas = document.createElement('canvas');
+                  canvas.width = Math.round(bitmap.width * scale);
+                  canvas.height = Math.round(bitmap.height * scale);
+                  const ctx = canvas.getContext('2d');
+                  if (!ctx) throw new Error('Canvas not supported');
+                  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                  const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                  if (dataUrl.length > 95_000) {
+                    setImageAttachError('Image is too large after compression. Please choose a smaller image.');
+                    setImageDataUrl('');
+                  } else {
+                    setImageDataUrl(dataUrl);
+                  }
+                } catch {
+                  setImageAttachError('Failed to process image. Try a different file.');
+                }
+              }}
+            />
+            {!!imageDataUrl && (
+              <div className="mt-2">
+                <img src={imageDataUrl} alt="Preview" className="max-h-40 rounded border" />
+                <p className="text-xs text-gray-500 mt-1">A compressed preview is attached to your suggestion.</p>
+              </div>
+            )}
+            {imageAttachError && <p className="text-xs text-red-600">{imageAttachError}</p>}
+            <div>
+              <label className="block text-sm font-medium mb-1">Or provide a public image URL</label>
+              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://.../image.png" />
             </div>
           </div>
         )}
