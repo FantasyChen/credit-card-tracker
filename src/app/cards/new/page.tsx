@@ -49,23 +49,15 @@ function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; m
             <h2 className={`text-xl font-semibold dark:text-gray-100 ${matchedFields?.includes('name') ? 'bg-yellow-200 dark:bg-yellow-800 px-1 rounded' : ''}`}>
               {card.name}
             </h2>
-            <div className="flex items-center gap-2">
-              {matchedFields && matchedFields.length > 0 && (
-                <div className="hidden md:flex flex-wrap gap-1">
-                  {matchedFields.map(field => (
-                    <span key={field} className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">
-                      {field}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <a
-                href={`/settings/suggest?type=EDIT_CARD&cardName=${encodeURIComponent(card.name)}&issuer=${encodeURIComponent(card.issuer)}`}
-                className="text-xs text-blue-600 underline"
-              >
-                Suggest an edit
-              </a>
-            </div>
+            {matchedFields && matchedFields.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {matchedFields.map(field => (
+                  <span key={field} className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">
+                    {field}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <p className={`text-gray-600 mb-1 dark:text-gray-300 ${matchedFields?.includes('issuer') ? 'bg-yellow-200 dark:bg-yellow-800 px-1 rounded' : ''}`}>
             Issuer: {card.issuer}
@@ -92,6 +84,16 @@ function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; m
               </div>
             </div>
           )}
+
+          {/* Suggest an edit link */}
+          <div className="mb-4 text-right">
+            <a
+              href={`/settings/suggest?type=EDIT_CARD&cardName=${encodeURIComponent(card.name)}&issuer=${encodeURIComponent(card.issuer)}`}
+              className="text-xs text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Suggest an edit
+            </a>
+          </div>
 
           {/* --- Add Last 4 Digits Field --- */}
           <div className="mb-4">
