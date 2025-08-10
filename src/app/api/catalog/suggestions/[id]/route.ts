@@ -20,6 +20,9 @@ export async function PATCH(
     if (!status) {
       return NextResponse.json({ error: 'status is required' }, { status: 400 });
     }
+    if (!['APPROVED', 'REJECTED', 'PENDING'].includes(status)) {
+      return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    }
 
     const updated = await prisma.catalogSuggestion.update({
       where: { id },

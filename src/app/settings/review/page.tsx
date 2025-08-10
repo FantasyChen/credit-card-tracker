@@ -62,10 +62,28 @@ export default function ReviewSuggestionsPage() {
     });
   };
 
+  const refresh = async (filter?: 'PENDING' | 'APPROVED' | 'REJECTED') => {
+    try {
+      const q = filter ? `?status=${filter}` : '';
+      const res = await fetch(`/api/catalog/suggestions${q}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load suggestions');
+      setSuggestions(await res.json());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Suggestion Review</h1>
       {error && <p className="text-red-600 mb-2">{error}</p>}
+      <div className="mb-3 flex gap-2 items-center">
+        <span className="text-sm text-gray-600">Filter:</span>
+        <Button variant="outline" onClick={() => refresh()}>All</Button>
+        <Button variant="outline" onClick={() => refresh('PENDING')}>Pending</Button>
+        <Button variant="outline" onClick={() => refresh('APPROVED')}>Approved</Button>
+        <Button variant="outline" onClick={() => refresh('REJECTED')}>Rejected</Button>
+      </div>
       <div className="space-y-4">
         {suggestions.map((s) => (
           <div key={s.id} className="border rounded p-4 bg-white dark:bg-gray-800">
