@@ -982,6 +982,70 @@ async function main() {
         },
       ],
     },
+    {
+      name: 'Citi Strata Elite',
+      issuer: 'Citi',
+      annualFee: 595,
+      imageUrl: '/images/cards/citi-strata-elite.webp',
+      benefits: [
+        {
+          description: '$300 Annual Hotel Benefit (2+ nights via Citi Travel)',
+          category: 'Travel',
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
+        },
+        {
+          description: '$200 Annual Splurge Credit (select brands)',
+          category: 'Shopping',
+          maxAmount: 200,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 12,
+        },
+        {
+          description: '$100 Blacklane Credit (Jan-Jun)',
+          category: 'Transportation',
+          maxAmount: 100,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // Jan-Jun window
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          description: '$100 Blacklane Credit (Jul-Dec)',
+          category: 'Transportation',
+          maxAmount: 100,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7, // Jul-Dec window
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          description: '4 Admirals Club Lounge Passes (American Airlines)',
+          category: 'Travel',
+          maxAmount: 0,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+        },
+        {
+          description: 'Global Entry/TSA PreCheck Credit (every 4 years)',
+          category: 'Travel',
+          maxAmount: 120,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
+          fixedCycleDurationMonths: 48, // 4 years
+        },
+      ],
+    },
   ];
 
   // --- Upsert Logic (ensure benefits are deleted/recreated or updated properly) ---

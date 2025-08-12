@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import type { SuggestionStatus, SuggestionType } from '@/generated/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,9 +29,9 @@ export async function GET(request: Request) {
       take = parsed;
     }
 
-    const where: any = {};
-    if (status) where.status = status;
-    if (type) where.type = type;
+    const where: Partial<{ status: SuggestionStatus; type: SuggestionType; exportedAt: null }> = {};
+    if (status) where.status = status as SuggestionStatus;
+    if (type) where.type = type as SuggestionType;
     if (hideExported) where.exportedAt = null;
 
     if (aggregate === 'count') {
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
       },
     });
     return NextResponse.json(suggestions);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch suggestions' }, { status: 500 });
   }
 }
@@ -123,7 +124,7 @@ export async function POST(request: Request) {
 
     const created = await prisma.catalogSuggestion.create({
       data: {
-        type: type as any,
+        type: type as SuggestionType,
         payloadJson,
         sources: sourceList,
         createdById,
@@ -131,7 +132,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(created, { status: 201 });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to create suggestion' }, { status: 500 });
   }
 }

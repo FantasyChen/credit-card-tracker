@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import type { SuggestionStatus } from '@/generated/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,14 +28,14 @@ export async function PATCH(
     const updated = await prisma.catalogSuggestion.update({
       where: { id },
       data: {
-        status: status as any,
+        status: status as SuggestionStatus,
         reviewNote: reviewNote || null,
         reviewedById: session.user.id,
       },
     });
 
     return NextResponse.json(updated);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to update suggestion' }, { status: 500 });
   }
 }

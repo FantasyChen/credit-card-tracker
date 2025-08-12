@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import type { SuggestionStatus } from '@/generated/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
   }
 
   const suggestions = await prisma.catalogSuggestion.findMany({
-    where: ids.length > 0 ? { id: { in: ids } } : { status: status as any },
+    where: ids.length > 0 ? { id: { in: ids } } : { status: status as SuggestionStatus },
     orderBy: { updatedAt: 'desc' },
     take,
     include: {

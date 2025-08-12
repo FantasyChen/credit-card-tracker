@@ -4,6 +4,7 @@ import React, { useEffect, useState, useTransition } from 'react';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 type Suggestion = {
   id: string;
@@ -25,15 +26,16 @@ export default function ReviewSuggestionsPage() {
   const [hideExported, setHideExported] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (status === 'loading') {
-    return <p className="p-4">Loading...</p>;
-  }
-  if (status === 'unauthenticated') {
-    redirect('/api/auth/signin?callbackUrl=/settings/review');
-  }
-  if (data?.user?.role !== 'ADMIN' && data?.user?.role !== 'MODERATOR') {
-    redirect('/');
-  }
+  const shouldRedirectToSignin = status === 'unauthenticated';
+  const shouldRedirectHome = status === 'authenticated' && (data?.user?.role !== 'ADMIN' && data?.user?.role !== 'MODERATOR');
+
+  useEffect(() => {
+    if (shouldRedirectToSignin) {
+      redirect('/api/auth/signin?callbackUrl=/settings/review');
+    } else if (shouldRedirectHome) {
+      redirect('/');
+    }
+  }, [shouldRedirectToSignin, shouldRedirectHome]);
 
   useEffect(() => {
     (async () => {
@@ -47,6 +49,10 @@ export default function ReviewSuggestionsPage() {
       }
     })();
   }, [hideExported]);
+
+  if (status === 'loading' || shouldRedirectToSignin || shouldRedirectHome) {
+    return <p className="p-4">Loading...</p>;
+  }
 
   const updateStatus = (id: string, status: 'APPROVED' | 'REJECTED') => {
     startTransition(async () => {
@@ -93,41 +99,43 @@ export default function ReviewSuggestionsPage() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Suggestion Review</h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Suggestions</h1>
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <Badge variant="outline">Admin</Badge>
+        </div>
+      </div>
       {error && <p className="text-red-600 mb-2">{error}</p>}
-      <div className="mb-3 flex gap-2 items-center">
+      <div className="mb-3 flex flex-wrap gap-2 items-center">
         <span className="text-sm text-gray-600">Filter:</span>
-        <Button variant="outline" onClick={() => refresh()}>All</Button>
-        <Button variant="outline" onClick={() => refresh('PENDING')}>Pending</Button>
-        <Button variant="outline" onClick={() => refresh('APPROVED')}>Approved</Button>
-        <Button variant="outline" onClick={() => refresh('REJECTED')}>Rejected</Button>
+        <Button size="sm" variant="outline" onClick={() => refresh()}>All</Button>
+        <Button size="sm" variant="outline" onClick={() => refresh('PENDING')}>Pending</Button>
+        <Button size="sm" variant="outline" onClick={() => refresh('APPROVED')}>Approved</Button>
+        <Button size="sm" variant="outline" onClick={() => refresh('REJECTED')}>Rejected</Button>
         <label className="ml-auto flex items-center gap-2 text-sm">
           <input type="checkbox" checked={hideExported} onChange={(e) => setHideExported(e.target.checked)} />
           Hide exported
         </label>
-        <Button variant="outline" onClick={exportSelected}>Export selected</Button>
+        <Button size="sm" variant="outline" onClick={exportSelected}>Export selected</Button>
       </div>
       <div className="space-y-4">
         {suggestions.map((s) => (
-          <div key={s.id} className="border rounded p-4 bg-white dark:bg-gray-800">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm">
+          <div key={s.id} className="border rounded p-3 bg-white dark:bg-gray-800">
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <label className="flex items-center gap-2 text-xs text-gray-600">
                 <input type="checkbox" checked={!!selectedIds[s.id]} onChange={() => toggleSelected(s.id)} />
-                Select
+                {new Date(s.createdAt).toLocaleString()}
               </label>
-              {s.exportedAt && <span className="text-xs text-gray-500">Exported: {new Date(s.exportedAt).toLocaleString()}</span>}
-            </div>
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <p className="text-sm text-gray-500">{new Date(s.createdAt).toLocaleString()}</p>
-                <p className="font-medium">{s.type}</p>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{s.type}</Badge>
+                <Badge variant={s.status === 'PENDING' ? 'secondary' : s.status === 'APPROVED' ? 'default' : 'destructive'}>{s.status}</Badge>
+                {s.exportedAt && <Badge variant="outline">Exported</Badge>}
               </div>
-              <span className={`text-xs px-2 py-1 rounded ${s.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : s.status === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{s.status}</span>
             </div>
-            <pre className="text-xs overflow-auto bg-gray-50 dark:bg-gray-900 p-2 rounded max-h-64">{JSON.stringify(s.payloadJson, null, 2)}</pre>
+            <pre className="text-xs overflow-auto bg-gray-50 dark:bg-gray-900 p-2 rounded max-h-56">{JSON.stringify(s.payloadJson, null, 2)}</pre>
             {s.sources?.length > 0 && (
               <div className="mt-2 text-sm">
-                <p className="font-semibold">Sources:</p>
+                <p className="font-medium text-gray-700">Sources</p>
                 <ul className="list-disc list-inside">
                   {s.sources.map((src, idx) => (
                     <li key={idx}><a className="text-blue-600 underline" href={src} target="_blank" rel="noreferrer">{src}</a></li>
@@ -136,8 +144,8 @@ export default function ReviewSuggestionsPage() {
               </div>
             )}
             <div className="mt-3 flex gap-2">
-              <Button disabled={isPending || s.status !== 'PENDING'} onClick={() => updateStatus(s.id, 'APPROVED')}>Approve</Button>
-              <Button disabled={isPending || s.status !== 'PENDING'} variant="outline" onClick={() => updateStatus(s.id, 'REJECTED')}>Reject</Button>
+              <Button size="sm" disabled={isPending || s.status !== 'PENDING'} onClick={() => updateStatus(s.id, 'APPROVED')}>Approve</Button>
+              <Button size="sm" disabled={isPending || s.status !== 'PENDING'} variant="outline" onClick={() => updateStatus(s.id, 'REJECTED')}>Reject</Button>
             </div>
           </div>
         ))}
