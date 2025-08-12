@@ -199,7 +199,7 @@ SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 
 **CRITICAL - NEVER RUN:**
 - `npx prisma migrate reset` (wipes ALL data)
-- `npx prisma db push --force-reset` 
+- `npx prisma db push --force-reset`
 - Any command with `--force-reset` on production
 
 **Safe Development Workflow:**
@@ -207,6 +207,17 @@ SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 2. Test schema changes on dev branch: `export DATABASE_URL=$DATABASE_URL_DEV`
 3. Use `npx prisma migrate dev` for schema changes
 4. Let Vercel handle production deployments automatically
+
+**Explicit user-approved production changes:**
+- If and only if the human user explicitly requests it, it is acceptable to run non-destructive operations against the production database after verifying `DATABASE_URL` points to production.
+- Allowed non-destructive ops include:
+  - Seeding/upserting predefined catalog data: `npx prisma db seed`
+  - Applying already-generated migrations: `npx prisma migrate deploy`
+- Still forbidden on production: destructive resets (`migrate reset`, `db push --force-reset`, manual `DROP` statements), or anything that erases/modifies user data outside of intended migrations.
+- Always:
+  - Echo/print `DATABASE_URL` (mask credentials) and confirm the target.
+  - Prefer read-only or upsert-style scripts for catalog updates.
+  - Document the action in commit messages or ops notes.
 
 ### Adding New Credit Cards
 
@@ -268,6 +279,13 @@ curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-noti
 1. Test on development branch
 2. Commit migration files
 3. Vercel runs `npx prisma migrate deploy` automatically
+
+**Production changes on request (non-destructive):**
+- When the user asks to update production data (e.g., add or refresh predefined cards/benefits):
+  1. Verify target: `node scripts/check-database-connection.js` (ensure it reports production/Neon main)
+  2. Run non-destructive seed: `DATABASE_URL="<prod>" npx prisma db seed`
+  3. For schema already migrated in code, apply to prod: `DATABASE_URL="<prod>" npx prisma migrate deploy`
+  4. Never use reset/force-reset commands on production
 
 ### Monitoring & Analytics
 
