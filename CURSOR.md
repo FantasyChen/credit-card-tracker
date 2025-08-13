@@ -229,8 +229,16 @@ SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 **Benefit Inclusion Criteria:**
 - Must have cyclical value (credits, points, free nights)
 - Must reset on trackable cycles (monthly/quarterly/yearly)
-- Exclude always-on perks (multipliers, insurance, status)
+- Exclude always-on perks (multipliers, insurance, status, memberships)
 - Verify with reliable sources
+
+**Specific Exclusions:**
+- Priority Pass memberships (always-on access, no cyclical reset)
+- Lounge memberships (Admirals Club, Centurion Lounge access)
+- Insurance benefits (travel insurance, purchase protection)
+- Earning rate multipliers (3x points on dining, etc.)
+- Elite status benefits (hotel/airline status)
+- One-time signup bonuses
 
 ### Testing
 

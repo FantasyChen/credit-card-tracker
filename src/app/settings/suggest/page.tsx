@@ -167,7 +167,7 @@ export default function SuggestPage() {
 
   return (
     <div className="container mx-auto p-4 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-4">Suggest a Catalog Update</h1>
+      <h1 className="text-2xl font-bold mb-4">Suggest an update</h1>
       {message && (
         <p className={`mb-2 text-sm ${message.toLowerCase().includes('thanks') ? 'text-green-600' : 'text-red-600'}`}>{message}</p>
       )}
@@ -176,7 +176,7 @@ export default function SuggestPage() {
       )}
       <form action={submit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">What would you like to do?</label>
+          <label className="block text-sm font-medium mb-1">Action</label>
           <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="w-full border rounded p-2">
             <option value="ADD_CARD">Add a new card</option>
             <option value="EDIT_CARD">Suggest changes to a card</option>
@@ -192,7 +192,7 @@ export default function SuggestPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {(type !== 'ADD_CARD') && (
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-1">Select a card</label>
+              <label className="block text-sm font-medium mb-1">Card</label>
               <select value={selectedCardId} onChange={(e) => setSelectedCardId(e.target.value)} className="w-full border rounded p-2">
                 <option value="">-- Choose from catalog (optional) --</option>
                 {isLoadingCards && <option>Loading cards...</option>}
@@ -206,7 +206,7 @@ export default function SuggestPage() {
           {(type === 'ADD_CARD' || !selectedCard) && (
             <>
               <div>
-                <label className="block text-sm font-medium mb-1">Card Name</label>
+                <label className="block text-sm font-medium mb-1">Card name</label>
                 <Input value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Chase Sapphire Preferred" />
               </div>
               <div>

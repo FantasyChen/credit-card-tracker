@@ -989,7 +989,7 @@ async function main() {
       imageUrl: '/images/cards/citi-strata-elite.webp',
       benefits: [
         {
-          description: '$300 Annual Hotel Benefit (2+ nights via Citi Travel)',
+          description: 'Up to $300 Annual Hotel Benefit (2+ nights via Citi Travel)',
           category: 'Travel',
           maxAmount: 300,
           frequency: BenefitFrequency.YEARLY,
@@ -999,7 +999,7 @@ async function main() {
           fixedCycleDurationMonths: 12, // Calendar year
         },
         {
-          description: '$200 Annual Splurge Credit (select brands)',
+          description: 'Up to $200 Annual Splurge Credit℠ (select brands)',
           category: 'Shopping',
           maxAmount: 200,
           frequency: BenefitFrequency.YEARLY,
@@ -1009,7 +1009,7 @@ async function main() {
           fixedCycleDurationMonths: 12,
         },
         {
-          description: '$100 Blacklane Credit (Jan-Jun)',
+          description: 'Up to $100 Blacklane® Credit (Jan-Jun)',
           category: 'Transportation',
           maxAmount: 100,
           frequency: BenefitFrequency.YEARLY,
@@ -1019,7 +1019,7 @@ async function main() {
           fixedCycleDurationMonths: 6,
         },
         {
-          description: '$100 Blacklane Credit (Jul-Dec)',
+          description: 'Up to $100 Blacklane® Credit (Jul-Dec)',
           category: 'Transportation',
           maxAmount: 100,
           frequency: BenefitFrequency.YEARLY,
@@ -1029,14 +1029,17 @@ async function main() {
           fixedCycleDurationMonths: 6,
         },
         {
-          description: '4 Admirals Club Lounge Passes (American Airlines)',
+          description: '4 Admirals Club® Citi Strata Elite℠ Passes (American Airlines)',
           category: 'Travel',
-          maxAmount: 0,
+          maxAmount: 300, // Estimated value (~$75 per pass)
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // Calendar year
+          fixedCycleDurationMonths: 12,
         },
         {
-          description: 'Global Entry/TSA PreCheck Credit (every 4 years)',
+          description: 'Up to $120 Global Entry or TSA PreCheck® Application Fee Credit (every 4 years)',
           category: 'Travel',
           maxAmount: 120,
           frequency: BenefitFrequency.YEARLY,
