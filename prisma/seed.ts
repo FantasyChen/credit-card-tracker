@@ -299,12 +299,11 @@ async function main() {
           fixedCycleDurationMonths: 6,
         },
         {
-          description: '$25 Quarterly Hilton Credit',
+          description: '$50 Quarterly Hilton Credit',
           category: 'Travel',
-          maxAmount: 25,
+          maxAmount: 50,
           frequency: BenefitFrequency.QUARTERLY,
           percentage: 0,
-          occurrencesInCycle: 2,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
           fixedCycleStartMonth: 1, // January
           fixedCycleDurationMonths: 3, // Calendar quarters
@@ -429,12 +428,14 @@ async function main() {
       imageUrl: '/images/cards/hilton-honors-american-express-surpass-card.png',
       benefits: [
         {
-          description: '$25 Quarterly Hilton Credit',
+          description: '$50 Quarterly Hilton Credit',
           category: 'Travel',
-          maxAmount: 25,
+          maxAmount: 50,
           frequency: BenefitFrequency.QUARTERLY,
           percentage: 0,
-          occurrencesInCycle: 2,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 3, // Calendar quarters
         },
       ],
     },
