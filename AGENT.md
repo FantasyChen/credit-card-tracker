@@ -1,4 +1,4 @@
-# CouponCycle - Complete Project Documentation for Cursor Agent
+# CouponCycle - Complete Project Documentation for AI Agents
 
 ## 🎯 Project Overview
 
@@ -448,4 +448,4 @@ npm run build
 
 ---
 
-> **Note for Cursor Agent**: This document provides complete context for the CouponCycle project. Use this information to understand the system architecture, business logic, and development practices when assisting with code changes, feature additions, or debugging. Always follow the database safety rules and maintain the high code quality standards established in this project. 
+> **Note for AI Agents**: This document provides complete context for the CouponCycle project. Use this information to understand the system architecture, business logic, and development practices when assisting with code changes, feature additions, or debugging. Always follow the database safety rules and maintain the high code quality standards established in this project. 

@@ -1,112 +1,88 @@
 # Contributing to CouponCycle
 
-First off, thank you for considering contributing to CouponCycle! 🎉
-
-CouponCycle is a community-driven project, and we welcome contributions from developers of all skill levels. Whether you're fixing bugs, adding features, improving documentation, or helping with testing, your contribution is valuable.
+Thank you for considering contributing to CouponCycle! 🎉 This guide provides detailed information for developers and contributors who want to help improve the project.
 
 ## 📋 Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [How to Contribute](#how-to-contribute)
 - [Development Setup](#development-setup)
 - [Updating Credit Card Information](#updating-credit-card-information)
-- [Coding Standards](#coding-standards)
-- [Testing Guidelines](#testing-guidelines)
+- [Development Guidelines](#development-guidelines)
+- [Testing](#testing)
 - [Submitting Changes](#submitting-changes)
 - [Issue Guidelines](#issue-guidelines)
 - [Pull Request Process](#pull-request-process)
 
-## 🤝 Code of Conduct
-
-This project follows standard open source community guidelines. Please be respectful, inclusive, and constructive in all interactions. See our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-
-## 🚀 Getting Started
+## 🚀 Development Setup
 
 ### Prerequisites
 
 Before you begin, ensure you have:
-
 - Node.js 18 or higher
 - npm or yarn package manager
 - Git for version control
 - A Google account (for OAuth testing)
 - Basic knowledge of React, Next.js, and TypeScript
 
-### Development Setup
+### Detailed Setup Instructions
 
-1. **Fork the repository** on GitHub
-2. **Clone your fork** locally:
+1. **Fork and clone the repository**
    ```bash
    git clone https://github.com/your-username/credit-card-tracker.git
    cd credit-card-tracker
-   ```
-
-3. **Install dependencies**:
-   ```bash
    npm install
    ```
 
-4. **Set up environment variables**:
+2. **Environment Configuration**
+   Create `.env` from the template and fill in all values:
    ```bash
    cp .env.example .env
-   # Fill in your environment variables
    ```
 
-5. **Set up the database**:
+   **Required Environment Variables:**
+   ```bash
+   # Database
+   DATABASE_URL="postgresql://..." # Production
+   DATABASE_URL_DEV="postgresql://..." # Development branch
+
+   # Authentication  
+   GOOGLE_CLIENT_ID="your-google-client-id"
+   GOOGLE_CLIENT_SECRET="your-google-client-secret"
+   NEXTAUTH_URL="http://localhost:3000"
+   NEXTAUTH_SECRET="your-nextauth-secret"
+
+   # Services
+   RESEND_API_KEY="your-resend-api-key"
+   CRON_SECRET="your-cron-secret"
+   SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
+   ```
+
+3. **Database Setup**
    ```bash
    npx prisma generate
    npx prisma migrate dev
    npx prisma db seed
-   ```
-
-6. **Start the development server**:
-   ```bash
    npm run dev
    ```
-
-7. **Verify the setup** by visiting http://localhost:3000
-
-## 🛠️ How to Contribute
-
-### Types of Contributions
-
-We welcome several types of contributions:
-
-- **🐛 Bug Reports** - Help us identify and fix issues
-- **✨ Feature Requests** - Suggest new functionality
-- **💻 Code Contributions** - Implement features or fix bugs
-- **📚 Documentation** - Improve or add documentation
-- **🧪 Testing** - Write tests or improve test coverage
-- **🎨 Design** - UI/UX improvements
-- **🔍 Code Review** - Review pull requests
-
-### Good First Issues
-
-Look for issues labeled `good first issue` or `help wanted`. These are typically:
-- Bug fixes
-- Documentation improvements
-- Small feature additions
-- Test additions
-
-## 💻 Development Setup
 
 ### Project Structure
 
 ```
-credit-card-tracker/
-├── src/
-│   ├── app/           # Next.js app router pages
-│   ├── components/    # Reusable React components
-│   ├── lib/          # Utility functions and configurations
-│   └── types/        # TypeScript type definitions
-├── prisma/           # Database schema and migrations
-├── public/           # Static assets
-├── docs/             # Project documentation
-└── scripts/          # Utility scripts
+src/
+├── app/                    # Next.js App Router
+│   ├── api/               # API routes and cron jobs
+│   ├── benefits/          # Benefits dashboard
+│   ├── cards/            # Card management
+│   ├── loyalty/          # Loyalty program tracking
+│   └── settings/         # User preferences
+├── components/           # Reusable React components
+├── lib/                 # Core business logic
+│   ├── actions/         # Server actions
+│   ├── benefit-cycle.ts # Benefit cycle calculations
+│   └── auth.ts          # Authentication config
+└── types/               # TypeScript definitions
 ```
 
-### Helpful Scripts
+### Helpful Development Scripts
 
 ```bash
 # List available predefined cards
@@ -126,107 +102,87 @@ node scripts/test-annual-fee-roi.cjs
 node scripts/test-email.cjs
 ```
 
-### Key Technologies
+## 💳 Updating Credit Card Information
 
-- **Next.js 15** - React framework with App Router
-- **Prisma** - Database ORM
-- **NextAuth.js** - Authentication
-- **Tailwind CSS** - Styling
-- **TypeScript** - Type safety
-- **Jest** - Testing framework
+**This is one of the most valuable ways to contribute!** Credit card benefits and annual fees change frequently, and community help is essential.
 
-## 🔄 Updating Credit Card Information
-
-**This is one of the most valuable ways to contribute!** Credit card benefits and annual fees change frequently, and community help is essential to keep our data current.
-
-### 📚 Reliable Sources for Card Information
-
-Always verify information with these trusted sources (in order of preference):
+### 📚 Reliable Sources (In Order of Preference)
 
 1. **Official bank websites** (chase.com, americanexpress.com, etc.)
-2. **[US Credit Card Guide](https://www.uscreditcardguide.com/)** - Excellent for comprehensive benefit details
-3. **[Doctor of Credit](https://www.doctorofcredit.com/)** - Great for tracking changes and updates
-4. **Bank press releases** - For official announcements of changes
+2. **[US Credit Card Guide](https://www.uscreditcardguide.com/)** - Comprehensive benefit details
+3. **[Doctor of Credit](https://www.doctorofcredit.com/)** - Timely updates and changes
+4. **Bank press releases** - Official announcements
 
-### 📋 What Information to Update
+### 📋 What to Update
 
-#### High Priority Updates:
+#### High Priority:
 - **Annual fee changes** - Banks adjust these regularly
 - **Benefit value changes** - Credit amounts often change
 - **New benefits added** - Cards frequently add perks
 - **Benefits removed** - Important to remove discontinued perks
 - **Benefit frequency changes** - From monthly to quarterly, etc.
 
-#### Medium Priority Updates:
-- **Benefit description clarifications** - More accurate wording
-- **New credit cards** - Major issuers release new cards
-- **Discontinued cards** - Mark cards no longer available
+#### Medium Priority:
+- **Benefit description clarifications**
+- **New credit cards from major issuers**
+- **Discontinued cards** - Mark as no longer available
 
-### 🛠️ How to Update Card Information
+### 🛠️ Two Ways to Contribute Updates
 
-#### Step 1: Identify Changes
-Compare our current data with official sources:
+#### Option A: In-App Suggestion System (Recommended)
+1. Sign in to [CouponCycle](https://www.coupon-cycle.site/)
+2. Go to `Settings → Suggest`
+3. Submit a JSON payload with your updates and source links
+4. Moderators review suggestions in `Settings → Review`
 
-```bash
-# See what cards we currently have
-node scripts/list-available-cards.cjs
-```
+#### Option B: Direct Code Changes
+1. **Locate the card in `prisma/seed.ts`**
+2. **Update the information following our criteria**
+3. **Test your changes**
+4. **Submit a pull request**
 
-#### Step 2: Locate the Card in Code
-All card data is in `prisma/seed.ts`. Find the card you want to update:
+### 📝 Benefit Inclusion Criteria
 
+**Include These:**
+- Cyclical benefits with trackable resets (monthly/quarterly/yearly)
+- Statement credits with specific dollar amounts
+- Free nights, upgrades, or services with clear cycles
+- Benefits that users can "use up" and then reset
+
+**Exclude These:**
+- Always-on perks (points multipliers, insurance, status)
+- Memberships without cycles (Priority Pass, lounge access)
+- One-time signup bonuses
+- Benefits without specific dollar values
+
+**Example of Good Benefits:**
 ```typescript
-// Example: Finding Chase Sapphire Preferred
 {
-  name: 'Chase Sapphire Preferred',
-  issuer: 'Chase',
-  annualFee: 95,
-  imageUrl: '/images/cards/chase-sapphire-preferred.png',
-  benefits: [
-    // Benefits are listed here
-  ]
+  description: '$300 Annual Travel Credit',
+  category: 'Travel',
+  maxAmount: 300,
+  frequency: BenefitFrequency.YEARLY,
+  percentage: 0,
 }
 ```
 
-#### Step 3: Update the Information
-Make your changes following our data criteria:
+### 🧪 Testing Card Updates
 
-**Annual Fee:**
-```typescript
-annualFee: 95, // Update to current fee
-```
-
-**Benefits - Follow These Rules:**
-1. **Only trackable, cyclical benefits** (monthly, quarterly, yearly)
-2. **Specific dollar amounts** - avoid vague benefits
-3. **No always-on perks** (like points multipliers)
-
-```typescript
-benefits: [
-  {
-    description: '$300 Annual Travel Credit', // Clear, specific description
-    category: 'Travel', // Travel, Dining, Entertainment, etc.
-    maxAmount: 300, // Dollar amount per cycle
-    frequency: BenefitFrequency.YEARLY, // MONTHLY, QUARTERLY, YEARLY
-    percentage: 0, // Usually 0 for statement credits
-  }
-]
-```
-
-#### Step 4: Test Your Changes
 ```bash
-# Test that the seed data is valid
+# Verify seed data is valid
 npx prisma db seed
 
-# Build the project to ensure no errors
+# Build to check for errors
 npm run build
+
+# Check what cards are available
+node scripts/list-available-cards.cjs
 ```
 
-### 📝 Pull Request Guidelines for Card Updates
+### 📤 Pull Request Guidelines for Card Updates
 
 #### PR Title Format:
-- `Update [Card Name]: [Brief description]`
-- Example: `Update Chase Sapphire Preferred: Increase annual fee to $95`
+`Update [Card Name]: [Brief description]`
 
 #### PR Description Template:
 ```markdown
@@ -241,119 +197,62 @@ npm run build
 - [ ] Existing benefit modified: Hotel credit increased to $60
 
 ### Source Verification:
-- [ ] Verified with official Chase website
-- [ ] Cross-checked with US Credit Card Guide
-- [x] Link to source: https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred
+- [x] Verified with official Chase website
+- [x] Cross-checked with US Credit Card Guide
+- [x] Source: https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred
 
 ### Testing:
 - [x] Seed data runs without errors
 - [x] Build completes successfully
 ```
 
-#### What We'll Review:
-1. **Source verification** - Is the information from a reliable source?
-2. **Data format** - Does it follow our benefit criteria?
-3. **Accuracy** - Are amounts and frequencies correct?
-4. **Completeness** - Are all changes documented?
+## 🔧 Development Guidelines
 
-### 🚀 Quick Start for New Contributors
-
-**First-time contributors can start with:**
-
-1. **Annual fee updates** - These are straightforward and high-impact
-2. **Obvious benefit amount changes** - Easy to verify
-3. **Adding new major issuer cards** - If you see a popular card we're missing
-
-**Example beginner contribution:**
-"I noticed the Chase Sapphire Preferred annual fee increased to $120 on the Chase website, but your seed data shows $95."
-
-### 💡 Tips for Success
-
-- **Start small** - Update one card at a time
-- **Document your sources** - Include links in PR description  
-- **Double-check amounts** - Benefit values must be exact
-- **Ask questions** - Use GitHub Issues if you're unsure
-- **Be patient** - We review card updates carefully for accuracy
-
-### 🎯 High-Impact Contribution Areas
-
-We especially need help with:
-- **American Express cards** - Complex benefit structures
-- **Business credit cards** - Less community coverage
-- **Regional bank cards** - Harder to track changes
-- **Seasonal benefit changes** - Benefits that change by quarter
-
-Thank you for helping keep our credit card data accurate and current! 🎉
-
-## 📝 Coding Standards
-
-### Code Style
-
-We use ESLint and Prettier for code formatting. Before submitting:
+### Code Standards
 
 ```bash
-# Check linting
+# Before submitting any PR
 npm run lint
-
-# Run tests
 npm test
-
-# Build the project
 npm run build
 ```
 
 ### Naming Conventions
-
 - **Components**: PascalCase (`BenefitCard.tsx`)
 - **Files**: kebab-case (`benefit-cycle.ts`)
 - **Variables**: camelCase (`benefitAmount`)
 - **Database**: snake_case (`created_at`)
 
 ### TypeScript Guidelines
-
 - Use strict TypeScript configuration
 - Define proper types for all props and function parameters
 - Avoid `any` type - use proper typing
 - Use Prisma-generated types when possible
 
 ### Component Guidelines
-
 - Use functional components with hooks
 - Keep components small and focused
 - Use proper prop types
 - Handle loading and error states
 - Follow accessibility best practices
 
-## 🧪 Testing Guidelines
+## 🧪 Testing
 
 ### Writing Tests
-
 - Write tests for new features and bug fixes
 - Use descriptive test names
 - Test both happy path and edge cases
 - Mock external dependencies appropriately
 
 ### Running Tests
-
 ```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage
-npm run test:coverage
+npm test              # Run all tests
+npm run test:watch    # Watch mode
+npm run test:coverage # With coverage
 ```
 
-### End-to-End (optional)
-
-We are exploring adding Playwright-based smoke tests for auth, benefits dashboard, and cron side-effects. Contributions welcome.
-
 ### Test Structure
-
 ```typescript
-// Example test structure
 describe('BenefitCard Component', () => {
   it('should display benefit information correctly', () => {
     // Test implementation
@@ -368,35 +267,29 @@ describe('BenefitCard Component', () => {
 ## 📤 Submitting Changes
 
 ### Before Submitting
-
-1. **Test your changes** thoroughly
+1. **Test thoroughly** - Run all tests and build
 2. **Update documentation** if needed
 3. **Add tests** for new functionality
-4. **Run the build** to ensure no errors
-5. **Check for accessibility** compliance
+4. **Check accessibility** compliance
+5. **Follow code standards**
 
 ### Commit Guidelines
-
-Use clear, descriptive commit messages:
+Use clear, descriptive commit messages following conventional commits:
 
 ```bash
-# Good examples
-git commit -m "Fix: Correct annual fee calculation for multiple cards"
-git commit -m "Feature: Add drag and drop benefit reordering"
-git commit -m "Docs: Update setup instructions for new contributors"
+# Examples
+git commit -m "feat: add drag and drop benefit reordering"
+git commit -m "fix: correct annual fee calculation for multiple cards"
+git commit -m "docs: update setup instructions for new contributors"
 
-# Use conventional commits format
-type(scope): description
-
+# Format: type(scope): description
 # Types: feat, fix, docs, style, refactor, test, chore
 ```
 
 ## 🐛 Issue Guidelines
 
 ### Reporting Bugs
-
-When reporting bugs, please include:
-
+Include:
 - **Clear title** and description
 - **Steps to reproduce** the issue
 - **Expected vs actual behavior**
@@ -405,9 +298,7 @@ When reporting bugs, please include:
 - **Error messages** if any
 
 ### Feature Requests
-
-For feature requests, provide:
-
+Provide:
 - **Clear use case** for the feature
 - **Detailed description** of proposed functionality
 - **Mockups or wireframes** if applicable
@@ -415,16 +306,7 @@ For feature requests, provide:
 
 ## 🔄 Pull Request Process
 
-### Before Creating a PR
-
-1. **Sync with upstream** main branch
-2. **Create a feature branch** from main
-3. **Make your changes** in logical commits
-4. **Test thoroughly**
-5. **Update documentation**
-
 ### PR Checklist
-
 - [ ] Branch is up to date with main
 - [ ] All tests pass
 - [ ] Build completes successfully
@@ -433,7 +315,6 @@ For feature requests, provide:
 - [ ] Related issues are referenced
 
 ### PR Description Template
-
 ```markdown
 ## Description
 Brief description of changes
@@ -457,7 +338,6 @@ Fixes #123
 ```
 
 ### Review Process
-
 1. **Automated checks** must pass
 2. **Code review** by maintainers
 3. **Testing** by maintainers
@@ -465,24 +345,13 @@ Fixes #123
 
 ## 📞 Getting Help
 
-### Community Support
-
+- **GitHub Issues** - Bug reports and feature requests
 - **GitHub Discussions** - General questions and discussions
-- **Issues** - Bug reports and feature requests
-- **Email** - Direct contact for sensitive issues
+- **Email** - Contact form on website for sensitive issues
 
-### Maintainer Response Time
-
-We aim to respond to:
+### Response Times
 - **Critical bugs** - Within 24 hours
 - **General issues** - Within 1 week
 - **Pull requests** - Within 1 week
 
-## 🎉 Recognition
-
-Contributors are recognized in:
-- **README.md acknowledgments**
-- **Release notes** for significant contributions
-- **GitHub contributors** page
-
-Thank you for contributing to CouponCycle! 🚀 
+Thank you for contributing to CouponCycle! 🚀

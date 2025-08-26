@@ -1,320 +1,291 @@
 # CouponCycle 💳
 
-**Tired of losing hundreds of dollars in credit card benefits each year? So was I.** That's why I built this free, open-source tool to help you track your credit card perks and maximize your rewards.
+**Stop losing hundreds of dollars in credit card benefits every year.** CouponCycle is a free, open-source tool that tracks your credit card perks and ensures you never miss valuable benefits again.
 
-[![CouponCycle Hero Image](public/hero-image.jpg)](https://www.coupon-cycle.site/)
+[![CouponCycle Hero](public/hero-image.jpg)](https://www.coupon-cycle.site/)
 
-*Stop letting your benefits expire. Start tracking them like a pro.*
+*Track, optimize, and maximize your credit card rewards like a pro.*
 
-## ✨ Why Use CouponCycle?
+## 🚀 Try It Now
 
-This isn't just another expense tracker. It's a smart benefits management system designed for anyone who wants to get the most out of their credit cards.
-Note on naming: The public-facing app is called "CouponCycle", and the repository is named `credit-card-tracker`.
+**[Launch CouponCycle →](https://www.coupon-cycle.site/)**
 
+### Install on Your Phone (Recommended)
+This is a Progressive Web App (PWA) - install it for a native app experience:
+- **iPhone/iPad:** Open in Safari → Share → "Add to Home Screen"
+- **Android:** Open in Chrome → Menu (⋮) → "Install app"
 
-- **Never Miss a Deadline:** Get automated reminders before your benefits expire.
-- **See Your Real ROI:** Instantly know if your card's annual fee is paying for itself.
-- **All Your Cards in One Place:** A central dashboard for all your credit cards and their unique perks.
-- **Track Your Loyalty Points:** Keep an eye on your points and miles so they don't disappear.
-- **It's Free & Private:** No ads, no selling your data. Just a powerful tool for your benefit.
+## ✨ Why CouponCycle?
 
-## 🚀 Live App & Installation
+Credit card users lose an average of **$300-600 annually** by forgetting to use benefits that expire. CouponCycle solves this by:
 
-You can use the live application right now at **[www.coupon-cycle.site](https://www.coupon-cycle.site/)**.
+- **🔔 Smart Notifications** - Get reminders before benefits expire
+- **📊 ROI Tracking** - See if your annual fees are worth it
+- **🏆 Maximize Rewards** - Track all your cards and loyalty programs in one place
+- **📱 Mobile-First** - Works perfectly on your phone
+- **🔒 Privacy-Focused** - No ads, no data selling, completely free
 
-### For Your Mobile Device (Recommended)
+## 💡 Perfect For
 
-This is a Progressive Web App (PWA), which means you can install it on your phone for a native app-like experience.
+- **Travel Hackers** - Track airline/hotel credits and free nights
+- **Churners** - Manage multiple cards and their unique benefits
+- **Busy Professionals** - Automated reminders for dining, Uber, and other credits
+- **Anyone with 2+ Credit Cards** - Centralized benefit management
 
-- **iPhone/iPad:** Open the site in Safari, tap the 'Share' button, and select "Add to Home Screen".
-- **Android:** Open the site in Chrome, tap the three-dot menu, and select "Install app".
+## 🎯 Key Features
 
-## 🔄 Updating Card Information (Community Contributions Welcome!)
+### Credit Card Management
+- Track benefits from 50+ predefined cards (Chase, Amex, Capital One, etc.)
+- Custom opening dates for accurate benefit cycles
+- Drag-and-drop benefit prioritization
+- Annual fee ROI analysis
 
-Credit card benefits and annual fees change frequently. Help keep our data current!
+### Smart Notifications
+- Email alerts before benefits expire
+- Daily digest of available benefits
+- Loyalty program expiration warnings
 
-### Quick Guide for Card Information Updates:
+### Loyalty Program Tracking
+- Monitor airline miles and hotel points
+- Track expiration dates and activity requirements
+- Multi-program support (airlines, hotels, rental cars)
 
-1. **Find outdated information**: Compare our data with official sources
-2. **Verify with reliable sources**: Use [US Credit Card Guide](https://www.uscreditcardguide.com/) or official bank websites
-3. **Option A: In-app suggestion (recommended)**: Use `Settings → Suggest` in the app to submit a JSON payload + sources. Moderators review in `Settings → Review`.
-4. **Option B: Code change**: Edit `prisma/seed.ts` with new information and open a PR.
+### Data Control
+- Export/import all your data
+- No vendor lock-in
+- Complete ownership of your information
 
-**What to Update:**
-- Annual fees that have changed
-- Benefits that have been added, removed, or modified
-- New credit cards from major issuers
-- Corrections to benefit amounts or frequencies
+## 🤝 Community Contributions Welcome!
 
-**Quick Example:**
-```typescript
-// In prisma/seed.ts, find the card and update:
-{
-  name: 'Chase Sapphire Preferred',
-  issuer: 'Chase',
-  annualFee: 95, // ← Update this if changed
-  benefits: [
-    {
-      description: '$50 Annual Hotel Credit', // ← Update amounts/descriptions
-      maxAmount: 50, // ← Update this value
-      // ... rest of benefit
-    }
-  ]
-}
+Credit card benefits change frequently. **Help keep our data current!**
+
+### Quick Ways to Contribute:
+1. **Report outdated info** - Use the in-app suggestion system (`Settings → Suggest`)
+2. **Verify benefit amounts** - Check against official bank websites
+3. **Add new cards** - Submit popular cards we're missing
+
+### Most Needed Updates:
+- **Annual fee changes** - Banks adjust these regularly
+- **Benefit amount updates** - Credits often increase/decrease
+- **New card launches** - Major issuer releases
+- **Seasonal changes** - Quarterly benefit modifications
+
+**Reliable Sources:**
+- [US Credit Card Guide](https://www.uscreditcardguide.com/) (comprehensive)
+- [Doctor of Credit](https://www.doctorofcredit.com/) (timely updates)
+- Official bank websites (definitive)
+
+## 🛠️ For Developers
+
+### Quick Start
+```bash
+git clone https://github.com/fantasy-cc/credit-card-tracker.git
+cd credit-card-tracker
+npm install
+cp .env.example .env  # Fill in your values
+npx prisma migrate dev
+npm run dev
 ```
-
-See our [detailed contribution guide](CONTRIBUTING.md#updating-credit-card-information) for step-by-step instructions.
-
-### New Suggestion & Review APIs (non-destructive)
-
-- `POST /api/catalog/suggestions` — submit a suggestion (auth required)
-- `GET /api/catalog/suggestions` — list suggestions (moderator/admin)
-- `PATCH /api/catalog/suggestions/[id]` — approve/reject (moderator/admin)
-
-These features add new tables only and do not modify or delete existing production data automatically.
-
-## 🛠️ For Developers: Quick Start & Contribution
-
-<details>
-<summary><strong>Click here for development setup and contribution guide</strong></summary>
 
 ### Tech Stack
-
 - **Frontend:** Next.js 15, React 19, Tailwind CSS
 - **Backend:** Next.js API Routes, Prisma ORM
-- **Database:** PostgreSQL (production), SQLite (development)
-- **Authentication:** NextAuth.js with Google OAuth
-- **Email:** Resend API for notifications
-- **Deployment:** Vercel with automated cron jobs
+- **Database:** PostgreSQL (Neon), SQLite (dev)
+- **Auth:** NextAuth.js (Google OAuth)
+- **Deployment:** Vercel
 
-### Prerequisites
+### Contribution Guidelines
+See our **[Detailed Contributing Guide](CONTRIBUTING.md)** for:
+- Complete development setup
+- Database safety practices
+- Credit card data update procedures
+- Code standards and testing
+- Pull request process
 
-- Node.js 18+
-- npm or yarn
-- PostgreSQL (for production) or SQLite (for development)
+## 🏠 Self-Hosting
 
-### Installation
+Want complete control over your data? Self-hosting CouponCycle is straightforward and gives you full ownership of your credit card tracking.
 
-1.  **Clone the repository**
-    ```bash
-    git clone https://github.com/fantasy-cc/credit-card-tracker.git
-    cd credit-card-tracker
-    ```
+### 🎯 Why Self-Host?
+- **Complete Data Privacy** - Your financial data never leaves your server
+- **Custom Modifications** - Tailor the app to your specific needs
+- **No Third-Party Dependencies** - Full control over uptime and performance
+- **Educational Value** - Learn about web app deployment and management
 
-2.  **Install dependencies**
-    ```bash
-    npm install
-    ```
+### 📋 Prerequisites
 
-3.  **Set up environment variables**
-    ```bash
-    # Create your env file from the template and fill in values
-    cp .env.example .env
-    # Then edit .env with your secrets
-    ```
+Before you begin, you'll need:
+- **Server/VPS** with Node.js 18+ support
+- **PostgreSQL Database** (local or cloud)
+- **Domain Name** (optional but recommended)
+- **Email Service** (Resend, SendGrid, or similar)
+- **Google OAuth App** (for authentication)
 
-4.  **Set up the database**
-    ```bash
-    # Generate Prisma client
-    npx prisma generate
+### 🚀 Deployment with Vercel
 
-    # Run migrations
-    npx prisma migrate dev
+The easiest way to self-host CouponCycle is with Vercel, which provides automatic deployments and built-in cron job support.
 
-    # Seed the database with predefined cards
-    npx prisma db seed
-    ```
+1. **Fork the repository** on GitHub
 
-5.  **Start development server**
-    ```bash
-    npm run dev
-    ```
+2. **Create required accounts**:
+   - [Vercel](https://vercel.com/) for hosting
+   - [Neon](https://neon.tech/) for PostgreSQL database
+   - [Resend](https://resend.com/) for email notifications
+   - [Google Cloud Console](https://console.cloud.google.com/) for OAuth
 
-6.  **Open your browser**
-    Navigate to [http://localhost:3000](http://localhost:3000)
+3. **Set up PostgreSQL database**:
+   - Create a Neon database and get your connection string
+   - It will look like: `postgresql://username:password@ep-xxx.neon.tech/dbname`
 
-### Required Environment Variables
+4. **Configure Google OAuth**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create new project → Enable Google+ API
+   - Create OAuth 2.0 credentials
+   - Add your Vercel domain to authorized origins
 
-- `DATABASE_URL` - Your database connection string (production or local)
-- `DATABASE_URL_DEV` - Development database branch/instance for safe local work
-- `NEXTAUTH_URL` - Your app URL (http://localhost:3000 for development)
-- `NEXTAUTH_SECRET` - Random secret for NextAuth.js
-- `GOOGLE_CLIENT_ID` - Google OAuth client ID
-- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
-- `CRON_SECRET` - Secret for securing cron job endpoints
-- `RESEND_API_KEY` - Resend API key for email notifications
-- `SERPAPI_API_KEY` - API key used by card image download script
+5. **Deploy to Vercel**:
+   - Connect your GitHub fork to Vercel
+   - Add environment variables in the Vercel dashboard (see configuration below)
+   - Deploy! Vercel will automatically run database migrations
 
-See `.env.example` for a complete template.
+6. **Your app will be live** at `https://your-app.vercel.app`
 
-### Cron Jobs: Configure & Test
+> **Alternative Platforms:** CouponCycle can also be deployed on Railway, DigitalOcean, Render, Fly.io, or using Docker. The Vercel approach is recommended for its simplicity and automatic cron job support.
 
-The project runs two daily cron jobs (configured in `vercel.json`). Both require an Authorization header with your `CRON_SECRET`.
+### ⚙️ Environment Configuration
 
-- Endpoint: `/api/cron/check-benefits`
-- Endpoint: `/api/cron/send-notifications`
-
-Example manual trigger (local or remote):
-
+**Required Environment Variables:**
 ```bash
-# Replace <url> with http://localhost:3000 or your deployed URL
-curl -i -X GET \
-  -H "Authorization: Bearer $CRON_SECRET" \
-  <url>/api/cron/check-benefits
+# Database
+DATABASE_URL="postgresql://user:pass@host:5432/dbname"
 
-# Notifications cron supports an optional mockDate (non-production only)
-curl -i -X GET \
-  -H "Authorization: Bearer $CRON_SECRET" \
-  "<url>/api/cron/send-notifications?mockDate=2025-08-15"
+# Authentication
+NEXTAUTH_URL="https://your-domain.com"
+NEXTAUTH_SECRET="your-super-secret-key" # Generate with: openssl rand -base64 32
+GOOGLE_CLIENT_ID="your-google-oauth-client-id"
+GOOGLE_CLIENT_SECRET="your-google-oauth-secret"
+
+# Email Notifications
+RESEND_API_KEY="re_xxxxxxxxxx" # From resend.com
+
+# Security
+CRON_SECRET="another-random-secret" # For cron job authentication
 ```
 
-For safety guidance around cron and database operations, see `docs/safe-migration-guide.md` and `CURSOR.md` → Deployment & Operations.
-
-#### Vercel Cron configuration
-
-The repository includes `vercel.json` with daily schedules. Example:
-
-```json
-{
-  "crons": [
-    { "path": "/api/cron/check-benefits", "schedule": "0 5 * * *" },
-    { "path": "/api/cron/send-notifications", "schedule": "15 5 * * *" }
-  ]
-}
-```
-
-### Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.
-
-### Database Recovery with Neon CLI
-
-Since this project uses **Neon Database**, you have powerful recovery and investigation capabilities through the Neon CLI. This is essential for data loss incidents or database investigations.
-
-#### Installation & Setup
-
+**Optional but Recommended:**
 ```bash
-# Install Neon CLI globally
-npm install -g neonctl
+# Card image downloads (if you plan to add new cards)
+SERPAPI_API_KEY="your-serpapi-key"
 
-# Authenticate with your Neon account
-neonctl auth
-# Follow the prompts to log in via browser
+# Development branch (for safe testing)
+DATABASE_URL_DEV="postgresql://dev-connection-string"
 ```
 
-#### Key Commands for Database Recovery
+### 🔒 Security Best Practices
 
-**List Projects and Branches:**
+**Vercel handles most security automatically**, but follow these best practices:
+
+1. **Environment Variables** - Never commit secrets to your repository
+2. **Strong Secrets** - Generate secure values for `NEXTAUTH_SECRET` and `CRON_SECRET`:
 ```bash
-# List all your projects
-neonctl projects list
-
-# List branches in a specific project
-neonctl branches list --project-id your-project-id
-```
-
-**Point-in-Time Recovery:**
+   # Generate secure secrets
+   openssl rand -base64 32
+   ```
+3. **Database Security** - Use strong passwords and enable SSL (Neon enables this by default)
+4. **Regular Updates** - Keep dependencies updated:
 ```bash
-# Create a recovery branch from a specific timestamp
-neonctl branches create \
-  --project-id your-project-id \
-  --name recovery-branch-name \
-  --parent production \
-  --timestamp "2025-07-19T20:30:00Z"
+   npm audit && npm audit fix
+   ```
+5. **Custom Domain** - Use your own domain with HTTPS (Vercel provides SSL automatically)
 
-# The connection string will be provided in the output
-```
+### ⏰ Cron Jobs Setup
 
-**Investigation Workflow:**
-1. **Identify the incident time** (when data loss occurred)
-2. **Create branches** at different timestamps around the incident
-3. **Compare data** across branches using the provided connection strings
-4. **Test with your application** by temporarily switching DATABASE_URL
-5. **Recover data** by restoring from the working branch
+CouponCycle requires two daily cron jobs for proper functionality. **Vercel automatically handles these** based on the `vercel.json` configuration in the repository:
 
-#### Example Recovery Investigation
+- `/api/cron/check-benefits` - Daily at 5:00 AM UTC
+- `/api/cron/send-notifications` - Daily at 5:15 AM UTC
 
+**No additional setup required** for Vercel deployments! The cron jobs will run automatically once deployed.
+
+**Manual Testing:**
 ```bash
-# Create branches for investigation
-neonctl branches create --project-id abc123 --name before-incident --parent production --timestamp "2025-07-19T19:00:00Z"
-neonctl branches create --project-id abc123 --name during-incident --parent production --timestamp "2025-07-19T20:30:00Z"
-neonctl branches create --project-id abc123 --name after-incident --parent production --timestamp "2025-07-19T21:00:00Z"
-
-# Each branch gives you a unique connection string to test against
-# Use these in temporary scripts or update your .env temporarily
+# Test the cron endpoints manually (useful for debugging)
+curl -H "Authorization: Bearer $CRON_SECRET" https://your-app.vercel.app/api/cron/check-benefits
+curl -H "Authorization: Bearer $CRON_SECRET" https://your-app.vercel.app/api/cron/send-notifications
 ```
 
-#### Best Practices for Data Recovery
+### 🧹 Maintenance
 
-- **Act quickly**: Neon's PITR typically covers 7-30 days
-- **Create branches liberally**: They're free and instant due to copy-on-write
-- **Test thoroughly**: Always verify data integrity before final recovery
-- **Document timestamps**: Keep detailed records of when incidents occurred
-- **Use SQL queries**: Test specific user data with direct database queries
-- **Clean up**: Delete investigation branches after recovery to stay organized
+**Regular Tasks:**
+- **Monitor Vercel dashboard** for deployment status and function logs
+- **Update dependencies** monthly: `npm audit && npm update` in your fork
+- **Check Neon database** dashboard for usage and performance
+- **Monitor email delivery** through Resend dashboard
+- **Review GitHub Dependabot** alerts for security updates
 
-#### Emergency Recovery Steps
-
-1. **Stop the application** to prevent further data corruption
-2. **Identify the last known good timestamp**
-3. **Create a recovery branch** from that timestamp
-4. **Verify data integrity** in the recovery branch
-5. **Switch production** to point to the recovery branch
-6. **Update your main branch** with the recovered data
-7. **Resume application** with verified data
-
-**⚠️ Important**: Always test recovery branches thoroughly before switching production traffic.
-
-</details>
-
-## 💖 A Note from the Creator
-
-Hi, I'm fantasy_c. I'm an indie developer passionate about creating free tools that help people improve their lives. This project was born out of my own frustration with managing credit card benefits, and I'm sharing it with the world in the hopes that it helps you too.
-
-My goal is to build things that are genuinely useful, without ads or hidden costs. If you find this tool valuable, consider [supporting my work](https://coff.ee/fantasy_c).
-
-## 🗺️ Roadmap
-
-We're just getting started! Here's what's planned:
-
-- [x] Loyalty program tracking and notifications
-- [x] Progressive Web App support
-- [ ] Custom card and benefit creation
-- [x] Data export/import functionality (see `Settings → Data`)
-- [ ] Advanced analytics and reporting
-- [ ] Bank account integration
-- [ ] Multi-user households
-
-Have an idea? [Open an issue](https://github.com/fantasy-cc/credit-card-tracker/issues) and let's talk about it!
-
-## 🧰 Helpful scripts
-
-Common scripts to aid development and verification:
-
+**Health Checks:**
 ```bash
-# List all predefined cards currently available
-node scripts/list-available-cards.cjs
-
-# Download a card image into public/images/cards/
-node scripts/download-card-image.js --name "Chase Sapphire Preferred"
-
-# Check DB connectivity and which database you are pointing at
-node scripts/check-database-connection.js
-
-# Validate benefit ordering and ROI logic
-node scripts/test-drag-drop.cjs
-node scripts/test-annual-fee-roi.cjs
-
-# Test email sending (requires RESEND_API_KEY)
-node scripts/test-email.cjs
+# Test cron endpoints manually (replace with your domain)
+curl -H "Authorization: Bearer $CRON_SECRET" https://your-app.vercel.app/api/cron/check-benefits
 ```
 
-Backfill utilities (for maintainers): see `scripts/august-2025-backfill-analysis.cjs` and `scripts/august-2025-backfill-executor.cjs` and `BACKFILL_REQUEST.md`.
+### 🆘 Troubleshooting
 
-## 📄 License
+**Common Issues:**
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
+1. **Database Connection Failed**
+   - Check your `DATABASE_URL` in Vercel environment variables
+   - Verify Neon database is active and accessible
 
-Also see:
-- [PRIVACY.md](PRIVACY.md)
-- [TERMS.md](TERMS.md)
+2. **OAuth Errors**
+   - Verify redirect URIs in Google Console match your Vercel domain
+   - Check that `NEXTAUTH_URL` points to your Vercel app URL
+
+3. **Email Not Sending**
+   - Verify `RESEND_API_KEY` is valid in Vercel environment variables
+   - Check Resend dashboard for delivery status
+
+4. **Cron Jobs Not Running**
+   - Check Vercel Functions tab for cron job execution logs
+   - Verify `CRON_SECRET` is set correctly
+
+### 💡 Pro Tips
+
+- **Fork first** - Always work from your own fork for easy updates
+- **Use Vercel preview deployments** - Test changes before merging to main
+- **Monitor Vercel analytics** - Built-in performance monitoring
+- **Set up Vercel notifications** - Get alerts for deployment failures
+- **Use custom domain** - Better for production use than `.vercel.app` subdomain
+
+**Need Help?** Check Vercel's function logs first, then open an issue on GitHub with details about any errors you're encountering.
+
+## 🗺️ What's Next
+
+- [x] **Loyalty Program Tracking** - Points/miles expiration monitoring
+- [x] **Progressive Web App** - Native mobile experience
+- [x] **Data Export/Import** - Complete data portability
+- [ ] **Custom Cards** - Add non-predefined cards and benefits
+- [ ] **Advanced Analytics** - Detailed spending and benefit reports
+- [ ] **Multi-User Support** - Household account management
+
+Have ideas? [Open an issue](https://github.com/fantasy-cc/credit-card-tracker/issues) and let's discuss!
+
+## 💖 Support the Project
+
+CouponCycle is **completely free** with no ads or hidden costs. If it saves you money, consider:
+
+- ⭐ **Starring the repo** - Helps others discover the project
+- 🐛 **Reporting issues** - Makes the tool better for everyone  
+- 💡 **Contributing updates** - Keep card data current
+- ☕ **[Buy me a coffee](https://coff.ee/fantasy_c)** - Supports continued development
+
+## 📄 License & Legal
+
+- **License:** MIT - Free for personal and commercial use
+- **Privacy:** [Privacy Policy](PRIVACY.md) - No data selling, minimal collection
+- **Terms:** [Terms of Use](TERMS.md) - Standard usage guidelines
+- **Code of Conduct:** [Community Standards](CODE_OF_CONDUCT.md)
+
+---
+
+**Built by [@fantasy_c](https://github.com/fantasy-cc)** • **[Live App](https://www.coupon-cycle.site/)** • **[Issues](https://github.com/fantasy-cc/credit-card-tracker/issues)** • **[Discussions](https://github.com/fantasy-cc/credit-card-tracker/discussions)**
