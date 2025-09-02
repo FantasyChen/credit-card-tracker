@@ -114,7 +114,7 @@ describe('calculateBenefitCycle', () => {
       expect(cycleEndDate).toEqual(expectedEndDate);
     });
 
-    it('should use next year if referenceDate is after the current fixed cycle', () => {
+    it('should handle semi-annual cycles correctly (multiple cycles per year)', () => {
       const refDate = utcDate(2023, 11, 1); // Nov 1, 2023
       const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
         BenefitFrequency.MONTHLY, // Frequency is less relevant here
@@ -122,13 +122,66 @@ describe('calculateBenefitCycle', () => {
         null,
         BenefitCycleAlignment.CALENDAR_FIXED,
         1, // January
-        6  // 6 months duration (Jan-June)
+        6  // 6 months duration (creates two cycles: Jan-June and July-Dec)
       );
-      // Current year fixed cycle (Jan-June 2023) has passed.
-      // So, it should calculate for Jan-June 2024.
-      expect(cycleStartDate).toEqual(utcDate(2024, 1, 1)); // Jan 1, 2024
-      const expectedEndDate = utcDate(2024, 7, 1); // July 1, 2024
-      expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // June 30, 2024 end
+      // With 6-month cycles starting in January, there are 2 cycles per year:
+      // Cycle 1: Jan-June, Cycle 2: July-Dec
+      // Nov 1, 2023 falls in the July-Dec cycle
+      expect(cycleStartDate).toEqual(utcDate(2023, 7, 1)); // July 1, 2023
+      const expectedEndDate = utcDate(2024, 1, 1); // Jan 1, 2024
+      expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // Dec 31, 2023 end
+      expect(cycleEndDate).toEqual(expectedEndDate);
+    });
+
+    it('should return current year for annual cycles when reference date is within the cycle', () => {
+      const refDate = utcDate(2023, 11, 1); // Nov 1, 2023
+      const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
+        BenefitFrequency.YEARLY,
+        refDate,
+        null,
+        BenefitCycleAlignment.CALENDAR_FIXED,
+        1, // January
+        12 // 12 months duration (annual cycle)
+      );
+      // Nov 1, 2023 falls within the Jan 1 - Dec 31, 2023 cycle
+      expect(cycleStartDate).toEqual(utcDate(2023, 1, 1)); // Jan 1, 2023
+      const expectedEndDate = new Date(Date.UTC(2024, 0, 1)); // Jan 1, 2024 
+      expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // Dec 31, 2023 end-of-day
+      expect(cycleEndDate).toEqual(expectedEndDate);
+    });
+
+    it('should jump to next year for annual cycles when reference date is past the cycle', () => {
+      const refDate = utcDate(2024, 2, 1); // Feb 1, 2024
+      const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
+        BenefitFrequency.YEARLY,
+        refDate,
+        null,
+        BenefitCycleAlignment.CALENDAR_FIXED,
+        3, // March start
+        12 // 12 months duration (March-February annual cycle)
+      );
+      // Feb 1, 2024 is before the March 2024 cycle starts, so should get March 2024 cycle
+      expect(cycleStartDate).toEqual(utcDate(2024, 3, 1)); // March 1, 2024
+      const expectedEndDate = utcDate(2025, 3, 1); // March 1, 2025
+      expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // Feb 28/29, 2025 end
+      expect(cycleEndDate).toEqual(expectedEndDate);
+    });
+
+    it('should handle quarterly calendar fixed cycles (Aspire card scenario)', () => {
+      // Test the specific Aspire quarterly flight credit configuration
+      const septemberDate = utcDate(2025, 9, 2); // September 2, 2025
+      const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
+        BenefitFrequency.QUARTERLY,
+        septemberDate,
+        null,
+        BenefitCycleAlignment.CALENDAR_FIXED,
+        1, // January
+        3  // 3 months duration (creates Q1, Q2, Q3, Q4)
+      );
+      // September should fall in Q3 (July-September)
+      expect(cycleStartDate).toEqual(utcDate(2025, 7, 1)); // July 1, 2025
+      const expectedEndDate = utcDate(2025, 10, 1); // Oct 1, 2025
+      expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // Sep 30, 2025 end
       expect(cycleEndDate).toEqual(expectedEndDate);
     });
 

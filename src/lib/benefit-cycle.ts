@@ -23,8 +23,9 @@ export function calculateBenefitCycle(
   const refYear = referenceDate.getUTCFullYear();
   const refMonth = referenceDate.getUTCMonth(); // 0-indexed
 
-  let cycleStartDate: Date;
-  let cycleEndDate: Date;
+  // Initialize variables to satisfy TypeScript flow analysis
+  let cycleStartDate: Date = new Date();
+  let cycleEndDate: Date = new Date();
 
   if (
     cycleAlignment === BenefitCycleAlignment.CALENDAR_FIXED &&
@@ -34,25 +35,85 @@ export function calculateBenefitCycle(
     fixedCycleDurationMonths > 0
   ) {
     // --- CALENDAR_FIXED Logic --- 
+    // Enhanced to handle recurring cycles (monthly, quarterly, etc.) within a year
     // All calculations in UTC
-    const currentYearCycleStartDate = new Date(Date.UTC(refYear, fixedCycleStartMonth - 1, 1, 0, 0, 0, 0));
-    const currentYearCycleEndDate = new Date(currentYearCycleStartDate.getTime());
-    currentYearCycleEndDate.setUTCMonth(currentYearCycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
-    currentYearCycleEndDate.setUTCMilliseconds(currentYearCycleEndDate.getUTCMilliseconds() - 1);
+    
+    // Calculate how many cycles occur per year
+    const cyclesPerYear = Math.floor(12 / fixedCycleDurationMonths);
+    
+    if (cyclesPerYear === 1) {
+      // Annual cycle - use original logic
+      const currentYearCycleStartDate = new Date(Date.UTC(refYear, fixedCycleStartMonth - 1, 1, 0, 0, 0, 0));
+      const currentYearCycleEndDate = new Date(currentYearCycleStartDate.getTime());
+      currentYearCycleEndDate.setUTCMonth(currentYearCycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
+      currentYearCycleEndDate.setUTCMilliseconds(currentYearCycleEndDate.getUTCMilliseconds() - 1);
 
-    if (referenceDate <= currentYearCycleEndDate) {
-      // The current year's cycle is either ongoing or still upcoming in the current year.
-      // Or, the reference date is within the current year's cycle.
-      cycleStartDate = currentYearCycleStartDate;
-      cycleEndDate = currentYearCycleEndDate;
+      if (referenceDate <= currentYearCycleEndDate) {
+        cycleStartDate = currentYearCycleStartDate;
+        cycleEndDate = currentYearCycleEndDate;
+      } else {
+        // Jump to next year for annual cycles
+        const nextYear = refYear + 1;
+        cycleStartDate = new Date(Date.UTC(nextYear, fixedCycleStartMonth - 1, 1, 0, 0, 0, 0));
+        cycleEndDate = new Date(cycleStartDate.getTime());
+        cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
+        cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
+      }
     } else {
-      // The current year's fixed cycle has entirely passed for the referenceDate.
-      // So, the next relevant cycle will be in the next year.
-      const nextYear = refYear + 1;
-      cycleStartDate = new Date(Date.UTC(nextYear, fixedCycleStartMonth - 1, 1, 0, 0, 0, 0));
-      cycleEndDate = new Date(cycleStartDate.getTime());
-      cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
-      cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
+      // Multiple cycles per year (monthly, quarterly, etc.)
+      // Find which cycle the reference date falls into
+      let foundCurrentCycle = false;
+      
+      for (let cycleIndex = 0; cycleIndex < cyclesPerYear; cycleIndex++) {
+        const cycleStartMonth = (fixedCycleStartMonth - 1 + (cycleIndex * fixedCycleDurationMonths)) % 12;
+        const cycleStartYear = refYear + Math.floor((fixedCycleStartMonth - 1 + (cycleIndex * fixedCycleDurationMonths)) / 12);
+        
+        const thisCycleStartDate = new Date(Date.UTC(cycleStartYear, cycleStartMonth, 1, 0, 0, 0, 0));
+        const thisCycleEndDate = new Date(thisCycleStartDate.getTime());
+        thisCycleEndDate.setUTCMonth(thisCycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
+        thisCycleEndDate.setUTCMilliseconds(thisCycleEndDate.getUTCMilliseconds() - 1);
+        
+        // Check if reference date falls within this cycle
+        if (referenceDate >= thisCycleStartDate && referenceDate <= thisCycleEndDate) {
+          cycleStartDate = thisCycleStartDate;
+          cycleEndDate = thisCycleEndDate;
+          foundCurrentCycle = true;
+          break;
+        }
+      }
+      
+      if (!foundCurrentCycle) {
+        // Reference date doesn't fall within any current year cycles
+        // Find the next upcoming cycle (could be in current year or next year)
+        let foundNextCycle = false;
+        
+        // Check remaining cycles in current year
+        for (let cycleIndex = 0; cycleIndex < cyclesPerYear; cycleIndex++) {
+          const cycleStartMonth = (fixedCycleStartMonth - 1 + (cycleIndex * fixedCycleDurationMonths)) % 12;
+          const cycleStartYear = refYear + Math.floor((fixedCycleStartMonth - 1 + (cycleIndex * fixedCycleDurationMonths)) / 12);
+          
+          const thisCycleStartDate = new Date(Date.UTC(cycleStartYear, cycleStartMonth, 1, 0, 0, 0, 0));
+          
+          if (thisCycleStartDate > referenceDate) {
+            const thisCycleEndDate = new Date(thisCycleStartDate.getTime());
+            thisCycleEndDate.setUTCMonth(thisCycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
+            thisCycleEndDate.setUTCMilliseconds(thisCycleEndDate.getUTCMilliseconds() - 1);
+            
+            cycleStartDate = thisCycleStartDate;
+            cycleEndDate = thisCycleEndDate;
+            foundNextCycle = true;
+            break;
+          }
+        }
+        
+        // If no upcoming cycle in current year, use first cycle of next year
+        if (!foundNextCycle) {
+          cycleStartDate = new Date(Date.UTC(refYear + 1, fixedCycleStartMonth - 1, 1, 0, 0, 0, 0));
+          cycleEndDate = new Date(cycleStartDate.getTime());
+          cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
+          cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
+        }
+      }
     }
   } else {
     // --- CARD_ANNIVERSARY or Default Logic (existing logic) ---
@@ -102,6 +163,7 @@ export function calculateBenefitCycle(
         throw new Error(`Unsupported frequency for recurring benefit cycle calculation: ${frequency}`);
     }
 
+    // Assign the calculated cycle dates
     if (frequency === BenefitFrequency.YEARLY && cardOpenedDate) {
         cycleStartDate = new Date(Date.UTC(cycleStartYear, cycleStartMonth, 1, 0, 0, 0, 0));
         cycleEndDate = new Date(Date.UTC(cycleEndYear, cycleEndMonth, 1, 0, 0, 0, 0));
@@ -160,4 +222,4 @@ export function calculateOneTimeBenefitLifetime(
     }
 
     return { cycleStartDate, cycleEndDate };
-} 
+}
