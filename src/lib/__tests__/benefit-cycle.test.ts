@@ -114,7 +114,7 @@ describe('calculateBenefitCycle', () => {
       expect(cycleEndDate).toEqual(expectedEndDate);
     });
 
-    it('should handle semi-annual cycles correctly (multiple cycles per year)', () => {
+    it('should handle semi-annual cycles correctly (single benefit pattern)', () => {
       const refDate = utcDate(2023, 11, 1); // Nov 1, 2023
       const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
         BenefitFrequency.MONTHLY, // Frequency is less relevant here
@@ -122,14 +122,14 @@ describe('calculateBenefitCycle', () => {
         null,
         BenefitCycleAlignment.CALENDAR_FIXED,
         1, // January
-        6  // 6 months duration (creates two cycles: Jan-June and July-Dec)
+        6  // 6 months duration (Jan-June benefit)
       );
-      // With 6-month cycles starting in January, there are 2 cycles per year:
-      // Cycle 1: Jan-June, Cycle 2: July-Dec
-      // Nov 1, 2023 falls in the July-Dec cycle
-      expect(cycleStartDate).toEqual(utcDate(2023, 7, 1)); // July 1, 2023
-      const expectedEndDate = utcDate(2024, 1, 1); // Jan 1, 2024
-      expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // Dec 31, 2023 end
+      // Each benefit represents only its own cycle pattern
+      // For a Jan-June benefit, Nov 1, 2023 is past the Jan-June 2023 cycle,
+      // so it should return the next Jan-June cycle (2024)
+      expect(cycleStartDate).toEqual(utcDate(2024, 1, 1)); // Jan 1, 2024
+      const expectedEndDate = utcDate(2024, 7, 1); // July 1, 2024
+      expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // June 30, 2024 end
       expect(cycleEndDate).toEqual(expectedEndDate);
     });
 
@@ -175,13 +175,14 @@ describe('calculateBenefitCycle', () => {
         septemberDate,
         null,
         BenefitCycleAlignment.CALENDAR_FIXED,
-        1, // January
-        3  // 3 months duration (creates Q1, Q2, Q3, Q4)
+        1, // January (Q1 benefit)
+        3  // 3 months duration (Jan-Mar for Q1 benefit)
       );
-      // September should fall in Q3 (July-September)
-      expect(cycleStartDate).toEqual(utcDate(2025, 7, 1)); // July 1, 2025
-      const expectedEndDate = utcDate(2025, 10, 1); // Oct 1, 2025
-      expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // Sep 30, 2025 end
+      // For a Q1 benefit (Jan-Mar), September 2025 is past the 2025 Q1 cycle,
+      // so it should return the next Q1 cycle (2026)
+      expect(cycleStartDate).toEqual(utcDate(2026, 1, 1)); // Jan 1, 2026
+      const expectedEndDate = utcDate(2026, 4, 1); // Apr 1, 2026
+      expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // Mar 31, 2026 end
       expect(cycleEndDate).toEqual(expectedEndDate);
     });
 
