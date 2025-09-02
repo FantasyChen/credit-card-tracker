@@ -3,10 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
 import { calculateBenefitCycle } from '@/lib/benefit-cycle';
 
-// Shared core logic for the cron job
+// Improved core logic with card-level error isolation
 async function runCheckBenefitsLogic() {
   const now = new Date(); 
-  console.log(`Core check-benefits logic started at: ${now.toISOString()}`);
+  console.log(`🚀 Improved check-benefits logic started at: ${now.toISOString()}`);
+  
   try {
     const allUserCardsWithBenefits = await prisma.creditCard.findMany({
       include: {
@@ -26,132 +27,192 @@ async function runCheckBenefitsLogic() {
           }
         },
         user: {
-            select: {
-                id: true, 
-            }
+          select: {
+            id: true, 
+          }
         }
       },
     });
 
-    const upsertPromises: Promise<unknown>[] = [];
-    let benefitsProcessed = 0;
+    console.log(`📊 Total cards to process: ${allUserCardsWithBenefits.length}`);
 
-    for (const card of allUserCardsWithBenefits) {
-      if (!card.user?.id) { 
-        console.warn(`Card ${card.id} is missing user information. Skipping its benefits.`);
-        continue;
+    // IMPROVED: Process each card with isolation to prevent cascading failures
+    const cardProcessingResults = await Promise.allSettled(
+      allUserCardsWithBenefits.map(card => processCardSafely(card, now))
+    );
+
+    // Aggregate results from all cards
+    let totalBenefitsProcessed = 0;
+    let totalUpsertsAttempted = 0;
+    let totalUpsertsSuccessful = 0;
+    let totalUpsertsFailed = 0;
+    let cardsSuccessful = 0;
+    let cardsFailed = 0;
+
+    cardProcessingResults.forEach((result, index) => {
+      const card = allUserCardsWithBenefits[index];
+      
+      if (result.status === 'fulfilled') {
+        cardsSuccessful++;
+        const cardResult = result.value;
+        totalBenefitsProcessed += cardResult.benefitsProcessed;
+        totalUpsertsAttempted += cardResult.upsertsAttempted;
+        totalUpsertsSuccessful += cardResult.upsertsSuccessful;
+        totalUpsertsFailed += cardResult.upsertsFailed;
+        console.log(`✅ Card ${card.name}: ${cardResult.benefitsProcessed} benefits, ${cardResult.upsertsSuccessful}/${cardResult.upsertsAttempted} upserts successful`);
+      } else {
+        cardsFailed++;
+        const error = result.reason instanceof Error ? result.reason.message : String(result.reason);
+        console.error(`❌ Card ${card.name} (${card.id}) failed completely: ${error}`);
       }
-      const userId = card.user.id;
+    });
 
-      for (const benefit of card.benefits) {
-        benefitsProcessed++;
-        const cardOpenedDateForCalc: Date | null = card.openedDate;
-        
-        if (
-          benefit.cycleAlignment !== BenefitCycleAlignment.CALENDAR_FIXED &&
-          benefit.frequency === BenefitFrequency.YEARLY &&
-          !card.openedDate 
-        ) {
-          console.warn(`Skipping YEARLY (anniversary based) benefit cycle for benefit ${benefit.id} on card ${card.id} as card has no openedDate.`);
-          continue;
-        }
-
-        try {
-          const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
-            benefit.frequency,
-            now, 
-            cardOpenedDateForCalc,
-            benefit.cycleAlignment,
-            benefit.fixedCycleStartMonth,
-            benefit.fixedCycleDurationMonths
-          );
-
-          // Create multiple BenefitStatus records based on occurrencesInCycle
-          const occurrences = benefit.occurrencesInCycle || 1;
-          
-          for (let occurrenceIndex = 0; occurrenceIndex < occurrences; occurrenceIndex++) {
-            upsertPromises.push(
-              prisma.benefitStatus.upsert({
-                where: {
-                  benefitId_userId_cycleStartDate_occurrenceIndex: {
-                    benefitId: benefit.id,
-                    userId: userId,
-                    cycleStartDate: cycleStartDate,
-                    occurrenceIndex: occurrenceIndex,
-                  },
-                },
-                update: {
-                  cycleEndDate: cycleEndDate,
-                },
-                create: {
-                  benefitId: benefit.id,
-                  userId: userId,
-                  cycleStartDate: cycleStartDate,
-                  cycleEndDate: cycleEndDate,
-                  occurrenceIndex: occurrenceIndex,
-                  isCompleted: false, 
-                },
-              })
-            );
-          }
-        } catch (error) {
-          console.error(`Error calculating cycle for benefit ${benefit.id} (user: ${userId}, card: ${card.id}):`, error instanceof Error ? error.message : error);
-        }
-      }
+    // Enhanced logging for better observability
+    console.log(`\n📊 EXECUTION SUMMARY:`);
+    console.log(`   Cards: ${cardsSuccessful}/${allUserCardsWithBenefits.length} successful`);
+    console.log(`   Benefits: ${totalBenefitsProcessed} processed`);
+    console.log(`   Upserts: ${totalUpsertsSuccessful}/${totalUpsertsAttempted} successful`);
+    
+    if (cardsFailed > 0) {
+      console.warn(`⚠️ ${cardsFailed} cards failed but were isolated - other cards processed normally`);
     }
 
-    if (upsertPromises.length > 0) {
-      console.log(`Core logic: Attempting ${upsertPromises.length} benefit status upserts out of ${benefitsProcessed} benefits processed.`);
-      
-      // Use Promise.allSettled instead of Promise.all to handle partial failures
-      const results = await Promise.allSettled(upsertPromises);
-      
-      // Count successes and failures
-      const successful = results.filter(result => result.status === 'fulfilled').length;
-      const failed = results.filter(result => result.status === 'rejected').length;
-      
-      console.log(`Core logic: ${successful} benefit status upserts completed successfully.`);
-      
-      if (failed > 0) {
-        console.warn(`Core logic: ${failed} benefit status upserts failed:`);
-        results.forEach((result, index) => {
-          if (result.status === 'rejected') {
-            console.error(`  Upsert ${index + 1} failed:`, result.reason instanceof Error ? result.reason.message : result.reason);
-          }
-        });
-      }
-      
-      return NextResponse.json({ 
-        message: 'Cron job executed successfully.', 
-        upsertsAttempted: upsertPromises.length, 
-        upsertsSuccessful: successful,
-        upsertsFailed: failed,
-        benefitsProcessed 
-      }, { status: 200 });
-    } else if (benefitsProcessed > 0) {
-      console.log(`Core logic: ${benefitsProcessed} benefits processed, but no new benefit statuses needed upserting.`);
-      return NextResponse.json({ 
-        message: 'Cron job executed successfully.', 
-        upsertsAttempted: 0, 
-        upsertsSuccessful: 0,
-        upsertsFailed: 0,
-        benefitsProcessed 
-      }, { status: 200 });
-    } else {
-      console.log('Core logic: No recurring benefits found to process.');
-      return NextResponse.json({ 
-        message: 'Cron job executed successfully.', 
-        upsertsAttempted: 0, 
-        upsertsSuccessful: 0,
-        upsertsFailed: 0,
-        benefitsProcessed: 0 
-      }, { status: 200 });
-    }
+    // Return enhanced response (backward compatible)
+    return NextResponse.json({ 
+      message: 'Cron job executed successfully.', 
+      upsertsAttempted: totalUpsertsAttempted, 
+      upsertsSuccessful: totalUpsertsSuccessful,
+      upsertsFailed: totalUpsertsFailed,
+      benefitsProcessed: totalBenefitsProcessed,
+      // New metrics for improved observability
+      cardsProcessed: allUserCardsWithBenefits.length,
+      cardsSuccessful: cardsSuccessful,
+      cardsFailed: cardsFailed,
+      timestamp: now.toISOString()
+    }, { status: 200 });
 
   } catch (error) {
-    console.error('Core check-benefits logic failed:', error instanceof Error ? error.message : error, error instanceof Error ? error.stack : '');
-    return NextResponse.json({ message: 'Cron job failed.', error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    console.error('💥 GLOBAL FAILURE in improved check-benefits logic:', error instanceof Error ? error.message : error);
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+    return NextResponse.json({ 
+      message: 'Cron job failed globally.', 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: now.toISOString()
+    }, { status: 500 });
   }
+}
+
+/**
+ * Process a single card with complete error isolation
+ * This prevents one card's failure from affecting other cards
+ */
+async function processCardSafely(card: {
+  id: string;
+  name: string;
+  openedDate: Date | null;
+  user: { id: string } | null;
+  benefits: {
+    id: string;
+    frequency: BenefitFrequency;
+    cycleAlignment: BenefitCycleAlignment | null;
+    fixedCycleStartMonth: number | null;
+    fixedCycleDurationMonths: number | null;
+    occurrencesInCycle: number;
+  }[];
+}, now: Date) {
+  const result = {
+    cardId: card.id,
+    benefitsProcessed: 0,
+    upsertsAttempted: 0,
+    upsertsSuccessful: 0,
+    upsertsFailed: 0
+  };
+
+  // CARD-LEVEL VALIDATION
+  if (!card.user?.id) {
+    throw new Error('Card missing user information');
+  }
+
+  const userId = card.user.id;
+  const upsertPromises: Promise<unknown>[] = [];
+
+  // Process each benefit (same logic as original, but isolated per card)
+  for (const benefit of card.benefits) {
+    result.benefitsProcessed++;
+    const cardOpenedDateForCalc: Date | null = card.openedDate;
+    
+    // Skip yearly anniversary benefits without opening date
+    if (
+      benefit.cycleAlignment !== BenefitCycleAlignment.CALENDAR_FIXED &&
+      benefit.frequency === BenefitFrequency.YEARLY &&
+      !card.openedDate 
+    ) {
+      console.warn(`Skipping YEARLY (anniversary based) benefit cycle for benefit ${benefit.id} on card ${card.id} as card has no openedDate.`);
+      continue;
+    }
+
+    try {
+      const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
+        benefit.frequency,
+        now, 
+        cardOpenedDateForCalc,
+        benefit.cycleAlignment,
+        benefit.fixedCycleStartMonth,
+        benefit.fixedCycleDurationMonths
+      );
+
+      // Create multiple BenefitStatus records based on occurrencesInCycle
+      const occurrences = benefit.occurrencesInCycle || 1;
+      
+      for (let occurrenceIndex = 0; occurrenceIndex < occurrences; occurrenceIndex++) {
+        upsertPromises.push(
+          prisma.benefitStatus.upsert({
+            where: {
+              benefitId_userId_cycleStartDate_occurrenceIndex: {
+                benefitId: benefit.id,
+                userId: userId,
+                cycleStartDate: cycleStartDate,
+                occurrenceIndex: occurrenceIndex,
+              },
+            },
+            update: {
+              cycleEndDate: cycleEndDate,
+            },
+            create: {
+              benefitId: benefit.id,
+              userId: userId,
+              cycleStartDate: cycleStartDate,
+              cycleEndDate: cycleEndDate,
+              occurrenceIndex: occurrenceIndex,
+              isCompleted: false, 
+            },
+          })
+        );
+      }
+    } catch (error) {
+      console.error(`Error calculating cycle for benefit ${benefit.id} (user: ${userId}, card: ${card.id}):`, error instanceof Error ? error.message : error);
+      // Continue processing other benefits for this card
+    }
+  }
+
+  // Execute upserts for this card using Promise.allSettled for fault tolerance
+  if (upsertPromises.length > 0) {
+    result.upsertsAttempted = upsertPromises.length;
+    
+    const upsertResults = await Promise.allSettled(upsertPromises);
+    
+    // Count successes and failures
+    upsertResults.forEach((upsertResult) => {
+      if (upsertResult.status === 'fulfilled') {
+        result.upsertsSuccessful++;
+      } else {
+        result.upsertsFailed++;
+        console.error(`Upsert failed for card ${card.id}:`, upsertResult.reason instanceof Error ? upsertResult.reason.message : upsertResult.reason);
+      }
+    });
+  }
+
+  return result;
 }
 
 // GET handler for Vercel Cron (defaults to GET)
@@ -171,7 +232,7 @@ export async function GET(request: Request) {
     console.warn('Unauthorized GET cron job attempt for check-benefits.');
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
-  console.log("Authorized GET request for check-benefits. Running core logic...");
+  console.log("✅ Authorized GET request for improved check-benefits. Running core logic...");
   return await runCheckBenefitsLogic();
 }
 
@@ -192,6 +253,6 @@ export async function POST(request: Request) {
     console.warn('Unauthorized POST cron job attempt for check-benefits.');
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
-  console.log("Authorized POST request for check-benefits. Running core logic...");
+  console.log("✅ Authorized POST request for improved check-benefits. Running core logic...");
   return await runCheckBenefitsLogic();
-} 
+}
