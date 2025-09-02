@@ -10,7 +10,10 @@ const createJestConfig = nextJest({
 const config = {
   // Add more setup options before each test is run
   // setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  testEnvironment: 'node',
+  testEnvironment: 'jsdom',
+  testEnvironmentOptions: {
+    customExportConditions: [''],
+  },
   // preset: 'ts-jest', // Removed: next/jest handles transpilation
   moduleNameMapper: {
     // Handle module aliases (this will be automatically configured for you soon)
@@ -21,9 +24,9 @@ const config = {
     '^@/generated/prisma$': '<rootDir>/src/generated/prisma', 
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'], // if you have a setup file
-  // Adjusted transformIgnorePatterns
+  // Adjusted transformIgnorePatterns for ESM modules
   transformIgnorePatterns: [
-    '/node_modules/(?!(@auth/prisma-adapter|next-auth))/', // Transform these specific ESM packages
+    '/node_modules/(?!(@auth/prisma-adapter|next-auth|@prisma/client|@vercel/analytics))/', // Transform these specific ESM packages
     '^.+\\.module\\.(css|sass|scss)$'
   ],
 };

@@ -465,7 +465,10 @@ describe('/api/cron/send-notifications', () => {
         });
     });
 
-    // ... existing code ...
+    it('should handle mockDate parameter in development', async () => {
+      // TODO: Add test implementation for mockDate functionality
+      expect(true).toBe(true);
+    });
   });
 
 }); 

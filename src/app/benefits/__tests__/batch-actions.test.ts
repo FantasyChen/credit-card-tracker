@@ -1,19 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Session } from 'next-auth';
 
-// Mock the dependencies
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
-    benefitStatus: {
-      updateMany: jest.fn(),
-    },
-  },
-}));
-
-jest.mock('next-auth/next', () => ({
-  getServerSession: jest.fn(),
-}));
-
+// Mock the cache functions - Prisma is mocked globally in jest.setup.ts
 jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
 }));
@@ -28,8 +16,8 @@ import { getServerSession } from 'next-auth/next';
 import { revalidatePath } from 'next/cache';
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
-const mockGetServerSession = getServerSession as jest.MockedFunction<typeof getServerSession>;
-const mockRevalidatePath = revalidatePath as jest.MockedFunction<typeof revalidatePath>;
+const mockGetServerSession = jest.mocked(getServerSession);
+const mockRevalidatePath = jest.mocked(revalidatePath);
 
 describe('batchCompleteBenefitsByCategoryAction', () => {
   beforeEach(() => {

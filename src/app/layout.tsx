@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import { Analytics } from '@vercel/analytics/next';
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { ErrorBoundary } from "@/lib/monitoring/errorBoundary";
 // import { ThemeProviders } from "@/components/ThemeProviders"; // Removed
 // import { ensureCurrentBenefitStatuses } from "@/lib/actions/benefitActions"; // Keep import commented out or remove
 
@@ -73,18 +74,20 @@ export default async function RootLayout({
       </head>
       {/* <ThemeProviders> */}
       <Providers session={session}>{/* Use original Providers */}
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
-        >
-          <div className="flex min-h-full flex-col bg-gray-50 dark:bg-gray-950">
-            <Navbar />
-            <main className="container mx-auto flex-grow px-4 py-8">
-              {children}
-            </main>
-            <Footer />
-            <Analytics />
-          </div>
-        </body>
+        <ErrorBoundary>
+          <body
+            className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
+          >
+            <div className="flex min-h-full flex-col bg-gray-50 dark:bg-gray-950">
+              <Navbar />
+              <main className="container mx-auto flex-grow px-4 py-8">
+                {children}
+              </main>
+              <Footer />
+              <Analytics />
+            </div>
+          </body>
+        </ErrorBoundary>
       </Providers>
       {/* </ThemeProviders> */}
     </html>
