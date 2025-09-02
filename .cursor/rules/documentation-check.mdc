@@ -4,8 +4,8 @@ globs:
 alwaysApply: true
 ---
 # .cursor/rules/documentation-check.mdc
-# This rule reminds to update key documentation files in the docs/ folder.
+# This rule reminds to update key documentation files when making significant changes.
 
 when: before:commit
-description: "Reminder: Have you updated CURSOR.md or docs/DESIGN.md if your recent changes affect project overview, scope, design, setup, or the development plan?"
+description: "Reminder: Have you updated AGENT.md, README.md, docs/safe-migration-guide.md, or docs/BACKFILL_REQUEST.md if your recent changes affect project overview, scope, design, setup, or the development plan?"
 # This rule is a reminder and does not automatically run any commands or fail the commit.

@@ -17,10 +17,27 @@ description: "CRITICAL: Never run destructive database commands that could affec
 - Any command with `--force-reset` flag
 
 ## Safe Alternatives:
-- For local development: Check DATABASE_URL points to local/dev database first
+- For local development: Use `DATABASE_URL_DEV` environment variable to point to development database branch
 - For schema changes: Use `npx prisma migrate dev` (creates migration files)
 - For production: Use `npx prisma migrate deploy` (applies migrations safely)
-- For local reset: Verify you're in development environment first
+- For local reset: Switch to development branch first: `export DATABASE_URL=$DATABASE_URL_DEV`
+
+## Safe Development Workflow:
+1. Always use development database branch first
+2. Test schema changes on dev branch: `export DATABASE_URL=$DATABASE_URL_DEV`
+3. Use `npx prisma migrate dev` for schema changes
+4. Let Vercel handle production deployments automatically
+
+## Explicit User-Approved Production Changes:
+If and only if the human user explicitly requests it, these non-destructive operations are acceptable after verifying DATABASE_URL points to production:
+- **Allowed non-destructive ops:**
+  - Seeding/upserting predefined catalog data: `npx prisma db seed`
+  - Applying already-generated migrations: `npx prisma migrate deploy`
+- **Still forbidden on production:** Destructive resets (`migrate reset`, `db push --force-reset`), manual `DROP` statements, or anything that erases/modifies user data outside of intended migrations
+- **Always required:**
+  - Echo/print `DATABASE_URL` (mask credentials) and confirm the target
+  - Prefer read-only or upsert-style scripts for catalog updates
+  - Document the action in commit messages or ops notes
 
 ## Before ANY database operation:
 1. Check DATABASE_URL environment variable

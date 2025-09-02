@@ -19,9 +19,7 @@
     "lint": "next lint",
     "test": "jest",
     "postinstall": "prisma generate",
-    "migrate:dev": "node scripts/db-migration-safe.js",
-    "migrate:test": "node scripts/db-test-staging.js",
-    "migrate:prod": "node scripts/db-migration-prod.js",
+
     "migrate:status": "npx prisma migrate status",
     "migrate:diff": "npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma"
   },

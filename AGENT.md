@@ -427,7 +427,7 @@ npm run build
 
 ### Community Resources
 - **Live App**: [www.coupon-cycle.site](https://www.coupon-cycle.site/)
-- **Repository**: [GitHub](https://github.com/fantasy-cc/credit-card-tracker)
+- **Repository**: [GitHub](https://github.com/FantasyChen/credit-card-tracker)
 - **Documentation**: This file and `/docs` folder
 - **Support Creator**: [Buy me a coffee](https://coff.ee/fantasy_c)
 

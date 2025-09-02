@@ -38,26 +38,16 @@ Before you begin, ensure you have:
    cp .env.example .env
    ```
 
-   **Required Environment Variables:**
-   ```bash
-   # Database
-   DATABASE_URL="postgresql://..." # Production
-   DATABASE_URL_DEV="postgresql://..." # Development branch
-
-   # Authentication  
-   GOOGLE_CLIENT_ID="your-google-client-id"
-   GOOGLE_CLIENT_SECRET="your-google-client-secret"
-   NEXTAUTH_URL="http://localhost:3000"
-   NEXTAUTH_SECRET="your-nextauth-secret"
-
-   # Services
-   RESEND_API_KEY="your-resend-api-key"
-   CRON_SECRET="your-cron-secret"
-   SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
-   ```
+   > **📄 Complete Environment Setup:** See the detailed environment configuration section in [AGENT.md](AGENT.md#environment-setup) for all required and optional environment variables.
 
 3. **Database Setup**
+   > **⚠️ Database Safety:** Always use the development database branch for testing. See [docs/safe-migration-guide.md](docs/safe-migration-guide.md) for complete safety procedures.
+   
    ```bash
+   # Switch to development database branch first
+   export DATABASE_URL=$DATABASE_URL_DEV
+   
+   # Then run setup commands
    npx prisma generate
    npx prisma migrate dev
    npx prisma db seed
@@ -247,8 +237,6 @@ npm run build
 ### Running Tests
 ```bash
 npm test              # Run all tests
-npm run test:watch    # Watch mode
-npm run test:coverage # With coverage
 ```
 
 ### Test Structure
