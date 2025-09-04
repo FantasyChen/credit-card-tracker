@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { validateCardDigits } from '@/lib/cardDisplayUtils';
 
 // Define schema for input validation
 const updateCardSchema = z.object({
@@ -47,14 +48,14 @@ export async function updateCardAction(formData: FormData) {
       return { success: false, error: 'Card not found or you do not have permission to edit it.' };
     }
 
-    // Validate last 4 digits if provided
+    // Validate last digits if provided (dynamic for AMEX vs other cards)
     let processedLastFourDigits: string | null = null;
     if (lastFourDigits && lastFourDigits.trim()) {
-      const trimmed = lastFourDigits.trim();
-      if (trimmed.length !== 4 || !/^\d{4}$/.test(trimmed)) {
-        return { success: false, error: 'Last 4 digits must be exactly 4 numeric digits.' };
+      const validation = validateCardDigits(lastFourDigits, existingCard.issuer);
+      if (!validation.valid) {
+        return { success: false, error: validation.error || 'Invalid card digits.' };
       }
-      processedLastFourDigits = trimmed;
+      processedLastFourDigits = lastFourDigits.trim();
     }
 
     // Process opened date

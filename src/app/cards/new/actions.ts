@@ -8,6 +8,8 @@ import { revalidatePath } from 'next/cache';
 // import { calculateBenefitCycle, calculateOneTimeBenefitLifetime } from '@/lib/benefit-cycle'; // Removed unused imports
 // import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma'; // Also remove this as it's not used after refactor
 import { createCardForUser } from '@/lib/actions/cardUtils';
+import { validateCardDigits } from '@/lib/cardDisplayUtils';
+import { prisma } from '@/lib/prisma';
 
 export async function addCardAction(formData: FormData) {
   const session = await getServerSession(authOptions);
@@ -39,9 +41,22 @@ export async function addCardAction(formData: FormData) {
     throw new Error('Please provide both month and year or leave both blank.');
   }
 
-  // Validate last 4 digits if provided
-  if (lastFourDigits && (lastFourDigits.length !== 4 || !/^\d{4}$/.test(lastFourDigits))) {
-    throw new Error('Last 4 digits must be exactly 4 numeric digits.');
+  // Get predefined card issuer for validation
+  const predefinedCard = await prisma.predefinedCard.findUnique({
+    where: { id: predefinedCardId },
+    select: { issuer: true },
+  });
+
+  if (!predefinedCard) {
+    throw new Error('Card template not found.');
+  }
+
+  // Validate last digits if provided (dynamic for AMEX vs other cards)
+  if (lastFourDigits && lastFourDigits.trim()) {
+    const validation = validateCardDigits(lastFourDigits, predefinedCard.issuer);
+    if (!validation.valid) {
+      throw new Error(validation.error || 'Invalid card digits.');
+    }
   }
 
 

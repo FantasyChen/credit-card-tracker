@@ -4,6 +4,7 @@ import React, { useState, useEffect, useTransition } from 'react'; // Import use
 import Image from 'next/image';
 import { addCardAction } from './actions'; // Import the action from the new file
 import { searchCards, type CardWithBenefits } from '@/lib/cardSearchUtils';
+import { isAmexCard } from '@/lib/cardDisplayUtils';
 
 // Helper arrays
 const months = [
@@ -19,6 +20,16 @@ const years = Array.from({ length: 10 }, (_, i) => currentYear - i); // Last 10 
 // --- Sub-component for the card form with its own transition state ---
 function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; matchedFields?: string[] }) {
   const [isPending, startTransition] = useTransition();
+  
+  // Check if this is an AMEX card for dynamic form constraints
+  const isAmex = isAmexCard(card.issuer);
+  const maxLength = isAmex ? 5 : 4;
+  const pattern = isAmex ? "[0-9]{4,5}" : "[0-9]{4}";
+  const placeholder = isAmex ? "12345" : "1234";
+  const label = isAmex ? "Last 5 Digits (Optional)" : "Last 4 Digits (Optional)";
+  const helperText = isAmex 
+    ? "Enter the last 5 digits from your AMEX card (4 digits also accepted)"
+    : "Helps identify your specific card if you have multiple of the same type";
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -95,30 +106,31 @@ function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; m
             </a>
           </div>
 
-          {/* --- Add Last 4 Digits Field --- */}
+          {/* --- Add Last Digits Field (Dynamic for AMEX) --- */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-100">
-              Last 4 Digits (Optional)
+              {label}
             </label>
             <input
               type="text"
               id={`lastFourDigits-${card.id}`}
               name="lastFourDigits"
-              maxLength={4}
-              pattern="[0-9]{4}"
-              placeholder="1234"
+              maxLength={maxLength}
+              pattern={pattern}
+              placeholder={placeholder}
               className="mt-1 block w-full pl-3 pr-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 dark:placeholder-gray-400"
               onInput={(e) => {
-                // Only allow numbers
+                // Only allow numbers and enforce length limits
                 const target = e.target as HTMLInputElement;
-                target.value = target.value.replace(/[^0-9]/g, '');
+                const cleaned = target.value.replace(/[^0-9]/g, '');
+                target.value = cleaned.slice(0, maxLength);
               }}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Helps identify your specific card if you have multiple of the same type
+              {helperText}
             </p>
           </div>
-          {/* --- End Last 4 Digits Field --- */}
+          {/* --- End Last Digits Field --- */}
 
           {/* --- Add Opened Month and Year Select --- */}
           <div className="mb-4">

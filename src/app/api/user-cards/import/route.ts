@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 // Import the actual card creation logic
 import { createCardForUser } from '@/lib/actions/cardUtils';
+import { validateCardDigits } from '@/lib/cardDisplayUtils';
 import { revalidatePath } from 'next/cache';
 
 // Define the expected structure of the imported JSON
@@ -101,14 +102,14 @@ export async function POST(request: Request) {
           continue; // Skip if already exists
         }
 
-        // Validate last 4 digits if provided
+        // Validate last digits if provided (dynamic for AMEX vs other cards)
         let processedLastFourDigits: string | null = null;
         if (lastFourDigits && lastFourDigits.trim()) {
-          const trimmed = lastFourDigits.trim();
-          if (trimmed.length !== 4 || !/^\d{4}$/.test(trimmed)) {
-            throw new Error(`Invalid last 4 digits for card "${predefinedCardName}": must be exactly 4 numeric digits.`);
+          const validation = validateCardDigits(lastFourDigits, predefinedCard.issuer);
+          if (!validation.valid) {
+            throw new Error(`Invalid last digits for card "${predefinedCardName}": ${validation.error}`);
           }
-          processedLastFourDigits = trimmed;
+          processedLastFourDigits = lastFourDigits.trim();
         }
 
         // --- Use the actual Add Card Logic ---

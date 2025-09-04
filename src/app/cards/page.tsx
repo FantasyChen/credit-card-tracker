@@ -92,7 +92,7 @@ function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.D
             </p>
             {card.lastFourDigits && (
                <p className="text-gray-500 dark:text-gray-400 text-sm">
-                 <span className="font-medium">Last 4:</span> ••••{card.lastFourDigits}
+                 <span className="font-medium">Last {card.lastFourDigits.length}:</span> {'•'.repeat(card.lastFourDigits.length)}{card.lastFourDigits}
                </p>
             )}
             {card.openedDate && (
