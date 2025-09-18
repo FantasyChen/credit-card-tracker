@@ -127,11 +127,24 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$500 Annual Hotel Credit (The Edit by Chase Properties)',
+          description: '$250 Hotel Credit (The Edit by Chase Properties - Jan-Jun)',
           category: 'Travel',
-          maxAmount: 500,
-          frequency: BenefitFrequency.YEARLY,
+          maxAmount: 250,
+          frequency: BenefitFrequency.YEARLY, // This specific credit occurs once a year in this window
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          description: '$250 Hotel Credit (The Edit by Chase Properties - Jul-Dec)',
+          category: 'Travel',
+          maxAmount: 250,
+          frequency: BenefitFrequency.YEARLY, // This specific credit occurs once a year in this window
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7, // July
+          fixedCycleDurationMonths: 6,
         },
         {
           description: '$300 Annual StubHub Credit (Event Tickets)',

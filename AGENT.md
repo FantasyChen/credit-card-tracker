@@ -114,7 +114,7 @@ The heart of the application is the `calculateBenefitCycle()` function in `src/l
 **Examples:**
 - Monthly Uber credit: Resets 1st of each month
 - Quarterly travel credit: Resets every 3 months from card anniversary
-- Annual hotel credit: Resets yearly on card anniversary date
+- Semi-annual hotel credit: Resets every 6 months on calendar dates (Jan-Jun, Jul-Dec)
 
 ### Automated Benefit Status Management
 

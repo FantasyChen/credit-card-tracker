@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import dotenv from 'dotenv';
-import { PrismaClient, BenefitFrequency } from '../src/generated/prisma/index.js';
+import { PrismaClient, BenefitFrequency, BenefitCycleAlignment } from '../src/generated/prisma/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -45,11 +45,24 @@ const NEW_CSR_BENEFITS = [
     frequency: BenefitFrequency.YEARLY,
   },
   {
-    description: '$500 Annual Hotel Credit (The Edit by Chase Properties)',
+    description: '$250 Hotel Credit (The Edit by Chase Properties - Jan-Jun)',
     category: 'Travel',
-    maxAmount: 500,
+    maxAmount: 250,
     percentage: 0,
     frequency: BenefitFrequency.YEARLY,
+    cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+    fixedCycleStartMonth: 1,
+    fixedCycleDurationMonths: 6,
+  },
+  {
+    description: '$250 Hotel Credit (The Edit by Chase Properties - Jul-Dec)',
+    category: 'Travel',
+    maxAmount: 250,
+    percentage: 0,
+    frequency: BenefitFrequency.YEARLY,
+    cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+    fixedCycleStartMonth: 7,
+    fixedCycleDurationMonths: 6,
   },
   {
     description: '$300 Annual StubHub Credit (Event Tickets)',
@@ -232,6 +245,9 @@ async function performMigration(cards) {
               percentage: benefitData.percentage,
               maxAmount: benefitData.maxAmount,
               frequency: benefitData.frequency,
+              cycleAlignment: benefitData.cycleAlignment || null,
+              fixedCycleStartMonth: benefitData.fixedCycleStartMonth || null,
+              fixedCycleDurationMonths: benefitData.fixedCycleDurationMonths || null,
               startDate: new Date(), // Start from today
               endDate: null, // Ongoing benefits
             }
@@ -401,7 +417,8 @@ ${colors.bold}Examples:${colors.reset}
 
 ${colors.bold}New 2025 Benefits:${colors.reset}
   • $300 Annual Dining Credit (Select Restaurants)
-  • $500 Annual Hotel Credit (The Edit by Chase Properties)  
+  • $250 Hotel Credit (The Edit by Chase Properties - Jan-Jun)
+  • $250 Hotel Credit (The Edit by Chase Properties - Jul-Dec)
   • $300 Annual StubHub Credit (Event Tickets)
   • Apple TV+ and Apple Music Subscriptions ($250 Annual Value)
   • Points Boost: Up to 2¢ per point on select Chase Travel bookings
