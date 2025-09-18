@@ -219,12 +219,25 @@ SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
   - Prefer read-only or upsert-style scripts for catalog updates.
   - Document the action in commit messages or ops notes.
 
+**Database Environment Priority**: Shell variables override `.env` file. Use `unset DATABASE_URL` to clear overrides and use `.env` configuration. Always verify target with `node scripts/check-database-connection.js`.
+
 ### Adding New Credit Cards
 
 1. **Research Card**: Verify benefits at [US Credit Card Guide](https://www.uscreditcardguide.com/)
 2. **Download Image**: `node scripts/download-card-image.js --name "Card Name"`
 3. **Update Seed**: Add card and benefits to `prisma/seed.ts`
 4. **Re-seed**: `npx prisma db seed`
+
+### Updating Existing Card Benefits
+
+⚠️ **CRITICAL**: Updating existing card benefits requires a **two-step process**:
+
+1. **Update Templates** (affects new users): Edit `prisma/seed.ts` → `npx prisma db seed`
+2. **Migrate Existing Users**: Run appropriate migration script with `--force`
+
+**See `docs/predefined-card-update-guide.md` for complete workflow.**
+
+**Common Issue**: If you only update templates, existing users will still see old benefits until migrated.
 
 **Benefit Inclusion Criteria:**
 - Must have cyclical value (credits, points, free nights)

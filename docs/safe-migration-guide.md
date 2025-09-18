@@ -45,6 +45,20 @@ If no export is available, you'll need to manually re-add your credit cards:
 
 ## For Developers: Safe Migration Practices
 
+### 📚 Key Documentation
+
+- **`docs/predefined-card-update-guide.md`** - Complete workflow for updating card benefits
+- **Database Environment Management** - Use `node scripts/check-database-connection.js` to verify target
+- **Two-Step Process** - Always update both predefined templates AND migrate existing users
+
+### 🔄 Predefined Card Updates vs User Migrations
+
+**Issue**: Updated seed file but users still see old benefits
+**Cause**: Only updated predefined card templates, existing user cards not migrated
+**Solution**: Complete both steps:
+1. Update templates: `npx prisma db seed`
+2. Migrate existing users: Run migration script with `--force`
+
 ### 🌟 Recommended: Use Development Branch First
 
 **We now use Neon database branches for safe development.** Always test schema changes on your development branch before touching production.
