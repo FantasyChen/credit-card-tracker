@@ -179,9 +179,10 @@ async function main() {
     {
       name: 'American Express Platinum Card',
       issuer: 'American Express',
-      annualFee: 695,
+      annualFee: 895,
       imageUrl: '/images/cards/american-express-platinum-card.png',
       benefits: [
+        // Existing benefits that remain unchanged
         {
           description: '$200 Airline Fee Credit (Incidental Fees, select one airline)',
           category: 'Travel',
@@ -229,34 +230,118 @@ async function main() {
           fixedCycleStartMonth: 7,
           fixedCycleDurationMonths: 6,
         },
+        // NEW 2025 BENEFITS - Quarterly benefits split by quarter
         {
-          description: '$20 Monthly Digital Entertainment Credit',
+          description: '$100 Quarterly Resy Dining Credit (Q1: Jan-Mar)',
+          category: 'Dining',
+          maxAmount: 100,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 3, // Q1: Jan-Mar
+        },
+        {
+          description: '$100 Quarterly Resy Dining Credit (Q2: Apr-Jun)',
+          category: 'Dining',
+          maxAmount: 100,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 4, // April
+          fixedCycleDurationMonths: 3, // Q2: Apr-Jun
+        },
+        {
+          description: '$100 Quarterly Resy Dining Credit (Q3: Jul-Sep)',
+          category: 'Dining',
+          maxAmount: 100,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7, // July
+          fixedCycleDurationMonths: 3, // Q3: Jul-Sep
+        },
+        {
+          description: '$100 Quarterly Resy Dining Credit (Q4: Oct-Dec)',
+          category: 'Dining',
+          maxAmount: 100,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 10, // October
+          fixedCycleDurationMonths: 3, // Q4: Oct-Dec
+        },
+        {
+          description: '$75 Quarterly Lululemon Credit (Q1: Jan-Mar)',
+          category: 'Shopping',
+          maxAmount: 75,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 3, // Q1: Jan-Mar
+        },
+        {
+          description: '$75 Quarterly Lululemon Credit (Q2: Apr-Jun)',
+          category: 'Shopping',
+          maxAmount: 75,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 4, // April
+          fixedCycleDurationMonths: 3, // Q2: Apr-Jun
+        },
+        {
+          description: '$75 Quarterly Lululemon Credit (Q3: Jul-Sep)',
+          category: 'Shopping',
+          maxAmount: 75,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7, // July
+          fixedCycleDurationMonths: 3, // Q3: Jul-Sep
+        },
+        {
+          description: '$75 Quarterly Lululemon Credit (Q4: Oct-Dec)',
+          category: 'Shopping',
+          maxAmount: 75,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 10, // October
+          fixedCycleDurationMonths: 3, // Q4: Oct-Dec
+        },
+        {
+          description: '$300 Semi-Annual Hotel Credit (FHR/THC prepaid bookings - Jan-Jun)',
+          category: 'Travel',
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          description: '$300 Semi-Annual Hotel Credit (FHR/THC prepaid bookings - Jul-Dec)',
+          category: 'Travel',
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7, // July
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          description: '$25 Monthly Digital Entertainment Credit',
           category: 'Entertainment',
-          maxAmount: 20,
+          maxAmount: 25,
           frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
         {
-          description: '$300 Equinox Credit (Annual or $25/month option)',
-          category: 'Wellness',
-          maxAmount: 300, 
-          frequency: BenefitFrequency.YEARLY,
-          percentage: 0,
-          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
-          fixedCycleStartMonth: 1, // January
-          fixedCycleDurationMonths: 12, // Calendar year
-        },
-        {
-          description: '$13 Monthly Walmart+ Credit (Covers monthly membership cost)',
+          description: '$120 Annual Uber One Membership Credit',
           category: 'Membership',
-          maxAmount: 13, 
-          frequency: BenefitFrequency.MONTHLY,
-          percentage: 0,
-        },
-        {
-          description: '$200 Annual Hotel Credit (FHR/THC prepaid bookings)',
-          category: 'Travel',
-          maxAmount: 200,
+          maxAmount: 120,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
@@ -264,9 +349,9 @@ async function main() {
           fixedCycleDurationMonths: 12, // Calendar year
         },
         {
-          description: '$189 CLEAR Plus Credit (Annual Statement Credit)',
-          category: 'Travel',
-          maxAmount: 189,
+          description: '$200 Annual Oura Ring Credit',
+          category: 'Wellness',
+          maxAmount: 200,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
@@ -278,9 +363,10 @@ async function main() {
     {
       name: 'American Express Business Platinum Card',
       issuer: 'American Express',
-      annualFee: 695,
+      annualFee: 895,
       imageUrl: '/images/cards/american-express-business-platinum-card.png',
       benefits: [
+        // Existing benefits that remain unchanged
         {
           description: '$200 Airline Fee Credit',
           category: 'Travel',
@@ -291,57 +377,31 @@ async function main() {
           fixedCycleStartMonth: 1, // January
           fixedCycleDurationMonths: 12, // Calendar year
         },
+        // NEW 2025 BENEFITS
         {
-          description: '$200 Dell Credit (Jan-Jun)',
-          category: 'Electronics',
-          maxAmount: 200,
-          frequency: BenefitFrequency.YEARLY,
-          percentage: 0,
-          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
-          fixedCycleStartMonth: 1,
-          fixedCycleDurationMonths: 6,
-        },
-        {
-          description: '$200 Dell Credit (Jul-Dec)',
-          category: 'Electronics',
-          maxAmount: 200,
-          frequency: BenefitFrequency.YEARLY,
-          percentage: 0,
-          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
-          fixedCycleStartMonth: 7,
-          fixedCycleDurationMonths: 6,
-        },
-        {
-          description: '$50 Quarterly Hilton Credit',
+          description: '$300 Semi-Annual Hotel Credit (FHR/THC prepaid bookings - Jan-Jun)',
           category: 'Travel',
-          maxAmount: 50,
-          frequency: BenefitFrequency.QUARTERLY,
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
           fixedCycleStartMonth: 1, // January
-          fixedCycleDurationMonths: 3, // Calendar quarters
+          fixedCycleDurationMonths: 6,
         },
         {
-          description: '$10 Monthly Wireless Credit',
-          category: 'Utilities',
-          maxAmount: 10,
-          frequency: BenefitFrequency.MONTHLY,
-          percentage: 0,
-        },
-        {
-          description: '$90 Quarterly Indeed Credit',
-          category: 'Business Services',
-          maxAmount: 90,
-          frequency: BenefitFrequency.QUARTERLY,
+          description: '$300 Semi-Annual Hotel Credit (FHR/THC prepaid bookings - Jul-Dec)',
+          category: 'Travel',
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
-          fixedCycleStartMonth: 1, // January
-          fixedCycleDurationMonths: 3, // Calendar quarters
+          fixedCycleStartMonth: 7, // July
+          fixedCycleDurationMonths: 6,
         },
         {
-          description: '$150 Annual Adobe Credit (select products)',
-          category: 'Software',
-          maxAmount: 150,
+          description: '$1,150 Annual Dell Technologies Credit',
+          category: 'Electronics',
+          maxAmount: 1150,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
@@ -349,11 +409,35 @@ async function main() {
           fixedCycleDurationMonths: 12, // Calendar year
         },
         {
-          description: '$189 CLEAR Plus Credit',
-          category: 'Travel',
-          maxAmount: 189,
+          description: '$250 Annual Adobe Credit (after $600 spend)',
+          category: 'Software',
+          maxAmount: 250,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
+        },
+        // High-spending benefits for $250K+ annual spenders
+        {
+          description: '$1,200 Annual Amex Travel Flight Credit (High Spender Benefit)',
+          category: 'Travel',
+          maxAmount: 1200,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
+        },
+        {
+          description: '$2,400 Annual One AP Statement Credit (High Spender Benefit)',
+          category: 'Business Services',
+          maxAmount: 2400,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 12, // Calendar year
         },
       ],
     },

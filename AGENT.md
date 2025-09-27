@@ -455,8 +455,38 @@ npm run build
 
 ---
 
-*Last Updated: July 2025*
-*Version: 0.1.0*
+## 📝 Recent Updates
+
+### September 2025: AMEX Platinum 2025 Benefits Update
+**Date**: September 18, 2025  
+**Implementation Status**: ✅ Complete
+
+**Changes Implemented**:
+- **Annual Fee Update**: Both cards increased from $695 → $895
+- **American Express Platinum Card**: Updated with 12 new benefits including quarterly Resy dining credit ($100), quarterly Lululemon credit ($75), enhanced hotel credits ($600 total), and more
+- **American Express Business Platinum Card**: Updated with 7 new benefits including enhanced hotel credits ($600), Dell Technologies credit ($1,150), Adobe credit ($250), and high-spender benefits
+
+**Technical Implementation**:
+1. ✅ **Seed Data Updated**: Modified `prisma/seed.ts` with new benefit structures and annual fees
+2. ✅ **Production Templates Updated**: Non-destructive seed operation applied to production database  
+3. ✅ **Migration Script Created**: `scripts/migrate-amex-2025-benefits.js` for existing user cards (280+ cards found)
+4. ✅ **Testing Completed**: Dry-run testing successful on all user cards
+
+**Migration Instructions**:
+```bash
+# Dry run to see what would change
+node scripts/migrate-amex-2025-benefits.js --dry-run
+
+# Apply changes to existing user cards
+node scripts/migrate-amex-2025-benefits.js --force
+```
+
+**User Impact**: Existing AMEX Platinum cardholders will receive updated benefits in their next benefit cycle after running the migration script.
+
+---
+
+*Last Updated: September 2025*
+*Version: 0.1.1*
 *Created by: fantasy_c*
 
 ---

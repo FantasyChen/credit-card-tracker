@@ -161,6 +161,23 @@ async function processCardSafely(card: {
         benefit.fixedCycleDurationMonths
       );
 
+      // VALIDATION: Prevent quarterly benefit mismatches like the Sep 2025 incident
+      const { validateBenefitCycle } = await import('@/lib/benefit-validation');
+      const validation = validateBenefitCycle(
+        {
+          description: `Benefit ID ${benefit.id}`, // We don't have description here, but use ID for now
+          fixedCycleStartMonth: benefit.fixedCycleStartMonth,
+          fixedCycleDurationMonths: benefit.fixedCycleDurationMonths
+        },
+        { cycleStartDate, cycleEndDate }
+      );
+      
+      if (!validation.isValid) {
+        console.error(`❌ BENEFIT VALIDATION FAILED for benefit ${benefit.id}:`, validation.error);
+        // For now, log the error but continue - we can make this stricter later
+        // throw new Error(`Benefit validation failed: ${validation.error}`);
+      }
+
       // Create multiple BenefitStatus records based on occurrencesInCycle
       const occurrences = benefit.occurrencesInCycle || 1;
       

@@ -103,6 +103,22 @@ export async function createCardForUser(
           newBenefit.fixedCycleStartMonth,
           newBenefit.fixedCycleDurationMonths
         );
+
+        // SOURCE-LEVEL PROTECTION: Validate benefit cycles during card creation
+        const { validateBenefitCycle } = await import('@/lib/benefit-validation');
+        const validation = validateBenefitCycle(
+          {
+            description: newBenefit.description,
+            fixedCycleStartMonth: newBenefit.fixedCycleStartMonth,
+            fixedCycleDurationMonths: newBenefit.fixedCycleDurationMonths
+          },
+          cycleInfo
+        );
+        
+        if (!validation.isValid) {
+          console.error(`❌ CARD CREATION VALIDATION FAILED for benefit "${newBenefit.description}":`, validation.error);
+          throw new Error(`Card creation failed: ${validation.error}`);
+        }
       }
 
       // Create multiple BenefitStatus records based on occurrencesInCycle
