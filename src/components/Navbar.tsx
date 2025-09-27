@@ -22,6 +22,7 @@ const Navbar = () => {
     { name: 'Dashboard', href: '/' },
     { name: 'Cards', href: '/cards' },
     { name: 'Benefits', href: '/benefits' },
+    { name: 'Guide', href: '/guide' },
     { name: 'Notifications', href: '/settings/notifications', authRequired: true },
     { name: 'Contact', href: '/contact' },
     { name: 'Suggest', href: '/settings/suggest' },

@@ -348,7 +348,8 @@ curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-noti
 ## 🔮 Future Roadmap
 
 ### Short Term (Next 3 months)
-- [ ] Custom card/benefit creation for non-predefined cards
+- [x] **COMPLETED**: Automated benefit migration framework (Sep 2025)
+- [ ] Custom card/benefit creation for non-predefined cards  
 - [ ] Enhanced mobile app experience
 - [ ] Better data visualization and reporting
 - [ ] User feedback and rating system
@@ -385,6 +386,18 @@ export DATABASE_URL=$DATABASE_URL_DEV
 npx prisma migrate dev --name fix_drift
 ```
 
+**Credit Card Benefit Updates (NEW Framework):**
+```bash
+# Validate migration plan
+node scripts/validate-migration.js --migration-id=card-update-2025
+
+# Preview changes (dry run)
+node scripts/migrate-benefits.js --migration-id=card-update-2025 --dry-run
+
+# Execute migration safely
+node scripts/migrate-benefits.js --migration-id=card-update-2025 --force
+```
+
 **Build Failures:**
 ```bash
 # Regenerate Prisma client
@@ -398,6 +411,12 @@ npm run build
 - Regular export reminders to users
 - Automated backup system considerations
 - Point-in-time recovery via Neon CLI
+- Automated migration framework preserves completed benefits by default
+
+**Deprecated Migration Approach:**
+- Old manual scripts moved to `scripts/deprecated/`
+- Use new automated framework in `scripts/migrate-benefits.js`
+- See `docs/benefit-migration-framework.md` for complete guide
 
 **Performance Optimization:**
 - Database query optimization

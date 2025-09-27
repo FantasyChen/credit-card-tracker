@@ -16,12 +16,75 @@ const geistSans = GeistSans;
 const geistMono = GeistMono;
 
 export const metadata: Metadata = {
-  title: "CouponCycle - Maximize Your Card Benefits",
-  description: "Never miss a credit card benefit again. CouponCycle helps you track every perk and maximize your annual fees.",
+  title: {
+    default: "CouponCycle - Credit Card Benefits Tracker | Never Miss Rewards Again",
+    template: "%s | CouponCycle"
+  },
+  description: "Track credit card benefits, maximize rewards, and never miss expiring perks again. Free tool for Chase, Amex, Capital One, and 50+ premium cards. Get ROI insights and smart notifications.",
+  keywords: [
+    "credit card benefits tracker",
+    "credit card rewards tracker", 
+    "credit card perks manager",
+    "Chase Sapphire benefits",
+    "American Express benefits",
+    "Capital One benefits",
+    "credit card annual fee ROI",
+    "travel credit tracker",
+    "dining credit tracker",
+    "Uber credit tracker",
+    "free credit card tool",
+    "maximize credit card rewards",
+    "credit card benefit calendar",
+    "premium credit card tracker"
+  ],
+  authors: [{ name: "CouponCycle Team" }],
+  creator: "CouponCycle",
+  publisher: "CouponCycle",
+  formatDetection: {
+    telephone: false,
+  },
+  metadataBase: new URL('https://www.coupon-cycle.site'),
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: "CouponCycle - Credit Card Benefits Tracker",
+    description: "Never miss a credit card benefit again. Track every perk and maximize your annual fees.",
+    url: 'https://www.coupon-cycle.site',
+    siteName: 'CouponCycle',
+    images: [
+      {
+        url: '/hero-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'CouponCycle - Credit Card Benefits Tracker',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "CouponCycle - Credit Card Benefits Tracker",
+    description: "Never miss a credit card benefit again. Track every perk and maximize your annual fees.",
+    images: ['/hero-image.jpg'],
+    creator: '@fantasy_c',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
   icons: {
     icon: {
       url: "/favicon.png",
-      sizes: "any", // Hint that the icon can be scaled
+      sizes: "any",
     },
     apple: {
       url: "/favicon.png",
@@ -33,9 +96,6 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "CouponCycle",
-  },
-  formatDetection: {
-    telephone: false,
   },
 };
 
@@ -71,6 +131,34 @@ export default async function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <link rel="apple-touch-icon" href="/favicon.png" />
         <link rel="shortcut icon" href="/favicon.png" />
+        
+        {/* Google Analytics */}
+        {process.env.GOOGLE_ANALYTICS_ID && (
+          <>
+            <script
+              async
+              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.GOOGLE_ANALYTICS_ID}`}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${process.env.GOOGLE_ANALYTICS_ID}', {
+                    page_title: document.title,
+                    page_location: window.location.href,
+                  });
+                `,
+              }}
+            />
+          </>
+        )}
+        
+        {/* Google Search Console Verification */}
+        {process.env.GOOGLE_SEARCH_CONSOLE_VERIFICATION && (
+          <meta name="google-site-verification" content={process.env.GOOGLE_SEARCH_CONSOLE_VERIFICATION} />
+        )}
       </head>
       {/* <ThemeProviders> */}
       <Providers session={session}>{/* Use original Providers */}

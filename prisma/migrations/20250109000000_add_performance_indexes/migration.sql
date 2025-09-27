@@ -19,7 +19,6 @@ CREATE INDEX IF NOT EXISTS "PredefinedCard_name_issuer_idx" ON "PredefinedCard"(
 
 -- Index for loyalty account expiration queries
 CREATE INDEX IF NOT EXISTS "LoyaltyAccount_userId_lastActivityDate_idx" ON "LoyaltyAccount"("userId", "lastActivityDate");
-CREATE INDEX IF NOT EXISTS "LoyaltyAccount_userId_pointsExpirationDate_idx" ON "LoyaltyAccount"("userId", "pointsExpirationDate");
 
 -- Index for user notification preferences
 CREATE INDEX IF NOT EXISTS "User_notifyNewBenefit_notifyBenefitExpiration_idx" ON "User"("notifyNewBenefit", "notifyBenefitExpiration") WHERE "notifyNewBenefit" = true OR "notifyBenefitExpiration" = true;

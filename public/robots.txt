@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+
+# Allow all search engines to crawl the entire site
+Allow: /api/predefined-cards
+Allow: /api/predefined-cards-with-benefits
+
+# Disallow sensitive areas
+Disallow: /api/auth/
+Disallow: /api/user-cards/
+Disallow: /api/cron/
+Disallow: /api/monitoring/
+Disallow: /settings/
+Disallow: /cards/new
+Disallow: /cards/*/edit
+
+# Sitemap location
+Sitemap: https://www.coupon-cycle.site/sitemap.xml
+
+# Crawl delay (optional - be nice to servers)
+Crawl-delay: 1
