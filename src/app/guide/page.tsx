@@ -38,7 +38,7 @@ export default function GuidePage() {
 
         <h2>Understanding Credit Card Benefit Cycles</h2>
         <p>
-          Most credit card benefits operate on annual cycles that reset on your card's anniversary date. 
+          Most credit card benefits operate on annual cycles that reset on your card&apos;s anniversary date. 
           Key benefit types include:
         </p>
         
@@ -110,7 +110,7 @@ export default function GuidePage() {
 
         <h3>3. Track Usage Throughout the Year</h3>
         <p>
-          Don't wait until the end of the year to use benefits. Plan ahead and use credits consistently 
+          Don&apos;t wait until the end of the year to use benefits. Plan ahead and use credits consistently 
           throughout your benefit cycle.
         </p>
 
@@ -146,7 +146,7 @@ export default function GuidePage() {
         <h3>Multiple Cards Strategy</h3>
         <p>
           Having multiple cards can maximize benefits across different categories, but requires 
-          careful tracking to ensure you're getting value from each card.
+          careful tracking to ensure you&apos;re getting value from each card.
         </p>
 
         <h2>Getting Started</h2>
