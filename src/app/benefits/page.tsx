@@ -19,6 +19,7 @@ interface CreditCardWithDisplayName extends PrismaCreditCard {
 // Updated Type combining BenefitStatus with Benefit and Card details (with displayName) for display
 export interface DisplayBenefitStatus extends BenefitStatus { // Export for use in client component
   benefit: Benefit & { creditCard: CreditCardWithDisplayName };
+  usageWaySlug?: string | null; // Add optional usage way slug
 }
 
 export default async function BenefitsDashboardPage() {
@@ -46,7 +47,28 @@ export default async function BenefitsDashboardPage() {
     },
   });
 
-  // 2. Calculate displayNames for each card using the utility function
+  // 2. Fetch all usage ways to match with benefits
+  const usageWays = await prisma.benefitUsageWay.findMany({
+    include: {
+      predefinedBenefits: {
+        select: {
+          category: true,
+          description: true,
+        },
+      },
+    },
+  });
+
+  // Create a map from benefit description/category to usage way slug
+  const usageWayMap = new Map<string, string>();
+  usageWays.forEach((way) => {
+    way.predefinedBenefits.forEach((benefit) => {
+      const key = `${benefit.category}:${benefit.description}`;
+      usageWayMap.set(key, way.slug);
+    });
+  });
+
+  // 3. Calculate displayNames for each card using the utility function
   const cardDisplayNameMap = createCardDisplayNameMap(userCards);
 
   // Fetch All Relevant Benefit Statuses for Display
@@ -96,10 +118,15 @@ export default async function BenefitsDashboardPage() {
     }, 0);
   });
 
-  // 3. Augment statuses with card displayName
+  // 4. Augment statuses with card displayName and usage way slug
   const allStatusesAugmented: DisplayBenefitStatus[] = allStatusesRaw.map(status => {
     const cardOriginal = status.benefit.creditCard;
     const resolvedDisplayName = cardDisplayNameMap.get(cardOriginal.id) || cardOriginal.name;
+    
+    // Look up usage way for this benefit
+    const benefitKey = `${status.benefit.category}:${status.benefit.description}`;
+    const usageWaySlug = usageWayMap.get(benefitKey) || null;
+    
     return {
       ...status,
       benefit: {
@@ -109,6 +136,7 @@ export default async function BenefitsDashboardPage() {
           displayName: resolvedDisplayName,
         },
       },
+      usageWaySlug,
     };
   });
 
