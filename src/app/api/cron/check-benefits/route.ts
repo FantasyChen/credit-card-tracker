@@ -36,10 +36,21 @@ async function runCheckBenefitsLogic() {
 
     console.log(`📊 Total cards to process: ${allUserCardsWithBenefits.length}`);
 
-    // IMPROVED: Process each card with isolation to prevent cascading failures
-    const cardProcessingResults = await Promise.allSettled(
-      allUserCardsWithBenefits.map(card => processCardSafely(card, now))
-    );
+    // BATCHED PROCESSING: Process cards in batches to prevent database connection exhaustion
+    // Neon/PostgreSQL has connection limits (typically 20-100), so we batch to stay within limits
+    const BATCH_SIZE = 50; // Process 50 cards at a time
+    const cardProcessingResults: PromiseSettledResult<Awaited<ReturnType<typeof processCardSafely>>>[] = [];
+    
+    for (let i = 0; i < allUserCardsWithBenefits.length; i += BATCH_SIZE) {
+      const batch = allUserCardsWithBenefits.slice(i, i + BATCH_SIZE);
+      console.log(`📦 Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(allUserCardsWithBenefits.length / BATCH_SIZE)} (${batch.length} cards)`);
+      
+      const batchResults = await Promise.allSettled(
+        batch.map(card => processCardSafely(card, now))
+      );
+      
+      cardProcessingResults.push(...batchResults);
+    }
 
     // Aggregate results from all cards
     let totalBenefitsProcessed = 0;

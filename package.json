@@ -3,7 +3,14 @@
   "version": "0.1.0",
   "description": "A smart credit card benefits tracking application that helps you maximize your rewards and never miss valuable perks",
   "type": "module",
-  "keywords": ["credit-cards", "benefits", "tracking", "rewards", "next.js", "react"],
+  "keywords": [
+    "credit-cards",
+    "benefits",
+    "tracking",
+    "rewards",
+    "next.js",
+    "react"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/FantasyChen/credit-card-tracker.git"
@@ -19,7 +26,6 @@
     "lint": "next lint",
     "test": "jest",
     "postinstall": "prisma generate",
-
     "migrate:status": "npx prisma migrate status",
     "migrate:diff": "npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma"
   },
@@ -31,7 +37,7 @@
     "@headlessui/react": "^2.2.1",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^5.0.1",
-    "@prisma/client": "^6.6.0",
+    "@prisma/client": "^6.16.3",
     "@radix-ui/react-slot": "^1.2.2",
     "@sendgrid/mail": "^8.1.5",
     "@vercel/analytics": "^1.5.0",
@@ -44,7 +50,6 @@
     "next": "^15.3.1",
     "next-auth": "^4.24.11",
     "next-themes": "^0.4.6",
-    "prisma": "^6.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.55.0",
@@ -69,6 +74,7 @@
     "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
+    "prisma": "^6.16.3",
     "tailwindcss": "^4",
     "ts-jest": "^29.3.2",
     "ts-node": "^10.9.2",
