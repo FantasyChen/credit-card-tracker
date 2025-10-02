@@ -117,14 +117,6 @@ function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.D
                   </li>
                 )}
               </ul>
-              <div className="mt-2 text-right">
-                <Link
-                  href={`/settings/suggest?type=EDIT_CARD&cardName=${encodeURIComponent(card.name)}&issuer=${encodeURIComponent(card.issuer)}`}
-                  className="text-xs text-blue-600 underline"
-                >
-                  Suggest an edit
-                </Link>
-              </div>
             </div>
           )}
         </div>

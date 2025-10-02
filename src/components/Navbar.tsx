@@ -22,18 +22,15 @@ const Navbar = () => {
     { name: 'Dashboard', href: '/' },
     { name: 'Cards', href: '/cards' },
     { name: 'Benefits', href: '/benefits' },
+    { name: 'How to Use', href: '/benefits/how-to-use' },
     { name: 'Guide', href: '/guide' },
     { name: 'Notifications', href: '/settings/notifications', authRequired: true },
     { name: 'Contact', href: '/contact' },
-    { name: 'Suggest', href: '/settings/suggest' },
   ], []); // Empty dependency array as baseNavigation is static
 
   // Filter navigation items based on authentication status
   const navigation = useMemo(() => {
     const items: NavItem[] = [...baseNavigation];
-    if (session?.user?.role === 'ADMIN' || session?.user?.role === 'MODERATOR') {
-      items.push({ name: 'Review', href: '/settings/review', authRequired: true });
-    }
     return items.filter(item => {
       if (item.authRequired && !session) {
         return false; // Don't show auth-required links if not logged in

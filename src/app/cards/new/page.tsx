@@ -96,15 +96,6 @@ function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; m
             </div>
           )}
 
-          {/* Suggest an edit link */}
-          <div className="mb-4 text-right">
-            <a
-              href={`/settings/suggest?type=EDIT_CARD&cardName=${encodeURIComponent(card.name)}&issuer=${encodeURIComponent(card.issuer)}`}
-              className="text-xs text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              Suggest an edit
-            </a>
-          </div>
 
           {/* --- Add Last Digits Field (Dynamic for AMEX) --- */}
           <div className="mb-4">

@@ -1311,6 +1311,321 @@ async function main() {
   }
   console.log('Upsert process finished.');
 
+  // === Seed Benefit Usage Ways ===
+  console.log('Seeding benefit usage ways...');
+  
+  const usageWays = [
+    {
+      title: 'How to Use Airline Fee Credits',
+      slug: 'airline-fee-credits',
+      description: 'Maximize your airline fee reimbursements and get the most value from your travel credits',
+      category: 'Travel',
+      content: `## Getting Reimbursed
+
+Airline fee credits are designed to offset incidental charges when flying. To ensure you get reimbursed:
+
+1. **Purchase eligible items directly from the airline** - Book on the airline's website or app, not through third-party sites
+2. **Use the credit card linked to this benefit** - Make sure you're using the correct card for the purchase
+3. **Credits post within 1-2 billing cycles** - Be patient, reimbursements aren't instant
+
+## What Qualifies
+
+Most issuers cover these airline fees:
+- ✈️ Checked bag fees
+- 💺 Seat selection and upgrades
+- 🍽️ In-flight food and beverage purchases
+- 🔄 Change and cancellation fees
+- 📞 Phone booking fees
+- 🎒 Carry-on bag fees (budget airlines)
+
+## What Doesn't Qualify
+
+Be aware these typically don't count:
+- ❌ Actual ticket purchases
+- ❌ Bookings through third-party sites (Expedia, Kayak, etc.)
+- ❌ Gift cards (some issuers restrict this)
+- ❌ Travel packages or vacation bundles
+
+## Pro Tips
+
+- Check your specific issuer's terms for the detailed list
+- Some cards require you to select a preferred airline at the start of the year
+- Credits usually don't roll over to the next year
+- Set calendar reminders before expiration`,
+      tips: [
+        'Book directly on airline website, not through OTAs like Expedia',
+        'Check your issuer\'s specific list of qualifying purchases',
+        'Credits typically post within 1-2 statements, not immediately',
+        'Some cards require pre-selecting your airline for the year'
+      ]
+    },
+    {
+      title: 'How to Use Uber and Lyft Credits',
+      slug: 'rideshare-credits',
+      description: 'Redeem your monthly ride-sharing credits and get free transportation',
+      category: 'Transportation',
+      content: `## Activation Steps
+
+Getting your Uber/Lyft credits is straightforward:
+
+1. **Link your credit card** - Add the card to your Uber or Lyft app payment methods
+2. **Credits auto-apply at checkout** - No need to manually activate
+3. **Must use within the month** - Credits typically don't roll over month-to-month
+
+## Uber Cash Details
+
+For cards offering Uber Cash:
+- 💵 Credits deposit on the 1st of each month (or your card anniversary)
+- 🍔 Can be used for Uber Eats food delivery too
+- 🚗 Split payment if ride exceeds credit amount
+- 📅 Expires at month-end - use it or lose it
+
+## Lyft Credit Details
+
+For cards offering Lyft credits:
+- 🚕 Applied automatically at checkout
+- 💳 Must use the enrolled card for the ride
+- 📱 Credits show in your Lyft wallet
+- ⏰ Monthly reset varies by issuer
+
+## Maximizing Value
+
+**For Uber Credits:**
+- Use Uber Eats for groceries or restaurant delivery
+- Combine multiple trips if your credit is small
+- Stack with Uber promotions when available
+
+**For Lyft Credits:**
+- Take advantage during surge pricing times
+- Use for airport rides to maximize value
+- Combine with Lyft Pink membership benefits
+
+## Common Issues
+
+- ⚠️ Credits don't stack month-to-month
+- ⚠️ Tips don't count toward credit usage
+- ⚠️ Must complete ride/delivery in the same month`,
+      tips: [
+        'Set a reminder to use credits before month-end',
+        'Uber credits work for both rides AND Uber Eats',
+        'Credits don\'t roll over - use them or lose them',
+        'Link the card before the month starts to ensure credits deposit'
+      ]
+    },
+    {
+      title: 'How to Use Hotel Credits',
+      slug: 'hotel-credits',
+      description: 'Book hotels and get automatic statement credits',
+      category: 'Travel',
+      content: `## Booking Process
+
+To receive your hotel credit:
+
+1. **Book through the qualifying portal** - Requirements vary by card issuer
+2. **Use your enrolled credit card** - Pay with the card that offers the benefit
+3. **Credit posts after checkout** - Not at booking time, but after your stay completes
+
+## Qualifying Booking Portals
+
+**American Express:**
+- Amex Travel portal
+- Fine Hotels & Resorts program
+- The Hotel Collection
+
+**Chase:**
+- Chase Travel Portal (Chase Ultimate Rewards)
+- Direct hotel bookings (card-specific)
+
+**Capital One:**
+- Capital One Travel portal
+- Direct hotel bookings
+
+**Citi:**
+- Citi Travel Portal
+- Prestige Hotel Collection
+
+## Important Requirements
+
+- 💰 Some require minimum annual spend ($500-$1,000)
+- ⏳ Credits may take 8-12 weeks to post
+- 📋 Read your specific issuer's terms carefully
+- 🏨 Must complete the stay (not just book)
+
+## Maximizing Your Credit
+
+**Booking Strategy:**
+- Book early to ensure credit posts before year-end
+- Combine with hotel loyalty programs
+- Look for properties that double-dip (credit + points)
+- Consider extended stays to meet minimum spend requirements
+
+**Credit Timing:**
+- Book at least 3 months before credit expiration
+- Account for statement closing dates
+- Contact issuer if credit doesn't post within timeframe
+
+## Common Mistakes to Avoid
+
+❌ Booking through third-party sites (Booking.com, Hotels.com)
+❌ Using points instead of cash payment
+❌ Cancelling before the stay is completed
+❌ Not meeting minimum spend requirements`,
+      tips: [
+        'Book early to ensure credit posts before expiration',
+        'Confirm you\'re using the correct booking platform',
+        'Credits post AFTER checkout, not at booking',
+        'Track your statement to verify the credit appears',
+        'Some credits require minimum annual hotel spend'
+      ]
+    },
+    {
+      title: 'How to Use Dining and Restaurant Credits',
+      slug: 'dining-credits',
+      description: 'Get reimbursed for dining, food delivery, and restaurant expenses',
+      category: 'Dining',
+      content: `## How Dining Credits Work
+
+Dining credits come in several forms:
+- 🍽️ **Restaurant Credits** - Statement credits for qualifying dining purchases
+- 🚚 **Delivery Credits** - DoorDash, Uber Eats, Grubhub credits
+- 🥤 **Merchant-Specific** - Credits for specific chains (Shake Shack, Cheesecake Factory, etc.)
+
+## Activation & Usage
+
+**For Restaurant Credits:**
+1. Use your card at qualifying restaurants
+2. Credit posts automatically within 1-2 billing cycles
+3. Check eligible merchant categories (usually MCC 5812 and 5814)
+
+**For Delivery Credits:**
+1. Link card to delivery app (DoorDash, Uber Eats, etc.)
+2. Credits auto-apply at checkout
+3. Use before monthly expiration
+
+**For Merchant-Specific Credits:**
+1. Enroll the benefit in your card account (if required)
+2. Make qualifying purchase at the specific merchant
+3. Credit posts within 8-10 weeks typically
+
+## Popular Credit Programs
+
+**DoorDash Credits (Chase, Amex):**
+- Monthly credit ($10-$15 typical)
+- Includes DashPass subscription costs
+- Can use for pickup orders too
+- Must have DashPass membership
+
+**Grubhub Credits (Amex Gold):**
+- Part of the $10 monthly dining credit
+- Combine with Grubhub+ membership
+- Includes pickup orders
+- No delivery fee with membership
+
+**Shake Shack Credit (Amex Gold):**
+- Monthly $10 credit
+- In-store or app purchases
+- Credit posts automatically
+- Must enroll in Amex Offers
+
+## Maximizing Your Credits
+
+💡 **Stack Multiple Credits:**
+- Use dining credit + credit card rewards points
+- Combine with restaurant loyalty programs
+- Use delivery apps during promo periods
+
+💡 **Monthly Credits Strategy:**
+- Set phone reminders for month-end
+- Use for groceries via delivery apps
+- Gift food to friends/family if not needed
+
+💡 **Plan Ahead:**
+- Schedule date nights around credit reset dates
+- Use for team lunches or group orders
+- Consider takeout if dining out isn't convenient
+
+## Credit Expiration
+
+⚠️ Most dining credits are use-it-or-lose-it:
+- Monthly credits don't roll over
+- Set calendar reminders
+- Credits typically reset on the 1st or card anniversary
+- Plan usage at the start of each month`,
+      tips: [
+        'Monthly dining credits typically don\'t roll over',
+        'Delivery app credits often require active membership',
+        'Link your card to apps at the start of the month',
+        'Some credits require enrollment through card issuer portal',
+        'Credits can often be used for both dine-in and takeout'
+      ]
+    },
+    {
+      title: 'How to Use Statement Credits',
+      slug: 'statement-credits',
+      description: 'Understand how automatic statement credits work and how to ensure you receive them',
+      category: 'General',
+      content: `## How Statement Credits Work
+
+Statement credits are automatic reimbursements that appear on your credit card statement:
+
+1. **Make qualifying purchase** with the enrolled card
+2. **Charge appears** on your statement
+3. **Credit automatically posts** within billing cycles (typically 1-2)
+4. **Net charge is reduced** by the credit amount
+
+## Types of Statement Credits
+
+**Automatic Enrollment:**
+- Travel credits (airline, hotel, etc.)
+- Dining credits (DoorDash, Uber Eats)
+- Streaming credits (Netflix, Hulu)
+- No action needed beyond using the card
+
+**Manual Enrollment:**
+- Must add offer to card through issuer portal
+- Limited time availability
+- Specific merchant requirements
+- Credit posts after purchase
+
+**Annual Credits:**
+- Single yearly credit (e.g., $300 travel)
+- Resets on card anniversary
+- Must use within the year
+- Doesn't roll over
+
+**Monthly Credits:**
+- Recurring monthly (e.g., $15 Uber)
+- Resets 1st of month or card anniversary date
+- Must use each month
+- Doesn't accumulate
+
+## Timing of Credits
+
+Most common timeline:
+- **1-2 Billing Cycles** - Airline fees, dining, entertainment
+- **8-12 Weeks** - Hotel credits, annual travel credits
+- **Check your card's specific terms** for exact timing`,
+      tips: [
+        'Credits usually post within 1-2 billing cycles, not immediately',
+        'Keep receipts for all purchases expecting statement credits',
+        'Set calendar reminders before monthly/annual credits expire',
+        'Some credits require enrollment or activation first',
+        'Contact card issuer if expected credit doesn\'t appear',
+        'Track all credits in a spreadsheet to ensure you receive them'
+      ]
+    }
+  ];
+
+  for (const way of usageWays) {
+    await prisma.benefitUsageWay.upsert({
+      where: { slug: way.slug },
+      update: way,
+      create: way,
+    });
+  }
+
+  console.log(`✅ Seeded ${usageWays.length} benefit usage ways.`);
+
   // --- Seed Loyalty Programs (only ones with expiration) ---
   console.log('Seeding loyalty programs...');
   

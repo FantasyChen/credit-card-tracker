@@ -29,8 +29,6 @@ model User {
   creditCards             CreditCard[]
   loyaltyAccounts         LoyaltyAccount[]
   sessions                Session[]
-  createdSuggestions      CatalogSuggestion[] @relation("UserCreatedSuggestions")
-  reviewedSuggestions     CatalogSuggestion[] @relation("UserReviewedSuggestions")
 }
 
 model Account {
@@ -119,7 +117,22 @@ model PredefinedBenefit {
   fixedCycleDurationMonths Int?
   fixedCycleStartMonth     Int?
   occurrencesInCycle       Int                    @default(1)
+  usageWayId               String?
   predefinedCard           PredefinedCard         @relation(fields: [predefinedCardId], references: [id])
+  usageWay                 BenefitUsageWay?       @relation(fields: [usageWayId], references: [id])
+}
+
+model BenefitUsageWay {
+  id                 String              @id @default(cuid())
+  title              String
+  slug               String              @unique
+  description        String?
+  content            String
+  category           String?
+  tips               String[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  predefinedBenefits PredefinedBenefit[]
 }
 
 model BenefitStatus {
@@ -181,23 +194,6 @@ model LoyaltyAccount {
   @@unique([userId, loyaltyProgramId])
 }
 
-// Suggestions to update predefined catalog (cards/benefits) via user submissions and moderator review
-model CatalogSuggestion {
-  id           String            @id @default(cuid())
-  type         SuggestionType
-  status       SuggestionStatus  @default(PENDING)
-  payloadJson  Json
-  sources      String[]
-  reviewNote   String?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  createdById  String
-  reviewedById String?
-  exportedAt   DateTime?
-
-  createdBy    User              @relation("UserCreatedSuggestions", fields: [createdById], references: [id], onDelete: Cascade)
-  reviewedBy   User?             @relation("UserReviewedSuggestions", fields: [reviewedById], references: [id])
-}
 
 enum BenefitFrequency {
   MONTHLY
@@ -224,18 +220,3 @@ enum UserRole {
   ADMIN
 }
 
-enum SuggestionType {
-  ADD_CARD
-  EDIT_CARD
-  ADD_BENEFIT
-  EDIT_BENEFIT
-  DEPRECATE_CARD
-  DEPRECATE_BENEFIT
-  IMAGE_UPDATE
-}
-
-enum SuggestionStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useTransition } from 'react';
+import Link from 'next/link';
 import { formatDate } from '@/lib/dateUtils';
 import { toggleBenefitStatusAction, markBenefitAsNotUsableAction } from '@/app/benefits/actions'; // Ensure this path is correct
 import type { DisplayBenefitStatus } from '@/app/benefits/page'; // Import the shared type
@@ -138,6 +139,24 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               <span>{status.benefit.creditCard.issuer}</span>
             </div>
           </div>
+          
+          {/* Usage Guide Link */}
+          {status.usageWaySlug && (
+            <div className="pl-11">
+              <Link
+                href={`/benefits/how-to-use/${status.usageWaySlug}`}
+                className="inline-flex items-center text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors"
+              >
+                <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                How to use this benefit
+                <svg className="h-3 w-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          )}
           
           {/* Action buttons - full width on mobile, fixed width on larger screens */}
           <div className="pl-11">
