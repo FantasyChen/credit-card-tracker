@@ -82,10 +82,24 @@ Credit card benefits change frequently. **Help keep our data current!**
 git clone https://github.com/FantasyChen/credit-card-tracker.git
 cd credit-card-tracker
 npm install
-cp .env.example .env  # Fill in your values
+cp .env.example .env  # Fill in your values (see Environment Setup below)
 npx prisma migrate dev
 npm run dev
 ```
+
+### Environment Setup
+Create a `.env` file from the example:
+```bash
+cp .env.example .env
+```
+
+**Required variables for local development:**
+- `DATABASE_URL` - Your PostgreSQL connection string (use `DATABASE_URL_DEV` for development)
+- `NEXTAUTH_SECRET` - Generate with: `openssl rand -base64 32`
+- `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET` - From [Google Cloud Console](https://console.cloud.google.com/)
+- `RESEND_API_KEY` - For email notifications (get from [Resend](https://resend.com/))
+
+See `.env.example` for all available configuration options.
 
 ### Tech Stack
 - **Frontend:** Next.js 15 (App Router), React 19, Tailwind CSS 4
@@ -117,7 +131,14 @@ git clone https://github.com/FantasyChen/credit-card-tracker.git
 cd credit-card-tracker
 npm install
 cp .env.example .env  # Fill in your values
+npx prisma migrate deploy
+npm run build
+npm start
 ```
+
+**Deployment Options:**
+- **Vercel (Recommended):** Connect your GitHub repo - automatic deployments on push
+- **Self-hosted:** Deploy anywhere that supports Node.js and PostgreSQL
 
 > **📄 Complete Self-Hosting Guide:** See [AGENT.md](AGENT.md#deployment--operations) for detailed deployment instructions, environment setup, security best practices, and troubleshooting.
 

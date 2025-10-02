@@ -175,7 +175,12 @@ The heart of the application is the `calculateBenefitCycle()` function in `src/l
 
 ### Environment Setup
 
-**Required Environment Variables:**
+**Local Development:**
+- The project includes a fully configured `.env` file for local development
+- All required environment variables are already set up
+- No additional configuration needed for local development
+
+**Required Environment Variables for Production:**
 ```bash
 # Database
 DATABASE_URL="postgresql://..." # Production
@@ -193,7 +198,7 @@ CRON_SECRET="your-cron-secret"
 SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 ```
 
-> Note for Cursor: The `.env` file already exists in this repository and is fully configured. The Cursor agent cannot access it directly due to environment isolation, but local commands and the app will still read from `.env`. Refer to `.env.example` if you need a reference of keys.
+> **Note for Cursor:** The `.env` file already exists in this repository and is fully configured. The Cursor agent cannot access it directly due to environment isolation, but local commands and the app will still read from `.env`. Refer to `.env.example` if you need a reference of keys.
 
 ### Database Safety Rules ⚠️
 
@@ -269,10 +274,12 @@ node scripts/check-database-connection.js  # Verify database connection
 
 ### Vercel Configuration
 
-**Automatic Deployment:**
-- Main branch pushes trigger production deploys
+**Automatic GitHub Deployment:**
+- **Push to main branch** → Automatic production deployment
+- **No manual deployment needed** - Vercel handles everything
 - Environment variables configured in Vercel dashboard
 - Build command: `prisma generate && next build`
+- Database migrations run automatically via `npx prisma migrate deploy`
 
 **Cron Jobs** (configured in `vercel.json`):
 - Daily benefit status updates: `/api/cron/check-benefits`
@@ -297,9 +304,10 @@ curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-noti
 - Point-in-time recovery available for data incidents
 
 **Migration Process:**
-1. Test on development branch
-2. Commit migration files
-3. Vercel runs `npx prisma migrate deploy` automatically
+1. Test on development branch (optional)
+2. Commit migration files to main branch
+3. Push to GitHub → Vercel automatically runs `npx prisma migrate deploy`
+4. No manual deployment steps required
 
 **Production changes on request (non-destructive):**
 - When the user asks to update production data (e.g., add or refresh predefined cards/benefits):
