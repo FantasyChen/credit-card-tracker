@@ -1613,6 +1613,440 @@ Most common timeline:
         'Contact card issuer if expected credit doesn\'t appear',
         'Track all credits in a spreadsheet to ensure you receive them'
       ]
+    },
+    {
+      title: 'How to Use Amex Airline Gift Card Credits (Aspire $200)',
+      slug: 'amex-airline-gift-cards',
+      description: 'Maximize your $200 airline fee credit by purchasing airline gift cards',
+      category: 'Travel',
+      content: `## The Gift Card Trick
+
+The American Express Hilton Honors Aspire Card offers a **$250 annual airline fee credit** that can be used for airline gift cards with certain airlines:
+
+1. **Select your preferred airline** in your Amex account (once per calendar year)
+2. **Purchase gift cards directly from the airline** (not third-party sites)
+3. **Keep purchase amounts small** ($50-100 increments work best)
+4. **Credit posts within 1-2 billing cycles**
+
+## Airlines That Work
+
+Based on community reports, these airlines typically reimburse gift card purchases:
+
+✈️ **Alaska Airlines**
+- Purchase gift cards at AlaskaAir.com
+- $50 or $100 denominations work best
+- Credits post reliably within 1-2 statements
+
+✈️ **Southwest Airlines**
+- Buy at Southwest.com
+- Multiple small purchases recommended
+- Very reliable for gift card reimbursement
+
+✈️ **American Airlines**
+- Purchase at AA.com
+- $100 or less per transaction
+- Results may vary (check recent reports)
+
+✈️ **Delta Airlines**
+- Buy at Delta.com
+- Mixed results - not as reliable as Alaska/Southwest
+- Some users report success with small amounts
+
+## Step-by-Step Process
+
+**1. Select Your Airline**
+- Log into your Amex account
+- Go to Benefits → Airline Fee Credit
+- Choose your preferred airline (once per calendar year)
+- Wait 24 hours for selection to process
+
+**2. Purchase Gift Cards**
+- Go directly to the airline website (not third-party sites)
+- Buy gift cards in **small denominations** ($50-100)
+- Use your Aspire card for payment
+- Save confirmation email
+
+**3. Wait for Credit**
+- Credits typically post within **1-2 billing cycles**
+- Check your statement for "Airline Fee Credit"
+- If no credit after 8 weeks, contact Amex
+
+**4. Use Your Gift Cards**
+- Gift cards work for flights, baggage, seat upgrades
+- No expiration on most airline gift cards
+- Can combine multiple gift cards per booking
+
+## Pro Tips
+
+💡 **Use Alaska Airlines** - Most reliable for gift card reimbursement
+💡 **Buy in small amounts** - $50-100 per transaction works best
+💡 **Space out purchases** - Don't buy all $250 at once
+💡 **Keep records** - Save confirmation emails and receipts
+💡 **Check recent reports** - Airline policies change; verify on credit card forums
+💡 **Select airline early** - Choose in January to maximize time
+
+## Important Warnings
+
+⚠️ **Not officially supported** - Amex terms say "incidental fees only"
+⚠️ **Results may vary** - What works today may not work tomorrow
+⚠️ **At your own risk** - Some users report clawbacks (rare)
+⚠️ **Don't abuse** - Avoid large purchases or obvious gift card patterns
+⚠️ **No guarantee** - This is not a promised benefit feature
+
+## What Else Qualifies
+
+Besides gift cards, your credit also covers:
+- ✅ Checked bag fees
+- ✅ Seat selection fees
+- ✅ In-flight purchases
+- ✅ Change/cancellation fees
+- ✅ Lounge day passes
+
+## Alternatives to Gift Cards
+
+If you prefer to play it safe:
+- Use for legitimate airline fees
+- Purchase lounge access passes
+- Pay for checked bags throughout the year
+- Upgrade seats on flights`,
+      tips: [
+        'Alaska Airlines gift cards ($50-100) are most reliable for reimbursement',
+        'Select your airline in January and wait 24 hours before purchasing',
+        'Buy gift cards in small amounts ($50-100) rather than one large purchase',
+        'Keep confirmation emails - credits post within 1-2 billing cycles',
+        'This is not officially supported - results may vary by airline',
+        'Check FlyerTalk and Reddit for recent data points before purchasing'
+      ]
+    },
+    {
+      title: 'How to Use Amex Resy Credits via Toast Gift Cards',
+      slug: 'resy-toast-gift-cards',
+      description: 'Use your Resy dining credits by purchasing Toast gift cards at participating restaurants',
+      category: 'Dining',
+      content: `## The Toast Gift Card Method
+
+Many Resy restaurants use **Toast** as their point-of-sale system, which allows you to purchase gift cards online. These gift card purchases typically trigger your **Amex Resy credits**:
+
+- **Resy Credits**: $25-100 per period (varies by card)
+- **Works with**: Restaurants on Toast platform
+- **Purchase**: Through restaurant website or Toast app
+- **Credit posts**: Within 1-2 billing cycles
+
+## How It Works
+
+**1. Find Toast-Powered Resy Restaurants**
+- Browse Resy.com for restaurants
+- Look for restaurants with online gift card options
+- Most modern restaurants use Toast for online ordering
+- Check restaurant website for "Gift Cards" section
+
+**2. Purchase Gift Cards**
+- Visit the restaurant's website directly
+- Click "Gift Cards" or "Buy Gift Card"
+- Enter amount (match your credit amount: $25, $50, $100)
+- Use your eligible Amex card
+- Complete purchase
+
+**3. Credit Posts Automatically**
+- Charge appears as restaurant name on statement
+- Amex Resy credit posts within 1-2 billing cycles
+- No need to book through Resy app
+- Credit shows as "Resy Dining Credit"
+
+**4. Use Your Gift Card**
+- Make reservations through Resy or directly
+- Present gift card at restaurant
+- Can use for dine-in or takeout
+- Most don't expire
+
+## Verified Toast Restaurants
+
+Popular Resy restaurants using Toast (verify current status):
+
+🍽️ **Carbone** (multiple locations)
+🍽️ **Cote** (Korean BBQ)
+🍽️ **Quality Italian**
+🍽️ **Parm**
+🍽️ **Dirty French**
+🍽️ **ZZ's Clam Bar**
+
+**How to Verify:**
+- Visit restaurant website
+- Look for online gift card purchasing
+- Toast-powered sites have similar checkout flow
+- You'll see "Powered by Toast" in footer or checkout
+
+## Step-by-Step Example
+
+**Example: Using $100 Quarterly Resy Credit (Amex Platinum)**
+
+1. **Quarter starts** (Jan 1, Apr 1, Jul 1, Oct 1)
+2. **Find restaurant** - Go to Carbone's website
+3. **Click Gift Cards** - carbonerestaurant.com/gift-cards
+4. **Enter amount** - $100 e-gift card
+5. **Use Amex Platinum** - Pay with enrolled card
+6. **Receive confirmation** - Email with gift card code
+7. **Credit posts** - Check statement in 4-8 weeks
+8. **Make reservation** - Book through Resy when ready
+9. **Dine and redeem** - Use gift card at meal
+
+## Which Cards Have Resy Credits?
+
+**American Express Platinum Card**
+- $100 Resy credit per half-year
+- Jan-Jun: $100 credit
+- Jul-Dec: $100 credit
+- Total: $200/year
+
+**American Express Gold Card**
+- $50 Resy credit per half-year
+- Jan-Jun: $50 credit
+- Jul-Dec: $50 credit
+- Total: $100/year
+
+## Pro Tips
+
+💡 **Buy exact credit amount** - $50 gift card for $50 credit
+💡 **Use early in period** - Don't wait until last minute
+💡 **Save for special occasions** - Gift cards don't expire
+💡 **Combine with other credits** - Stack with dining category rewards
+💡 **Check restaurant website** - Not all Resy restaurants use Toast
+💡 **Call ahead** - Confirm they accept their own gift cards (rare issues)
+
+## Alternative Ways to Use Resy Credit
+
+**If you prefer traditional booking:**
+1. **Book through Resy app** - Make reservation on Resy.com
+2. **Dine at restaurant** - Use your Amex card to pay
+3. **Credit posts** - If spending meets threshold
+4. **Note**: Some cards require minimum spend per transaction
+
+**Traditional method vs Gift Cards:**
+- Traditional: Must dine to use credit
+- Gift Cards: Purchase anytime, use later
+- Gift Cards: More flexible timing
+- Traditional: Better for immediate dining plans
+
+## Important Notes
+
+⚠️ **Check current terms** - Amex may update which purchases qualify
+⚠️ **Keep receipts** - Save confirmation for records
+⚠️ **Toast required** - Regular online orders may not trigger credit
+⚠️ **Expiration** - Use credit before period ends (typically 6 months)
+⚠️ **One credit per period** - Can't stack multiple periods
+
+## Troubleshooting
+
+**Credit didn't post?**
+- Wait full 8-12 weeks before inquiring
+- Check that restaurant uses Toast platform
+- Verify you used correct Amex card
+- Contact Amex if no credit after 12 weeks
+
+**Restaurant doesn't accept gift cards?**
+- Very rare but possible
+- Call restaurant before purchasing
+- Most Toast gift cards work seamlessly
+- Ask about any restrictions`,
+      tips: [
+        'Many Resy restaurants use Toast - buy gift cards on their websites',
+        'Purchase gift cards in amounts matching your credit ($50, $100)',
+        'Credits post within 1-2 billing cycles after gift card purchase',
+        'Gift cards don\'t expire - buy early in credit period, use later',
+        'Look for "Powered by Toast" on restaurant websites',
+        'Call restaurant to confirm they accept their own gift cards before buying'
+      ]
+    },
+    {
+      title: 'How to Use Amex Gold Dunkin Credit via Mobile Gift Card',
+      slug: 'amex-gold-dunkin-credit',
+      description: 'Load your Dunkin credit directly into the Dunkin mobile app as a gift card',
+      category: 'Dining',
+      content: `## The Mobile Gift Card Method
+
+The **American Express Gold Card** offers a **$7 monthly Dunkin credit** that can be used by loading funds into the Dunkin mobile app:
+
+- **Credit Amount**: $7 per month
+- **How to Use**: Load Dunkin gift card in mobile app
+- **Credit Posts**: Within 1-2 billing cycles
+- **No Dunkin purchase required upfront**: Load first, credit posts, use later
+
+## Step-by-Step Process
+
+**1. Download Dunkin App**
+- iOS: Download from App Store
+- Android: Download from Google Play
+- Create account or sign in
+- Link DD Perks rewards (optional but recommended)
+
+**2. Add Money to App**
+- Open Dunkin app
+- Tap "Scan" at bottom
+- Tap "Manage" or "Add Value"
+- Choose **$7 or more** to load
+- Select your **Amex Gold Card** as payment method
+- Complete transaction
+
+**3. Wait for Credit**
+- Charge appears on Amex statement as "Dunkin" purchase
+- Amex credit posts within **1-2 billing cycles**
+- You'll see "Dunkin Credit" on statement
+- Net cost: $0 (after $7 credit)
+
+**4. Use Your Balance**
+- Visit any Dunkin location
+- Order at counter or drive-thru
+- Scan app barcode to pay
+- Balance deducts from app wallet
+
+## Alternative Method: Dunkin Gift Cards
+
+**Physical/Digital Gift Cards:**
+1. **Buy at Dunkin location** - Ask cashier to load $7 onto gift card
+2. **Buy online** - DunkinDonuts.com gift cards (may not trigger credit)
+3. **Use Amex Gold** - Pay with your card
+4. **Credit posts** - Within 1-2 statements
+
+**Note**: Loading the mobile app is easier and more reliable than buying separate gift cards.
+
+## Maximizing Your $7 Monthly Credit
+
+**Best Value Orders:**
+
+☕ **Coffee + Snack** ($6-8)
+- Medium hot/iced coffee
+- Classic donut or munchkins
+- Total: ~$6-7
+
+🥯 **Breakfast Combo** ($7-8)
+- Bagel with cream cheese
+- Small coffee
+- Total: ~$7
+
+🥪 **Quick Lunch** ($7-8)
+- Wake-up wrap or snack
+- Medium drink
+- Total: ~$7
+
+💡 **Pro Strategy**: Load $20-30 at once, use throughout month
+- Load $21 on day 1 (3 months worth)
+- Credits post over 3 months: $7 + $7 + $7 = $21
+- Net cost: $0
+- Always have Dunkin balance ready
+
+## Monthly Credit Reset
+
+- **Resets**: 1st of each month
+- **Doesn't roll over**: Use it or lose it
+- **Set reminder**: Calendar alert for 25th of month
+- **Can't stack**: Only $7 per month maximum
+
+## DD Perks Integration
+
+**Link Rewards Program:**
+- Earn points on every purchase
+- 10 points per $1 spent
+- Free drink every 200 points
+- Birthday reward
+- **Stack with Amex credit**: Get credit + rewards points
+
+**Example:**
+- Load $7 with Amex Gold
+- Get $7 Amex credit (net $0)
+- Earn ~70 DD Perks points
+- Build toward free drinks
+
+## Important Requirements
+
+✅ **Must use Amex Gold Card** - Other Amex cards don't qualify
+✅ **Monthly credit only** - Resets on 1st of month
+✅ **Load minimum $7** - Smaller amounts may not trigger credit
+✅ **Use enrolled card** - The card you enrolled for benefits
+✅ **Wait for credit** - Takes 1-2 billing cycles to post
+
+## Common Questions
+
+**Can I load more than $7?**
+- Yes! Load any amount
+- Only $7 credit posts per month
+- Excess stays in app for future use
+
+**Does it work at all Dunkin locations?**
+- Yes, mobile app works nationwide
+- Even airport and rest stop locations
+- Works for drive-thru and in-store
+
+**Can I use it for mobile orders?**
+- Yes, order ahead in app
+- Pay with app balance
+- Skip the line, pick up order
+
+**What if I don't use Dunkin?**
+- Give app login to friend/family
+- Let them use the $7 credit
+- Or visit once a month for coffee
+
+**Do I need to enroll?**
+- Some cards require enrollment in Amex Offers
+- Check your Amex app for "Dunkin" offer
+- Click "Add to Card" if shown
+- Not all accounts need explicit enrollment
+
+## Tracking Your Credits
+
+**Monthly Checklist:**
+1. **Day 1-5**: Load $7 (or more) in Dunkin app
+2. **Day 30-60**: Check statement for credit
+3. **Anytime**: Use balance at Dunkin
+4. **Repeat**: Every month
+
+**Keep Records:**
+- Screenshot app load receipt
+- Save Amex statement showing credit
+- Track in spreadsheet if managing multiple cards
+
+## Alternative: Stack Multiple Cards
+
+**If you have multiple Gold Cards:**
+- Each card gets $7/month
+- Load $7 from each card
+- Multiple credits post separately
+- Use combined balance for larger orders
+
+**Example with 2 Gold Cards:**
+- Load $7 from Card 1
+- Load $7 from Card 2
+- Total loaded: $14
+- Total credits: $14 (after posting)
+- Use $14 balance through month
+
+## Troubleshooting
+
+**Credit didn't post?**
+- Wait 8-12 weeks (2-3 billing cycles)
+- Verify you used Amex Gold Card
+- Check if enrollment needed in Amex Offers
+- Contact Amex if still missing
+
+**App won't accept Amex?**
+- Try different amount ($10 instead of $7)
+- Use website: DunkinDonuts.com
+- Contact Dunkin support
+- Try again next day
+
+**Already loaded $7, now what?**
+- Just wait for credit to post
+- Use your balance at Dunkin
+- Next month, load $7 again
+- Credits post retroactively`,
+      tips: [
+        'Load $7+ into Dunkin mobile app using your Amex Gold Card',
+        'Credit posts within 1-2 billing cycles, but you can use balance immediately',
+        'Set monthly reminder on the 1st to load your $7 credit',
+        'Consider loading multiple months at once ($21 = 3 months)',
+        'Link DD Perks rewards to earn points while using credit',
+        'Monthly credit doesn\'t roll over - use it or lose it each month'
+      ]
     }
   ];
 
