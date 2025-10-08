@@ -4,6 +4,22 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { LoyaltyAccountsClient } from './LoyaltyAccountsClient';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "Loyalty Programs - Track Points & Miles",
+  description: "Track your airline miles, hotel points, and loyalty program expiration dates. Never lose points to expiration again.",
+  keywords: [
+    'loyalty program tracker',
+    'airline miles tracker',
+    'hotel points tracker',
+    'points expiration',
+    'miles management'
+  ],
+  alternates: {
+    canonical: '/loyalty',
+  },
+};
 
 export default async function LoyaltyPage() {
   const session = await getServerSession(authOptions);

@@ -44,9 +44,6 @@ export const metadata: Metadata = {
     telephone: false,
   },
   metadataBase: new URL('https://www.coupon-cycle.site'),
-  alternates: {
-    canonical: '/',
-  },
   openGraph: {
     title: "CouponCycle - Credit Card Benefits Tracker",
     description: "Never miss a credit card benefit again. Track every perk and maximize your annual fees.",

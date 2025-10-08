@@ -1,4 +1,13 @@
 import React from 'react';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "Contact Us",
+  description: "Get in touch with the CouponCycle team. Send us your feedback, feature requests, or questions about tracking your credit card benefits.",
+  alternates: {
+    canonical: '/contact',
+  },
+};
 
 export default function ContactPage() {
   return (

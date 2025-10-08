@@ -16,6 +16,9 @@ export const metadata: Metadata = {
     "travel credit optimization",
     "dining credit tracker"
   ],
+  alternates: {
+    canonical: '/guide',
+  },
 };
 
 export default function GuidePage() {

@@ -6,8 +6,24 @@ import { redirect } from 'next/navigation';
 import { BenefitStatus, Benefit, CreditCard as PrismaCreditCard } from '@/generated/prisma';
 import BenefitsDisplayClient from '@/components/BenefitsDisplayClient'; // Import the new client component
 import { createCardDisplayNameMap } from '@/lib/cardDisplayUtils';
+import { Metadata } from 'next';
 // We will create a new client component for the list and cards
-// import BenefitListClient from '@/components/BenefitListClient'; 
+// import BenefitListClient from '@/components/BenefitListClient';
+
+export const metadata: Metadata = {
+  title: "Benefits Dashboard - Track All Your Credit Card Benefits",
+  description: "Track and manage all your credit card benefits in one place. Monitor upcoming credits, expiring benefits, and maximize your annual fee ROI.",
+  keywords: [
+    'credit card benefits dashboard',
+    'track credit card benefits',
+    'benefits tracker',
+    'credit card perks',
+    'annual fee ROI'
+  ],
+  alternates: {
+    canonical: '/benefits',
+  },
+}; 
 
 // Type for CreditCard that includes its displayName
 interface CreditCardWithDisplayName extends PrismaCreditCard {

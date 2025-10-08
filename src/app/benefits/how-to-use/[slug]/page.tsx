@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import React from 'react';
 
 interface PageProps {
   params: { slug: string };
@@ -27,6 +28,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       'how to use',
       usageWay.category || 'rewards',
     ],
+    alternates: {
+      canonical: `/benefits/how-to-use/${params.slug}`,
+    },
   };
 }
 
@@ -77,7 +81,7 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
   // Simple markdown-like content rendering
   const renderContent = (content: string) => {
     const lines = content.split('\n');
-    const elements: JSX.Element[] = [];
+    const elements: React.JSX.Element[] = [];
     let inList = false;
     let listItems: string[] = [];
     let key = 0;

@@ -13,6 +13,9 @@ export const metadata: Metadata = {
     'dining credits guide',
     'maximize credit card rewards'
   ],
+  alternates: {
+    canonical: '/benefits/how-to-use',
+  },
 };
 
 export default async function HowToUseIndexPage() {
