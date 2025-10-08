@@ -1,7 +1,13 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const fromEmail = process.env.FROM_EMAIL; // You'll need to set this in your .env and Vercel
+// Lazy instantiation to avoid errors during build time when env vars aren't available
+let resendInstance: Resend | null = null;
+function getResendClient(): Resend {
+  if (!resendInstance) {
+    resendInstance = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendInstance;
+}
 
 interface EmailOptions {
   to: string | string[];
@@ -29,6 +35,7 @@ export async function sendEmail({
     return false;
   }
 
+  const fromEmail = process.env.FROM_EMAIL;
   if (!fromEmail) {
     console.error('FROM_EMAIL is not set. Email not sent.');
     if (process.env.NODE_ENV !== 'production') {
@@ -39,6 +46,7 @@ export async function sendEmail({
   }
 
   try {
+    const resend = getResendClient();
     const { data, error } = await resend.emails.send({
       from: fromEmail, // e.g., 'CouponCycle <notifications@yourdomain.com>'
       to: to,
