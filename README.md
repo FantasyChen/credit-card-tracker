@@ -1,23 +1,23 @@
 # CouponCycle 💳
 
-**Stop losing hundreds of dollars in credit card benefits every year.** CouponCycle is a free, open-source tool that tracks your credit card perks and ensures you never miss valuable benefits again.
+**Stop losing hundreds of dollars in credit card benefits every year.**
+
+CouponCycle is a free, open-source tool that tracks your credit card perks and ensures you never miss valuable benefits again. Track, optimize, and maximize your credit card rewards like a pro.
 
 [![CouponCycle Hero](public/hero-image.jpg)](https://www.coupon-cycle.site/)
-
-*Track, optimize, and maximize your credit card rewards like a pro.*
 
 ## 🚀 Try It Now
 
 **[Launch CouponCycle →](https://www.coupon-cycle.site/)**
 
-### Install on Your Phone (Recommended)
+### 📱 Install on Your Phone
 This is a Progressive Web App (PWA) - install it for a native app experience:
 - **iPhone/iPad:** Open in Safari → Share → "Add to Home Screen"
 - **Android:** Open in Chrome → Menu (⋮) → "Install app"
 
 ## ✨ Why CouponCycle?
 
-Credit card users lose an average of **$300-600 annually** by forgetting to use benefits that expire. CouponCycle solves this by:
+Credit card users lose an average of **$300-600 annually** by forgetting to use benefits that expire. CouponCycle solves this with:
 
 - **🔔 Smart Notifications** - Get reminders before benefits expire
 - **📊 ROI Tracking** - See if your annual fees are worth it
@@ -34,28 +34,14 @@ Credit card users lose an average of **$300-600 annually** by forgetting to use 
 
 ## 🎯 Key Features
 
-### Credit Card Management
-- Track benefits from 50+ predefined cards (Chase, Amex, Capital One, etc.)
-- Custom opening dates for accurate benefit cycles
-- Drag-and-drop benefit prioritization
-- Annual fee ROI analysis
+- **50+ Predefined Cards** - Chase, Amex, Capital One, and more
+- **Smart Notifications** - Email alerts before benefits expire
+- **Loyalty Program Tracking** - Monitor airline miles and hotel points
+- **Drag & Drop Prioritization** - Organize benefits by importance
+- **ROI Analysis** - See if your annual fees are worth it
+- **Data Export/Import** - Complete ownership of your information
 
-### Smart Notifications
-- Email alerts before benefits expire
-- Daily digest of available benefits
-- Loyalty program expiration warnings
-
-### Loyalty Program Tracking
-- Monitor airline miles and hotel points
-- Track expiration dates and activity requirements
-- Multi-program support (airlines, hotels, rental cars)
-
-### Data Control
-- Export/import all your data
-- No vendor lock-in
-- Complete ownership of your information
-
-## 🤝 Community Contributions Welcome!
+## 🤝 Help Keep Data Current
 
 Credit card benefits change frequently. **Help keep our data current!**
 
@@ -63,12 +49,6 @@ Credit card benefits change frequently. **Help keep our data current!**
 1. **Report outdated info** - Use the in-app suggestion system (`Settings → Suggest`)
 2. **Verify benefit amounts** - Check against official bank websites
 3. **Add new cards** - Submit popular cards we're missing
-
-### Most Needed Updates:
-- **Annual fee changes** - Banks adjust these regularly
-- **Benefit amount updates** - Credits often increase/decrease
-- **New card launches** - Major issuer releases
-- **Seasonal changes** - Quarterly benefit modifications
 
 **Reliable Sources:**
 - [US Credit Card Guide](https://www.uscreditcardguide.com/) (comprehensive)
@@ -82,55 +62,32 @@ Credit card benefits change frequently. **Help keep our data current!**
 git clone https://github.com/FantasyChen/credit-card-tracker.git
 cd credit-card-tracker
 npm install
-cp .env.example .env  # Fill in your values (see Environment Setup below)
 npx prisma migrate dev
 npm run dev
 ```
 
-### Environment Setup
-Create a `.env` file from the example:
-```bash
-cp .env.example .env
-```
-
-**Required variables for local development:**
-- `DATABASE_URL` - Your PostgreSQL connection string (use `DATABASE_URL_DEV` for development)
-- `NEXTAUTH_SECRET` - Generate with: `openssl rand -base64 32`
-- `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET` - From [Google Cloud Console](https://console.cloud.google.com/)
-- `RESEND_API_KEY` - For email notifications (get from [Resend](https://resend.com/))
-
-See `.env.example` for all available configuration options.
-
 ### Tech Stack
-- **Frontend:** Next.js 15 (App Router), React 19, Tailwind CSS 4
+- **Frontend:** Next.js 15, React 19, Tailwind CSS 4
 - **Backend:** Next.js API Routes + Server Actions  
 - **Database:** PostgreSQL (Neon), SQLite (development)
 - **ORM:** Prisma with generated client
 - **Auth:** NextAuth.js (Google OAuth)
 - **Email:** Resend API for notifications
 - **Deployment:** Vercel with automated cron jobs
-- **Testing:** Jest with Testing Library
 
-> **📄 Complete Architecture:** See [AGENT.md](AGENT.md#technology-stack) for detailed system architecture and implementation details.
+> **📄 Complete Documentation:** See [AGENT.md](AGENT.md) for detailed system architecture, development guidelines, and implementation details.
 
 ### Contribution Guidelines
-See our **[Detailed Contributing Guide](CONTRIBUTING.md)** for:
-- Complete development setup
-- Database safety practices
-- Credit card data update procedures
-- Code standards and testing
-- Pull request process
+See our **[Contributing Guide](CONTRIBUTING.md)** for complete development setup, database safety practices, and pull request process.
 
 ## 🏠 Self-Hosting
 
 Want complete control over your data? Self-hosting CouponCycle gives you full ownership of your credit card tracking.
 
-**Quick Start:**
 ```bash
 git clone https://github.com/FantasyChen/credit-card-tracker.git
 cd credit-card-tracker
 npm install
-cp .env.example .env  # Fill in your values
 npx prisma migrate deploy
 npm run build
 npm start
@@ -140,7 +97,7 @@ npm start
 - **Vercel (Recommended):** Connect your GitHub repo - automatic deployments on push
 - **Self-hosted:** Deploy anywhere that supports Node.js and PostgreSQL
 
-> **📄 Complete Self-Hosting Guide:** See [AGENT.md](AGENT.md#deployment--operations) for detailed deployment instructions, environment setup, security best practices, and troubleshooting.
+> **📄 Complete Self-Hosting Guide:** See [AGENT.md](AGENT.md) for detailed deployment instructions, environment setup, and troubleshooting.
 
 ## 🗺️ What's Next
 

@@ -17,6 +17,7 @@ export async function GET() {
         name: true,
         issuer: true,
         openedDate: true,
+        nickname: true,
       },
       orderBy: {
         name: 'asc',
@@ -30,6 +31,7 @@ export async function GET() {
         predefinedCardName: card.name,
         predefinedCardIssuer: card.issuer,
         openedDate: card.openedDate ? card.openedDate.toISOString().split('T')[0] : null,
+        nickname: card.nickname,
       })),
     };
 

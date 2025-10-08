@@ -23,6 +23,7 @@ export async function addCardAction(formData: FormData) {
   const openedMonthString = formData.get('openedMonth') as string | null;
   const openedYearString = formData.get('openedYear') as string | null;
   const lastFourDigits = formData.get('lastFourDigits') as string | null;
+  const nickname = formData.get('nickname') as string | null;
 
   if (!predefinedCardId) {
     throw new Error('Predefined card ID is missing.');
@@ -62,7 +63,7 @@ export async function addCardAction(formData: FormData) {
 
 
   try {
-    const result = await createCardForUser(userId, predefinedCardId, openedDate, lastFourDigits);
+    const result = await createCardForUser(userId, predefinedCardId, openedDate, lastFourDigits, nickname);
 
     if (!result.success) {
       throw new Error(result.message || 'Failed to add card in helper function.');

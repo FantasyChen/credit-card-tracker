@@ -10,6 +10,7 @@ import { validateCardDigits } from '@/lib/cardDisplayUtils';
 // Define schema for input validation
 const updateCardSchema = z.object({
   cardId: z.string().cuid(),
+  nickname: z.string().optional(),
   lastFourDigits: z.string().optional(),
   openedMonth: z.string().optional(),
   openedYear: z.string().optional(),
@@ -23,6 +24,7 @@ export async function updateCardAction(formData: FormData) {
 
   const parseResult = updateCardSchema.safeParse({
     cardId: formData.get('cardId'),
+    nickname: formData.get('nickname') || undefined,
     lastFourDigits: formData.get('lastFourDigits') || undefined,
     openedMonth: formData.get('openedMonth') || undefined,
     openedYear: formData.get('openedYear') || undefined,
@@ -33,7 +35,7 @@ export async function updateCardAction(formData: FormData) {
     return { success: false, error: 'Invalid input data.' };
   }
 
-  const { cardId, lastFourDigits, openedMonth, openedYear } = parseResult.data;
+  const { cardId, nickname, lastFourDigits, openedMonth, openedYear } = parseResult.data;
 
   try {
     // Verify the card belongs to the current user
@@ -46,6 +48,12 @@ export async function updateCardAction(formData: FormData) {
 
     if (!existingCard) {
       return { success: false, error: 'Card not found or you do not have permission to edit it.' };
+    }
+
+    // Process nickname
+    let processedNickname: string | null = null;
+    if (nickname && nickname.trim()) {
+      processedNickname = nickname.trim();
     }
 
     // Validate last digits if provided (dynamic for AMEX vs other cards)
@@ -79,6 +87,7 @@ export async function updateCardAction(formData: FormData) {
     await prisma.creditCard.update({
       where: { id: cardId },
       data: {
+        nickname: processedNickname,
         lastFourDigits: processedLastFourDigits,
         openedDate: processedOpenedDate,
       },

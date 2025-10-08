@@ -38,6 +38,7 @@ export default async function BenefitsDashboardPage() {
       name: true,
       issuer: true,
       lastFourDigits: true, // Include lastFourDigits for display name generation
+      nickname: true, // Include nickname for display name generation
       createdAt: true,
       updatedAt: true,
       userId: true,

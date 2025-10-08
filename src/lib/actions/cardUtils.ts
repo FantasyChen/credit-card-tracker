@@ -16,7 +16,8 @@ export async function createCardForUser(
   userId: string,
   predefinedCardId: string,
   openedDateInput: Date | null,
-  lastFourDigits?: string | null
+  lastFourDigits?: string | null,
+  nickname?: string | null
 ): Promise<CreateCardResult> {
 
 
@@ -66,6 +67,7 @@ export async function createCardForUser(
         userId: userId,
         openedDate: openedDate, // Use the determined openedDate
         lastFourDigits: lastFourDigits || null, // Include last 4 digits if provided
+        nickname: nickname || null, // Include nickname if provided
       },
     });
 

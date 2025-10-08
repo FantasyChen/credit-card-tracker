@@ -1,5 +1,7 @@
 # CouponCycle - Complete Project Documentation for AI Agents
 
+> **🤖 PRIMARY AI REFERENCE**: This document is the main source of truth for AI agents working on this project. It contains complete system architecture, business logic, development guidelines, and operational procedures. Always reference this document when making changes or additions to the codebase.
+
 ## 🎯 Project Overview
 
 **CouponCycle** is a free, open-source Progressive Web App that helps users maximize their credit card benefits by tracking recurring perks, managing loyalty programs, and ensuring no valuable benefits expire unused. 
@@ -176,9 +178,10 @@ The heart of the application is the `calculateBenefitCycle()` function in `src/l
 ### Environment Setup
 
 **Local Development:**
-- The project includes a fully configured `.env` file for local development
-- All required environment variables are already set up
-- No additional configuration needed for local development
+- ✅ **FULLY CONFIGURED**: The project includes a complete `.env` file with all required environment variables
+- ✅ **READY TO USE**: No additional configuration needed for local development
+- ✅ **AGENT NOTE**: AI agents cannot see the `.env` file directly due to security isolation, but the file exists and is fully configured
+- All local commands and the application will automatically read from the existing `.env` file
 
 **Required Environment Variables for Production:**
 ```bash
@@ -198,7 +201,7 @@ CRON_SECRET="your-cron-secret"
 SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 ```
 
-> **Note for Cursor:** The `.env` file already exists in this repository and is fully configured. The Cursor agent cannot access it directly due to environment isolation, but local commands and the app will still read from `.env`. Refer to `.env.example` if you need a reference of keys.
+> **CRITICAL NOTE FOR AI AGENTS:** The `.env` file already exists in this repository and is fully configured with all required environment variables. AI agents cannot access it directly due to security isolation, but local commands and the app will automatically read from `.env`. Do not attempt to create or modify the `.env` file - it already exists and is properly configured.
 
 ### Database Safety Rules ⚠️
 
@@ -240,8 +243,6 @@ SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 1. **Update Templates** (affects new users): Edit `prisma/seed.ts` → `npx prisma db seed`
 2. **Migrate Existing Users**: Run appropriate migration script with `--force`
 
-**See `docs/predefined-card-update-guide.md` for complete workflow.**
-
 **Common Issue**: If you only update templates, existing users will still see old benefits until migrated.
 
 **Benefit Inclusion Criteria:**
@@ -257,6 +258,134 @@ SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 - Earning rate multipliers (3x points on dining, etc.)
 - Elite status benefits (hotel/airline status)
 - One-time signup bonuses
+
+### Automated Benefit Migration Framework
+
+**NEW APPROACH (September 2025)**: The error-prone manual two-step process has been replaced with an automated migration framework.
+
+#### Quick Start with New Framework
+
+```bash
+# 1. Validate migration
+node scripts/validate-migration.js --migration-id=your-migration
+
+# 2. Preview changes (dry run) 
+node scripts/migrate-benefits.js --migration-id=your-migration --dry-run
+
+# 3. Execute migration
+node scripts/migrate-benefits.js --migration-id=your-migration --force
+```
+
+**Benefits of the new framework:**
+- ✅ Automated two-step process (no more forgetting to migrate users)
+- ✅ Comprehensive validation prevents errors like Q3→Q1 bugs
+- ✅ Fault-tolerant processing with Promise.allSettled
+- ✅ User data protection (preserves completed benefits)
+- ✅ Safe by default (dry run mode, transaction safety)
+
+#### Creating Migrations
+
+Add your migration to `scripts/migrate-benefits.js`:
+
+```javascript
+const MIGRATION_REGISTRY = {
+  'my-card-2025': createMyCard2025Migration,
+  // ... other migrations
+};
+
+function createMyCard2025Migration() {
+  return MigrationPlanBuilder.fromConfig({
+    id: 'my-card-2025',
+    title: 'My Card 2025 Benefits Update',
+    description: 'Updated benefits structure',
+    cards: [{
+      name: 'My Card Name',
+      issuer: 'My Issuer',
+      annualFee: 695,
+      benefits: [
+        {
+          category: 'Travel',
+          description: 'Annual Travel Credit',
+          percentage: 100,
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY
+        }
+        // ... more benefits
+      ]
+    }]
+  });
+}
+```
+
+#### Safety Features
+
+1. **Dry Run by Default**: `node scripts/migrate-benefits.js --migration-id=test` (no data modified)
+2. **User Action Preservation**: Preserves completed benefits and user timestamps
+3. **Promise.allSettled**: Individual failures don't stop entire migration
+4. **Transaction Safety**: Each user's migration runs in a database transaction
+5. **Comprehensive Validation**: Prevents Q3→Q1 bugs and validates schema compatibility
+
+### Adding "How to Use" Guides
+
+The system includes step-by-step guides for maximizing credit card benefits, stored in the `BenefitUsageWay` table.
+
+#### Adding New Usage Guides
+
+1. **Define Guide in Seed**: Add to `prisma/seed.ts` around line 1317:
+
+```typescript
+const usageWays = [
+  // ... existing guides ...
+  {
+    title: 'How to Use [Benefit Type]',
+    slug: 'benefit-type-slug',  // Must be unique, URL-friendly
+    description: 'Short description for preview and SEO',
+    category: 'Category Name',  // Travel, Dining, Transportation, Entertainment, General
+    content: `## Section Title
+
+Your guide content here. Supports markdown-like formatting:
+
+1. **Numbered lists** - Step-by-step instructions
+2. **Make qualifying purchase** with the enrolled card
+3. **Credit posts** within 1-2 billing cycles
+
+## What Qualifies
+
+- ✈️ Item 1
+- 💺 Item 2
+- 🍽️ Item 3`,
+    tips: [
+      'Quick tip 1 - short and actionable',
+      'Quick tip 2 - avoid using apostrophes without escaping',
+      'Quick tip 3 - these appear in a sidebar',
+      'Quick tip 4 - limit to 4-6 tips for readability'
+    ]
+  }
+];
+```
+
+2. **Run Seed Command**: `npx prisma db seed`
+
+3. **Automatic Matching**: The system automatically matches benefits to guides based on `category` and `description`
+
+#### Content Formatting
+
+Supported markdown-like syntax:
+- `## Heading` - Large section heading
+- `**Bold text**` - **Bold text**
+- `- List item` - Bullet point
+- `1. Numbered item` - Numbered list
+- Blank line - Paragraph break
+- `💡 🚗 ✈️` - Emojis for visual interest
+
+#### Categories
+
+Use these standard categories for consistency:
+- `Travel` - Airlines, hotels, TSA PreCheck, Global Entry
+- `Transportation` - Uber, Lyft, parking, tolls
+- `Dining` - Restaurants, food delivery (DoorDash, Uber Eats, Grubhub)
+- `Entertainment` - Streaming services, events, concerts
+- `General` - Statement credits, miscellaneous benefits
 
 ### Testing
 
@@ -275,8 +404,9 @@ node scripts/check-database-connection.js  # Verify database connection
 ### Vercel Configuration
 
 **Automatic GitHub Deployment:**
-- **Push to main branch** → Automatic production deployment
-- **No manual deployment needed** - Vercel handles everything
+- ✅ **AUTOMATIC**: Push to main branch → Automatic production deployment
+- ✅ **NO MANUAL STEPS**: Vercel handles everything automatically
+- ✅ **AGENT NOTE**: AI agents should NOT attempt manual deployment - simply push to GitHub
 - Environment variables configured in Vercel dashboard
 - Build command: `prisma generate && next build`
 - Database migrations run automatically via `npx prisma migrate deploy`
@@ -306,8 +436,8 @@ curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-noti
 **Migration Process:**
 1. Test on development branch (optional)
 2. Commit migration files to main branch
-3. Push to GitHub → Vercel automatically runs `npx prisma migrate deploy`
-4. No manual deployment steps required
+3. ✅ **Push to GitHub** → Vercel automatically runs `npx prisma migrate deploy`
+4. ✅ **No manual deployment steps required** - everything is automatic
 
 **Production changes on request (non-destructive):**
 - When the user asks to update production data (e.g., add or refresh predefined cards/benefits):

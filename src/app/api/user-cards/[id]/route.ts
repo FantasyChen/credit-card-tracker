@@ -26,6 +26,7 @@ export async function GET(
         name: true,
         issuer: true,
         lastFourDigits: true,
+        nickname: true,
         openedDate: true,
       }
     });

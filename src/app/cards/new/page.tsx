@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useTransition } from 'react'; // Import useTransition
 import Image from 'next/image';
+import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { addCardAction } from './actions'; // Import the action from the new file
 import { searchCards, type CardWithBenefits } from '@/lib/cardSearchUtils';
 import { isAmexCard } from '@/lib/cardDisplayUtils';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 // Helper arrays
 const months = [
@@ -20,13 +22,14 @@ const years = Array.from({ length: 10 }, (_, i) => currentYear - i); // Last 10 
 // --- Sub-component for the card form with its own transition state ---
 function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; matchedFields?: string[] }) {
   const [isPending, startTransition] = useTransition();
+  const [showBenefits, setShowBenefits] = useState(false);
   
   // Check if this is an AMEX card for dynamic form constraints
   const isAmex = isAmexCard(card.issuer);
   const maxLength = isAmex ? 5 : 4;
   const pattern = isAmex ? "[0-9]{4,5}" : "[0-9]{4}";
   const placeholder = isAmex ? "12345" : "1234";
-  const label = isAmex ? "Last 5 Digits (Optional)" : "Last 4 Digits (Optional)";
+  const label = isAmex ? "Last 5 Digits" : "Last 4 Digits";
   const helperText = isAmex 
     ? "Enter the last 5 digits from your AMEX card (4 digits also accepted)"
     : "Helps identify your specific card if you have multiple of the same type";
@@ -43,10 +46,11 @@ function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; m
   return (
     <form onSubmit={handleSubmit}> 
       <input type="hidden" name="predefinedCardId" value={card.id} />
-      <div className="border rounded-lg p-4 shadow-md flex flex-col justify-between h-full bg-white dark:bg-gray-800 dark:border-gray-700 dark:shadow-lg dark:shadow-indigo-500/20">
+      <div className="border rounded-lg p-3 shadow-md flex flex-col justify-between h-full bg-white dark:bg-gray-800 dark:border-gray-700 dark:shadow-lg dark:shadow-indigo-500/20">
         <div>
+          {/* Card Image - Slightly Smaller */}
           {card.imageUrl && (
-            <div className="relative h-40 w-full mb-4 rounded overflow-hidden">
+            <div className="relative h-32 w-full mb-3 rounded overflow-hidden">
               <Image
                 src={card.imageUrl}
                 alt={card.name}
@@ -56,51 +60,87 @@ function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; m
               />
             </div>
           )}
+          
+          {/* Card Name and Match Badges */}
           <div className="flex items-start justify-between mb-2">
-            <h2 className={`text-xl font-semibold dark:text-gray-100 ${matchedFields?.includes('name') ? 'bg-yellow-200 dark:bg-yellow-800 px-1 rounded' : ''}`}>
+            <h2 className={`text-lg font-semibold dark:text-gray-100 ${matchedFields?.includes('name') ? 'bg-yellow-200 dark:bg-yellow-800 px-1 rounded' : ''}`}>
               {card.name}
             </h2>
             {matchedFields && matchedFields.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {matchedFields.map(field => (
-                  <span key={field} className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">
+                  <span key={field} className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded-full">
                     {field}
                   </span>
                 ))}
               </div>
             )}
           </div>
-          <p className={`text-gray-600 mb-1 dark:text-gray-300 ${matchedFields?.includes('issuer') ? 'bg-yellow-200 dark:bg-yellow-800 px-1 rounded' : ''}`}>
-            Issuer: {card.issuer}
-          </p>
-          <p className={`text-gray-600 mb-2 dark:text-gray-300 ${matchedFields?.includes('annual fee') ? 'bg-yellow-200 dark:bg-yellow-800 px-1 rounded' : ''}`}>
-            Annual Fee: ${card.annualFee}
-          </p>
           
-          {/* Show benefits preview */}
+          {/* Issuer and Annual Fee - More Compact */}
+          <div className="flex items-center gap-3 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+            <p className={`text-xs text-gray-500 dark:text-gray-400 ${matchedFields?.includes('issuer') ? 'bg-yellow-200 dark:bg-yellow-800 px-1 rounded' : ''}`}>
+              {card.issuer}
+            </p>
+            <span className="text-gray-300 dark:text-gray-600">•</span>
+            <p className={`text-xs font-medium text-gray-700 dark:text-gray-300 ${matchedFields?.includes('annual fee') ? 'bg-yellow-200 dark:bg-yellow-800 px-1 rounded' : ''}`}>
+              ${card.annualFee}/year
+            </p>
+          </div>
+          
+          {/* Collapsible Benefits Section */}
           {card.benefits && card.benefits.length > 0 && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Key Benefits:</h3>
-              <div className="space-y-1">
-                {card.benefits.slice(0, 3).map((benefit, index) => (
-                  <div key={index} className={`text-xs text-gray-600 dark:text-gray-400 ${matchedFields?.includes('benefit') || matchedFields?.includes('category') ? 'bg-yellow-200 dark:bg-yellow-800 px-1 rounded' : ''}`}>
-                    • {benefit.description} {benefit.maxAmount && `($${benefit.maxAmount})`}
-                  </div>
-                ))}
-                {card.benefits.length > 3 && (
-                  <div className="text-xs text-gray-500 dark:text-gray-500">
-                    +{card.benefits.length - 3} more benefits
-                  </div>
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={() => setShowBenefits(!showBenefits)}
+                className="flex items-center justify-between w-full text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                    ✓ {card.benefits.length} {card.benefits.length === 1 ? 'Benefit' : 'Benefits'}
+                  </span>
+                </span>
+                {showBenefits ? (
+                  <ChevronUpIcon className="w-4 h-4" />
+                ) : (
+                  <ChevronDownIcon className="w-4 h-4" />
                 )}
-              </div>
+              </button>
+              
+              {showBenefits && (
+                <div className="mt-2 space-y-1 pl-2 border-l-2 border-green-200 dark:border-green-800">
+                  {card.benefits.map((benefit, index) => (
+                    <div key={index} className={`text-xs text-gray-600 dark:text-gray-400 ${matchedFields?.includes('benefit') || matchedFields?.includes('category') ? 'bg-yellow-200 dark:bg-yellow-800 px-1 rounded' : ''}`}>
+                      • {benefit.description} {benefit.maxAmount && `($${benefit.maxAmount})`}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
+          {/* Nickname Field with Tooltip */}
+          <div className="mb-3">
+            <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
+              Nickname <span className="text-xs text-gray-400 ml-1">(optional)</span>
+              <Tooltip content="Helpful for identifying cards when you have multiple of the same type" />
+            </label>
+            <input
+              type="text"
+              id={`nickname-${card.id}`}
+              name="nickname"
+              maxLength={50}
+              placeholder="My Travel Card, Work Card..."
+              className="block w-full px-3 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 dark:placeholder-gray-400"
+            />
+          </div>
 
-          {/* --- Add Last Digits Field (Dynamic for AMEX) --- */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-100">
-              {label}
+          {/* Last Digits Field with Tooltip */}
+          <div className="mb-3">
+            <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
+              {label} <span className="text-xs text-gray-400 ml-1">(optional)</span>
+              <Tooltip content={helperText} />
             </label>
             <input
               type="text"
@@ -109,31 +149,36 @@ function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; m
               maxLength={maxLength}
               pattern={pattern}
               placeholder={placeholder}
-              className="mt-1 block w-full pl-3 pr-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 dark:placeholder-gray-400"
+              className="block w-full px-3 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 dark:placeholder-gray-400"
               onInput={(e) => {
-                // Only allow numbers and enforce length limits
                 const target = e.target as HTMLInputElement;
                 const cleaned = target.value.replace(/[^0-9]/g, '');
                 target.value = cleaned.slice(0, maxLength);
               }}
             />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {helperText}
-            </p>
           </div>
-          {/* --- End Last Digits Field --- */}
 
-          {/* --- Add Opened Month and Year Select --- */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-100">
-              Date Card Opened (Optional)
+          {/* Opened Date with Tooltip */}
+          <div className="mb-3">
+            <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
+              Opened Date <span className="text-xs text-gray-400 ml-1">(optional)</span>
+              <Tooltip 
+                content={
+                  <>
+                    Helps track annual fees/benefits. Check your credit report (
+                    <a href="https://www.creditkarma.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Credit Karma</a>
+                    {', '}
+                    <a href="https://www.experian.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Experian</a>
+                    , etc.) if unsure.
+                  </>
+                }
+              />
             </label>
-            <div className="flex space-x-2">
-              {/* Month Select */}
+            <div className="flex gap-2">
               <select
                 id={`openedMonth-${card.id}`}
                 name="openedMonth"
-                className="mt-1 block w-1/2 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
+                className="block w-1/2 px-2 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
                 defaultValue=""
               >
                 <option value="" disabled>Month...</option>
@@ -141,11 +186,10 @@ function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; m
                   <option key={month.value} value={month.value}>{month.label}</option>
                 ))}
               </select>
-              {/* Year Select */}
               <select
                 id={`openedYear-${card.id}`}
                 name="openedYear"
-                className="mt-1 block w-1/2 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
+                className="block w-1/2 px-2 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
                 defaultValue=""
               >
                 <option value="" disabled>Year...</option>
@@ -154,19 +198,14 @@ function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; m
                 ))}
               </select>
             </div>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Helps track annual fees/benefits. Check your credit report (
-              <a href="https://www.creditkarma.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">Credit Karma</a>,
-              <a href="https://www.experian.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">Experian</a>, etc.)
-               if unsure.
-            </p>
           </div>
-          {/* --- End Opened Month and Year Select --- */}
         </div>
+        
+        {/* Submit Button */}
         <button
           type="submit"
           disabled={isPending}
-          className={`mt-auto w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`mt-auto w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 transition-colors ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {isPending ? 'Adding...' : 'Add Card'}
         </button>

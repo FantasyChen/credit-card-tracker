@@ -4,6 +4,7 @@ import React, { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateCardAction } from './actions';
 import { isAmexCard } from '@/lib/cardDisplayUtils';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 interface CreditCard {
   id: string;
@@ -11,6 +12,7 @@ interface CreditCard {
   issuer: string;
   lastFourDigits: string | null;
   openedDate: Date | null;
+  nickname: string | null;
 }
 
 const months = [
@@ -121,7 +123,7 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
   const maxLength = isAmex ? 5 : 4;
   const pattern = isAmex ? "[0-9]{4,5}" : "[0-9]{4}";
   const placeholder = isAmex ? "12345" : "1234";
-  const label = isAmex ? "Last 5 Digits (Optional)" : "Last 4 Digits (Optional)";
+  const label = isAmex ? "Last 5 Digits" : "Last 4 Digits";
   const helperText = isAmex 
     ? "Enter the last 5 digits from your AMEX card (4 digits also accepted)"
     : "Helps identify your specific card if you have multiple of the same type";
@@ -134,14 +136,31 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
         <form onSubmit={handleSubmit}>
           <input type="hidden" name="cardId" value={cardId || ''} />
           
-          <div className="border rounded-lg p-6 shadow-md bg-white dark:bg-gray-800 dark:border-gray-700">
-            <h2 className="text-xl font-semibold mb-4 dark:text-gray-100">{card.name}</h2>
-            <p className="text-gray-600 mb-4 dark:text-gray-300">Issuer: {card.issuer}</p>
+          <div className="border rounded-lg p-4 shadow-md bg-white dark:bg-gray-800 dark:border-gray-700">
+            <h2 className="text-lg font-semibold mb-2 dark:text-gray-100">{card.name}</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">{card.issuer}</p>
+
+            {/* Nickname Field */}
+            <div className="mb-3">
+              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
+                Nickname <span className="text-xs text-gray-400 ml-1">(optional)</span>
+                <Tooltip content="Give this card a nickname to easily identify it" />
+              </label>
+              <input
+                type="text"
+                name="nickname"
+                maxLength={50}
+                placeholder="Work Card, Personal Travel..."
+                defaultValue={card.nickname || ''}
+                className="block w-full px-3 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 dark:placeholder-gray-400"
+              />
+            </div>
 
             {/* Last Digits Field (Dynamic for AMEX) */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-100">
-                {label}
+            <div className="mb-3">
+              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
+                {label} <span className="text-xs text-gray-400 ml-1">(optional)</span>
+                <Tooltip content={helperText} />
               </label>
               <input
                 type="text"
@@ -150,29 +169,25 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
                 pattern={pattern}
                 placeholder={placeholder}
                 defaultValue={card.lastFourDigits || ''}
-                className="mt-1 block w-full pl-3 pr-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 dark:placeholder-gray-400"
+                className="block w-full px-3 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 dark:placeholder-gray-400"
                 onInput={(e) => {
-                  // Only allow numbers and enforce length limits
                   const target = e.target as HTMLInputElement;
                   const cleaned = target.value.replace(/[^0-9]/g, '');
                   target.value = cleaned.slice(0, maxLength);
                 }}
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {helperText}
-              </p>
             </div>
 
             {/* Anniversary Date Fields */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-100">
-                Anniversary Date (Optional)
+            <div className="mb-4">
+              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
+                Anniversary Date <span className="text-xs text-gray-400 ml-1">(optional)</span>
+                <Tooltip content="The card anniversary date affects when annual benefits reset" />
               </label>
-              <div className="flex space-x-2">
-                {/* Month Select */}
+              <div className="flex gap-2">
                 <select
                   name="openedMonth"
-                  className="mt-1 block w-1/2 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
+                  className="block w-1/2 px-2 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
                   defaultValue={openedDate ? openedDate.getUTCMonth() + 1 : ''}
                 >
                   <option value="">Month...</option>
@@ -180,10 +195,9 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
                     <option key={month.value} value={month.value}>{month.label}</option>
                   ))}
                 </select>
-                {/* Year Select */}
                 <select
                   name="openedYear"
-                  className="mt-1 block w-1/2 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
+                  className="block w-1/2 px-2 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
                   defaultValue={openedDate ? openedDate.getUTCFullYear() : ''}
                 >
                   <option value="">Year...</option>
@@ -192,23 +206,20 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
                   ))}
                 </select>
               </div>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                The card anniversary date affects when annual benefits reset
-              </p>
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
               <button
                 type="button"
                 onClick={() => router.push('/cards')}
-                className="flex-1 bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 transition duration-200 dark:bg-gray-600 dark:hover:bg-gray-700"
+                className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 transition-colors dark:bg-gray-600 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isPending}
-                className={`flex-1 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200 dark:bg-blue-600 dark:hover:bg-blue-700 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`flex-1 bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors dark:bg-blue-600 dark:hover:bg-blue-700 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {isPending ? 'Saving...' : 'Save Changes'}
               </button>

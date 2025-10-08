@@ -4,8 +4,7 @@ globs:
 alwaysApply: true
 ---
 # .cursor/rules/documentation-check.mdc
-# This rule reminds to update key documentation files when making significant changes.
+# This rule reminds to reference and update key documentation files.
 
-when: before:commit
-description: "Reminder: Have you updated AGENT.md, README.md, docs/safe-migration-guide.md, or docs/BACKFILL_REQUEST.md if your recent changes affect project overview, scope, design, setup, or the development plan?"
-# This rule is a reminder and does not automatically run any commands or fail the commit.
+description: "IMPORTANT: Always start by reading AGENT.md (PRIMARY AI REFERENCE) for complete project context. Update AGENT.md or README.md if your changes affect project overview, scope, design, setup, or development plan. AGENT.md is the main documentation that AI agents should reference for project context. README.md is the human-readable documentation for users and contributors."
+# This rule is a reminder and does not automatically run any commands or fail operations.

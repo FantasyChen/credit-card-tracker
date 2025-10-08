@@ -3,6 +3,7 @@ interface CardForDisplay {
   name: string;
   issuer: string;
   lastFourDigits?: string | null;
+  nickname?: string | null;
 }
 
 // Utility functions for AMEX card digit handling
@@ -73,8 +74,12 @@ export function generateCardDisplayNames<T extends CardForDisplay>(
     const cardKey = `${card.name}-${card.issuer}`;
     let displayName = card.name;
 
-    // Only modify display name if there are duplicates
-    if (cardCounts[cardKey] > 1) {
+    // If card has a nickname, use it directly
+    if (card.nickname && card.nickname.trim()) {
+      displayName = card.nickname.trim();
+    } 
+    // Only modify display name if there are duplicates and no nickname
+    else if (cardCounts[cardKey] > 1) {
       if (card.lastFourDigits && card.lastFourDigits.trim()) {
         // Prefer last digits if available (4 or 5 for AMEX, 4 for others)
         const length = card.lastFourDigits.length;
