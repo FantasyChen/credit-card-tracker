@@ -218,7 +218,7 @@ export default function UserCardsPage() {
               <p className="text-gray-500 mb-4 dark:text-gray-400">
                 Please sign in to manage your cards.
               </p>
-              <Link href="/api/auth/signin?callbackUrl=/cards" className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200 dark:bg-blue-600 dark:hover:bg-blue-700">
+              <Link href="/auth/signin?callbackUrl=/cards" className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200 dark:bg-blue-600 dark:hover:bg-blue-700">
                 Sign In
               </Link>
             </>

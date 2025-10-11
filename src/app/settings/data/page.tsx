@@ -1,27 +1,35 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useTransition, useEffect } from 'react';
 import { Button } from '@/components/ui/button'; // Assuming you have a Button component
 import { Input } from '@/components/ui/input';   // Assuming you have an Input component
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export default function DataManagementPage() {
   const { status } = useSession();
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition(); // For form submission state
 
+  // Handle redirect if not authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin?callbackUrl=/settings/data');
+    }
+  }, [status, router]); // router is stable but included for completeness
+
   // Handle loading state for session
   if (status === 'loading') {
     return <p className="text-center mt-10">Loading session...</p>;
   }
 
-  // Redirect if not authenticated
+  // Show loading while redirecting
   if (status === 'unauthenticated') {
-    redirect('/api/auth/signin?callbackUrl=/settings/data');
+    return <p className="text-center mt-10">Redirecting to sign in...</p>;
   }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {

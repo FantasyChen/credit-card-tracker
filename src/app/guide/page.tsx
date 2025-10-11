@@ -172,7 +172,7 @@ export default function GuidePage() {
             Get smart notifications, calculate ROI, and never miss a valuable benefit again.
           </p>
           <Link 
-            href="/api/auth/signin" 
+            href="/auth/signin" 
             className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
           >
             Get Started Free

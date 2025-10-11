@@ -13,29 +13,29 @@ interface NavItem {
   authRequired?: boolean; // Optional: true if link requires authentication
 }
 
+// Define baseNavigation outside the component to avoid re-creating it
+const baseNavigation: NavItem[] = [
+  { name: 'Dashboard', href: '/' },
+  { name: 'Cards', href: '/cards' },
+  { name: 'Benefits', href: '/benefits' },
+  { name: 'Notifications', href: '/settings/notifications', authRequired: true },
+  { name: 'Contact', href: '/contact' },
+];
+
 const Navbar = () => {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const baseNavigation: NavItem[] = useMemo(() => [
-    { name: 'Dashboard', href: '/' },
-    { name: 'Cards', href: '/cards' },
-    { name: 'Benefits', href: '/benefits' },
-    { name: 'Notifications', href: '/settings/notifications', authRequired: true },
-    { name: 'Contact', href: '/contact' },
-  ], []); // Empty dependency array as baseNavigation is static
-
   // Filter navigation items based on authentication status
   const navigation = useMemo(() => {
-    const items: NavItem[] = [...baseNavigation];
-    return items.filter(item => {
+    return baseNavigation.filter(item => {
       if (item.authRequired && !session) {
         return false; // Don't show auth-required links if not logged in
       }
       return true;
     });
-  }, [session, baseNavigation]);
+  }, [session]);
 
   return (
     <nav className="bg-white shadow-sm dark:bg-gray-800">
@@ -84,7 +84,7 @@ const Navbar = () => {
                 </button>
               ) : (
                 <Link
-                  href="/api/auth/signin"
+                  href="/auth/signin"
                   className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                 >
                   Sign in
@@ -142,7 +142,7 @@ const Navbar = () => {
                 </button>
               ) : (
                 <Link
-                  href="/api/auth/signin"
+                  href="/auth/signin"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="block w-full rounded-md bg-indigo-600 px-3 py-2 text-center text-base font-medium text-white shadow-sm hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                 >
