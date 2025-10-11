@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
@@ -48,6 +48,13 @@ export default function SupportedCreditCards() {
   // Enhanced search functionality with server-side optimization
   const [searchResults, setSearchResults] = useState<Array<{card: CardWithBenefits, score: number, matchedFields: string[]}>>([]);
   const [isSearching, setIsSearching] = useState(false);
+  
+  // Memoize the search handler to prevent infinite loops
+  const handleSearch = useCallback((query: string, results: any[]) => {
+    setSearchTerm(query);
+    setSearchResults(results);
+    setIsSearching(false);
+  }, []);
   
   // Use client-side search as fallback
   const fallbackResults = searchCards(cards, searchTerm);
@@ -168,11 +175,7 @@ export default function SupportedCreditCards() {
           {/* Enhanced Search Bar */}
           <div className="max-w-lg mx-auto mb-8 space-y-4">
             <SearchInput
-              onSearch={(query, results) => {
-                setSearchTerm(query);
-                setSearchResults(results);
-                setIsSearching(false);
-              }}
+              onSearch={handleSearch as any}
               placeholder="Search cards, issuers, benefits... Try 'amex', 'travel', 'dining', 'uber'"
               showSuggestions={true}
               debounceMs={300}
@@ -289,7 +292,7 @@ export default function SupportedCreditCards() {
               Ready to start tracking your credit card benefits?
             </p>
             <Link
-              href="/api/auth/signin"
+              href="/auth/signin"
               className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-900 transition-colors duration-200"
             >
               Get Started Free
