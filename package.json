@@ -27,8 +27,7 @@
     "test": "jest",
     "postinstall": "prisma generate",
     "migrate:status": "npx prisma migrate status",
-    "migrate:diff": "npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma",
-    "verify-auth": "node scripts/verify-auth-config.js"
+    "migrate:diff": "npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",
