@@ -92,8 +92,17 @@ async function runCheckBenefitsLogic() {
 
     // Send notifications after benefit processing
     console.log(`\n📧 Starting notification processing...`);
-    const notificationResult = await runSendNotificationsLogic();
-    const notificationData = notificationResult.status === 200 ? await notificationResult.json() : null;
+    let emailsSent = 0;
+    let usersProcessedForNotifications = 0;
+    
+    try {
+      const notificationData = await sendNotificationsDirectly();
+      emailsSent = notificationData.emailsSent;
+      usersProcessedForNotifications = notificationData.usersProcessed;
+    } catch (notificationError) {
+      console.error('❌ Notification processing failed:', notificationError);
+      // Continue even if notifications fail - don't block the cron job
+    }
 
     // Return enhanced response (backward compatible)
     return NextResponse.json({ 
@@ -107,8 +116,8 @@ async function runCheckBenefitsLogic() {
       cardsSuccessful: cardsSuccessful,
       cardsFailed: cardsFailed,
       // Notification metrics
-      notificationsSent: notificationData?.emailsSent || 0,
-      usersProcessed: notificationData?.usersProcessed || 0,
+      notificationsSent: emailsSent,
+      usersProcessed: usersProcessedForNotifications,
       timestamp: now.toISOString()
     }, { status: 200 });
 
@@ -264,31 +273,16 @@ interface LoyaltyAccountWithDetails extends LoyaltyAccount {
   loyaltyProgram: LoyaltyProgram;
 }
 
-// Notification logic (consolidated from send-notifications)
-async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
-  let today = new Date();
-  if (requestUrlForMockDate) {
-    const { searchParams } = new URL(requestUrlForMockDate);
-    const mockDateString = searchParams.get('mockDate');
-    if (process.env.NODE_ENV !== 'production' && mockDateString) {
-      const parsedMockDate = new Date(mockDateString);
-      if (!isNaN(parsedMockDate.getTime())) {
-        today = parsedMockDate;
-        console.log(`Core send-notifications logic: Using mock date: ${today.toISOString()}`);
-      } else {
-        console.warn(`Core send-notifications logic: Invalid mockDate format received: ${mockDateString}. Using current date.`);
-      }
-    }
-  }
-
+// Notification logic (consolidated from send-notifications) - returns data directly
+async function sendNotificationsDirectly() {
+  const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   console.log(`Core send-notifications logic started for date: ${today.toISOString()}`);
 
   let emailsSent = 0;
   let usersProcessed = 0;
 
-  try {
-    const usersToNotify = await prisma.user.findMany({
+  const usersToNotify = await prisma.user.findMany({
       where: {
         AND: [
           {
@@ -315,11 +309,11 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
       },
     });
 
-    usersProcessed = usersToNotify.length;
-    if (usersProcessed === 0) {
-      console.log('Core logic: No users with notification preferences enabled.');
-      return NextResponse.json({ message: 'No users to notify.' }, { status: 200 });
-    }
+  usersProcessed = usersToNotify.length;
+  if (usersProcessed === 0) {
+    console.log('Core logic: No users with notification preferences enabled.');
+    return { emailsSent: 0, usersProcessed: 0 };
+  }
 
     for (const user of usersToNotify) {
       if (!user.email) continue; 
@@ -475,15 +469,10 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
           console.warn(`Failed to send '${subject}' email to ${user.email}. sendEmail returned false.`);
         }
       }
-    }
-
-    console.log(`Core logic: Processed ${usersProcessed} users. Sent ${emailsSent} emails.`);
-    return NextResponse.json({ message: 'Notification cron job executed.', usersProcessed, emailsSent }, { status: 200 });
-
-  } catch (error) {
-    console.error('Core send-notifications logic failed:', error);
-    return NextResponse.json({ message: 'Error executing notification cron job.' }, { status: 500 });
   }
+
+  console.log(`Core logic: Processed ${usersProcessed} users. Sent ${emailsSent} emails.`);
+  return { emailsSent, usersProcessed };
 }
 
 // GET handler for Vercel Cron (defaults to GET)
