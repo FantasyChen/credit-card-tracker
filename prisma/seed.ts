@@ -439,6 +439,16 @@ async function main() {
           fixedCycleStartMonth: 1, // January
           fixedCycleDurationMonths: 12, // Calendar year
         },
+        // NEW BENEFIT: Quarterly Hilton Credit
+        {
+          description: '$50 Quarterly Hilton Credit (Hilton properties)',
+          category: 'Travel',
+          maxAmount: 50,
+          frequency: BenefitFrequency.QUARTERLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
+          occurrencesInCycle: 1,
+        },
       ],
     },
     {

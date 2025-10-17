@@ -10,14 +10,18 @@
  *   node scripts/validate-migration.js --migration-id=csr-2025 --verbose
  */
 
-const path = require('path');
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Add TypeScript support for this script
-require('ts-node/register');
+import 'ts-node/register';
 
 // Import validation tools and migration registry
-const { MigrationValidator } = require('../src/lib/benefit-migration/validation-tools');
-const { MIGRATION_REGISTRY } = require('./migrate-benefits');
+import { MigrationValidator } from '../src/lib/benefit-migration/validation-tools.ts';
+import { MIGRATION_REGISTRY } from './migrate-benefits.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Main validation function
@@ -139,7 +143,7 @@ process.on('SIGINT', () => {
 });
 
 // Run the validation
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(error => {
     console.error('💥 Fatal error:', error);
     process.exit(1);

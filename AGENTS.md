@@ -238,92 +238,109 @@ SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 
 ### Updating Existing Card Benefits
 
-⚠️ **CRITICAL**: Updating existing card benefits requires a **two-step process**:
+⚠️ **CRITICAL**: Updating card benefits requires a **three-step process** to ensure all users see the changes:
 
-1. **Update Templates** (affects new users): Edit `prisma/seed.ts` → `npx prisma db seed`
-2. **Migrate Existing Users**: Run appropriate migration script with `--force`
+1. **Update Templates** - Affects new users who add the card in the future
+2. **Migrate Existing Users** - Updates cards for current users
+3. **Create Benefit Statuses** - Makes benefits visible in the dashboard
 
-**Common Issue**: If you only update templates, existing users will still see old benefits until migrated.
+**The problem we solve**: Simply updating the seed file only helps new users. Existing users won't see changes until their cards are migrated AND benefit statuses are created.
 
-**Benefit Inclusion Criteria:**
+---
+
+#### **✨ NEW: Unified Update Script (Recommended)**
+
+**Use this single command for the complete update process:**
+
+```bash
+# Step 1: Update prisma/seed.ts with new benefits
+# (Edit the file manually to add/remove/change benefits)
+
+# Step 2: Update the predefined template (run seed)
+npx prisma db seed
+
+# Step 3: Run unified script to complete the update
+# Preview changes (dry run)
+node scripts/update-card-benefits.js --card "Card Name" --dry-run
+
+# Execute update
+node scripts/update-card-benefits.js --card "Card Name" --force
+```
+
+**What the unified script does:**
+1. ✅ Updates predefined card templates (for new users)
+2. ✅ Migrates all existing user cards (for current users)
+3. ✅ Creates benefit statuses (makes benefits visible in dashboard)
+4. ✅ Transaction-safe (rollback on failure)
+5. ✅ Dry run mode for safety
+
+**Example: Adding a quarterly $50 Hilton credit to Amex Business Platinum**
+
+```bash
+# 1. Edit prisma/seed.ts - add the new benefit:
+{
+  description: '$50 Quarterly Hilton Credit (Hilton properties)',
+  category: 'Travel',
+  maxAmount: 50,
+  frequency: BenefitFrequency.QUARTERLY,
+  percentage: 0,
+  cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
+  occurrencesInCycle: 1,
+}
+
+# 2. Update template
+npx prisma db seed
+
+# 3. Preview migration
+node scripts/update-card-benefits.js \
+  --card "American Express Business Platinum Card" \
+  --dry-run
+
+# 4. Execute migration
+node scripts/update-card-benefits.js \
+  --card "American Express Business Platinum Card" \
+  --force
+```
+
+---
+
+#### **Alternative: Advanced Migration Framework**
+
+For complex migrations involving multiple cards or custom logic, use the advanced framework:
+
+```bash
+# 1. Create migration in scripts/migrate-benefits.js
+# 2. Validate migration
+node scripts/validate-migration.js --migration-id=your-migration
+
+# 3. Preview changes (dry run) 
+node scripts/migrate-benefits.js --migration-id=your-migration --dry-run
+
+# 4. Execute migration
+node scripts/migrate-benefits.js --migration-id=your-migration --force
+
+# 5. Create benefit statuses (CRITICAL STEP - often forgotten!)
+# Run the cron job or use the unified script
+```
+
+**⚠️ Common Mistake**: The advanced framework doesn't automatically create benefit statuses. Users won't see benefits in their dashboard until statuses are created.
+
+---
+
+#### **Benefit Inclusion Criteria**
+
+**Include:**
 - Must have cyclical value (credits, points, free nights)
 - Must reset on trackable cycles (monthly/quarterly/yearly)
-- Exclude always-on perks (multipliers, insurance, status, memberships)
-- Verify with reliable sources
+- Verify with reliable sources ([US Credit Card Guide](https://www.uscreditcardguide.com/))
 
-**Specific Exclusions:**
+**Exclude:**
 - Priority Pass memberships (always-on access, no cyclical reset)
 - Lounge memberships (Admirals Club, Centurion Lounge access)
 - Insurance benefits (travel insurance, purchase protection)
 - Earning rate multipliers (3x points on dining, etc.)
 - Elite status benefits (hotel/airline status)
 - One-time signup bonuses
-
-### Automated Benefit Migration Framework
-
-**NEW APPROACH (September 2025)**: The error-prone manual two-step process has been replaced with an automated migration framework.
-
-#### Quick Start with New Framework
-
-```bash
-# 1. Validate migration
-node scripts/validate-migration.js --migration-id=your-migration
-
-# 2. Preview changes (dry run) 
-node scripts/migrate-benefits.js --migration-id=your-migration --dry-run
-
-# 3. Execute migration
-node scripts/migrate-benefits.js --migration-id=your-migration --force
-```
-
-**Benefits of the new framework:**
-- ✅ Automated two-step process (no more forgetting to migrate users)
-- ✅ Comprehensive validation prevents errors like Q3→Q1 bugs
-- ✅ Fault-tolerant processing with Promise.allSettled
-- ✅ User data protection (preserves completed benefits)
-- ✅ Safe by default (dry run mode, transaction safety)
-
-#### Creating Migrations
-
-Add your migration to `scripts/migrate-benefits.js`:
-
-```javascript
-const MIGRATION_REGISTRY = {
-  'my-card-2025': createMyCard2025Migration,
-  // ... other migrations
-};
-
-function createMyCard2025Migration() {
-  return MigrationPlanBuilder.fromConfig({
-    id: 'my-card-2025',
-    title: 'My Card 2025 Benefits Update',
-    description: 'Updated benefits structure',
-    cards: [{
-      name: 'My Card Name',
-      issuer: 'My Issuer',
-      annualFee: 695,
-      benefits: [
-        {
-          category: 'Travel',
-          description: 'Annual Travel Credit',
-          percentage: 100,
-          maxAmount: 300,
-          frequency: BenefitFrequency.YEARLY
-        }
-        // ... more benefits
-      ]
-    }]
-  });
-}
-```
-
-#### Safety Features
-
-1. **Dry Run by Default**: `node scripts/migrate-benefits.js --migration-id=test` (no data modified)
-2. **User Action Preservation**: Preserves completed benefits and user timestamps
-3. **Promise.allSettled**: Individual failures don't stop entire migration
-4. **Transaction Safety**: Each user's migration runs in a database transaction
-5. **Comprehensive Validation**: Prevents Q3→Q1 bugs and validates schema compatibility
 
 ### Adding "How to Use" Guides
 

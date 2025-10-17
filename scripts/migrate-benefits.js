@@ -10,27 +10,32 @@
  *   node scripts/migrate-benefits.js --migration-id=amex-plat-2025 --force
  */
 
-const path = require('path');
-const fs = require('fs');
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 // Add TypeScript support for this script
-require('ts-node/register');
+import 'ts-node/register';
 
 // Import our migration framework
-const { 
+import { 
   MigrationCLI, 
   MigrationPlanBuilder, 
   BenefitFrequency, 
   BenefitCycleAlignment 
-} = require('../src/lib/benefit-migration');
+} from '../src/lib/benefit-migration/index.ts';
 
 // Import validation tools
-const { MigrationValidator } = require('../src/lib/benefit-migration/validation-tools');
+import { MigrationValidator } from '../src/lib/benefit-migration/validation-tools.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Migration definitions registry
 const MIGRATION_REGISTRY = {
   'amex-plat-2025': createAmexPlatinum2025Migration,
   'csr-2025': createCSR2025Migration,
+  'amex-business-plat-hilton': createAmexBusinessPlatHiltonMigration,
   'example-migration': createExampleMigration
 };
 
@@ -186,6 +191,117 @@ function createCSR2025Migration() {
 }
 
 /**
+ * Amex Business Platinum Hilton Credit Migration
+ * 
+ * Adds a quarterly $50 Hilton credit to the American Express Business Platinum Card
+ */
+function createAmexBusinessPlatHiltonMigration() {
+  return MigrationPlanBuilder.fromConfig({
+    id: 'amex-business-plat-hilton',
+    title: 'Amex Business Platinum: Add Quarterly Hilton $50 Credit',
+    description: 'Adding quarterly $50 Hilton credit to Amex Business Platinum Card',
+    version: '2025.1',
+    cards: [{
+      name: 'American Express Business Platinum Card',
+      issuer: 'American Express',
+      annualFee: 895,
+      effectiveDate: new Date('2025-01-01'),
+      migrationNotes: 'Adding new quarterly Hilton credit benefit',
+      benefits: [
+        // Existing benefits that remain unchanged
+        {
+          description: '$200 Airline Fee Credit',
+          category: 'Travel',
+          maxAmount: 200,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 12,
+          occurrencesInCycle: 1
+        },
+        {
+          description: '$300 Semi-Annual Hotel Credit (FHR/THC prepaid bookings - Jan-Jun)',
+          category: 'Travel',
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 6,
+          occurrencesInCycle: 1
+        },
+        {
+          description: '$300 Semi-Annual Hotel Credit (FHR/THC prepaid bookings - Jul-Dec)',
+          category: 'Travel',
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7,
+          fixedCycleDurationMonths: 6,
+          occurrencesInCycle: 1
+        },
+        {
+          description: '$1,150 Annual Dell Technologies Credit',
+          category: 'Electronics',
+          maxAmount: 1150,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 12,
+          occurrencesInCycle: 1
+        },
+        {
+          description: '$250 Annual Adobe Credit (after $600 spend)',
+          category: 'Software',
+          maxAmount: 250,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 12,
+          occurrencesInCycle: 1
+        },
+        {
+          description: '$1,200 Annual Amex Travel Flight Credit (High Spender Benefit)',
+          category: 'Travel',
+          maxAmount: 1200,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 12,
+          occurrencesInCycle: 1
+        },
+        {
+          description: '$2,400 Annual One AP Statement Credit (High Spender Benefit)',
+          category: 'Business Services',
+          maxAmount: 2400,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 12,
+          occurrencesInCycle: 1
+        },
+        // NEW BENEFIT: Quarterly Hilton Credit
+        {
+          description: '$50 Quarterly Hilton Credit (Hilton properties)',
+          category: 'Travel',
+          maxAmount: 50,
+          frequency: BenefitFrequency.QUARTERLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
+          occurrencesInCycle: 1
+        }
+      ]
+    }]
+  });
+}
+
+/**
  * Example migration for testing
  */
 function createExampleMigration() {
@@ -322,16 +438,17 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Run the migration
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(error => {
     console.error('💥 Fatal error:', error);
     process.exit(1);
   });
 }
 
-module.exports = {
+export {
   MIGRATION_REGISTRY,
   createAmexPlatinum2025Migration,
   createCSR2025Migration,
+  createAmexBusinessPlatHiltonMigration,
   createExampleMigration
 };
