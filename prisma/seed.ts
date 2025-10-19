@@ -120,11 +120,24 @@ async function main() {
       imageUrl: '/images/cards/chase-sapphire-reserve.jpg',
       benefits: [
         {
-          description: '$300 Annual Dining Credit (Select Restaurants)',
+          description: '$150 Semi-Annual Fine Dining Credit (Select Restaurants - Jan-Jun)',
           category: 'Dining',
-          maxAmount: 300,
+          maxAmount: 150,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          description: '$150 Semi-Annual Fine Dining Credit (Select Restaurants - Jul-Dec)',
+          category: 'Dining',
+          maxAmount: 150,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7, // July
+          fixedCycleDurationMonths: 6,
         },
         {
           description: '$250 Hotel Credit (The Edit by Chase Properties - Jan-Jun)',
@@ -147,17 +160,44 @@ async function main() {
           fixedCycleDurationMonths: 6,
         },
         {
-          description: '$300 Annual StubHub Credit (Event Tickets)',
+          description: '$150 Semi-Annual StubHub Credit (Event Tickets - Jan-Jun)',
           category: 'Entertainment',
-          maxAmount: 300,
+          maxAmount: 150,
           frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          description: '$150 Semi-Annual StubHub Credit (Event Tickets - Jul-Dec)',
+          category: 'Entertainment',
+          maxAmount: 150,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 7, // July
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          description: '$10 Monthly DoorDash Credit',
+          category: 'Food Delivery',
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
         {
-          description: 'Apple TV+ and Apple Music Subscriptions ($250 Annual Value)',
+          description: '$10 Monthly Lyft Credit',
+          category: 'Transportation',
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$20.83 Monthly Apple Subscriptions (TV+ and Music)',
           category: 'Entertainment',
-          maxAmount: 250,
-          frequency: BenefitFrequency.YEARLY,
+          maxAmount: 20.83,
+          frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
         {
@@ -358,6 +398,13 @@ async function main() {
           fixedCycleStartMonth: 1, // January
           fixedCycleDurationMonths: 12, // Calendar year
         },
+        {
+          description: '$12.95 Monthly Walmart+ Membership Credit',
+          category: 'Membership',
+          maxAmount: 12.95,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
       ],
     },
     {
@@ -449,6 +496,23 @@ async function main() {
           cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
           occurrencesInCycle: 1,
         },
+        {
+          description: '$90 Quarterly Indeed Credit (Job Postings)',
+          category: 'Business Services',
+          maxAmount: 90,
+          frequency: BenefitFrequency.QUARTERLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          fixedCycleStartMonth: 1, // January
+          fixedCycleDurationMonths: 3, // Calendar quarters
+        },
+        {
+          description: '$10 Monthly Wireless Bill Credit',
+          category: 'Business Services',
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
       ],
     },
     {
@@ -465,10 +529,10 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$155 Annual Walmart+ Membership Credit (Covers annual membership cost)',
+          description: '$12.95 Monthly Walmart+ Membership Credit',
           category: 'Membership',
-          maxAmount: 155,
-          frequency: BenefitFrequency.YEARLY,
+          maxAmount: 12.95,
+          frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
       ],
@@ -772,9 +836,9 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$5 Monthly rideshare credit',
+          description: '$8 Monthly rideshare credit',
           category: 'Travel',
-          maxAmount: 5,
+          maxAmount: 8,
           frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
@@ -793,9 +857,9 @@ async function main() {
           percentage: 0,
         },
         {
-          description: '$10 Monthly Instacart credit',
+          description: '$15 Monthly Instacart credit',
           category: 'Food Delivery',
-          maxAmount: 10,
+          maxAmount: 15,
           frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
