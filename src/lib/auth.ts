@@ -3,7 +3,7 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from './prisma';
 import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
-import FacebookProvider from 'next-auth/providers/facebook';
+// import FacebookProvider from 'next-auth/providers/facebook';
 
 declare module "next-auth" {
   /**
@@ -43,15 +43,15 @@ export const authOptions: NextAuthOptions = {
         },
       },
     }),
-    FacebookProvider({
-      clientId: process.env.FACEBOOK_CLIENT_ID!,
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: 'email public_profile',
-        },
-      },
-    }),
+    // FacebookProvider({
+    //   clientId: process.env.FACEBOOK_CLIENT_ID!,
+    //   clientSecret: process.env.FACEBOOK_CLIENT_SECRET!,
+    //   authorization: {
+    //     params: {
+    //     scope: 'email public_profile',
+    //     },
+    //   },
+    // }),
   ],
   session: {
     strategy: 'jwt',
