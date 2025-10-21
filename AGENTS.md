@@ -20,7 +20,7 @@
 - **Backend:** Next.js API Routes + Server Actions  
 - **Database:** PostgreSQL (production via Neon), SQLite (development)
 - **ORM:** Prisma with generated client
-- **Authentication:** NextAuth.js with Google OAuth
+- **Authentication:** NextAuth.js with free OAuth providers (Google, GitHub, Facebook)
 - **Email:** Resend API for notifications
 - **Deployment:** Vercel with automated cron jobs
 - **Testing:** Jest with Testing Library
@@ -630,6 +630,24 @@ npm run build
 ---
 
 ## 📝 Recent Updates
+
+### January 2025: Multiple OAuth Provider Support
+**Date**: January 17, 2025  
+**Implementation Status**: ✅ Complete
+
+**Changes Implemented**:
+- **Simplified Authentication**: Configured free OAuth providers (Google, GitHub and Facebook) only, removing paid options
+- **Clean Sign-in UI**: Streamlined sign-in page with only free OAuth options
+- **Provider Icons**: Added official brand icons for Google, GitHub and Facebook
+
+**Technical Implementation**:
+1. ✅ **NextAuth Configuration**: Updated `src/lib/auth.ts` with free OAuth providers only
+2. ✅ **UI Enhancement**: Redesigned `src/app/auth/signin/page.tsx` with three provider options
+3. ✅ **Environment Variables**: Simplified to only include free OAuth provider credentials
+
+**User Impact**: Users can now sign in using free OAuth providers (Google, GitHub or Facebook), providing a cost-effective authentication solution without requiring paid developer programs.
+
+---
 
 ### September 2025: AMEX Platinum 2025 Benefits Update
 **Date**: September 18, 2025  
