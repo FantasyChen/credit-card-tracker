@@ -1,13 +1,11 @@
 import { 
   validateQuarterlyBenefit, 
-  validateDecemberBenefit, 
-  validateBenefitCycle,
-  validateCurrentlyActiveBenefits 
+  validateBenefitCycle
 } from '../benefit-validation';
 import { calculateBenefitCycle } from '../benefit-cycle';
 import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
 
-describe('Benefit Validation', () => {
+describe('Benefit Validation - Minimal Strategy', () => {
   
   describe('validateQuarterlyBenefit', () => {
     
@@ -81,77 +79,73 @@ describe('Benefit Validation', () => {
       expect(result.error).toContain('Got: 1');
     });
     
-  });
-  
-  describe('validateDecemberBenefit', () => {
-    
-    test('December benefit should accept December dates', () => {
+    test('Non-quarterly benefits should pass', () => {
       const benefit = {
-        description: '$20 Additional Uber Cash (December)'
+        description: '$15 Monthly Uber Cash ($35 in December)',
+        fixedCycleStartMonth: null,
+        fixedCycleDurationMonths: null
       };
       
       const cycle = {
-        cycleStartDate: new Date('2025-12-01T00:00:00Z'),
-        cycleEndDate: new Date('2025-12-31T23:59:59Z')
+        cycleStartDate: new Date('2025-10-01T00:00:00Z'),
+        cycleEndDate: new Date('2025-10-31T23:59:59Z')
       };
       
-      const result = validateDecemberBenefit(benefit, cycle);
-      expect(result.isValid).toBe(true);
-    });
-    
-    test('December benefit should reject September dates', () => {
-      const benefit = {
-        description: '$20 Additional Uber Cash (December)'
-      };
-      
-      const cycle = {
-        cycleStartDate: new Date('2025-09-01T00:00:00Z'),
-        cycleEndDate: new Date('2025-09-30T23:59:59Z')
-      };
-      
-      const result = validateDecemberBenefit(benefit, cycle);
-      expect(result.isValid).toBe(false);
-      expect(result.error).toContain('December benefit');
-      expect(result.error).toContain('wrong start month');
+      const result = validateQuarterlyBenefit(benefit, cycle);
+      expect(result.isValid).toBe(true); // No false positives!
     });
     
   });
   
-  describe('validateCurrentlyActiveBenefits', () => {
-    
-    test('Q3 benefit should be active in September 2025', () => {
+  describe('validateBenefitCycle (main function)', () => {
+    test('should delegate to quarterly validation', () => {
       const benefit = {
-        description: '$100 Quarterly Resy Dining Credit (Q3: Jul-Sep)'
+        description: '$100 Quarterly Resy Dining Credit (Q2: Apr-Jun)',
+        fixedCycleStartMonth: 4,
+        fixedCycleDurationMonths: 3
       };
       
       const cycle = {
-        cycleStartDate: new Date('2025-07-01T00:00:00Z'),
-        cycleEndDate: new Date('2025-09-30T23:59:59Z')
+        cycleStartDate: new Date('2025-04-01T00:00:00Z'),
+        cycleEndDate: new Date('2025-06-30T23:59:59Z')
       };
       
-      const referenceDate = new Date('2025-09-26T21:00:00Z');
-      
-      const result = validateCurrentlyActiveBenefits(benefit, cycle, referenceDate);
+      const result = validateBenefitCycle(benefit, cycle);
       expect(result.isValid).toBe(true);
     });
     
-    test('Q3 benefit should NOT have Q1 dates in September 2025', () => {
+    test('should pass non-quarterly benefits (no false positives)', () => {
       const benefit = {
-        description: '$100 Quarterly Resy Dining Credit (Q3: Jul-Sep)'
+        description: '$15 Monthly Uber Cash ($35 in December)',
+        fixedCycleStartMonth: null,
+        fixedCycleDurationMonths: null
       };
       
       const cycle = {
-        cycleStartDate: new Date('2026-01-01T00:00:00Z'),
-        cycleEndDate: new Date('2026-03-31T23:59:59Z')
+        cycleStartDate: new Date('2025-10-01T00:00:00Z'),
+        cycleEndDate: new Date('2025-10-31T23:59:59Z')
       };
       
-      const referenceDate = new Date('2025-09-26T21:00:00Z');
-      
-      const result = validateCurrentlyActiveBenefits(benefit, cycle, referenceDate);
-      expect(result.isValid).toBe(false);
-      expect(result.error).toContain('should be active in 2025-09-26');
+      const result = validateBenefitCycle(benefit, cycle);
+      expect(result.isValid).toBe(true); // This was the false positive that caused Oct 2025 outage!
     });
     
+    test('should catch quarterly mismatches', () => {
+      const benefit = {
+        description: '$100 Quarterly Resy Dining Credit (Q3: Jul-Sep)',
+        fixedCycleStartMonth: 7,
+        fixedCycleDurationMonths: 3
+      };
+      
+      const cycle = {
+        cycleStartDate: new Date('2025-01-01T00:00:00Z'), // Wrong! Should be July
+        cycleEndDate: new Date('2025-03-31T23:59:59Z')
+      };
+      
+      const result = validateBenefitCycle(benefit, cycle);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain('Q3 benefit');
+    });
   });
   
   describe('Integration with calculateBenefitCycle', () => {
@@ -174,14 +168,6 @@ describe('Benefit Validation', () => {
       
       const validation = validateBenefitCycle(benefit, calculatedCycle);
       expect(validation.isValid).toBe(true);
-      
-      // Also validate it should be currently active
-      const activeValidation = validateCurrentlyActiveBenefits(
-        benefit, 
-        calculatedCycle,
-        new Date('2025-09-26T21:00:00Z')
-      );
-      expect(activeValidation.isValid).toBe(true);
     });
     
   });
