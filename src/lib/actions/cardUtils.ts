@@ -107,6 +107,7 @@ export async function createCardForUser(
         );
 
         // SOURCE-LEVEL PROTECTION: Validate benefit cycles during card creation
+        // Log validation warnings but don't block card creation
         const { validateBenefitCycle } = await import('@/lib/benefit-validation');
         const validation = validateBenefitCycle(
           {
@@ -118,8 +119,10 @@ export async function createCardForUser(
         );
         
         if (!validation.isValid) {
-          console.error(`❌ CARD CREATION VALIDATION FAILED for benefit "${newBenefit.description}":`, validation.error);
-          throw new Error(`Card creation failed: ${validation.error}`);
+          // Log warning but continue - don't block card creation
+          console.warn(`⚠️ BENEFIT VALIDATION WARNING for "${newBenefit.description}":`, validation.error);
+          console.warn(`   Cycle: ${cycleInfo.cycleStartDate.toISOString()} → ${cycleInfo.cycleEndDate.toISOString()}`);
+          console.warn(`   Continuing with card creation...`);
         }
       }
 
