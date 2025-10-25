@@ -62,7 +62,15 @@ describe('BenefitMigrationEngine', () => {
         .finishCard()
         .build();
 
-      mockPrisma.creditCard.count.mockResolvedValue(5);
+      mockPrisma.creditCard.count.mockImplementation((args) => {
+        if (args?.where?.name === 'Test Card') {
+          return Promise.resolve(5);
+        }
+        return Promise.resolve(0);
+      });
+
+      // Mock findMany to return empty array (no existing cards)
+      mockPrisma.creditCard.findMany.mockResolvedValue([]);
 
       const result = await engine.executeMigration(plan);
 
@@ -98,13 +106,21 @@ describe('BenefitMigrationEngine', () => {
         }]
       };
 
-      mockPrisma.creditCard.count.mockResolvedValue(1);
+      mockPrisma.creditCard.count.mockImplementation((args) => {
+        if (args?.where?.name === 'Test Card') {
+          return Promise.resolve(1);
+        }
+        return Promise.resolve(0);
+      });
+
+      // Mock findMany to return empty array (no existing cards)
+      mockPrisma.creditCard.findMany.mockResolvedValue([]);
 
       const result = await engine.executeMigration(plan);
 
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
-      expect(result.errors[0].type).toBe('benefit_validation');
+      expect(result.errors[0].type).toBe('validation');
     });
   });
 
@@ -128,7 +144,12 @@ describe('BenefitMigrationEngine', () => {
         .build();
 
       // Mock existing cards
-      mockPrisma.creditCard.count.mockResolvedValue(2);
+      mockPrisma.creditCard.count.mockImplementation((args) => {
+        if (args?.where?.name === 'Test Card') {
+          return Promise.resolve(2);
+        }
+        return Promise.resolve(0);
+      });
       mockPrisma.creditCard.findMany.mockResolvedValue([
         {
           id: 'card1',
@@ -183,7 +204,12 @@ describe('BenefitMigrationEngine', () => {
         .build();
 
       // Mock cards with one that will fail
-      mockPrisma.creditCard.count.mockResolvedValue(3);
+      mockPrisma.creditCard.count.mockImplementation((args) => {
+        if (args?.where?.name === 'Test Card') {
+          return Promise.resolve(3);
+        }
+        return Promise.resolve(0);
+      });
       mockPrisma.creditCard.findMany.mockResolvedValue([
         {
           id: 'card1',
@@ -254,7 +280,12 @@ describe('BenefitMigrationEngine', () => {
         .finishCard()
         .build();
 
-      mockPrisma.creditCard.count.mockResolvedValue(1);
+      mockPrisma.creditCard.count.mockImplementation((args) => {
+        if (args?.where?.name === 'Test Card') {
+          return Promise.resolve(1);
+        }
+        return Promise.resolve(0);
+      });
       mockPrisma.creditCard.findMany.mockResolvedValue([
         {
           id: 'card1',
@@ -286,11 +317,15 @@ describe('BenefitMigrationEngine', () => {
 
       mockPrisma.$transaction.mockImplementation(async (callback) => {
         const tx = {
-          benefitStatus: { deleteMany: jest.fn() },
-          benefit: { deleteMany: jest.fn() },
-          creditCard: { update: jest.fn() },
-          benefit: { create: jest.fn().mockResolvedValue({ id: 'new-benefit1' }) },
-          benefitStatus: { create: jest.fn() }
+          benefitStatus: { 
+            deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+            create: jest.fn().mockResolvedValue({ id: 'status1' })
+          },
+          benefit: { 
+            deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+            create: jest.fn().mockResolvedValue({ id: 'new-benefit1' })
+          },
+          creditCard: { update: jest.fn().mockResolvedValue({ id: 'card1' }) }
         };
         return callback(tx);
       });
@@ -302,13 +337,15 @@ describe('BenefitMigrationEngine', () => {
       // Verify only deletable benefits were removed (benefit3)
       const transactionCall = mockPrisma.$transaction.mock.calls[0][0];
       const mockTx = {
-        benefitStatus: { deleteMany: jest.fn() },
+        benefitStatus: { 
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+          create: jest.fn().mockResolvedValue({ id: 'status1' })
+        },
         benefit: { 
-          deleteMany: jest.fn(),
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
           create: jest.fn().mockResolvedValue({ id: 'new-benefit1' })
         },
-        creditCard: { update: jest.fn() },
-        benefitStatus: { create: jest.fn() }
+        creditCard: { update: jest.fn().mockResolvedValue({ id: 'card1' }) }
       };
       
       await transactionCall(mockTx);

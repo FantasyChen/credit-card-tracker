@@ -56,6 +56,14 @@ export class BenefitMigrationEngine {
       const failedChecks = preChecks.filter(check => check.status === 'fail');
       
       if (failedChecks.length > 0 && !this.options.force) {
+        // Convert failed checks to migration errors
+        for (const check of failedChecks) {
+          this.errors.push({
+            type: check.checkType === 'benefit_validation' ? 'validation' : 'database',
+            message: check.message,
+            details: check.details
+          });
+        }
         throw new Error(`Pre-migration checks failed: ${failedChecks.map(c => c.message).join(', ')}`);
       }
 
