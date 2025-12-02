@@ -157,8 +157,49 @@ export default async function BenefitsDashboardPage() {
     };
   });
 
+  // 5. Deduplicate benefit statuses (defense against duplicate records from timezone issues)
+  // Group by (benefitId, DATE(cycleStartDate), occurrenceIndex) and keep the best record
+  const deduplicatedStatuses = (() => {
+    const groups = new Map<string, DisplayBenefitStatus[]>();
+    
+    for (const status of allStatusesAugmented) {
+      // Create key using date only (not time) to catch timezone-related duplicates
+      const dateOnly = new Date(status.cycleStartDate).toISOString().split('T')[0];
+      const key = `${status.benefitId}|${dateOnly}|${status.occurrenceIndex}`;
+      
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(status);
+    }
+    
+    // For each group, keep the "best" record
+    const result: DisplayBenefitStatus[] = [];
+    for (const [, statuses] of groups) {
+      if (statuses.length === 1) {
+        result.push(statuses[0]);
+      } else {
+        // Multiple records for same benefit/date/occurrence - keep the best one
+        // Priority: completed > not usable > most recently updated
+        const best = statuses.sort((a, b) => {
+          // Prefer completed
+          if (a.isCompleted && !b.isCompleted) return -1;
+          if (!a.isCompleted && b.isCompleted) return 1;
+          // Prefer not usable over upcoming
+          if (a.isNotUsable && !b.isNotUsable) return -1;
+          if (!a.isNotUsable && b.isNotUsable) return 1;
+          // Prefer most recently updated
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        })[0];
+        result.push(best);
+      }
+    }
+    
+    return result;
+  })();
+
   // Filter for statuses whose cycle has actually started
-  const activeOrPastCycleStatuses = allStatusesAugmented.filter(status => {
+  const activeOrPastCycleStatuses = deduplicatedStatuses.filter(status => {
     // Ensure cycleStartDate is treated as a Date object for comparison
     const cycleStartDate = new Date(status.cycleStartDate);
     return cycleStartDate <= now;

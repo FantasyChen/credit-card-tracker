@@ -7,6 +7,7 @@
 import { prisma } from '@/lib/prisma';
 import { calculateBenefitCycle } from '@/lib/benefit-cycle';
 import { validateBenefitCycle } from '@/lib/benefit-validation';
+import { normalizeCycleDate } from '@/lib/dateUtils';
 import { BenefitFrequency } from '@/generated/prisma';
 import type {
   MigrationPlan,
@@ -454,11 +455,11 @@ export class BenefitMigrationEngine {
         if (benefitData.frequency === BenefitFrequency.ONE_TIME) {
           // For ONE_TIME benefits, create a simple cycle from start date
           cycleInfo = {
-            cycleStartDate: cardUpdate.effectiveDate || now,
+            cycleStartDate: normalizeCycleDate(cardUpdate.effectiveDate || now),
             cycleEndDate: new Date(cardUpdate.effectiveDate?.getTime() || now.getTime() + 365 * 24 * 60 * 60 * 1000) // 1 year from start
           };
         } else {
-          cycleInfo = calculateBenefitCycle(
+          const rawCycleInfo = calculateBenefitCycle(
             benefitData.frequency,
             now,
             card.openedDate,
@@ -466,6 +467,12 @@ export class BenefitMigrationEngine {
             benefitData.fixedCycleStartMonth,
             benefitData.fixedCycleDurationMonths
           );
+          
+          // CRITICAL: Normalize cycleStartDate to midnight UTC to prevent duplicate records
+          cycleInfo = {
+            cycleStartDate: normalizeCycleDate(rawCycleInfo.cycleStartDate),
+            cycleEndDate: rawCycleInfo.cycleEndDate
+          };
 
           // Validate the cycle if requested
           if (this.options.validateCycles) {

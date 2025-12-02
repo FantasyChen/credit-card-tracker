@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
 import { calculateBenefitCycle } from '@/lib/benefit-cycle';
+import { normalizeCycleDate } from '@/lib/dateUtils';
 
 /**
  * Ensures that BenefitStatus records exist for the current cycle
@@ -61,7 +62,7 @@ export async function ensureCurrentBenefitStatuses() {
 
         // Calculate the expected dates for the *current* cycle based on 'now'
         try {
-          const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
+          const { cycleStartDate: rawCycleStartDate, cycleEndDate } = calculateBenefitCycle(
             benefit.frequency,
             now, // Reference date is now
             cardOpenedDateForCalc,
@@ -69,6 +70,9 @@ export async function ensureCurrentBenefitStatuses() {
             benefit.fixedCycleStartMonth, // Pass new field
             benefit.fixedCycleDurationMonths // Pass new field
           );
+
+          // CRITICAL: Normalize cycleStartDate to midnight UTC to prevent duplicate records
+          const cycleStartDate = normalizeCycleDate(rawCycleStartDate);
 
           // Optional: Add a check to avoid creating statuses for cycles that ended long ago?
           // const bufferDays = 30; // e.g., don't create if cycle ended more than 30 days ago

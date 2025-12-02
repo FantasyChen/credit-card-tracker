@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
 import { calculateBenefitCycle } from '@/lib/benefit-cycle';
+import { normalizeCycleDate } from '@/lib/dateUtils';
 import { sendEmail } from '@/lib/email';
 import { BenefitStatus, User, Benefit, CreditCard, LoyaltyAccount, LoyaltyProgram } from '@/generated/prisma';
 
@@ -182,7 +183,7 @@ async function processCardSafely(card: {
     }
 
     try {
-      const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
+      const { cycleStartDate: rawCycleStartDate, cycleEndDate } = calculateBenefitCycle(
         benefit.frequency,
         now, 
         cardOpenedDateForCalc,
@@ -190,6 +191,10 @@ async function processCardSafely(card: {
         benefit.fixedCycleStartMonth,
         benefit.fixedCycleDurationMonths
       );
+
+      // CRITICAL: Normalize cycleStartDate to midnight UTC to prevent duplicate records
+      // This ensures the unique constraint works correctly regardless of timezone issues
+      const cycleStartDate = normalizeCycleDate(rawCycleStartDate);
 
       // VALIDATION: Prevent quarterly benefit mismatches like the Sep 2025 incident
       const { validateBenefitCycle } = await import('@/lib/benefit-validation');

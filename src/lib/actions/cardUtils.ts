@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { calculateBenefitCycle, calculateOneTimeBenefitLifetime } from '@/lib/benefit-cycle';
+import { normalizeCycleDate } from '@/lib/dateUtils';
 import { BenefitFrequency } from '@/generated/prisma';
 
 interface CreateCardResult {
@@ -97,7 +98,7 @@ export async function createCardForUser(
       if (newBenefit.frequency === BenefitFrequency.ONE_TIME) {
         cycleInfo = calculateOneTimeBenefitLifetime(newBenefit.startDate);
       } else {
-        cycleInfo = calculateBenefitCycle(
+        const rawCycleInfo = calculateBenefitCycle(
           newBenefit.frequency,
           now, // Reference date is now
           openedDate, // Use the determined openedDate for cycle calculation
@@ -105,6 +106,12 @@ export async function createCardForUser(
           newBenefit.fixedCycleStartMonth,
           newBenefit.fixedCycleDurationMonths
         );
+        
+        // CRITICAL: Normalize cycleStartDate to midnight UTC to prevent duplicate records
+        cycleInfo = {
+          cycleStartDate: normalizeCycleDate(rawCycleInfo.cycleStartDate),
+          cycleEndDate: rawCycleInfo.cycleEndDate
+        };
 
         // SOURCE-LEVEL PROTECTION: Validate benefit cycles during card creation
         // Log validation warnings but don't block card creation
