@@ -568,10 +568,9 @@ npm run build
 - Point-in-time recovery via Neon CLI
 - Automated migration framework preserves completed benefits by default
 
-**Deprecated Migration Approach:**
-- Old manual scripts moved to `scripts/deprecated/`
-- Use new automated framework in `scripts/migrate-benefits.js`
-- See `docs/benefit-migration-framework.md` for complete guide
+**Migration Framework:**
+- Use the automated framework in `scripts/migrate-benefits.js`
+- See `docs/benefit-update-quick-guide.md` for quick reference
 
 **Performance Optimization:**
 - Database query optimization

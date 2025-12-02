@@ -91,11 +91,11 @@ if (!validation.isValid) {
 
 ### Data Repair
 
-**Created repair script:** `scripts/repair-incomplete-platinum-cards.cjs`
+**Created repair script:** `scripts/repair-incomplete-platinum-cards.cjs` *(removed after use)*
 
 **Executed repair:**
 ```bash
-node scripts/repair-incomplete-platinum-cards.cjs --force
+node scripts/repair-incomplete-platinum-cards.cjs --force  # Script removed in Dec 2025 cleanup
 ```
 
 **Results:**
@@ -161,7 +161,7 @@ American Express Platinum Card (Oct 18):  19 benefits ✅
 ## Files Modified
 
 - `src/lib/actions/cardUtils.ts` - Changed validation error handling
-- `scripts/repair-incomplete-platinum-cards.cjs` - One-time repair script (kept for reference)
+- `scripts/repair-incomplete-platinum-cards.cjs` - One-time repair script *(removed in Dec 2025 cleanup)*
 
 ## Follow-up Actions
 

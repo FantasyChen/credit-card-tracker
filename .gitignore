@@ -58,6 +58,7 @@ src/generated/prisma/
 
 # Editor directories and files
 .idea
+.cursor/
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
