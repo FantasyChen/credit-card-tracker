@@ -96,6 +96,32 @@ export function calculateBenefitCycle(
     let cycleEndMonth: number; // 0-indexed
 
     switch (frequency) {
+      case BenefitFrequency.WEEKLY: {
+        // WEEKLY: 7-day cycles
+        // Calculate the most recent cycle start based on the reference date
+        // Each week starts on the same day of week as the benefit start date (or Sunday if no card date)
+        const refTime = referenceDate.getTime();
+        const dayOfWeek = referenceDate.getUTCDay(); // 0 = Sunday, 6 = Saturday
+        
+        // Find the most recent Sunday (start of week) or use benefit-specific start day
+        const daysFromWeekStart = dayOfWeek;
+        const weekStartTime = refTime - (daysFromWeekStart * 24 * 60 * 60 * 1000);
+        const weekStart = new Date(weekStartTime);
+        
+        // Normalize to midnight UTC
+        cycleStartDate = new Date(Date.UTC(
+          weekStart.getUTCFullYear(),
+          weekStart.getUTCMonth(),
+          weekStart.getUTCDate(),
+          0, 0, 0, 0
+        ));
+        
+        // End date is 7 days later minus 1ms
+        cycleEndDate = new Date(cycleStartDate.getTime() + (7 * 24 * 60 * 60 * 1000) - 1);
+        
+        return { cycleStartDate, cycleEndDate };
+      }
+
       case BenefitFrequency.MONTHLY:
         cycleStartYear = refYear;
         cycleStartMonth = refMonth;

@@ -29,6 +29,7 @@ model User {
   creditCards             CreditCard[]
   loyaltyAccounts         LoyaltyAccount[]
   sessions                Session[]
+  standaloneBenefits      Benefit[]        // Custom benefits not tied to a card
 }
 
 model Account {
@@ -82,14 +83,16 @@ model Benefit {
   startDate                DateTime
   endDate                  DateTime?
   frequency                BenefitFrequency       @default(ONE_TIME)
-  creditCardId             String
+  creditCardId             String?                // Optional: null for standalone benefits
+  userId                   String?                // For standalone benefits not tied to a card
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
   cycleAlignment           BenefitCycleAlignment? @default(CARD_ANNIVERSARY)
   fixedCycleDurationMonths Int?
   fixedCycleStartMonth     Int?
   occurrencesInCycle       Int                    @default(1)
-  creditCard               CreditCard             @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  creditCard               CreditCard?            @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  user                     User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   benefitStatuses          BenefitStatus[]
 }
 
@@ -197,6 +200,7 @@ model LoyaltyAccount {
 
 
 enum BenefitFrequency {
+  WEEKLY
   MONTHLY
   QUARTERLY
   YEARLY

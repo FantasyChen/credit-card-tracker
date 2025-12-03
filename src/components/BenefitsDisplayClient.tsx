@@ -122,10 +122,11 @@ export default function BenefitsDisplayClient({
     });
   };
 
-  // Group benefits by credit card
+  // Group benefits by credit card (handles null creditCard for custom benefits)
   const groupBenefitsByCard = (benefits: DisplayBenefitStatus[]) => {
     const grouped = benefits.reduce((acc, benefit) => {
-      const cardName = benefit.benefit.creditCard.name;
+      // Use "Custom Benefits" as the group name for standalone benefits
+      const cardName = benefit.benefit.creditCard?.name || '⭐ Custom Benefits';
       if (!acc[cardName]) {
         acc[cardName] = [];
       }
@@ -133,8 +134,12 @@ export default function BenefitsDisplayClient({
       return acc;
     }, {} as Record<string, DisplayBenefitStatus[]>);
 
-    // Sort cards by total value (descending)
-    return Object.entries(grouped).sort(([, a], [, b]) => {
+    // Sort cards by total value (descending), but always put "Custom Benefits" first
+    return Object.entries(grouped).sort(([keyA, a], [keyB, b]) => {
+      // Put custom benefits first
+      if (keyA === '⭐ Custom Benefits') return -1;
+      if (keyB === '⭐ Custom Benefits') return 1;
+      
       const aTotal = a.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
       const bTotal = b.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
       return bTotal - aTotal;
@@ -297,6 +302,16 @@ export default function BenefitsDisplayClient({
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold dark:text-white">Benefits Dashboard</h1>
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          {/* Add Custom Benefit Button */}
+          <Link
+            href="/benefits/custom"
+            className="px-4 py-2 rounded-md text-sm font-medium transition-colors bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg"
+          >
+            <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Custom
+          </Link>
           <button
             onClick={setListView}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${

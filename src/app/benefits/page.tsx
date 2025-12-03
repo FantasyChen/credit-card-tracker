@@ -25,17 +25,25 @@ export const metadata: Metadata = {
   },
 }; 
 
-// Type for CreditCard that includes its displayName
+// Type for CreditCard that includes its displayName (can be null for standalone benefits)
 interface CreditCardWithDisplayName extends PrismaCreditCard {
   displayName: string;
-  // If FetchedUserCard from cards/page.tsx includes benefits on the card itself, ensure consistency or map as needed
-  // For this page, benefits come via BenefitStatus -> Benefit -> CreditCard, so card.benefits isn't directly on the card here
+}
+
+// Type for standalone (custom) benefits without a card
+interface StandaloneBenefitDisplay {
+  displayName: string;
+  isCustomBenefit: true;
 }
 
 // Updated Type combining BenefitStatus with Benefit and Card details (with displayName) for display
+// creditCard can be null for standalone/custom benefits
 export interface DisplayBenefitStatus extends BenefitStatus { // Export for use in client component
-  benefit: Benefit & { creditCard: CreditCardWithDisplayName };
+  benefit: Benefit & { 
+    creditCard: CreditCardWithDisplayName | null;
+  };
   usageWaySlug?: string | null; // Add optional usage way slug
+  isCustomBenefit?: boolean; // Flag to indicate this is a custom/standalone benefit
 }
 
 export default async function BenefitsDashboardPage() {
@@ -138,11 +146,27 @@ export default async function BenefitsDashboardPage() {
   // 4. Augment statuses with card displayName and usage way slug
   const allStatusesAugmented: DisplayBenefitStatus[] = allStatusesRaw.map(status => {
     const cardOriginal = status.benefit.creditCard;
-    const resolvedDisplayName = cardDisplayNameMap.get(cardOriginal.id) || cardOriginal.name;
+    const isCustomBenefit = cardOriginal === null;
     
     // Look up usage way for this benefit
     const benefitKey = `${status.benefit.category}:${status.benefit.description}`;
     const usageWaySlug = usageWayMap.get(benefitKey) || null;
+    
+    if (isCustomBenefit) {
+      // Standalone/custom benefit - no credit card associated
+      return {
+        ...status,
+        benefit: {
+          ...status.benefit,
+          creditCard: null,
+        },
+        usageWaySlug,
+        isCustomBenefit: true,
+      };
+    }
+    
+    // Regular card-based benefit
+    const resolvedDisplayName = cardDisplayNameMap.get(cardOriginal.id) || cardOriginal.name;
     
     return {
       ...status,
@@ -154,6 +178,7 @@ export default async function BenefitsDashboardPage() {
         },
       },
       usageWaySlug,
+      isCustomBenefit: false,
     };
   });
 

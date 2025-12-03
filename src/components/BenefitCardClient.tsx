@@ -117,26 +117,42 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
           
           {/* Card info - more compact on mobile */}
           <div className="pl-11 space-y-1.5">
-            <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-              <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-              </svg>
-              <span className="font-medium truncate">{status.benefit.creditCard.displayName}</span>
-              <span className="mx-2 hidden sm:inline">•</span>
-              <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">{status.benefit.creditCard.issuer}</span>
-            </div>
+            {status.benefit.creditCard ? (
+              // Regular credit card benefit
+              <>
+                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                  <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                  <span className="font-medium truncate">{status.benefit.creditCard.displayName}</span>
+                  <span className="mx-2 hidden sm:inline">•</span>
+                  <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">{status.benefit.creditCard.issuer}</span>
+                </div>
+                {/* Show issuer on mobile in a separate line for better readability */}
+                <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 sm:hidden">
+                  <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h4a1 1 0 011 1v5m-6 0V9a1 1 0 011-1h4a1 1 0 011 1v11" />
+                  </svg>
+                  <span>{status.benefit.creditCard.issuer}</span>
+                </div>
+              </>
+            ) : (
+              // Custom/standalone benefit - no credit card
+              <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                <svg className="h-4 w-4 mr-2 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+                <span className="font-medium text-purple-600 dark:text-purple-400">Custom Benefit</span>
+                <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full">
+                  Personal
+                </span>
+              </div>
+            )}
             <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
               <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <span>Due: <span className="font-medium">{formatDate(status.cycleEndDate)}</span></span>
-            </div>
-            {/* Show issuer on mobile in a separate line for better readability */}
-            <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 sm:hidden">
-              <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h4a1 1 0 011 1v5m-6 0V9a1 1 0 011-1h4a1 1 0 011 1v11" />
-              </svg>
-              <span>{status.benefit.creditCard.issuer}</span>
             </div>
           </div>
           

@@ -12,6 +12,7 @@ async function runCheckBenefitsLogic() {
   console.log(`🚀 Improved check-benefits logic started at: ${now.toISOString()}`);
   
   try {
+    // 1. Fetch card-based benefits (existing logic)
     const allUserCardsWithBenefits = await prisma.creditCard.findMany({
       include: {
         benefits: {
@@ -37,7 +38,28 @@ async function runCheckBenefitsLogic() {
       },
     });
 
+    // 2. Fetch standalone/custom benefits (new feature)
+    const standaloneBenefits = await prisma.benefit.findMany({
+      where: {
+        creditCardId: null, // Standalone benefits have no credit card
+        userId: { not: null }, // Must have a user
+        frequency: {
+          not: BenefitFrequency.ONE_TIME,
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        frequency: true,
+        cycleAlignment: true,
+        fixedCycleStartMonth: true,
+        fixedCycleDurationMonths: true,
+        occurrencesInCycle: true,
+      }
+    });
+
     console.log(`📊 Total cards to process: ${allUserCardsWithBenefits.length}`);
+    console.log(`📊 Total standalone benefits to process: ${standaloneBenefits.length}`);
 
     // BATCHED PROCESSING: Process cards in batches to prevent database connection exhaustion
     // Neon/PostgreSQL has connection limits (typically 20-100), so we batch to stay within limits
@@ -81,10 +103,49 @@ async function runCheckBenefitsLogic() {
       }
     });
 
+    // Process standalone benefits
+    let standaloneBenefitsProcessed = 0;
+    let standaloneUpsertsAttempted = 0;
+    let standaloneUpsertsSuccessful = 0;
+    let standaloneUpsertsFailed = 0;
+
+    if (standaloneBenefits.length > 0) {
+      console.log(`\n📦 Processing standalone benefits...`);
+      
+      const standaloneResults = await Promise.allSettled(
+        standaloneBenefits.map(benefit => processStandaloneBenefitSafely(benefit, now))
+      );
+
+      standaloneResults.forEach((result, index) => {
+        const benefit = standaloneBenefits[index];
+        
+        if (result.status === 'fulfilled') {
+          const benefitResult = result.value;
+          standaloneBenefitsProcessed++;
+          standaloneUpsertsAttempted += benefitResult.upsertsAttempted;
+          standaloneUpsertsSuccessful += benefitResult.upsertsSuccessful;
+          standaloneUpsertsFailed += benefitResult.upsertsFailed;
+        } else {
+          const error = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          console.error(`❌ Standalone benefit ${benefit.id} failed: ${error}`);
+          standaloneUpsertsFailed++;
+        }
+      });
+      
+      console.log(`✅ Standalone benefits: ${standaloneBenefitsProcessed}/${standaloneBenefits.length} processed, ${standaloneUpsertsSuccessful}/${standaloneUpsertsAttempted} upserts successful`);
+    }
+
+    // Add standalone results to totals
+    totalBenefitsProcessed += standaloneBenefitsProcessed;
+    totalUpsertsAttempted += standaloneUpsertsAttempted;
+    totalUpsertsSuccessful += standaloneUpsertsSuccessful;
+    totalUpsertsFailed += standaloneUpsertsFailed;
+
     // Enhanced logging for better observability
     console.log(`\n📊 EXECUTION SUMMARY:`);
     console.log(`   Cards: ${cardsSuccessful}/${allUserCardsWithBenefits.length} successful`);
-    console.log(`   Benefits: ${totalBenefitsProcessed} processed`);
+    console.log(`   Standalone benefits: ${standaloneBenefitsProcessed}/${standaloneBenefits.length} processed`);
+    console.log(`   Total benefits: ${totalBenefitsProcessed} processed`);
     console.log(`   Upserts: ${totalUpsertsSuccessful}/${totalUpsertsAttempted} successful`);
     
     if (cardsFailed > 0) {
@@ -116,6 +177,9 @@ async function runCheckBenefitsLogic() {
       cardsProcessed: allUserCardsWithBenefits.length,
       cardsSuccessful: cardsSuccessful,
       cardsFailed: cardsFailed,
+      // Standalone benefit metrics
+      standaloneBenefitsProcessed: standaloneBenefitsProcessed,
+      standaloneBenefitsTotal: standaloneBenefits.length,
       // Notification metrics
       notificationsSent: emailsSent,
       usersProcessed: usersProcessedForNotifications,
@@ -267,11 +331,102 @@ async function processCardSafely(card: {
   return result;
 }
 
+/**
+ * Process a single standalone benefit with complete error isolation
+ * Standalone benefits are not tied to a credit card
+ */
+async function processStandaloneBenefitSafely(benefit: {
+  id: string;
+  userId: string | null;
+  frequency: BenefitFrequency;
+  cycleAlignment: BenefitCycleAlignment | null;
+  fixedCycleStartMonth: number | null;
+  fixedCycleDurationMonths: number | null;
+  occurrencesInCycle: number;
+}, now: Date) {
+  const result = {
+    benefitId: benefit.id,
+    upsertsAttempted: 0,
+    upsertsSuccessful: 0,
+    upsertsFailed: 0
+  };
+
+  if (!benefit.userId) {
+    throw new Error('Standalone benefit missing user information');
+  }
+
+  const userId = benefit.userId;
+  const upsertPromises: Promise<unknown>[] = [];
+
+  try {
+    const { cycleStartDate: rawCycleStartDate, cycleEndDate } = calculateBenefitCycle(
+      benefit.frequency,
+      now, 
+      null, // No card opened date for standalone benefits
+      benefit.cycleAlignment,
+      benefit.fixedCycleStartMonth,
+      benefit.fixedCycleDurationMonths
+    );
+
+    // CRITICAL: Normalize cycleStartDate to midnight UTC to prevent duplicate records
+    const cycleStartDate = normalizeCycleDate(rawCycleStartDate);
+
+    // Create multiple BenefitStatus records based on occurrencesInCycle
+    const occurrences = benefit.occurrencesInCycle || 1;
+    
+    for (let occurrenceIndex = 0; occurrenceIndex < occurrences; occurrenceIndex++) {
+      upsertPromises.push(
+        prisma.benefitStatus.upsert({
+          where: {
+            benefitId_userId_cycleStartDate_occurrenceIndex: {
+              benefitId: benefit.id,
+              userId: userId,
+              cycleStartDate: cycleStartDate,
+              occurrenceIndex: occurrenceIndex,
+            },
+          },
+          update: {
+            cycleEndDate: cycleEndDate,
+          },
+          create: {
+            benefitId: benefit.id,
+            userId: userId,
+            cycleStartDate: cycleStartDate,
+            cycleEndDate: cycleEndDate,
+            occurrenceIndex: occurrenceIndex,
+            isCompleted: false, 
+          },
+        })
+      );
+    }
+  } catch (error) {
+    console.error(`Error calculating cycle for standalone benefit ${benefit.id} (user: ${userId}):`, error instanceof Error ? error.message : error);
+  }
+
+  // Execute upserts using Promise.allSettled for fault tolerance
+  if (upsertPromises.length > 0) {
+    result.upsertsAttempted = upsertPromises.length;
+    
+    const upsertResults = await Promise.allSettled(upsertPromises);
+    
+    upsertResults.forEach((upsertResult) => {
+      if (upsertResult.status === 'fulfilled') {
+        result.upsertsSuccessful++;
+      } else {
+        result.upsertsFailed++;
+        console.error(`Upsert failed for standalone benefit ${benefit.id}:`, upsertResult.reason instanceof Error ? upsertResult.reason.message : upsertResult.reason);
+      }
+    });
+  }
+
+  return result;
+}
+
 // Extend Prisma types to ensure relations are included for type safety
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface UserWithNotificationPrefs extends User {}
 interface BenefitStatusWithDetails extends BenefitStatus {
-  benefit: Benefit & { creditCard: CreditCard };
+  benefit: Benefit & { creditCard: CreditCard | null }; // creditCard is now optional for standalone benefits
   user: UserWithNotificationPrefs;
 }
 interface LoyaltyAccountWithDetails extends LoyaltyAccount {
@@ -398,12 +553,15 @@ async function sendNotificationsDirectly() {
 
       if (newBenefitCyclesToNotify.length > 0) {
         const subject = "Your New Benefit Cycles Have Started!";
-        const benefitsListHtml = newBenefitCyclesToNotify.map(status => 
-          `<li>
-             <strong>${status.benefit.description}</strong> on your ${status.benefit.creditCard.name} card.
+        const benefitsListHtml = newBenefitCyclesToNotify.map(status => {
+          const cardInfo = status.benefit.creditCard 
+            ? `on your ${status.benefit.creditCard.name} card` 
+            : '(Custom Benefit)';
+          return `<li>
+             <strong>${status.benefit.description}</strong> ${cardInfo}.
              Cycle: ${status.cycleStartDate.toLocaleDateString('en-US', { timeZone: 'UTC' })} - ${status.cycleEndDate.toLocaleDateString('en-US', { timeZone: 'UTC' })}.
-           </li>`
-        ).join('');
+           </li>`;
+        }).join('');
 
         const htmlBody = `
           <h1>New Benefit Cycles!</h1>
@@ -423,12 +581,15 @@ async function sendNotificationsDirectly() {
 
       if (expiringBenefitsToNotify.length > 0) {
         const subject = "Benefit Expiration Reminders";
-        const benefitsListHtml = expiringBenefitsToNotify.map(status => 
-          `<li>
-             <strong>${status.benefit.description}</strong> on your ${status.benefit.creditCard.name} card,
+        const benefitsListHtml = expiringBenefitsToNotify.map(status => {
+          const cardInfo = status.benefit.creditCard 
+            ? `on your ${status.benefit.creditCard.name} card` 
+            : '(Custom Benefit)';
+          return `<li>
+             <strong>${status.benefit.description}</strong> ${cardInfo},
              expiring on ${status.cycleEndDate.toLocaleDateString('en-US', { timeZone: 'UTC' })} (in ${user.notifyExpirationDays} day(s)).
-           </li>`
-        ).join('');
+           </li>`;
+        }).join('');
         
         const htmlBody = `
           <h1>Benefits Expiring Soon!</h1>
