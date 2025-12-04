@@ -240,7 +240,7 @@ export async function createCustomBenefitAction(formData: FormData) {
     });
 
     // Calculate the initial cycle dates
-    const now = new Date();
+    // For custom benefits, the cycle is anchored to the user's start date
     let cycleStartDate: Date;
     let cycleEndDate: Date;
 
@@ -249,16 +249,42 @@ export async function createCustomBenefitAction(formData: FormData) {
       cycleStartDate = cycle.cycleStartDate;
       cycleEndDate = cycle.cycleEndDate;
     } else {
-      const cycle = calculateBenefitCycle(
-        frequency as BenefitFrequency,
-        now,
-        null, // No card opened date for standalone benefits
-        null,
-        null,
-        null
-      );
-      cycleStartDate = cycle.cycleStartDate;
-      cycleEndDate = cycle.cycleEndDate;
+      // For recurring custom benefits, use the start date as the cycle anchor
+      // Normalize start date to midnight UTC
+      cycleStartDate = new Date(Date.UTC(
+        startDate.getUTCFullYear(),
+        startDate.getUTCMonth(),
+        startDate.getUTCDate(),
+        0, 0, 0, 0
+      ));
+      
+      // Calculate cycle end based on frequency
+      switch (frequency) {
+        case 'WEEKLY':
+          // Weekly: 7 days from start (due on day 7, next cycle on day 8)
+          cycleEndDate = new Date(cycleStartDate.getTime() + (7 * 24 * 60 * 60 * 1000) - 1);
+          break;
+        case 'MONTHLY':
+          // Monthly: same date next month minus 1 day
+          cycleEndDate = new Date(cycleStartDate);
+          cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + 1);
+          cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
+          break;
+        case 'QUARTERLY':
+          // Quarterly: 3 months from start
+          cycleEndDate = new Date(cycleStartDate);
+          cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + 3);
+          cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
+          break;
+        case 'YEARLY':
+          // Yearly: 1 year from start
+          cycleEndDate = new Date(cycleStartDate);
+          cycleEndDate.setUTCFullYear(cycleEndDate.getUTCFullYear() + 1);
+          cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
+          break;
+        default:
+          throw new Error(`Unsupported frequency: ${frequency}`);
+      }
     }
 
     // Create the initial benefit status

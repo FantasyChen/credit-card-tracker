@@ -51,6 +51,7 @@ async function runCheckBenefitsLogic() {
         id: true,
         userId: true,
         frequency: true,
+        startDate: true, // Include start date for cycle calculation
         cycleAlignment: true,
         fixedCycleStartMonth: true,
         fixedCycleDurationMonths: true,
@@ -334,11 +335,13 @@ async function processCardSafely(card: {
 /**
  * Process a single standalone benefit with complete error isolation
  * Standalone benefits are not tied to a credit card
+ * Cycles are anchored to the benefit's start date
  */
 async function processStandaloneBenefitSafely(benefit: {
   id: string;
   userId: string | null;
   frequency: BenefitFrequency;
+  startDate: Date;
   cycleAlignment: BenefitCycleAlignment | null;
   fixedCycleStartMonth: number | null;
   fixedCycleDurationMonths: number | null;
@@ -359,17 +362,66 @@ async function processStandaloneBenefitSafely(benefit: {
   const upsertPromises: Promise<unknown>[] = [];
 
   try {
-    const { cycleStartDate: rawCycleStartDate, cycleEndDate } = calculateBenefitCycle(
-      benefit.frequency,
-      now, 
-      null, // No card opened date for standalone benefits
-      benefit.cycleAlignment,
-      benefit.fixedCycleStartMonth,
-      benefit.fixedCycleDurationMonths
-    );
-
-    // CRITICAL: Normalize cycleStartDate to midnight UTC to prevent duplicate records
-    const cycleStartDate = normalizeCycleDate(rawCycleStartDate);
+    // For standalone/custom benefits, calculate cycles anchored to the start date
+    const startDate = new Date(benefit.startDate);
+    let cycleStartDate: Date;
+    let cycleEndDate: Date;
+    
+    // Calculate which cycle we're currently in based on start date and frequency
+    const nowTime = now.getTime();
+    const startTime = startDate.getTime();
+    
+    // Get cycle duration in milliseconds
+    let cycleDurationMs: number;
+    switch (benefit.frequency) {
+      case BenefitFrequency.WEEKLY:
+        cycleDurationMs = 7 * 24 * 60 * 60 * 1000;
+        break;
+      case BenefitFrequency.MONTHLY:
+        // Approximate month as 30 days for calculation
+        cycleDurationMs = 30 * 24 * 60 * 60 * 1000;
+        break;
+      case BenefitFrequency.QUARTERLY:
+        cycleDurationMs = 91 * 24 * 60 * 60 * 1000;
+        break;
+      case BenefitFrequency.YEARLY:
+        cycleDurationMs = 365 * 24 * 60 * 60 * 1000;
+        break;
+      default:
+        throw new Error(`Unsupported frequency: ${benefit.frequency}`);
+    }
+    
+    // Calculate how many complete cycles have passed since start
+    const cyclesPassed = Math.floor((nowTime - startTime) / cycleDurationMs);
+    
+    // Calculate current cycle start based on start date and cycles passed
+    if (benefit.frequency === BenefitFrequency.WEEKLY) {
+      cycleStartDate = new Date(startTime + (cyclesPassed * cycleDurationMs));
+      cycleEndDate = new Date(cycleStartDate.getTime() + cycleDurationMs - 1);
+    } else if (benefit.frequency === BenefitFrequency.MONTHLY) {
+      // For monthly, use proper month arithmetic
+      cycleStartDate = new Date(startDate);
+      cycleStartDate.setUTCMonth(cycleStartDate.getUTCMonth() + cyclesPassed);
+      cycleEndDate = new Date(cycleStartDate);
+      cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + 1);
+      cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
+    } else if (benefit.frequency === BenefitFrequency.QUARTERLY) {
+      cycleStartDate = new Date(startDate);
+      cycleStartDate.setUTCMonth(cycleStartDate.getUTCMonth() + (cyclesPassed * 3));
+      cycleEndDate = new Date(cycleStartDate);
+      cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + 3);
+      cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
+    } else {
+      // Yearly
+      cycleStartDate = new Date(startDate);
+      cycleStartDate.setUTCFullYear(cycleStartDate.getUTCFullYear() + cyclesPassed);
+      cycleEndDate = new Date(cycleStartDate);
+      cycleEndDate.setUTCFullYear(cycleEndDate.getUTCFullYear() + 1);
+      cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
+    }
+    
+    // Normalize to midnight UTC
+    cycleStartDate = normalizeCycleDate(cycleStartDate);
 
     // Create multiple BenefitStatus records based on occurrencesInCycle
     const occurrences = benefit.occurrencesInCycle || 1;
