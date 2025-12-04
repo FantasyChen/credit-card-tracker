@@ -10,6 +10,7 @@ interface BenefitsDisplayProps {
   upcomingBenefits: DisplayBenefitStatus[];
   completedBenefits: DisplayBenefitStatus[];
   notUsableBenefits: DisplayBenefitStatus[];
+  scheduledBenefits: DisplayBenefitStatus[];
   totalUnusedValue: number;
   totalUsedValue: number;
   totalNotUsableValue: number;
@@ -20,6 +21,7 @@ export default function BenefitsDisplayClient({
   upcomingBenefits,
   completedBenefits,
   notUsableBenefits,
+  scheduledBenefits,
   totalUnusedValue,
   totalUsedValue,
   totalNotUsableValue,
@@ -31,6 +33,7 @@ export default function BenefitsDisplayClient({
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
   const [localNotUsableBenefits, setLocalNotUsableBenefits] = useState(notUsableBenefits);
+  const [localScheduledBenefits, setLocalScheduledBenefits] = useState(scheduledBenefits);
   const [localTotalUnusedValue, setLocalTotalUnusedValue] = useState(totalUnusedValue);
   const [localTotalUsedValue, setLocalTotalUsedValue] = useState(totalUsedValue);
   const [localTotalNotUsableValue, setLocalTotalNotUsableValue] = useState(totalNotUsableValue);
@@ -219,6 +222,37 @@ export default function BenefitsDisplayClient({
             onStatusChange={handleStatusChange} 
             onNotUsableChange={handleNotUsableChange}
             onDelete={handleDeleteBenefit}
+            isScheduled={false}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const renderScheduledBenefitsList = (benefits: DisplayBenefitStatus[]) => {
+    if (benefits.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <p className="text-gray-500 dark:text-gray-400">No scheduled benefits.</p>
+        </div>
+      );
+    }
+
+    // Sort by start date (soonest first)
+    const sortedBenefits = [...benefits].sort((a, b) => 
+      new Date(a.cycleStartDate).getTime() - new Date(b.cycleStartDate).getTime()
+    );
+
+    return (
+      <div className="space-y-4">
+        {sortedBenefits.map(status => (
+          <BenefitCardClient 
+            key={status.id} 
+            status={status} 
+            onStatusChange={handleStatusChange} 
+            onNotUsableChange={handleNotUsableChange}
+            onDelete={handleDeleteBenefit}
+            isScheduled={true}
           />
         ))}
       </div>
@@ -555,6 +589,19 @@ export default function BenefitsDisplayClient({
             <span className="hidden sm:inline">Not Usable ({localNotUsableBenefits.length})</span>
             <span className="sm:hidden">Not Usable ({localNotUsableBenefits.length})</span>
           </button>
+          {localScheduledBenefits.length > 0 && (
+            <button
+              onClick={() => setActiveTab('scheduled')}
+              className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm 
+                ${activeTab === 'scheduled' 
+                  ? 'border-purple-500 text-purple-600 dark:border-purple-400 dark:text-purple-400' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}
+              `}
+            >
+              <span className="hidden sm:inline">Scheduled ({localScheduledBenefits.length})</span>
+              <span className="sm:hidden">Scheduled ({localScheduledBenefits.length})</span>
+            </button>
+          )}
         </nav>
       </div>
 
@@ -579,6 +626,21 @@ export default function BenefitsDisplayClient({
             {viewMode === 'list' ? renderBenefitsList(localNotUsableBenefits) : 
              viewMode === 'category' ? renderCategoryView(localNotUsableBenefits) : 
              renderCardView(localNotUsableBenefits)}
+          </section>
+        )}
+        {activeTab === 'scheduled' && (
+          <section>
+            <div className="mb-4 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+              <div className="flex items-center">
+                <svg className="h-5 w-5 text-purple-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-purple-700 dark:text-purple-300">
+                  These benefits are scheduled to start in the future. They will appear in &quot;Upcoming&quot; once their start date arrives.
+                </p>
+              </div>
+            </div>
+            {renderScheduledBenefitsList(localScheduledBenefits)}
           </section>
         )}
       </div>

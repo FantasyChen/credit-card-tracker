@@ -230,6 +230,12 @@ export default async function BenefitsDashboardPage() {
     return cycleStartDate <= now;
   });
 
+  // Filter for scheduled (future) benefits - cycle hasn't started yet
+  const scheduledBenefits = deduplicatedStatuses.filter(status => {
+    const cycleStartDate = new Date(status.cycleStartDate);
+    return cycleStartDate > now;
+  });
+
   // Separate benefits into categories
   const upcomingBenefits = activeOrPastCycleStatuses.filter(status => {
     const cycleStartDate = new Date(status.cycleStartDate);
@@ -260,6 +266,7 @@ export default async function BenefitsDashboardPage() {
       upcomingBenefits={upcomingBenefits}
       completedBenefits={completedBenefits}
       notUsableBenefits={notUsableBenefits}
+      scheduledBenefits={scheduledBenefits}
       totalUnusedValue={totalUnusedValue}
       totalUsedValue={totalUsedValue}
       totalNotUsableValue={totalNotUsableValue}
