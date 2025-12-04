@@ -159,7 +159,7 @@ export default function AddCustomBenefitPage() {
                 id="maxAmount"
                 name="maxAmount"
                 required
-                min="0.01"
+                min="0"
                 step="0.01"
                 placeholder="0.00"
                 className="w-full pl-8 pr-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"

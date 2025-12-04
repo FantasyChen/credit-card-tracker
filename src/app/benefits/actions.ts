@@ -13,7 +13,7 @@ import { redirect } from 'next/navigation';
 const customBenefitSchema = z.object({
   description: z.string().min(1, 'Description is required').max(200),
   category: z.enum(['Travel', 'Dining', 'Shopping', 'Entertainment', 'Transportation', 'Other']),
-  maxAmount: z.number().positive('Value must be positive'),
+  maxAmount: z.number().min(0, 'Value must be 0 or greater'),
   frequency: z.enum(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_TIME']),
   startDate: z.date(),
 });
