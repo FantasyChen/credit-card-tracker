@@ -97,6 +97,31 @@ export default function BenefitsDisplayClient({
     }
   };
 
+  const handleDeleteBenefit = (benefitId: string) => {
+    // Remove from all lists based on benefit ID
+    const findAndRemove = (list: DisplayBenefitStatus[]) => 
+      list.filter(b => b.benefit.id !== benefitId);
+    
+    // Find the benefit to get its value for updating totals
+    const allBenefits = [...localUpcomingBenefits, ...localCompletedBenefits, ...localNotUsableBenefits];
+    const deletedBenefit = allBenefits.find(b => b.benefit.id === benefitId);
+    
+    if (deletedBenefit) {
+      const benefitValue = deletedBenefit.benefit.maxAmount || 0;
+      
+      if (localUpcomingBenefits.some(b => b.benefit.id === benefitId)) {
+        setLocalUpcomingBenefits(findAndRemove);
+        setLocalTotalUnusedValue(prev => prev - benefitValue);
+      } else if (localCompletedBenefits.some(b => b.benefit.id === benefitId)) {
+        setLocalCompletedBenefits(findAndRemove);
+        setLocalTotalUsedValue(prev => prev - benefitValue);
+      } else if (localNotUsableBenefits.some(b => b.benefit.id === benefitId)) {
+        setLocalNotUsableBenefits(findAndRemove);
+        setLocalTotalNotUsableValue(prev => prev - benefitValue);
+      }
+    }
+  };
+
 
 
   const setListView = () => setViewMode('list');
@@ -188,7 +213,13 @@ export default function BenefitsDisplayClient({
     return (
       <div className="space-y-4">
         {benefits.map(status => (
-          <BenefitCardClient key={status.id} status={status} onStatusChange={handleStatusChange} onNotUsableChange={handleNotUsableChange} />
+          <BenefitCardClient 
+            key={status.id} 
+            status={status} 
+            onStatusChange={handleStatusChange} 
+            onNotUsableChange={handleNotUsableChange}
+            onDelete={handleDeleteBenefit}
+          />
         ))}
       </div>
     );
@@ -242,6 +273,7 @@ export default function BenefitsDisplayClient({
             benefits={categoryBenefits}
             onStatusChange={handleStatusChange}
             onNotUsableChange={handleNotUsableChange}
+            onDelete={handleDeleteBenefit}
           />
         ))}
       </div>
@@ -291,6 +323,7 @@ export default function BenefitsDisplayClient({
             benefits={cardBenefits}
             onStatusChange={handleStatusChange}
             onNotUsableChange={handleNotUsableChange}
+            onDelete={handleDeleteBenefit}
           />
         ))}
       </div>

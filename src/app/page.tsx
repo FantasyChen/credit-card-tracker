@@ -374,10 +374,21 @@ export default async function Home() {
                                     </p>
                                     <div className="mt-1 space-y-1">
                                       <div className="flex items-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                                        <svg className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                        </svg>
-                                        <span className="truncate">{status.benefit.creditCard.name}</span>
+                                        {status.benefit.creditCard ? (
+                                          <>
+                                            <svg className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                            </svg>
+                                            <span className="truncate">{status.benefit.creditCard.name}</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <svg className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                            </svg>
+                                            <span className="truncate text-purple-600 dark:text-purple-400">Custom Benefit</span>
+                                          </>
+                                        )}
                                       </div>
                                       {status.benefit.maxAmount && (
                                         <div className="text-xs sm:text-sm font-semibold text-indigo-600 dark:text-indigo-400">
