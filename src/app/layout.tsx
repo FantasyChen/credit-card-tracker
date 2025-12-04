@@ -5,6 +5,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Providers from "@/components/Providers"; // Reinstate original Providers
 import Footer from "@/components/Footer";
+import SkipLink from "@/components/ui/SkipLink";
 import { Analytics } from '@vercel/analytics/next';
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -115,9 +116,7 @@ export default async function RootLayout({
   const session = await getServerSession(authOptions);
 
   return (
-    // Remove suppressHydrationWarning if not needed by original Providers
-    // <html lang="en" className="h-full" suppressHydrationWarning>
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -163,9 +162,16 @@ export default async function RootLayout({
           <body
             className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
           >
+            <SkipLink />
             <div className="flex min-h-full flex-col bg-gray-50 dark:bg-gray-950">
               <Navbar />
-              <main className="container mx-auto flex-grow px-4 py-8">
+              <main 
+                id="main-content" 
+                className="container mx-auto flex-grow px-4 py-8"
+                tabIndex={-1}
+                role="main"
+                aria-label="Main content"
+              >
                 {children}
               </main>
               <Footer />

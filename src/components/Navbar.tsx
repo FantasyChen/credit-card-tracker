@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useState, useMemo } from 'react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 
 interface NavItem {
   name: string;
@@ -38,7 +39,8 @@ const Navbar = () => {
   }, [session]);
 
   return (
-    <nav className="bg-white shadow-sm dark:bg-gray-800">
+    <header role="banner">
+    <nav className="bg-white shadow-sm dark:bg-gray-800" role="navigation" aria-label="Main navigation">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
@@ -73,8 +75,12 @@ const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center">
+            {/* Theme Toggle - visible on all screen sizes */}
+            <div className="hidden sm:block">
+              <ThemeToggle />
+            </div>
             {/* Desktop Sign in/out button */}
-            <div className="hidden sm:ml-4 sm:block">
+            <div className="hidden sm:ml-2 sm:block">
               {session ? (
                 <button
                   onClick={() => signOut()}
@@ -93,6 +99,7 @@ const Navbar = () => {
             </div>
             {/* Mobile menu button & Theme Toggle */}
             <div className="ml-2 flex items-center sm:hidden">
+              <ThemeToggle />
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="ml-2 inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:focus:ring-indigo-400"
@@ -112,7 +119,7 @@ const Navbar = () => {
 
       {/* Mobile menu, show/hide based on menu state. */}
       {isMobileMenuOpen && (
-        <div className="sm:hidden" id="mobile-menu">
+        <div className="sm:hidden" id="mobile-menu" role="menu" aria-label="Mobile navigation menu">
           <div className="space-y-1 px-2 pb-3 pt-2">
             {navigation.map((item) => (
               <Link
@@ -125,6 +132,7 @@ const Navbar = () => {
                 }`}
                 aria-current={pathname === item.href ? 'page' : undefined}
                 onClick={() => setIsMobileMenuOpen(false)} // Close menu on item click
+                role="menuitem"
               >
                 {item.name}
               </Link>
@@ -153,6 +161,7 @@ const Navbar = () => {
         </div>
       )}
     </nav>
+    </header>
   );
 };
 

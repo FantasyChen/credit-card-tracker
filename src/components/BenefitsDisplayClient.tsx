@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import BenefitCardClient from '@/components/BenefitCardClient';
 import CategoryBenefitsGroup from '@/components/CategoryBenefitsGroup';
+import EmptyState from '@/components/ui/EmptyState';
 import type { DisplayBenefitStatus } from '@/app/benefits/page';
 import Link from 'next/link';
 
@@ -176,39 +177,27 @@ export default function BenefitsDisplayClient({
 
   const renderBenefitsList = (benefits: DisplayBenefitStatus[]) => {
     if (benefits.length === 0) {
-      return (
-        <div className="text-center py-12">
-          <div className="mx-auto h-24 w-24 text-gray-300 dark:text-gray-600 mb-4">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-            {activeTab === 'upcoming' ? 'No upcoming benefits' : 
-             activeTab === 'completed' ? 'No completed benefits yet' : 
-             'No not usable benefits'}
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-            {activeTab === 'upcoming' 
-              ? 'Add credit cards with benefits to start tracking your rewards and credits.'
-              : activeTab === 'completed' 
-                ? 'Mark benefits as complete when you use them to track your ROI.'
-                : 'Benefits marked as not usable will appear here.'
-            }
-          </p>
-          {activeTab === 'upcoming' && (
-            <Link
-              href="/cards/new"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-            >
-              <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Your First Card
-            </Link>
-          )}
-        </div>
-      );
+      const emptyStateProps = {
+        upcoming: {
+          icon: 'clock' as const,
+          title: 'No upcoming benefits',
+          description: 'Add credit cards with benefits to start tracking your rewards and credits.',
+          actionLabel: 'Add Your First Card',
+          actionHref: '/cards/new',
+        },
+        completed: {
+          icon: 'check' as const,
+          title: 'No completed benefits yet',
+          description: 'Mark benefits as complete when you use them to track your ROI.',
+        },
+        'not-usable': {
+          icon: 'x-circle' as const,
+          title: 'No not usable benefits',
+          description: 'Benefits marked as not usable will appear here.',
+        },
+      };
+      const props = emptyStateProps[activeTab as keyof typeof emptyStateProps] || emptyStateProps.upcoming;
+      return <EmptyState {...props} />;
     }
 
 
@@ -261,39 +250,27 @@ export default function BenefitsDisplayClient({
 
   const renderCategoryView = (benefits: DisplayBenefitStatus[]) => {
     if (benefits.length === 0) {
-      return (
-        <div className="text-center py-12">
-          <div className="mx-auto h-24 w-24 text-gray-300 dark:text-gray-600 mb-4">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-            {activeTab === 'upcoming' ? 'No upcoming benefits' : 
-             activeTab === 'completed' ? 'No completed benefits yet' : 
-             'No not usable benefits'}
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-            {activeTab === 'upcoming' 
-              ? 'Add credit cards with benefits to start tracking your rewards and credits.'
-              : activeTab === 'completed' 
-                ? 'Mark benefits as complete when you use them to track your ROI.'
-                : 'Benefits marked as not usable will appear here.'
-            }
-          </p>
-          {activeTab === 'upcoming' && (
-            <Link
-              href="/cards/new"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-            >
-              <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Your First Card
-            </Link>
-          )}
-        </div>
-      );
+      const emptyStateProps = {
+        upcoming: {
+          icon: 'clock' as const,
+          title: 'No upcoming benefits',
+          description: 'Add credit cards with benefits to start tracking your rewards and credits.',
+          actionLabel: 'Add Your First Card',
+          actionHref: '/cards/new',
+        },
+        completed: {
+          icon: 'check' as const,
+          title: 'No completed benefits yet',
+          description: 'Mark benefits as complete when you use them to track your ROI.',
+        },
+        'not-usable': {
+          icon: 'x-circle' as const,
+          title: 'No not usable benefits',
+          description: 'Benefits marked as not usable will appear here.',
+        },
+      };
+      const props = emptyStateProps[activeTab as keyof typeof emptyStateProps] || emptyStateProps.upcoming;
+      return <EmptyState {...props} />;
     }
 
     const categorizedBenefits = groupBenefitsByCategory(benefits);
@@ -316,34 +293,27 @@ export default function BenefitsDisplayClient({
 
   const renderCardView = (benefits: DisplayBenefitStatus[]) => {
     if (benefits.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12 bg-gradient-to-br from-gray-50 to-slate-100 rounded-xl border border-gray-200 dark:from-gray-800/50 dark:to-slate-800/50 dark:border-gray-700">
-          <div className="p-4 bg-gray-100 rounded-full dark:bg-gray-700 mb-4">
-            <svg className="h-8 w-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Benefits Available</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-4">
-            {activeTab === 'upcoming' 
-              ? "You don't have any upcoming benefits. Add some credit cards to get started!" 
-              : activeTab === 'completed'
-              ? "No completed benefits yet. Start using your credit card benefits!"
-              : "No unusable benefits found."}
-          </p>
-          {activeTab === 'upcoming' && (
-            <Link
-              href="/cards/new"
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Credit Card
-            </Link>
-          )}
-        </div>
-      );
+      const emptyStateProps = {
+        upcoming: {
+          icon: 'credit-card' as const,
+          title: 'No Benefits Available',
+          description: "You don't have any upcoming benefits. Add some credit cards to get started!",
+          actionLabel: 'Add Credit Card',
+          actionHref: '/cards/new',
+        },
+        completed: {
+          icon: 'check' as const,
+          title: 'No Benefits Available',
+          description: 'No completed benefits yet. Start using your credit card benefits!',
+        },
+        'not-usable': {
+          icon: 'x-circle' as const,
+          title: 'No Benefits Available',
+          description: 'No unusable benefits found.',
+        },
+      };
+      const props = emptyStateProps[activeTab as keyof typeof emptyStateProps] || emptyStateProps.upcoming;
+      return <EmptyState {...props} />;
     }
 
     const cardGroupedBenefits = groupBenefitsByCard(benefits);

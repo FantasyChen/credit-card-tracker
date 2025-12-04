@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { deleteCardAction } from './actions'; // Import the delete action
 import type { CreditCard, Benefit } from '@/generated/prisma'; // Removed unused PredefinedCard
 import { generateCardDisplayNames } from '@/lib/cardDisplayUtils';
+import { CardsPageSkeleton } from '@/components/ui/Skeleton';
+import EmptyState from '@/components/ui/EmptyState';
 
 // Type for cards fetched from the API, assuming benefits are included
 interface FetchedUserCard extends CreditCard {
@@ -208,7 +210,7 @@ export default function UserCardsPage() {
         )}
       </div>
 
-      {isLoading && <p className="text-center text-gray-500 mt-10 dark:text-gray-400">Loading cards...</p>}
+      {isLoading && <CardsPageSkeleton />}
       
       {/* Updated error handling */}
       {error && (
@@ -230,14 +232,13 @@ export default function UserCardsPage() {
 
       {/* Display when no cards and not loading and no error */}
       {!isLoading && !error && cards.length === 0 && (
-        <div className="text-center py-10 px-4 border border-dashed rounded-lg dark:border-gray-700">
-          <p className="text-gray-500 mb-4 dark:text-gray-400">
-            You haven&apos;t added any cards yet. Get started by adding your first card!
-          </p>
-          <Link href="/cards/new" className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200 dark:bg-blue-600 dark:hover:bg-blue-700">
-             Add Card
-          </Link>
-        </div>
+        <EmptyState
+          icon="credit-card"
+          title="No cards yet"
+          description="You haven't added any cards yet. Get started by adding your first card to track benefits!"
+          actionLabel="Add Your First Card"
+          actionHref="/cards/new"
+        />
       )}
 
       {!isLoading && !error && cards.length > 0 && (
