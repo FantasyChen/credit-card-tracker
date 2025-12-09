@@ -1,8 +1,54 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { BenefitFrequency } from '@/generated/prisma';
+import ShareButton from '@/components/ShareButton';
 import React from 'react';
+
+// Helper function to get next reset date based on frequency
+function getNextResetDate(frequency: BenefitFrequency): string {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  
+  switch (frequency) {
+    case 'WEEKLY':
+      const daysUntilMonday = (8 - now.getDay()) % 7 || 7;
+      const nextMonday = new Date(now);
+      nextMonday.setDate(now.getDate() + daysUntilMonday);
+      return nextMonday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    case 'MONTHLY':
+      const nextMonth = new Date(currentYear, currentMonth + 1, 1);
+      return nextMonth.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    case 'QUARTERLY':
+      const currentQuarter = Math.floor(currentMonth / 3);
+      const nextQuarterMonth = (currentQuarter + 1) * 3;
+      const nextQuarter = new Date(currentYear, nextQuarterMonth, 1);
+      if (nextQuarterMonth > 11) {
+        nextQuarter.setFullYear(currentYear + 1);
+        nextQuarter.setMonth(nextQuarterMonth - 12);
+      }
+      return nextQuarter.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    case 'YEARLY':
+      const nextYear = new Date(currentYear + 1, 0, 1);
+      return nextYear.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    default:
+      return 'One-time';
+  }
+}
+
+function getFrequencyLabel(frequency: BenefitFrequency): string {
+  switch (frequency) {
+    case 'WEEKLY': return 'Resets weekly';
+    case 'MONTHLY': return 'Resets monthly';
+    case 'QUARTERLY': return 'Resets quarterly';
+    case 'YEARLY': return 'Resets yearly';
+    case 'ONE_TIME': return 'One-time benefit';
+    default: return '';
+  }
+}
 
 interface PageProps {
   params: { slug: string };
@@ -78,6 +124,22 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
       index === self.findIndex((c) => c.id === card.id)
     );
 
+  // Helper function to render text with inline bold formatting
+  const renderTextWithBold = (text: string, keyPrefix: string): React.ReactNode => {
+    // Split by **text** pattern and render bold parts
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <strong key={`${keyPrefix}-${i}`} className="font-semibold text-gray-900 dark:text-white">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
+
   // Simple markdown-like content rendering
   const renderContent = (content: string) => {
     const lines = content.split('\n');
@@ -91,7 +153,7 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
         elements.push(
           <ul key={key++} className="list-disc list-inside space-y-2 mb-6 ml-4 text-gray-700 dark:text-gray-300">
             {listItems.map((item, i) => (
-              <li key={i} className="leading-relaxed">{item}</li>
+              <li key={i} className="leading-relaxed">{renderTextWithBold(item, `list-${key}-${i}`)}</li>
             ))}
           </ul>
         );
@@ -107,14 +169,14 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
         flushList();
         elements.push(
           <h2 key={key++} className="text-2xl font-bold text-gray-900 dark:text-white mt-8 mb-4">
-            {trimmed.replace('## ', '')}
+            {renderTextWithBold(trimmed.replace('## ', ''), `h2-${key}`)}
           </h2>
         );
-      } else if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+      } else if (trimmed.startsWith('### ')) {
         flushList();
         elements.push(
-          <h3 key={key++} className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
-            {trimmed.replace(/\*\*/g, '')}
+          <h3 key={key++} className="text-xl font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+            {renderTextWithBold(trimmed.replace('### ', ''), `h3-${key}`)}
           </h3>
         );
       } else if (trimmed.startsWith('- ')) {
@@ -135,7 +197,7 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
         flushList();
         elements.push(
           <p key={key++} className="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
-            {trimmed}
+            {renderTextWithBold(trimmed, `p-${key}`)}
           </p>
         );
       }
@@ -166,12 +228,16 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
 
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center mb-4">
-          {usageWay.category && (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
-              {usageWay.category}
-            </span>
-          )}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {usageWay.category && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
+                {usageWay.category}
+              </span>
+            )}
+          </div>
+          {/* Share Button */}
+          <ShareButton title={usageWay.title} description={usageWay.description || undefined} />
         </div>
         <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
           {usageWay.title}
@@ -218,26 +284,92 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
         </div>
       </article>
 
-      {/* Related Cards */}
+      {/* Related Cards with Images */}
       {relatedCards.length > 0 && (
         <div className="mt-12 bg-gray-50 dark:bg-gray-900 rounded-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-            Credit Cards with This Benefit
+            Cards Offering This Benefit
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {relatedCards.map((card) => (
-              <div
+              <Link
                 key={card.id}
-                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow"
+                href={`/cards/browse/${encodeURIComponent(card.name)}`}
+                className="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
               >
-                <div className="font-semibold text-gray-900 dark:text-white mb-1">
-                  {card.name}
+                <div className="flex items-start gap-4">
+                  {/* Card Image */}
+                  {card.imageUrl && (
+                    <div className="flex-shrink-0 w-16 h-10 relative rounded overflow-hidden bg-gray-100 dark:bg-gray-700">
+                      <Image
+                        src={card.imageUrl}
+                        alt={card.name}
+                        fill
+                        className="object-contain"
+                        sizes="64px"
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-0.5">
+                      {card.issuer}
+                    </div>
+                    <div className="font-semibold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
+                      {card.name}
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                      ${card.annualFee} annual fee
+                    </div>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {card.issuer}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Related Benefits with Reset Dates */}
+      {usageWay.predefinedBenefits.length > 0 && (
+        <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+            Benefits in This Guide
+          </h2>
+          <div className="space-y-4">
+            {usageWay.predefinedBenefits.map((benefit) => (
+              <div
+                key={benefit.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600"
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                      {benefit.category}
+                    </span>
+                    {benefit.maxAmount && (
+                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                        ${benefit.maxAmount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {benefit.description}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {benefit.predefinedCard.name}
+                  </div>
                 </div>
-                <div className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                  ${card.annualFee} annual fee
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {getFrequencyLabel(benefit.frequency)}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Next: {getNextResetDate(benefit.frequency)}
+                    </div>
+                  </div>
+                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
               </div>
             ))}

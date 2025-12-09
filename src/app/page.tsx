@@ -79,6 +79,35 @@ export default async function Home() {
                 Learn How to Maximize Benefits
               </Link>
             </div>
+
+            {/* Trust Badges */}
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              {/* 100% Free Badge */}
+              <div className="inline-flex items-center gap-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 px-4 py-3">
+                <div className="flex-shrink-0">
+                  <svg className="h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">100% Free Forever</p>
+                  <p className="text-xs text-indigo-600 dark:text-indigo-400">No subscriptions, no premium tiers, no hidden fees</p>
+                </div>
+              </div>
+
+              {/* Privacy Badge */}
+              <div className="inline-flex items-center gap-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-4 py-3">
+                <div className="flex-shrink-0">
+                  <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-green-800 dark:text-green-200">No bank access required</p>
+                  <p className="text-xs text-green-600 dark:text-green-400">We never ask for banking credentials</p>
+                </div>
+              </div>
+            </div>
           </div>
           <div className="hidden lg:col-span-5 lg:mt-0 lg:flex lg:items-center lg:justify-center relative">
             <Image 
@@ -88,6 +117,29 @@ export default async function Home() {
               className="rounded-lg object-contain"
               priority
             />
+          </div>
+        </div>
+      </section>
+
+      {/* Value Stats Section */}
+      <section className="bg-white dark:bg-gray-800 py-12 border-y border-gray-200 dark:border-gray-700">
+        <div className="container mx-auto max-w-screen-xl px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div className="p-6">
+              <div className="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">$500+</div>
+              <div className="text-gray-600 dark:text-gray-300 font-medium">Average yearly benefit value</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Per premium card holder</div>
+            </div>
+            <div className="p-6">
+              <div className="text-4xl font-bold text-red-500 dark:text-red-400 mb-2">80%</div>
+              <div className="text-gray-600 dark:text-gray-300 font-medium">Benefits go unused</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Without proper tracking</div>
+            </div>
+            <div className="p-6">
+              <div className="text-4xl font-bold text-green-600 dark:text-green-400 mb-2">2 min</div>
+              <div className="text-gray-600 dark:text-gray-300 font-medium">Setup time</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Add cards and start tracking</div>
+            </div>
           </div>
         </div>
       </section>

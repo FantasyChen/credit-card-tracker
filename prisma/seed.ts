@@ -950,7 +950,7 @@ async function main() {
       name: 'Alaska Airlines Visa Signature® credit card',
       issuer: 'Bank of America',
       annualFee: 95,
-      imageUrl: '/images/cards/alaska-airlines-visa-signature-credit-card.jpeg',
+      imageUrl: '/images/cards/alaska-airlines-visa-signature-credit-card.png',
       benefits: [
         {
           description: "Alaska\'s Famous Companion Fare™ (from $122)",
@@ -1245,7 +1245,7 @@ async function main() {
       name: 'Citi Strata Elite',
       issuer: 'Citi',
       annualFee: 595,
-      imageUrl: '/images/cards/citi-strata-elite.webp',
+      imageUrl: '/images/cards/citi-strata-elite.png',
       benefits: [
         {
           description: 'Up to $300 Annual Hotel Benefit (2+ nights via Citi Travel)',
