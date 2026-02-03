@@ -68,8 +68,37 @@ credit-card-tracker/
 │   ├── images/cards/        # Credit card images
 │   └── manifest.json        # PWA manifest
 ├── docs/                    # Project documentation
-└── scripts/                 # Utility scripts
+├── scripts/                 # Utility scripts (see Scripts Reference below)
+└── .cursor/
+    ├── rules/               # Cursor rules for safety checks
+    └── skills/              # AI agent skills for common workflows
 ```
+
+### Cursor Skills (AI Agent Workflows)
+
+The project includes Cursor skills that guide AI agents through common workflows:
+
+| Skill | Location | Purpose |
+|-------|----------|---------|
+| `add-new-credit-card` | `.cursor/skills/add-new-credit-card/` | Add new cards with images and benefits |
+| `update-card-benefits` | `.cursor/skills/update-card-benefits/` | Update benefits for existing cards |
+
+**How to use skills**: AI agents automatically detect when these skills are relevant based on user requests. The skills provide step-by-step guidance for complex multi-step workflows.
+
+### Scripts Reference
+
+| Script | Purpose | Type |
+|--------|---------|------|
+| `update-card-benefits.js` | Update existing card benefits (3-step process) | Workflow |
+| `migrate-benefits.js` | Advanced benefit migration framework | Workflow |
+| `validate-migration.js` | Validate migration plans before execution | Workflow |
+| `download-card-image.js` | Download card images from Google/UseYourCredits | Workflow |
+| `check-database-connection.js` | Verify database connection and environment | Utility |
+| `list-available-cards.cjs` | List all predefined cards | Utility |
+| `fix-duplicate-benefit-statuses.cjs` | Fix duplicate benefit status records | Maintenance |
+| `test-email.cjs` | Test email sending functionality | Testing |
+| `test-drag-drop.cjs` | Test drag-and-drop reordering | Testing |
+| `test-annual-fee-roi.cjs` | Test ROI calculations | Testing |
 
 ---
 
@@ -231,12 +260,18 @@ SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 
 ### Adding New Credit Cards
 
+> **Cursor Skill Available**: See `.cursor/skills/add-new-credit-card/SKILL.md` for detailed guidance.
+
+**Quick Steps:**
 1. **Research Card**: Verify benefits at [US Credit Card Guide](https://www.uscreditcardguide.com/)
 2. **Download Image**: `node scripts/download-card-image.js --name "Card Name"`
 3. **Update Seed**: Add card and benefits to `prisma/seed.ts`
 4. **Re-seed**: `npx prisma db seed`
+5. **Verify**: `node scripts/list-available-cards.cjs`
 
 ### Updating Existing Card Benefits
+
+> **Cursor Skill Available**: See `.cursor/skills/update-card-benefits/SKILL.md` for detailed guidance.
 
 ⚠️ **CRITICAL**: Updating card benefits requires a **three-step process** to ensure all users see the changes:
 
@@ -248,7 +283,7 @@ SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 
 ---
 
-#### **✨ NEW: Unified Update Script (Recommended)**
+#### **Unified Update Script (Recommended)**
 
 **Use this single command for the complete update process:**
 

@@ -58,12 +58,19 @@ src/generated/prisma/
 
 # Editor directories and files
 .idea
-.cursor/
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Cursor - ignore workspace files but keep skills and rules
+.cursor/*
+!.cursor/skills/
+!.cursor/rules/
+
+# Playwright MCP debug screenshots
+.playwright-mcp/
 *.suo
 *.ntvs*
 *.njsproj
