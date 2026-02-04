@@ -30,7 +30,7 @@ export default function BenefitsDisplayClient({
 }: BenefitsDisplayProps) {
   const [activeTab, setActiveTab] = useState('upcoming');
 
-  const [viewMode, setViewMode] = useState<'list' | 'category' | 'card'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'category' | 'card'>('card');
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
   const [localNotUsableBenefits, setLocalNotUsableBenefits] = useState(notUsableBenefits);
