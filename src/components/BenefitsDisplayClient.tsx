@@ -30,7 +30,7 @@ export default function BenefitsDisplayClient({
 }: BenefitsDisplayProps) {
   const [activeTab, setActiveTab] = useState('upcoming');
 
-  const [viewMode, setViewMode] = useState<'list' | 'category' | 'card'>('card');
+  const [viewMode, setViewMode] = useState<'category' | 'card'>('card');
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
   const [localNotUsableBenefits, setLocalNotUsableBenefits] = useState(notUsableBenefits);
@@ -175,7 +175,6 @@ export default function BenefitsDisplayClient({
 
 
 
-  const setListView = () => setViewMode('list');
   const setCategoryView = () => setViewMode('category');
   const setCardView = () => setViewMode('card');
 
@@ -401,19 +400,6 @@ export default function BenefitsDisplayClient({
             Add Custom
           </Link>
           <button
-            onClick={setListView}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'list' 
-                ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
-                : 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200'
-            }`}
-          >
-            <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-            List View
-          </button>
-          <button
             onClick={setCategoryView}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               viewMode === 'category' 
@@ -630,23 +616,17 @@ export default function BenefitsDisplayClient({
       <div>
         {activeTab === 'upcoming' && (
           <section>
-            {viewMode === 'list' ? renderBenefitsList(localUpcomingBenefits) : 
-             viewMode === 'category' ? renderCategoryView(localUpcomingBenefits) : 
-             renderCardView(localUpcomingBenefits)}
+            {viewMode === 'category' ? renderCategoryView(localUpcomingBenefits) : renderCardView(localUpcomingBenefits)}
           </section>
         )}
         {activeTab === 'completed' && (
           <section>
-            {viewMode === 'list' ? renderBenefitsList(localCompletedBenefits) : 
-             viewMode === 'category' ? renderCategoryView(localCompletedBenefits) : 
-             renderCardView(localCompletedBenefits)}
+            {viewMode === 'category' ? renderCategoryView(localCompletedBenefits) : renderCardView(localCompletedBenefits)}
           </section>
         )}
         {activeTab === 'not-usable' && (
           <section>
-            {viewMode === 'list' ? renderBenefitsList(localNotUsableBenefits) : 
-             viewMode === 'category' ? renderCategoryView(localNotUsableBenefits) : 
-             renderCardView(localNotUsableBenefits)}
+            {viewMode === 'category' ? renderCategoryView(localNotUsableBenefits) : renderCardView(localNotUsableBenefits)}
           </section>
         )}
         {activeTab === 'scheduled' && (
