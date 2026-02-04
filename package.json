@@ -21,7 +21,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && (prisma migrate deploy || true) && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
