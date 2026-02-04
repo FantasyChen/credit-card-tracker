@@ -13,6 +13,15 @@ jest.mock('@/lib/prisma', () => ({
     benefitStatus: {
       upsert: jest.fn(),
     },
+    benefit: {
+      findMany: jest.fn(),
+    },
+    user: {
+      findMany: jest.fn(),
+    },
+    loyaltyAccount: {
+      findMany: jest.fn(),
+    },
   },
 }));
 
@@ -53,6 +62,9 @@ describe('/api/cron/check-benefits', () => {
       cycleEndDate: utcDate(2023, 1, 31),
     });
     (prisma.creditCard.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.benefit.findMany as jest.Mock).mockResolvedValue([]); // Standalone benefits
+    (prisma.user.findMany as jest.Mock).mockResolvedValue([]); // Notification users
+    (prisma.loyaltyAccount.findMany as jest.Mock).mockResolvedValue([]); // Loyalty accounts
     (prisma.benefitStatus.upsert as jest.Mock).mockResolvedValue({});
     (NextResponse.json as jest.Mock).mockClear(); // Clear call history for NextResponse.json
   });
@@ -152,8 +164,8 @@ describe('/api/cron/check-benefits', () => {
         expect(prisma.benefitStatus.upsert).toHaveBeenCalledTimes(1);
         expect(prisma.benefitStatus.upsert).toHaveBeenCalledWith({
             where: { benefitId_userId_cycleStartDate_occurrenceIndex: { benefitId: 'b1', userId: 'user1', cycleStartDate: utcDate(2023,7,1), occurrenceIndex: 0 } },
-            update: { cycleEndDate: utcDate(2023,7,31) },
-            create: { benefitId: 'b1', userId: 'user1', cycleStartDate: utcDate(2023,7,1), cycleEndDate: utcDate(2023,7,31), occurrenceIndex: 0, isCompleted: false }
+            update: expect.objectContaining({ cycleEndDate: utcDate(2023,7,31) }),
+            create: { benefitId: 'b1', userId: 'user1', cycleStartDate: utcDate(2023,7,1), cycleEndDate: utcDate(2023,7,31), occurrenceIndex: 0, isCompleted: false, usedAmount: 0 }
         });
         expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ 
             message: 'Cron job executed successfully.', 

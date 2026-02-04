@@ -11,6 +11,7 @@ interface CategoryBenefitsGroupProps {
   onStatusChange?: (statusId: string, newIsCompleted: boolean) => void;
   onNotUsableChange?: (statusId: string, newIsNotUsable: boolean) => void;
   onDelete?: (benefitId: string) => void;
+  onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;
 }
 
 // Category icons mapping
@@ -151,7 +152,8 @@ export default function CategoryBenefitsGroup({
   benefits, 
   onStatusChange, 
   onNotUsableChange,
-  onDelete
+  onDelete,
+  onPartialCompletionChange
 }: CategoryBenefitsGroupProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -247,6 +249,7 @@ export default function CategoryBenefitsGroup({
                 onStatusChange={onStatusChange}
                 onNotUsableChange={onNotUsableChange}
                 onDelete={onDelete}
+                onPartialCompletionChange={onPartialCompletionChange}
               />
             ))}
           </div>

@@ -41,33 +41,76 @@ export default function BenefitsDisplayClient({
 
 
 
-  const handleStatusChange = (statusId: string, newIsCompleted: boolean) => {
+  const handleStatusChange = (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => {
     if (newIsCompleted) {
       // Moving from upcoming to completed
       const benefitToMove = localUpcomingBenefits.find(b => b.id === statusId);
       if (benefitToMove) {
-        const updatedBenefit = { ...benefitToMove, isCompleted: true, completedAt: new Date() };
+        const maxAmount = benefitToMove.benefit.maxAmount || 0;
+        const previousUsedAmount = benefitToMove.usedAmount ?? 0;
+        const finalUsedAmount = newUsedAmount ?? maxAmount; // Default to full completion
+        
+        const updatedBenefit = { 
+          ...benefitToMove, 
+          isCompleted: true, 
+          completedAt: new Date(),
+          usedAmount: finalUsedAmount,
+        };
         setLocalUpcomingBenefits(prev => prev.filter(b => b.id !== statusId));
         setLocalCompletedBenefits(prev => [...prev, updatedBenefit]);
         
-        // Update totals
-        const benefitValue = benefitToMove.benefit.maxAmount || 0;
-        setLocalTotalUnusedValue(prev => prev - benefitValue);
-        setLocalTotalUsedValue(prev => prev + benefitValue);
+        // Update totals: add the difference in usedAmount to totalUsedValue
+        const addedValue = finalUsedAmount - previousUsedAmount;
+        const remainingValue = maxAmount - finalUsedAmount;
+        
+        // Upcoming loses the remaining value, Used gains the added value
+        setLocalTotalUnusedValue(prev => prev - (maxAmount - previousUsedAmount));
+        setLocalTotalUsedValue(prev => prev + addedValue);
       }
     } else {
-      // Moving from completed to upcoming
+      // Moving from completed to upcoming (reset)
       const benefitToMove = localCompletedBenefits.find(b => b.id === statusId);
       if (benefitToMove) {
-        const updatedBenefit = { ...benefitToMove, isCompleted: false, completedAt: null };
+        const maxAmount = benefitToMove.benefit.maxAmount || 0;
+        const previousUsedAmount = benefitToMove.usedAmount ?? maxAmount;
+        
+        const updatedBenefit = { 
+          ...benefitToMove, 
+          isCompleted: false, 
+          completedAt: null,
+          usedAmount: 0, // Reset to 0 when uncompleting
+        };
         setLocalCompletedBenefits(prev => prev.filter(b => b.id !== statusId));
         setLocalUpcomingBenefits(prev => [...prev, updatedBenefit]);
         
         // Update totals
-        const benefitValue = benefitToMove.benefit.maxAmount || 0;
-        setLocalTotalUsedValue(prev => prev - benefitValue);
-        setLocalTotalUnusedValue(prev => prev + benefitValue);
+        setLocalTotalUsedValue(prev => prev - previousUsedAmount);
+        setLocalTotalUnusedValue(prev => prev + maxAmount); // Full amount is now unused
       }
+    }
+  };
+
+  // Handler for partial completion updates (doesn't move between tabs)
+  const handlePartialCompletionChange = (statusId: string, newUsedAmount: number, isNowComplete: boolean) => {
+    if (isNowComplete) {
+      // Move to completed if now fully complete
+      handleStatusChange(statusId, true, newUsedAmount);
+    } else {
+      // Stay in upcoming but update usedAmount
+      setLocalUpcomingBenefits(prev => prev.map(b => {
+        if (b.id === statusId) {
+          const maxAmount = b.benefit.maxAmount || 0;
+          const previousUsedAmount = b.usedAmount ?? 0;
+          const addedValue = newUsedAmount - previousUsedAmount;
+          
+          // Update totals
+          setLocalTotalUsedValue(v => v + addedValue);
+          setLocalTotalUnusedValue(v => v - addedValue);
+          
+          return { ...b, usedAmount: newUsedAmount };
+        }
+        return b;
+      }));
     }
   };
 
@@ -111,17 +154,21 @@ export default function BenefitsDisplayClient({
     const deletedBenefit = allBenefits.find(b => b.benefit.id === benefitId);
     
     if (deletedBenefit) {
-      const benefitValue = deletedBenefit.benefit.maxAmount || 0;
+      const maxAmount = deletedBenefit.benefit.maxAmount || 0;
+      const usedAmount = deletedBenefit.usedAmount ?? 0;
       
       if (localUpcomingBenefits.some(b => b.benefit.id === benefitId)) {
         setLocalUpcomingBenefits(findAndRemove);
-        setLocalTotalUnusedValue(prev => prev - benefitValue);
+        // For upcoming: remove remaining unused value and any partial used value
+        setLocalTotalUnusedValue(prev => prev - (maxAmount - usedAmount));
+        setLocalTotalUsedValue(prev => prev - usedAmount);
       } else if (localCompletedBenefits.some(b => b.benefit.id === benefitId)) {
         setLocalCompletedBenefits(findAndRemove);
-        setLocalTotalUsedValue(prev => prev - benefitValue);
+        // For completed: remove the used amount
+        setLocalTotalUsedValue(prev => prev - usedAmount);
       } else if (localNotUsableBenefits.some(b => b.benefit.id === benefitId)) {
         setLocalNotUsableBenefits(findAndRemove);
-        setLocalTotalNotUsableValue(prev => prev - benefitValue);
+        setLocalTotalNotUsableValue(prev => prev - maxAmount);
       }
     }
   };
@@ -211,6 +258,7 @@ export default function BenefitsDisplayClient({
             onStatusChange={handleStatusChange} 
             onNotUsableChange={handleNotUsableChange}
             onDelete={handleDeleteBenefit}
+            onPartialCompletionChange={handlePartialCompletionChange}
             isScheduled={false}
           />
         ))}
@@ -241,6 +289,7 @@ export default function BenefitsDisplayClient({
             onStatusChange={handleStatusChange} 
             onNotUsableChange={handleNotUsableChange}
             onDelete={handleDeleteBenefit}
+            onPartialCompletionChange={handlePartialCompletionChange}
             isScheduled={true}
           />
         ))}
@@ -285,6 +334,7 @@ export default function BenefitsDisplayClient({
             onStatusChange={handleStatusChange}
             onNotUsableChange={handleNotUsableChange}
             onDelete={handleDeleteBenefit}
+            onPartialCompletionChange={handlePartialCompletionChange}
           />
         ))}
       </div>
@@ -328,6 +378,7 @@ export default function BenefitsDisplayClient({
             onStatusChange={handleStatusChange}
             onNotUsableChange={handleNotUsableChange}
             onDelete={handleDeleteBenefit}
+            onPartialCompletionChange={handlePartialCompletionChange}
           />
         ))}
       </div>

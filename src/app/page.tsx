@@ -182,16 +182,17 @@ export default async function Home() {
     }, 0);
   });
 
+  // Calculate total claimed value using usedAmount (includes partial completions)
   const totalClaimedValue = await prisma.benefitStatus.findMany({
     where: {
       userId: userId,
-      isCompleted: true
+      isNotUsable: false, // Exclude not usable benefits
     },
-    include: {
-      benefit: true
+    select: {
+      usedAmount: true,
     }
   }).then(statuses => {
-    return statuses.reduce((total, status) => total + (status.benefit.maxAmount || 0), 0);
+    return statuses.reduce((total, status) => total + (status.usedAmount ?? 0), 0);
   });
 
   // Fetch upcoming benefits (not completed, not expired, ordered by cycle end date, limit 5)

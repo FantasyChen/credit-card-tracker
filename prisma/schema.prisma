@@ -140,20 +140,21 @@ model BenefitUsageWay {
 }
 
 model BenefitStatus {
-  id             String    @id @default(cuid())
-  benefitId      String
-  userId         String
-  cycleStartDate DateTime
-  cycleEndDate   DateTime
-  isCompleted    Boolean   @default(false)
-  completedAt    DateTime?
-  isNotUsable    Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  orderIndex     Int?
-  occurrenceIndex Int      @default(0)
-  benefit        Benefit   @relation(fields: [benefitId], references: [id], onDelete: Cascade)
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String    @id @default(cuid())
+  benefitId       String
+  userId          String
+  cycleStartDate  DateTime
+  cycleEndDate    DateTime
+  isCompleted     Boolean   @default(false)
+  completedAt     DateTime?
+  isNotUsable     Boolean   @default(false)
+  usedAmount      Float     @default(0)  // Track partial/full amount used
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  orderIndex      Int?
+  occurrenceIndex Int       @default(0)
+  benefit         Benefit   @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([benefitId, userId, cycleStartDate, occurrenceIndex])
 }

@@ -248,12 +248,17 @@ export default async function BenefitsDashboardPage() {
   const notUsableBenefits = activeOrPastCycleStatuses.filter(status => status.isNotUsable);
 
   // Calculate total values based on filtered, active/past cycle statuses
+  // Use usedAmount for partial completion tracking
   const totalUnusedValue = upcomingBenefits.reduce((sum, status) => {
-    return sum + (status.benefit.maxAmount || 0);
+    // Remaining value = maxAmount - usedAmount (for partial completions)
+    const maxAmount = status.benefit.maxAmount || 0;
+    const usedAmount = status.usedAmount ?? 0;
+    return sum + Math.max(0, maxAmount - usedAmount);
   }, 0);
 
-  const totalUsedValue = completedBenefits.reduce((sum, status) => {
-    return sum + (status.benefit.maxAmount || 0);
+  // Total used value counts usedAmount from ALL non-notUsable benefits (includes partial completions)
+  const totalUsedValue = [...upcomingBenefits, ...completedBenefits].reduce((sum, status) => {
+    return sum + (status.usedAmount ?? 0);
   }, 0);
 
   const totalNotUsableValue = notUsableBenefits.reduce((sum, status) => {

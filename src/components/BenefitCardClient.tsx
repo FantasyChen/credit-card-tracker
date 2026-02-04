@@ -3,21 +3,36 @@
 import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/dateUtils';
-import { toggleBenefitStatusAction, markBenefitAsNotUsableAction, deleteCustomBenefitAction } from '@/app/benefits/actions';
+import { 
+  toggleBenefitStatusAction, 
+  markBenefitAsNotUsableAction, 
+  deleteCustomBenefitAction,
+  addPartialCompletionAction,
+  markFullCompletionAction,
+} from '@/app/benefits/actions';
 import type { DisplayBenefitStatus } from '@/app/benefits/page';
+import { calculateCompletionPercentage } from '@/lib/partial-completion';
 
 interface BenefitCardClientProps {
   status: DisplayBenefitStatus;
-  onStatusChange?: (statusId: string, newIsCompleted: boolean) => void;
+  onStatusChange?: (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => void;
   onNotUsableChange?: (statusId: string, newIsNotUsable: boolean) => void;
   onDelete?: (benefitId: string) => void;
+  onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;
   isScheduled?: boolean;
 }
 
-export default function BenefitCardClient({ status, onStatusChange, onNotUsableChange, onDelete, isScheduled = false }: BenefitCardClientProps) {
+export default function BenefitCardClient({ status, onStatusChange, onNotUsableChange, onDelete, onPartialCompletionChange, isScheduled = false }: BenefitCardClientProps) {
   const [isPending, startTransition] = useTransition();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPartialModal, setShowPartialModal] = useState(false);
+  const [partialAmount, setPartialAmount] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const benefitAmount = status.benefit.maxAmount || 0;
+  const usedAmount = status.usedAmount ?? 0;
+  const remainingAmount = Math.max(0, benefitAmount - usedAmount);
+  const completionPercent = calculateCompletionPercentage(usedAmount, benefitAmount);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -32,6 +47,47 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
       } catch (error) {
         console.error('Failed to toggle benefit status:', error);
         // You might want to show an error message to the user here
+      }
+    });
+  };
+
+  const handleFullCompletion = async () => {
+    const formData = new FormData();
+    formData.append('benefitStatusId', status.id);
+    
+    startTransition(async () => {
+      try {
+        await markFullCompletionAction(formData);
+        onStatusChange?.(status.id, true, benefitAmount);
+      } catch (error) {
+        console.error('Failed to mark full completion:', error);
+      }
+    });
+  };
+
+  const handlePartialSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(partialAmount);
+    if (isNaN(amount) || amount <= 0) return;
+
+    const formData = new FormData();
+    formData.append('benefitStatusId', status.id);
+    formData.append('amount', amount.toString());
+    
+    startTransition(async () => {
+      try {
+        const result = await addPartialCompletionAction(formData);
+        if (result.success) {
+          if (result.isComplete) {
+            onStatusChange?.(status.id, true, result.newUsedAmount);
+          } else {
+            onPartialCompletionChange?.(status.id, result.newUsedAmount, result.isComplete);
+          }
+          setShowPartialModal(false);
+          setPartialAmount('');
+        }
+      } catch (error) {
+        console.error('Failed to add partial completion:', error);
       }
     });
   };
@@ -73,7 +129,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
   const isCompleted = status.isCompleted;
   const isCustomBenefit = status.isCustomBenefit;
   const isNotUsable = status.isNotUsable;
-  const benefitAmount = status.benefit.maxAmount || 0;
+  const hasPartialProgress = usedAmount > 0 && !isCompleted;
 
   return (
     <div className={`group relative overflow-hidden rounded-xl border transition-all duration-300 hover:shadow-lg ${
@@ -132,15 +188,34 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 )}
               </h3>
               {benefitAmount > 0 && (
-                <p className={`text-lg sm:text-xl font-bold mt-1 ${
-                  isCompleted 
-                    ? 'text-green-600 dark:text-green-400' 
-                    : isNotUsable
-                      ? 'text-gray-600 dark:text-gray-400'
-                      : 'text-indigo-600 dark:text-indigo-400'
-                }`}>
-                  ${benefitAmount.toFixed(2)}
-                </p>
+                <div className="mt-1">
+                  <p className={`text-lg sm:text-xl font-bold ${
+                    isCompleted 
+                      ? 'text-green-600 dark:text-green-400' 
+                      : isNotUsable
+                        ? 'text-gray-600 dark:text-gray-400'
+                        : hasPartialProgress
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-indigo-600 dark:text-indigo-400'
+                  }`}>
+                    {hasPartialProgress ? (
+                      <span>
+                        ${usedAmount.toFixed(2)} <span className="text-sm font-normal text-gray-500">of ${benefitAmount.toFixed(2)}</span>
+                      </span>
+                    ) : (
+                      <span>${benefitAmount.toFixed(2)}</span>
+                    )}
+                  </p>
+                  {/* Progress bar for partial completion */}
+                  {hasPartialProgress && (
+                    <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <div 
+                        className="bg-amber-500 h-2 rounded-full transition-all duration-300" 
+                        style={{ width: `${completionPercent}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -211,49 +286,81 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
           {/* Action buttons - full width on mobile, fixed width on larger screens */}
           <div className="pl-11">
             <div className="flex flex-col sm:flex-row gap-2">
-              {/* Complete/Pending button - hide for scheduled benefits */}
-              {!isScheduled && (
-                <form onSubmit={handleSubmit}>
-                  <input type="hidden" name="benefitStatusId" value={status.id} />
-                  <input type="hidden" name="isCompleted" value={status.isCompleted.toString()} />
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                      isCompleted
-                        ? 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-lg hover:shadow-xl focus:ring-yellow-500 dark:bg-yellow-600 dark:hover:bg-yellow-700'
-                        : 'bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl focus:ring-green-500 dark:bg-green-600 dark:hover:bg-green-700'
-                    } ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
-                  >
-                    {isPending ? (
-                      <div className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Updating...
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center">
-                        {isCompleted ? (
-                          <>
+              {/* Completion buttons - hide for scheduled benefits */}
+              {!isScheduled && !isNotUsable && (
+                <>
+                  {isCompleted ? (
+                    // For completed benefits, show "Mark Pending" to undo
+                    <form onSubmit={handleSubmit}>
+                      <input type="hidden" name="benefitStatusId" value={status.id} />
+                      <input type="hidden" name="isCompleted" value={status.isCompleted.toString()} />
+                      <button
+                        type="submit"
+                        disabled={isPending}
+                        className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-yellow-500 hover:bg-yellow-600 text-white shadow-lg hover:shadow-xl focus:ring-yellow-500 dark:bg-yellow-600 dark:hover:bg-yellow-700 ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                      >
+                        {isPending ? (
+                          <div className="flex items-center justify-center">
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Updating...
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center">
                             <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
                             Mark Pending
-                          </>
+                          </div>
+                        )}
+                      </button>
+                    </form>
+                  ) : (
+                    // For upcoming benefits with maxAmount, show split buttons
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleFullCompletion}
+                        disabled={isPending}
+                        className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl focus:ring-green-500 dark:bg-green-600 dark:hover:bg-green-700 ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                      >
+                        {isPending ? (
+                          <div className="flex items-center justify-center">
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Updating...
+                          </div>
                         ) : (
-                          <>
+                          <div className="flex items-center justify-center">
                             <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                             Mark Complete
-                          </>
+                          </div>
                         )}
-                      </div>
-                    )}
-                  </button>
-                </form>
+                      </button>
+                      {benefitAmount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowPartialModal(true)}
+                          disabled={isPending}
+                          className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-amber-500 hover:bg-amber-600 text-white shadow-lg hover:shadow-xl focus:ring-amber-500 dark:bg-amber-600 dark:hover:bg-amber-700 ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                        >
+                          <div className="flex items-center justify-center">
+                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            Partial Complete
+                          </div>
+                        </button>
+                      )}
+                    </>
+                  )}
+                </>
               )}
               
               {/* Not Usable button - only show for upcoming benefits, not scheduled */}
@@ -365,6 +472,98 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Amount Modal */}
+      {showPartialModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center mb-4">
+              <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full mr-3">
+                <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Partial Amount</h3>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                {status.benefit.description}
+              </p>
+              <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+                <span>Used: ${usedAmount.toFixed(2)}</span>
+                <span>Remaining: ${remainingAmount.toFixed(2)}</span>
+              </div>
+              {/* Progress bar */}
+              <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-amber-500 h-2 rounded-full transition-all duration-300" 
+                  style={{ width: `${completionPercent}%` }}
+                />
+              </div>
+            </div>
+
+            <form onSubmit={handlePartialSubmit}>
+              <div className="mb-4">
+                <label htmlFor="partialAmount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Amount to add
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input
+                    type="number"
+                    id="partialAmount"
+                    value={partialAmount}
+                    onChange={(e) => setPartialAmount(e.target.value)}
+                    placeholder={remainingAmount.toFixed(2)}
+                    step="0.01"
+                    min="0.01"
+                    max={remainingAmount}
+                    className="w-full pl-7 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:bg-gray-700 dark:text-white"
+                    autoFocus
+                  />
+                </div>
+                {parseFloat(partialAmount) > remainingAmount && (
+                  <p className="mt-1 text-sm text-red-500">
+                    Amount exceeds remaining balance of ${remainingAmount.toFixed(2)}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPartialModal(false);
+                    setPartialAmount('');
+                  }}
+                  disabled={isPending}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending || !partialAmount || parseFloat(partialAmount) <= 0 || parseFloat(partialAmount) > remainingAmount}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPending ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Adding...
+                    </>
+                  ) : (
+                    'Add Amount'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

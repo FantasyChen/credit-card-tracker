@@ -32,16 +32,22 @@ describe('batchCompleteBenefitsByCategoryAction', () => {
     };
     mockGetServerSession.mockResolvedValue(mockSession);
 
-    // Mock successful database update
-    mockPrisma.benefitStatus.updateMany.mockResolvedValue({ count: 3 });
+    // Mock findMany to return statuses with benefits
+    const mockStatuses = [
+      { id: 'benefit-1', usedAmount: 0, benefit: { maxAmount: 100 } },
+      { id: 'benefit-2', usedAmount: 30, benefit: { maxAmount: 50 } },
+      { id: 'benefit-3', usedAmount: 0, benefit: { maxAmount: 75 } },
+    ];
+    mockPrisma.benefitStatus.findMany.mockResolvedValue(mockStatuses as never);
+    mockPrisma.benefitStatus.update.mockResolvedValue({} as never);
 
     const category = 'Travel';
     const benefitStatusIds = ['benefit-1', 'benefit-2', 'benefit-3'];
 
     const result = await batchCompleteBenefitsByCategoryAction(category, benefitStatusIds);
 
-    // Verify the database update was called with correct parameters
-    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenCalledWith({
+    // Verify findMany was called to fetch statuses
+    expect(mockPrisma.benefitStatus.findMany).toHaveBeenCalledWith({
       where: {
         id: { in: benefitStatusIds },
         userId: 'test-user-id',
@@ -51,11 +57,13 @@ describe('batchCompleteBenefitsByCategoryAction', () => {
           category: category,
         },
       },
-      data: {
-        isCompleted: true,
-        completedAt: expect.any(Date),
+      include: {
+        benefit: true,
       },
     });
+
+    // Verify update was called for each status with usedAmount set to maxAmount
+    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledTimes(3);
 
     // Verify revalidation was called
     expect(mockRevalidatePath).toHaveBeenCalledWith('/benefits');
@@ -112,7 +120,8 @@ describe('batchCompleteBenefitsByCategoryAction', () => {
     };
     mockGetServerSession.mockResolvedValue(mockSession);
 
-    mockPrisma.benefitStatus.updateMany.mockRejectedValue(new Error('Database error'));
+    // Mock findMany to throw an error
+    mockPrisma.benefitStatus.findMany.mockRejectedValue(new Error('Database error'));
 
     await expect(
       batchCompleteBenefitsByCategoryAction('Travel', ['benefit-1'])
@@ -128,7 +137,13 @@ describe('batchCompleteBenefitsByCategoryAction', () => {
     };
     mockGetServerSession.mockResolvedValue(mockSession);
 
-    mockPrisma.benefitStatus.updateMany.mockResolvedValue({ count: 2 });
+    // Mock findMany to return only 2 eligible statuses (filtering out completed/not usable)
+    const mockStatuses = [
+      { id: 'benefit-1', usedAmount: 0, benefit: { maxAmount: 100 } },
+      { id: 'benefit-2', usedAmount: 20, benefit: { maxAmount: 50 } },
+    ];
+    mockPrisma.benefitStatus.findMany.mockResolvedValue(mockStatuses as never);
+    mockPrisma.benefitStatus.update.mockResolvedValue({} as never);
 
     const category = 'Dining';
     const benefitStatusIds = ['benefit-1', 'benefit-2', 'benefit-3'];
@@ -136,7 +151,7 @@ describe('batchCompleteBenefitsByCategoryAction', () => {
     await batchCompleteBenefitsByCategoryAction(category, benefitStatusIds);
 
     // Verify the where clause includes filters for uncompleted and usable benefits
-    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenCalledWith({
+    expect(mockPrisma.benefitStatus.findMany).toHaveBeenCalledWith({
       where: {
         id: { in: benefitStatusIds },
         userId: 'test-user-id',
@@ -146,10 +161,12 @@ describe('batchCompleteBenefitsByCategoryAction', () => {
           category: category,
         },
       },
-      data: {
-        isCompleted: true,
-        completedAt: expect.any(Date),
+      include: {
+        benefit: true,
       },
     });
+
+    // Verify update was called for each eligible status
+    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledTimes(2);
   });
 }); 

@@ -294,6 +294,8 @@ async function processCardSafely(card: {
             },
             update: {
               cycleEndDate: cycleEndDate,
+              // Note: We don't reset usedAmount on update - only on create
+              // This preserves partial completion progress within the current cycle
             },
             create: {
               benefitId: benefit.id,
@@ -301,7 +303,8 @@ async function processCardSafely(card: {
               cycleStartDate: cycleStartDate,
               cycleEndDate: cycleEndDate,
               occurrenceIndex: occurrenceIndex,
-              isCompleted: false, 
+              isCompleted: false,
+              usedAmount: 0, // New cycles always start fresh with 0 used
             },
           })
         );
@@ -439,6 +442,8 @@ async function processStandaloneBenefitSafely(benefit: {
           },
           update: {
             cycleEndDate: cycleEndDate,
+            // Note: We don't reset usedAmount on update - only on create
+            // This preserves partial completion progress within the current cycle
           },
           create: {
             benefitId: benefit.id,
@@ -446,7 +451,8 @@ async function processStandaloneBenefitSafely(benefit: {
             cycleStartDate: cycleStartDate,
             cycleEndDate: cycleEndDate,
             occurrenceIndex: occurrenceIndex,
-            isCompleted: false, 
+            isCompleted: false,
+            usedAmount: 0, // New cycles always start fresh with 0 used
           },
         })
       );

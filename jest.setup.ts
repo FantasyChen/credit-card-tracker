@@ -31,6 +31,8 @@ jest.mock('@/lib/prisma', () => ({
     benefitStatus: {
       updateMany: jest.fn(),
       findMany: jest.fn(),
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
       upsert: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -38,20 +40,33 @@ jest.mock('@/lib/prisma', () => ({
     },
     creditCard: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
     },
     user: {
+      findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
     },
     benefit: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+    },
+    predefinedCard: {
+      findMany: jest.fn(),
+    },
+    benefitUsageWay: {
+      findMany: jest.fn(),
+    },
+    loyaltyAccount: {
+      findMany: jest.fn(),
     },
   },
 }));

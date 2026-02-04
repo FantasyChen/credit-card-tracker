@@ -35,7 +35,24 @@ export async function toggleBenefitStatusAction(formData: FormData) {
   const newIsCompleted = !currentIsCompleted;
 
   try {
-    // Verify the status belongs to the current user before updating
+    // Fetch the status with its benefit to get maxAmount
+    const existingStatus = await prisma.benefitStatus.findFirst({
+      where: {
+        id: benefitStatusId,
+        userId: session.user.id,
+      },
+      include: {
+        benefit: true,
+      },
+    });
+
+    if (!existingStatus) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
+
+    const maxAmount = existingStatus.benefit.maxAmount ?? 0;
+
+    // Update with usedAmount: set to maxAmount when completing, 0 when uncompleting
     const updatedStatus = await prisma.benefitStatus.updateMany({
       where: {
         id: benefitStatusId,
@@ -43,7 +60,8 @@ export async function toggleBenefitStatusAction(formData: FormData) {
       },
       data: {
         isCompleted: newIsCompleted,
-        completedAt: newIsCompleted ? new Date() : null, // Set/clear completed timestamp
+        completedAt: newIsCompleted ? new Date() : null,
+        usedAmount: newIsCompleted ? maxAmount : 0,
       },
     });
 
@@ -52,7 +70,7 @@ export async function toggleBenefitStatusAction(formData: FormData) {
       throw new Error('Benefit status not found or permission denied.');
     }
 
-    console.log(`Benefit status ${benefitStatusId} toggled to ${newIsCompleted}`);
+    console.log(`Benefit status ${benefitStatusId} toggled to ${newIsCompleted} with usedAmount ${newIsCompleted ? maxAmount : 0}`);
 
     // Revalidate the benefits page to show the change
     revalidatePath('/benefits');
@@ -64,6 +82,253 @@ export async function toggleBenefitStatusAction(formData: FormData) {
   }
 
   // No redirect needed, revalidation handles the UI update
+}
+
+/**
+ * Add a partial amount to a benefit's usedAmount.
+ * If the total reaches maxAmount, the benefit is automatically marked complete.
+ */
+export async function addPartialCompletionAction(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated.');
+  }
+
+  const benefitStatusId = formData.get('benefitStatusId') as string;
+  const amountStr = formData.get('amount') as string;
+
+  if (!benefitStatusId) {
+    throw new Error('Benefit Status ID is missing.');
+  }
+
+  const amount = parseFloat(amountStr);
+  if (isNaN(amount) || amount <= 0) {
+    throw new Error('Amount must be a positive number.');
+  }
+
+  try {
+    // Fetch the existing status with benefit details
+    const existingStatus = await prisma.benefitStatus.findFirst({
+      where: {
+        id: benefitStatusId,
+        userId: session.user.id,
+      },
+      include: {
+        benefit: true,
+      },
+    });
+
+    if (!existingStatus) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
+
+    const maxAmount = existingStatus.benefit.maxAmount ?? 0;
+    const currentUsedAmount = existingStatus.usedAmount ?? 0;
+    
+    // Calculate new used amount, capped at maxAmount
+    let newUsedAmount = currentUsedAmount + amount;
+    if (maxAmount > 0) {
+      newUsedAmount = Math.min(newUsedAmount, maxAmount);
+    }
+
+    // Determine if this completes the benefit
+    const isNowComplete = maxAmount > 0 && newUsedAmount >= maxAmount;
+
+    await prisma.benefitStatus.update({
+      where: { id: benefitStatusId },
+      data: {
+        usedAmount: newUsedAmount,
+        isCompleted: isNowComplete,
+        completedAt: isNowComplete ? new Date() : null,
+      },
+    });
+
+    console.log(`Added partial completion: ${amount} to benefit ${benefitStatusId}. Total: ${newUsedAmount}/${maxAmount}. Complete: ${isNowComplete}`);
+
+    revalidatePath('/benefits');
+
+    return { 
+      success: true, 
+      newUsedAmount, 
+      isComplete: isNowComplete,
+      maxAmount,
+    };
+
+  } catch (error) {
+    console.error('Error adding partial completion:', error);
+    throw new Error('Failed to add partial completion.');
+  }
+}
+
+/**
+ * Mark a benefit as fully complete (sets usedAmount to maxAmount).
+ */
+export async function markFullCompletionAction(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated.');
+  }
+
+  const benefitStatusId = formData.get('benefitStatusId') as string;
+
+  if (!benefitStatusId) {
+    throw new Error('Benefit Status ID is missing.');
+  }
+
+  try {
+    // Fetch the status with benefit to get maxAmount
+    const existingStatus = await prisma.benefitStatus.findFirst({
+      where: {
+        id: benefitStatusId,
+        userId: session.user.id,
+      },
+      include: {
+        benefit: true,
+      },
+    });
+
+    if (!existingStatus) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
+
+    const maxAmount = existingStatus.benefit.maxAmount ?? 0;
+
+    await prisma.benefitStatus.update({
+      where: { id: benefitStatusId },
+      data: {
+        usedAmount: maxAmount,
+        isCompleted: true,
+        completedAt: new Date(),
+      },
+    });
+
+    console.log(`Marked full completion for benefit ${benefitStatusId}. usedAmount set to ${maxAmount}`);
+
+    revalidatePath('/benefits');
+
+    return { success: true, usedAmount: maxAmount };
+
+  } catch (error) {
+    console.error('Error marking full completion:', error);
+    throw new Error('Failed to mark benefit as complete.');
+  }
+}
+
+/**
+ * Reset a benefit's completion status (sets usedAmount to 0, isCompleted to false).
+ */
+export async function resetBenefitCompletionAction(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated.');
+  }
+
+  const benefitStatusId = formData.get('benefitStatusId') as string;
+
+  if (!benefitStatusId) {
+    throw new Error('Benefit Status ID is missing.');
+  }
+
+  try {
+    const updatedStatus = await prisma.benefitStatus.updateMany({
+      where: {
+        id: benefitStatusId,
+        userId: session.user.id,
+      },
+      data: {
+        usedAmount: 0,
+        isCompleted: false,
+        completedAt: null,
+      },
+    });
+
+    if (updatedStatus.count === 0) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
+
+    console.log(`Reset completion for benefit ${benefitStatusId}`);
+
+    revalidatePath('/benefits');
+
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error resetting benefit completion:', error);
+    throw new Error('Failed to reset benefit completion.');
+  }
+}
+
+/**
+ * Update the used amount for a benefit directly (can increase or decrease).
+ */
+export async function updateUsedAmountAction(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated.');
+  }
+
+  const benefitStatusId = formData.get('benefitStatusId') as string;
+  const newAmountStr = formData.get('newAmount') as string;
+
+  if (!benefitStatusId) {
+    throw new Error('Benefit Status ID is missing.');
+  }
+
+  const newAmount = parseFloat(newAmountStr);
+  if (isNaN(newAmount) || newAmount < 0) {
+    throw new Error('Amount must be a non-negative number.');
+  }
+
+  try {
+    // Fetch the status with benefit to get maxAmount
+    const existingStatus = await prisma.benefitStatus.findFirst({
+      where: {
+        id: benefitStatusId,
+        userId: session.user.id,
+      },
+      include: {
+        benefit: true,
+      },
+    });
+
+    if (!existingStatus) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
+
+    const maxAmount = existingStatus.benefit.maxAmount ?? 0;
+    
+    // Clamp new amount to maxAmount if it exists
+    let clampedAmount = newAmount;
+    if (maxAmount > 0) {
+      clampedAmount = Math.min(newAmount, maxAmount);
+    }
+
+    // Determine completion status
+    const isComplete = maxAmount > 0 && clampedAmount >= maxAmount;
+
+    await prisma.benefitStatus.update({
+      where: { id: benefitStatusId },
+      data: {
+        usedAmount: clampedAmount,
+        isCompleted: isComplete,
+        completedAt: isComplete ? (existingStatus.completedAt ?? new Date()) : null,
+      },
+    });
+
+    console.log(`Updated used amount for benefit ${benefitStatusId} to ${clampedAmount}. Complete: ${isComplete}`);
+
+    revalidatePath('/benefits');
+
+    return { 
+      success: true, 
+      usedAmount: clampedAmount,
+      isComplete,
+    };
+
+  } catch (error) {
+    console.error('Error updating used amount:', error);
+    throw new Error('Failed to update used amount.');
+  }
 }
 
 export async function markBenefitAsNotUsableAction(formData: FormData) {
@@ -156,29 +421,47 @@ export async function batchCompleteBenefitsByCategoryAction(category: string, be
   try {
     const now = new Date();
     
-    // Update all the benefit statuses in the specified category
-    const updatedStatuses = await prisma.benefitStatus.updateMany({
+    // First, fetch all the benefit statuses with their benefits to get maxAmount values
+    const statusesToComplete = await prisma.benefitStatus.findMany({
       where: {
         id: { in: benefitStatusIds },
-        userId: session.user.id, // Ensure user owns these status records
-        isCompleted: false, // Only update uncompleted benefits
-        isNotUsable: false, // Don't update benefits marked as not usable
+        userId: session.user.id,
+        isCompleted: false,
+        isNotUsable: false,
         benefit: {
-          category: category, // Additional validation that these benefits are in the correct category
+          category: category,
         },
       },
-      data: {
-        isCompleted: true,
-        completedAt: now,
+      include: {
+        benefit: true,
       },
     });
 
-    console.log(`Batch completed ${updatedStatuses.count} benefits in category: ${category}`);
+    // Update each status with its specific maxAmount
+    const updatePromises = statusesToComplete.map((status) => {
+      const maxAmount = status.benefit.maxAmount ?? 0;
+      // Calculate new usedAmount: remaining amount to reach max
+      const currentUsed = status.usedAmount ?? 0;
+      const newUsedAmount = maxAmount > 0 ? maxAmount : currentUsed;
+      
+      return prisma.benefitStatus.update({
+        where: { id: status.id },
+        data: {
+          isCompleted: true,
+          completedAt: now,
+          usedAmount: newUsedAmount,
+        },
+      });
+    });
+
+    await Promise.all(updatePromises);
+
+    console.log(`Batch completed ${statusesToComplete.length} benefits in category: ${category}`);
 
     // Revalidate the benefits page to show the changes
     revalidatePath('/benefits');
 
-    return { success: true, updatedCount: updatedStatuses.count };
+    return { success: true, updatedCount: statusesToComplete.length };
 
   } catch (error) {
     console.error('Error batch completing benefits by category:', error);
@@ -295,6 +578,7 @@ export async function createCustomBenefitAction(formData: FormData) {
         cycleStartDate,
         cycleEndDate,
         isCompleted: false,
+        usedAmount: 0,
         occurrenceIndex: 0,
       },
     });
