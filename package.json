@@ -21,7 +21,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && (prisma migrate deploy || echo 'Migration skipped - may already be applied') && next build",
+    "build": "prisma generate && (prisma migrate deploy || true) && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
