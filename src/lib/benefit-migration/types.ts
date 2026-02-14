@@ -73,6 +73,8 @@ export interface MigrationOptions {
   preserveUserActions: boolean; // Don't touch completed/not-usable benefits
   validateCycles: boolean;
   backupUserData: boolean;
+  /** When backupUserData is true, called before modifying each user's card. Used by CLI to write JSON backups. */
+  backupWriter?: (context: UserMigrationContext) => Promise<void>;
 }
 
 export interface UserMigrationContext {

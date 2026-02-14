@@ -132,6 +132,7 @@ node scripts/update-card-benefits.js --card "Card Name" --force  # Complete migr
 - **Transaction Safety**: Changes rollback if any step fails
 - **Progress Tracking**: See exactly which users were migrated
 - **Error Handling**: Individual user failures don't stop the entire migration
+- **Advanced (migrate-benefits.js)**: Use `--backup` with `--force` to save a JSON snapshot of affected user data before applying; see AGENTS.md for details.
 
 ## 📝 Use Cases
 
@@ -168,7 +169,7 @@ node scripts/update-card-benefits.js --card "Card Name" --force  # Complete migr
 
 ## 📚 For More Information
 
-See `AGENTS.md` section "Updating Existing Card Benefits" for detailed documentation and advanced usage.
+See **AGENTS.md** section "Updating Existing Card Benefits" for detailed documentation, advanced migration framework (`migrate-benefits.js`), and backup options.
 
 ---
 

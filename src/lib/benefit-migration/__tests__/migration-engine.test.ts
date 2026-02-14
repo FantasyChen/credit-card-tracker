@@ -355,4 +355,116 @@ describe('BenefitMigrationEngine', () => {
       });
     });
   });
+
+  describe('Backup', () => {
+    it('should call backupWriter for each user card when backupUserData is true', async () => {
+      const backupWriter = jest.fn().mockResolvedValue(undefined);
+      const engine = new BenefitMigrationEngine({
+        dryRun: false,
+        backupUserData: true,
+        backupWriter,
+      });
+
+      const plan = new MigrationPlanBuilder()
+        .setMetadata({
+          id: 'backup-test',
+          title: 'Backup Test',
+          description: 'Test backup writer is called',
+        })
+        .addCardUpdate('Test Card', 'Test Issuer')
+        .addDiningBenefit({
+          description: 'Test benefit',
+          percentage: 100,
+          maxAmount: 50,
+        })
+        .finishCard()
+        .build();
+
+      mockPrisma.predefinedCard.findUnique.mockResolvedValue({
+        id: 'predef1',
+        name: 'Test Card',
+        benefits: [],
+      });
+      mockPrisma.predefinedCard.update.mockResolvedValue({});
+
+      mockPrisma.creditCard.count.mockImplementation((args) => {
+        if (args?.where?.name === 'Test Card') return Promise.resolve(2);
+        return Promise.resolve(0);
+      });
+
+      const card1 = {
+        id: 'card1',
+        name: 'Test Card',
+        openedDate: new Date('2024-01-01'),
+        user: { id: 'user1', email: 'u1@example.com' },
+        benefits: [
+          {
+            id: 'b1',
+            category: 'Dining',
+            description: 'Old benefit',
+            percentage: 100,
+            maxAmount: 25,
+            frequency: BenefitFrequency.MONTHLY,
+            cycleAlignment: null,
+            fixedCycleStartMonth: null,
+            fixedCycleDurationMonths: null,
+            occurrencesInCycle: 1,
+            benefitStatuses: [
+              {
+                id: 's1',
+                benefitId: 'b1',
+                isCompleted: false,
+                isNotUsable: false,
+                completedAt: null,
+                cycleStartDate: new Date('2024-01-01'),
+                cycleEndDate: new Date('2024-01-31'),
+                occurrenceIndex: 0,
+              },
+            ],
+          },
+        ],
+      };
+      mockPrisma.creditCard.findMany.mockResolvedValue([
+        card1,
+        {
+          ...card1,
+          id: 'card2',
+          user: { id: 'user2', email: 'u2@example.com' },
+        },
+      ]);
+
+      mockPrisma.$transaction.mockImplementation(async (callback) => {
+        const tx = {
+          benefitStatus: { deleteMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'ns1' }) },
+          benefit: { deleteMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'nb1' }) },
+          creditCard: { update: jest.fn().mockResolvedValue({}) },
+        };
+        return callback(tx);
+      });
+
+      const result = await engine.executeMigration(plan);
+
+      expect(result.success).toBe(true);
+      expect(backupWriter).toHaveBeenCalledTimes(2);
+      expect(backupWriter).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          userId: 'user1',
+          userEmail: 'u1@example.com',
+          cardId: 'card1',
+          cardName: 'Test Card',
+          currentBenefits: expect.any(Array),
+          benefitStatuses: expect.any(Array),
+        })
+      );
+      expect(backupWriter).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          userId: 'user2',
+          userEmail: 'u2@example.com',
+          cardId: 'card2',
+        })
+      );
+    });
+  });
 });

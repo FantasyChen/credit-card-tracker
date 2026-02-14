@@ -4,8 +4,10 @@
  * Command-line interface for running benefit migrations safely
  */
 
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
 import { BenefitMigrationEngine } from './migration-engine';
-import type { MigrationPlan, MigrationOptions } from './types';
+import type { MigrationPlan, MigrationOptions, UserMigrationContext } from './types';
 
 export interface CLIOptions {
   dryRun?: boolean;
@@ -15,13 +17,21 @@ export interface CLIOptions {
   preserveUserActions?: boolean;
   validateCycles?: boolean;
   verbose?: boolean;
+  /** When true (and not dry-run), backup affected user data to backupDir before applying changes */
+  backup?: boolean;
+  /** Directory for backup JSON files (default: ./migration-backups) */
+  backupDir?: string;
 }
 
 export class MigrationCLI {
   private engine: BenefitMigrationEngine;
   private verbose: boolean = false;
+  private backupData: UserMigrationContext[] = [];
 
   constructor(options: CLIOptions = {}) {
+    const backupUserData = !!(options.backup && !options.dryRun && (options.force ?? false));
+    const backupDir = options.backupDir ?? './migration-backups';
+
     const migrationOptions: MigrationOptions = {
       dryRun: options.dryRun ?? true, // Default to dry run for safety
       force: options.force ?? false,
@@ -29,12 +39,20 @@ export class MigrationCLI {
       stopOnFirstError: options.stopOnFirstError ?? false,
       preserveUserActions: options.preserveUserActions ?? true,
       validateCycles: options.validateCycles ?? true,
-      backupUserData: false // TODO: Implement backup functionality
+      backupUserData,
+      backupWriter: backupUserData
+        ? async (context: UserMigrationContext) => {
+            this.backupData.push(context);
+          }
+        : undefined,
     };
 
     this.engine = new BenefitMigrationEngine(migrationOptions);
     this.verbose = options.verbose ?? false;
+    this.backupDir = backupDir;
   }
+
+  private backupDir: string = './migration-backups';
 
   /**
    * Execute a migration with CLI-style output and safety checks
@@ -60,7 +78,13 @@ Example:
     }
 
     // Execute migration
+    this.backupData = [];
     const result = await this.engine.executeMigration(plan);
+
+    // Write backup file if we collected any data
+    if (this.backupData.length > 0) {
+      await this.writeBackupFile(plan);
+    }
 
     // Display results
     this.displayResults(result);
@@ -68,6 +92,29 @@ Example:
     // Exit with error code if migration failed
     if (!result.success) {
       process.exit(1);
+    }
+  }
+
+  /**
+   * Write collected backup data to a timestamped JSON file in backupDir
+   */
+  private async writeBackupFile(plan: MigrationPlan): Promise<void> {
+    try {
+      await mkdir(this.backupDir, { recursive: true });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `migration-backup-${plan.id}-${timestamp}.json`;
+      const filepath = join(this.backupDir, filename);
+      const payload = {
+        migrationId: plan.id,
+        migrationTitle: plan.title,
+        backedUpAt: new Date().toISOString(),
+        userCount: this.backupData.length,
+        contexts: this.backupData,
+      };
+      await writeFile(filepath, JSON.stringify(payload, null, 2), 'utf-8');
+      console.log(`\n📦 Backup written: ${filepath} (${this.backupData.length} user cards)`);
+    } catch (err) {
+      console.error('\n⚠️  Failed to write backup file:', err instanceof Error ? err.message : err);
     }
   }
 
@@ -96,6 +143,9 @@ Example:
     console.log(`   Preserve user actions: ${this.engine['options'].preserveUserActions}`);
     console.log(`   Validate cycles: ${this.engine['options'].validateCycles}`);
     console.log(`   Stop on first error: ${this.engine['options'].stopOnFirstError}`);
+    if (this.engine['options'].backupUserData) {
+      console.log(`   Backup user data: yes (${this.backupDir})`);
+    }
 
     if (isDryRun) {
       console.log(`\n🔍 DRY RUN MODE: No data will be modified`);
@@ -201,9 +251,14 @@ Example:
         case '--verbose':
           options.verbose = true;
           break;
+        case '--backup':
+          options.backup = true;
+          break;
         default:
           if (arg.startsWith('--batch-size=')) {
             options.batchSize = parseInt(arg.split('=')[1]);
+          } else if (arg.startsWith('--backup-dir=')) {
+            options.backupDir = arg.split('=')[1];
           }
           break;
       }
@@ -229,6 +284,8 @@ OPTIONS:
   --stop-on-error            Stop on first error (default: continue)
   --no-preserve-user-actions  Replace all benefits (default: preserve completed/not-usable)
   --no-validate-cycles       Skip benefit cycle validation (default: validate)
+  --backup                   Backup affected user data to JSON before applying (use with --force)
+  --backup-dir=DIR           Directory for backup files (default: ./migration-backups)
   --skip-validation          Skip pre-migration validation (not recommended)
   --verbose                  Show detailed progress information
 

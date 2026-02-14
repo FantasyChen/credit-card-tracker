@@ -364,6 +364,44 @@ export class BenefitMigrationEngine {
   }
 
   /**
+   * Build UserMigrationContext from a card for backup purposes
+   */
+  private buildUserMigrationContext(card: any): UserMigrationContext {
+    const benefitStatuses = (card.benefits || []).flatMap((benefit: any) =>
+      (benefit.benefitStatuses || []).map((s: any) => ({
+        id: s.id,
+        benefitId: benefit.id,
+        isCompleted: s.isCompleted,
+        isNotUsable: s.isNotUsable,
+        completedAt: s.completedAt,
+        cycleStartDate: s.cycleStartDate,
+        cycleEndDate: s.cycleEndDate,
+        occurrenceIndex: s.occurrenceIndex,
+      }))
+    );
+    return {
+      userId: card.user?.id ?? '',
+      userEmail: card.user?.email ?? '',
+      cardId: card.id,
+      cardName: card.name,
+      openedDate: card.openedDate,
+      currentBenefits: (card.benefits || []).map((b: any) => ({
+        id: b.id,
+        category: b.category,
+        description: b.description,
+        percentage: b.percentage,
+        maxAmount: b.maxAmount,
+        frequency: b.frequency,
+        cycleAlignment: b.cycleAlignment,
+        fixedCycleStartMonth: b.fixedCycleStartMonth,
+        fixedCycleDurationMonths: b.fixedCycleDurationMonths,
+        occurrencesInCycle: b.occurrencesInCycle ?? 1,
+      })),
+      benefitStatuses,
+    };
+  }
+
+  /**
    * Migrate a single user's card
    */
   private async migrateUserCard(
@@ -374,6 +412,12 @@ export class BenefitMigrationEngine {
     if (this.options.dryRun) {
       // For dry run, just calculate what would happen
       return { created: cardUpdate.benefits.length, deleted: card.benefits.length };
+    }
+
+    // Backup current state before modifying (when backup is requested)
+    if (this.options.backupUserData && this.options.backupWriter) {
+      const context = this.buildUserMigrationContext(card);
+      await this.options.backupWriter(context);
     }
 
     let benefitsCreated = 0;

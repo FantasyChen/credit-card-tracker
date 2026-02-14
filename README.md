@@ -75,7 +75,12 @@ npm run dev
 - **Email:** Resend API for notifications
 - **Deployment:** Vercel with automated cron jobs
 
-> **📄 Complete Documentation:** See [AGENT.md](AGENT.md) for detailed system architecture, development guidelines, and implementation details.
+> **📄 Complete Documentation:** See [AGENTS.md](AGENTS.md) for detailed system architecture, development guidelines, and implementation details.
+
+### Testing
+```bash
+npm test   # Jest: unit, API routes, server actions, component tests
+```
 
 ### Contribution Guidelines
 See our **[Contributing Guide](CONTRIBUTING.md)** for complete development setup, database safety practices, and pull request process.
@@ -97,7 +102,7 @@ npm start
 - **Vercel (Recommended):** Connect your GitHub repo - automatic deployments on push
 - **Self-hosted:** Deploy anywhere that supports Node.js and PostgreSQL
 
-> **📄 Complete Self-Hosting Guide:** See [AGENT.md](AGENT.md) for detailed deployment instructions, environment setup, and troubleshooting.
+> **📄 Complete Self-Hosting Guide:** See [AGENTS.md](AGENTS.md) for detailed deployment instructions, environment setup, and troubleshooting.
 
 ## 🗺️ What's Next
 

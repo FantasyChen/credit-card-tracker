@@ -351,12 +351,17 @@ node scripts/validate-migration.js --migration-id=your-migration
 # 3. Preview changes (dry run) 
 node scripts/migrate-benefits.js --migration-id=your-migration --dry-run
 
-# 4. Execute migration
+# 4. Execute migration (optionally with backup)
 node scripts/migrate-benefits.js --migration-id=your-migration --force
+# With backup: saves affected user/card/benefit data to JSON before applying
+node scripts/migrate-benefits.js --migration-id=your-migration --force --backup
+node scripts/migrate-benefits.js --migration-id=your-migration --force --backup --backup-dir=./backups
 
 # 5. Create benefit statuses (CRITICAL STEP - often forgotten!)
 # Run the cron job or use the unified script
 ```
+
+**Migration backup (optional):** Use `--backup` with `--force` to write a timestamped JSON file of all affected user cards, benefits, and benefit statuses before applying changes. Files are written to `./migration-backups` by default, or to `--backup-dir=DIR`. Useful for auditing or recovery.
 
 **⚠️ Common Mistake**: The advanced framework doesn't automatically create benefit statuses. Users won't see benefits in their dashboard until statuses are created.
 
@@ -441,9 +446,19 @@ Use these standard categories for consistency:
 
 ### Testing
 
-**Available Tests:**
+**Jest test suite** (unit, integration, API, components):
 ```bash
 npm test                                    # Run all tests
+```
+
+**Test coverage includes:**
+- **Lib:** `benefit-cycle`, `benefit-validation`, `partial-completion`, `benefit-migration` (migration engine and backup)
+- **API routes:** `/api/cron/check-benefits`, `/api/cron/send-notifications`, `/api/user-cards`
+- **Server actions:** benefits (order, batch, partial), cards (`deleteCardAction`)
+- **Components:** `BenefitCardClient`, `BenefitsDisplayClient` (with mocks for child components and actions)
+
+**Other scripts:**
+```bash
 node scripts/test-drag-drop.cjs            # Test reordering functionality
 node scripts/test-annual-fee-roi.cjs       # Test ROI calculations
 node scripts/check-database-connection.js  # Verify database connection
@@ -602,6 +617,7 @@ npm run build
 - Automated backup system considerations
 - Point-in-time recovery via Neon CLI
 - Automated migration framework preserves completed benefits by default
+- **Migration backup:** Use `--backup` with `node scripts/migrate-benefits.js --force` to write a JSON snapshot of affected user data before applying migrations (see Advanced Migration Framework above)
 
 **Migration Framework:**
 - Use the automated framework in `scripts/migrate-benefits.js`
@@ -711,7 +727,45 @@ node scripts/migrate-amex-2025-benefits.js --force
 
 ---
 
-*Last Updated: September 2025*
+### February 2025: UX and Accessibility Improvements
+**Date**: February 2, 2025  
+**Implementation Status**: ✅ Complete
+
+**Changes Implemented**:
+- **Dark mode toggle**: ThemeProvider (next-themes) and ThemeToggle in Navbar; users can cycle light/dark/system
+- **Loading skeletons**: Skeleton.tsx with CardSkeleton, BenefitCardSkeleton, SummaryWidgetSkeleton, DashboardSkeleton, CardsPageSkeleton, BenefitsPageSkeleton; Cards page uses CardsPageSkeleton while loading
+- **Reusable EmptyState**: EmptyState component with icons and optional primary/secondary actions; used on Cards page and BenefitsDisplayClient
+- **Footer enhancement**: Product, Settings, Legal, and Community link groups; Privacy, Terms, GitHub, Contact, etc.
+- **Settings hub**: Unified `/settings` page with account info, Notifications and Import/Export cards, quick actions, and privacy notice link
+- **Accessibility**: SkipLink to main content, main landmark with id and tabIndex for focus; Navbar wrapped in header with role="banner" and nav with aria-label
+- **Privacy and Terms pages**: `/privacy` and `/terms` added so footer and settings links no longer 404
+
+---
+
+### February 2025: Migration Backup & Test Coverage
+**Date**: February 2025  
+**Implementation Status**: ✅ Complete
+
+**Migration CLI backup:**
+- **`--backup`**: When used with `--force`, the migration framework writes a timestamped JSON file of all affected user cards, benefits, and benefit statuses *before* applying changes. Default directory: `./migration-backups`; override with `--backup-dir=DIR`.
+- **Engine**: `MigrationOptions.backupWriter` callback; engine calls it per user card when `backupUserData` is true. CLI collects contexts and writes one file per run (e.g. `migration-backup-{plan.id}-{timestamp}.json`).
+
+**Test coverage added:**
+- **Components:** `src/components/__tests__/BenefitCardClient.test.tsx`, `src/components/__tests__/BenefitsDisplayClient.test.tsx` (tabs, summary widgets, empty state, view toggle).
+- **API:** `src/app/api/user-cards/__tests__/route.test.ts` (GET: 401 unauthenticated, 200 with data, 500 on error).
+- **Server actions:** `src/app/cards/__tests__/actions.test.ts` (`deleteCardAction`: auth, validation, not-found, delete, error handling).
+- **Migration:** `BenefitMigrationEngine` backup test (backupWriter called per user card with correct context). Jest setup: `prisma.creditCard.findUnique` added for ownership checks.
+
+**Next Set of Tasks** (for future sessions):
+1. **Medium**: Break up BenefitsDisplayClient into smaller components (e.g. BenefitSummaryWidgets, BenefitTabs, BenefitListView)
+2. **Medium**: Standardize API error response format across routes; add user-friendly error messages on Cards and other pages
+3. **Medium**: Add mockDate test for send-notifications cron (TODO in route.test.ts)
+4. **Low**: Roadmap features: custom card/benefit creation, better data visualization, user feedback system
+5. **Low**: SEO: JSON-LD on more pages, dynamic OG images; PWA: offline fallback, push notifications
+
+---
+
+*Last Updated: February 2025*
 *Version: 0.1.1*
 *Created by: fantasy_c*
 
