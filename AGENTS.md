@@ -18,7 +18,7 @@
 
 - **Frontend:** Next.js 15 (App Router), React 19, Tailwind CSS 4
 - **Backend:** Next.js API Routes + Server Actions  
-- **Database:** PostgreSQL (production via Neon), SQLite (development)
+- **Database:** PostgreSQL via Neon (main/prod branch + dev branch)
 - **ORM:** Prisma with generated client
 - **Authentication:** NextAuth.js with free OAuth providers (Google, GitHub, Facebook)
 - **Email:** Resend API for notifications
@@ -500,11 +500,24 @@ curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-noti
 - Development branch: Safe testing environment
 - Point-in-time recovery available for data incidents
 
+**Current verified status (Feb 2026):**
+- `DATABASE_URL_DEV` (`ep-frosty-snowflake-a6wht9o6`) schema is up to date
+- `DATABASE_URL` (`ep-falling-butterfly-a6pw6afh`) schema is up to date
+- Verify anytime with:
+  - `DATABASE_URL="$DATABASE_URL_DEV" npx prisma migrate status`
+  - `DATABASE_URL="$DATABASE_URL" npx prisma migrate status`
+
 **Migration Process:**
 1. Test on development branch (optional)
 2. Commit migration files to main branch
 3. ✅ **Push to GitHub** → Vercel automatically runs `npx prisma migrate deploy`
 4. ✅ **No manual deployment steps required** - everything is automatic
+
+**Operational note for legacy migration drift:**
+- If a historical migration fails because objects already exist / do not exist, make the SQL idempotent (`IF EXISTS` / `IF NOT EXISTS`) and use:
+  - `npx prisma migrate resolve --rolled-back <migration_name>`
+  - then rerun `npx prisma migrate deploy`
+- Do **not** use `migrate reset` on shared/prod databases.
 
 **Production changes on request (non-destructive):**
 - When the user asks to update production data (e.g., add or refresh predefined cards/benefits):

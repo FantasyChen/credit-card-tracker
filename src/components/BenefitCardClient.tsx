@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatDate } from '@/lib/dateUtils';
 import { 
   toggleBenefitStatusAction, 
@@ -9,7 +10,9 @@ import {
   deleteCustomBenefitAction,
   addPartialCompletionAction,
   markFullCompletionAction,
+  updateBenefitNotesAction,
 } from '@/app/benefits/actions';
+import { PencilSquareIcon } from '@heroicons/react/24/outline';
 import type { DisplayBenefitStatus } from '@/app/benefits/page';
 import { calculateCompletionPercentage } from '@/lib/partial-completion';
 
@@ -23,11 +26,14 @@ interface BenefitCardClientProps {
 }
 
 export default function BenefitCardClient({ status, onStatusChange, onNotUsableChange, onDelete, onPartialCompletionChange, isScheduled = false }: BenefitCardClientProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPartialModal, setShowPartialModal] = useState(false);
   const [partialAmount, setPartialAmount] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showNotesEditor, setShowNotesEditor] = useState(false);
+  const [notesValue, setNotesValue] = useState(status.notes ?? '');
 
   const benefitAmount = status.benefit.maxAmount || 0;
   const usedAmount = status.usedAmount ?? 0;
@@ -105,6 +111,23 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
       } catch (error) {
         console.error('Failed to mark benefit as not usable:', error);
         // You might want to show an error message to the user here
+      }
+    });
+  };
+
+  const handleNotesSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append('benefitStatusId', status.id);
+    formData.append('notes', notesValue);
+
+    startTransition(async () => {
+      try {
+        await updateBenefitNotesAction(formData);
+        setShowNotesEditor(false);
+        router.refresh();
+      } catch (error) {
+        console.error('Failed to update notes:', error);
       }
     });
   };
@@ -282,6 +305,56 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               </Link>
             </div>
           )}
+
+          {/* Benefit notes */}
+          <div className="pl-11">
+            {showNotesEditor ? (
+              <form onSubmit={handleNotesSubmit} className="space-y-2">
+                <textarea
+                  value={notesValue}
+                  onChange={(e) => setNotesValue(e.target.value)}
+                  placeholder="Add a note for this benefit cycle..."
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNotesEditor(false);
+                      setNotesValue(status.notes ?? '');
+                    }}
+                    disabled={isPending}
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-1">
+                {status.notes && (
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{status.notes}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowNotesEditor(true)}
+                  className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 dark:hover:text-gray-400 dark:hover:text-indigo-400 transition-colors"
+                  title={status.notes ? 'Edit note' : 'Add note'}
+                >
+                  <PencilSquareIcon className="h-4 w-4" />
+                  {status.notes ? 'Edit note' : 'Add note'}
+                </button>
+              </div>
+            )}
+          </div>
           
           {/* Action buttons - full width on mobile, fixed width on larger screens */}
           <div className="pl-11">

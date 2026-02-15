@@ -1,4 +1,4 @@
 -- Add exportedAt to CatalogSuggestion (nullable, additive)
-ALTER TABLE "public"."CatalogSuggestion"
+ALTER TABLE IF EXISTS "public"."CatalogSuggestion"
 ADD COLUMN IF NOT EXISTS "exportedAt" TIMESTAMP NULL;
 

@@ -69,7 +69,7 @@ npm run dev
 ### Tech Stack
 - **Frontend:** Next.js 15, React 19, Tailwind CSS 4
 - **Backend:** Next.js API Routes + Server Actions  
-- **Database:** PostgreSQL (Neon), SQLite (development)
+- **Database:** PostgreSQL (Neon main + Neon dev branch)
 - **ORM:** Prisma with generated client
 - **Auth:** NextAuth.js (Google OAuth)
 - **Email:** Resend API for notifications
@@ -81,6 +81,34 @@ npm run dev
 ```bash
 npm test   # Jest: unit, API routes, server actions, component tests
 ```
+
+### Database Environments (Dev + Prod)
+
+CouponCycle uses Neon PostgreSQL with two URLs:
+
+- `DATABASE_URL` = production (Neon main branch)
+- `DATABASE_URL_DEV` = development branch (safe for testing migrations)
+
+Use this workflow:
+
+```bash
+# 1) Verify target before any DB command
+node scripts/check-database-connection.js
+
+# 2) Run migrations on dev first
+DATABASE_URL="$DATABASE_URL_DEV" npx prisma migrate deploy
+
+# 3) Verify migration state on dev
+DATABASE_URL="$DATABASE_URL_DEV" npx prisma migrate status
+
+# 4) Apply to prod only when ready
+DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy
+
+# 5) Verify migration state on prod
+DATABASE_URL="$DATABASE_URL" npx prisma migrate status
+```
+
+Troubleshooting and safety notes are documented in `docs/safe-migration-guide.md`.
 
 ### Contribution Guidelines
 See our **[Contributing Guide](CONTRIBUTING.md)** for complete development setup, database safety practices, and pull request process.

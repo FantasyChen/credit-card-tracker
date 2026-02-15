@@ -149,6 +149,7 @@ model BenefitStatus {
   completedAt     DateTime?
   isNotUsable     Boolean   @default(false)
   usedAmount      Float     @default(0)  // Track partial/full amount used
+  notes           String?   // Optional user notes per benefit cycle
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   orderIndex      Int?

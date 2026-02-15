@@ -13,6 +13,7 @@ jest.mock('@/app/benefits/actions', () => ({
   deleteCustomBenefitAction: jest.fn().mockResolvedValue(undefined),
   addPartialCompletionAction: jest.fn().mockResolvedValue({ success: true, isComplete: false, newUsedAmount: 10 }),
   markFullCompletionAction: jest.fn().mockResolvedValue(undefined),
+  updateBenefitNotesAction: jest.fn().mockResolvedValue({ success: true }),
 }));
 
 jest.mock('@/lib/partial-completion', () => ({

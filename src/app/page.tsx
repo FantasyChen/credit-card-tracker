@@ -4,9 +4,9 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BenefitStatus, Benefit, CreditCard as PrismaCreditCard } from '@/generated/prisma';
-import { formatDate } from '@/lib/dateUtils';
 import { CreditCardIcon } from '@heroicons/react/24/outline';
 import SupportedCreditCards from '@/components/SupportedCreditCards';
+import DashboardBenefitRow from '@/components/DashboardBenefitRow';
 
 // Define a type for the upcoming benefits data
 interface UpcomingBenefit extends BenefitStatus {
@@ -195,12 +195,16 @@ export default async function Home() {
     return statuses.reduce((total, status) => total + (status.usedAmount ?? 0), 0);
   });
 
-  // Fetch upcoming benefits (not completed, not expired, ordered by cycle end date, limit 5)
-  const upcomingBenefits = await prisma.benefitStatus.findMany({
+  const now = new Date();
+  const sevenDaysFromNow = new Date(now);
+  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+  // Fetch benefits expiring within 7 days (urgent)
+  const expiringSoonBenefits = await prisma.benefitStatus.findMany({
     where: {
       userId: userId,
       isCompleted: false,
-      cycleEndDate: { gte: new Date() }, // Exclude expired benefits
+      cycleEndDate: { gte: now, lte: sevenDaysFromNow },
     },
     include: {
       benefit: {
@@ -212,8 +216,27 @@ export default async function Home() {
     orderBy: {
       cycleEndDate: 'asc',
     },
-    take: 5, // Limit to the next 5 upcoming benefits
-  }) as UpcomingBenefit[]; // Type assertion
+  }) as UpcomingBenefit[];
+
+  // Fetch upcoming benefits (expiring after 7 days, limit 5)
+  const upcomingBenefits = await prisma.benefitStatus.findMany({
+    where: {
+      userId: userId,
+      isCompleted: false,
+      cycleEndDate: { gt: sevenDaysFromNow },
+    },
+    include: {
+      benefit: {
+        include: {
+          creditCard: true,
+        },
+      },
+    },
+    orderBy: {
+      cycleEndDate: 'asc',
+    },
+    take: 5,
+  }) as UpcomingBenefit[];
 
   return (
     <div>
@@ -367,6 +390,45 @@ export default async function Home() {
         </div>
       </div>
 
+      {/* Expiring in 7 Days Section */}
+      {expiringSoonBenefits.length > 0 && (
+        <div className="mt-12">
+          <div className="sm:flex sm:items-center sm:justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold leading-6 text-orange-700 dark:text-orange-400 flex items-center gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
+                  Urgent
+                </span>
+                Expiring in 7 Days
+              </h2>
+              <p className="mt-1 text-sm text-orange-600/80 dark:text-orange-400/80">
+                These benefits expire soon — use them before they reset
+              </p>
+            </div>
+            <Link
+              href="/benefits"
+              className="mt-2 sm:mt-0 inline-flex items-center rounded-lg bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 shadow-sm ring-1 ring-inset ring-orange-200 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-300 dark:ring-orange-800 dark:hover:bg-orange-900/30 transition-colors duration-200"
+            >
+              View all
+              <svg className="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+          <div className="overflow-hidden shadow-lg ring-1 ring-orange-200 dark:ring-orange-800 rounded-xl bg-white dark:bg-gray-800">
+            <ul role="list" className="divide-y divide-orange-100 dark:divide-orange-900/50">
+              {expiringSoonBenefits.map((status) => (
+                <DashboardBenefitRow
+                  key={status.id}
+                  status={status}
+                  isExpiringSoon
+                />
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {/* Upcoming Benefits Section */}
       <div className="mt-12">
         <div className="sm:flex sm:items-center sm:justify-between mb-6">
@@ -411,61 +473,7 @@ export default async function Home() {
           <div className="overflow-hidden shadow-lg ring-1 ring-black ring-opacity-5 rounded-xl">
              <ul role="list" className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                 {upcomingBenefits.map((status) => (
-                    <li key={status.id} className="group px-6 py-5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-                            <div className="flex items-start space-x-3 flex-1 min-w-0">
-                                <div className="flex-shrink-0 mt-0.5">
-                                  <div className="p-2 bg-indigo-100 rounded-lg dark:bg-indigo-800/30">
-                                    <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                  </div>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm sm:text-base font-semibold text-indigo-600 dark:text-indigo-400 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors leading-tight">
-                                      {status.benefit.description}
-                                    </p>
-                                    <div className="mt-1 space-y-1">
-                                      <div className="flex items-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                                        {status.benefit.creditCard ? (
-                                          <>
-                                            <svg className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                            </svg>
-                                            <span className="truncate">{status.benefit.creditCard.name}</span>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <svg className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                            </svg>
-                                            <span className="truncate text-purple-600 dark:text-purple-400">Custom Benefit</span>
-                                          </>
-                                        )}
-                                      </div>
-                                      {status.benefit.maxAmount && (
-                                        <div className="text-xs sm:text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-                                          ${status.benefit.maxAmount.toFixed(2)}
-                                        </div>
-                                      )}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between sm:justify-end sm:space-x-3">
-                                <div className="text-left sm:text-right">
-                                  <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
-                                    Due: {formatDate(status.cycleEndDate)}
-                                  </p>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    {Math.ceil((new Date(status.cycleEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
-                                  </p>
-                                </div>
-                                <svg className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors flex-shrink-0 sm:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                            </div>
-                        </div>
-                    </li>
+                  <DashboardBenefitRow key={status.id} status={status} />
                 ))}
             </ul>
            </div>

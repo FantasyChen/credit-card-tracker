@@ -72,8 +72,9 @@ export async function toggleBenefitStatusAction(formData: FormData) {
 
     console.log(`Benefit status ${benefitStatusId} toggled to ${newIsCompleted} with usedAmount ${newIsCompleted ? maxAmount : 0}`);
 
-    // Revalidate the benefits page to show the change
+    // Revalidate the benefits page and dashboard to show the change
     revalidatePath('/benefits');
+    revalidatePath('/');
 
   } catch (error) {
     console.error('Error toggling benefit status:', error);
@@ -146,6 +147,7 @@ export async function addPartialCompletionAction(formData: FormData) {
     console.log(`Added partial completion: ${amount} to benefit ${benefitStatusId}. Total: ${newUsedAmount}/${maxAmount}. Complete: ${isNowComplete}`);
 
     revalidatePath('/benefits');
+    revalidatePath('/');
 
     return { 
       success: true, 
@@ -205,6 +207,7 @@ export async function markFullCompletionAction(formData: FormData) {
     console.log(`Marked full completion for benefit ${benefitStatusId}. usedAmount set to ${maxAmount}`);
 
     revalidatePath('/benefits');
+    revalidatePath('/');
 
     return { success: true, usedAmount: maxAmount };
 
@@ -372,6 +375,42 @@ export async function markBenefitAsNotUsableAction(formData: FormData) {
   } catch (error) {
     console.error('Error marking benefit as not usable:', error);
     throw new Error('Failed to update benefit status.');
+  }
+}
+
+export async function updateBenefitNotesAction(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated.');
+  }
+
+  const benefitStatusId = formData.get('benefitStatusId') as string;
+  const notes = (formData.get('notes') as string)?.trim() || null;
+
+  if (!benefitStatusId) {
+    throw new Error('Benefit Status ID is missing.');
+  }
+
+  try {
+    const updatedStatus = await prisma.benefitStatus.updateMany({
+      where: {
+        id: benefitStatusId,
+        userId: session.user.id,
+      },
+      data: { notes },
+    });
+
+    if (updatedStatus.count === 0) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
+
+    revalidatePath('/benefits');
+    revalidatePath('/');
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating benefit notes:', error);
+    throw new Error('Failed to update benefit notes.');
   }
 }
 

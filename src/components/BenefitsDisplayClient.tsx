@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import BenefitCardClient from '@/components/BenefitCardClient';
 import CategoryBenefitsGroup from '@/components/CategoryBenefitsGroup';
 import EmptyState from '@/components/ui/EmptyState';
 import type { DisplayBenefitStatus } from '@/app/benefits/page';
 import Link from 'next/link';
+import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface BenefitsDisplayProps {
   upcomingBenefits: DisplayBenefitStatus[];
@@ -29,6 +30,10 @@ export default function BenefitsDisplayClient({
   totalAnnualFees,
 }: BenefitsDisplayProps) {
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterCard, setFilterCard] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const [viewMode, setViewMode] = useState<'category' | 'card'>('card');
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
@@ -177,6 +182,58 @@ export default function BenefitsDisplayClient({
 
   const setCategoryView = () => setViewMode('category');
   const setCardView = () => setViewMode('card');
+
+  // Filter benefits by search and filters
+  const filterBenefits = (benefits: DisplayBenefitStatus[]): DisplayBenefitStatus[] => {
+    return benefits.filter((status) => {
+      const descMatch =
+        !searchQuery.trim() ||
+        status.benefit.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (status.benefit.creditCard?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+        status.benefit.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const categoryMatch = !filterCategory || status.benefit.category === filterCategory;
+      const cardName = status.benefit.creditCard?.name ?? '⭐ Custom Benefits';
+      const cardMatch = !filterCard || cardName === filterCard;
+      return descMatch && categoryMatch && cardMatch;
+    });
+  };
+
+  // Get unique categories and cards from all benefits for filter dropdowns
+  const allBenefitsForTab = useMemo(() => {
+    switch (activeTab) {
+      case 'upcoming':
+        return localUpcomingBenefits;
+      case 'completed':
+        return localCompletedBenefits;
+      case 'not-usable':
+        return localNotUsableBenefits;
+      case 'scheduled':
+        return localScheduledBenefits;
+      default:
+        return [];
+    }
+  }, [activeTab, localUpcomingBenefits, localCompletedBenefits, localNotUsableBenefits, localScheduledBenefits]);
+
+  const uniqueCategories = useMemo(
+    () => [...new Set(allBenefitsForTab.map((b) => b.benefit.category))].sort(),
+    [allBenefitsForTab]
+  );
+  const uniqueCards = useMemo(
+    () =>
+      [...new Set(allBenefitsForTab.map((b) => b.benefit.creditCard?.name ?? '⭐ Custom Benefits'))].sort((a, b) => {
+        if (a === '⭐ Custom Benefits') return -1;
+        if (b === '⭐ Custom Benefits') return 1;
+        return a.localeCompare(b);
+      }),
+    [allBenefitsForTab]
+  );
+
+  const hasActiveFilters = searchQuery.trim() || filterCategory || filterCard;
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilterCategory('');
+    setFilterCard('');
+  };
 
   // Group benefits by category
   const groupBenefitsByCategory = (benefits: DisplayBenefitStatus[]) => {
@@ -612,21 +669,106 @@ export default function BenefitsDisplayClient({
         </nav>
       </div>
 
+      {/* Search & Filters */}
+      <div className="mb-4 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search benefits, cards, categories..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                showFilters || hasActiveFilters
+                  ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              <FunnelIcon className="h-5 w-5 mr-2" />
+              Filters
+              {hasActiveFilters && (
+                <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-500 text-white">
+                  on
+                </span>
+              )}
+            </button>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Clear filters"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        </div>
+        {showFilters && (
+          <div className="flex flex-wrap gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div>
+              <label htmlFor="filter-category" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                Category
+              </label>
+              <select
+                id="filter-category"
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="block w-full sm:w-40 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-800 dark:text-white"
+              >
+                <option value="">All categories</option>
+                {uniqueCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="filter-card" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                Card
+              </label>
+              <select
+                id="filter-card"
+                value={filterCard}
+                onChange={(e) => setFilterCard(e.target.value)}
+                className="block w-full sm:w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-800 dark:text-white"
+              >
+                <option value="">All cards</option>
+                {uniqueCards.map((card) => (
+                  <option key={card} value={card}>
+                    {card}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Tab Content */}
       <div>
         {activeTab === 'upcoming' && (
           <section>
-            {viewMode === 'category' ? renderCategoryView(localUpcomingBenefits) : renderCardView(localUpcomingBenefits)}
+            {viewMode === 'category' ? renderCategoryView(filterBenefits(localUpcomingBenefits)) : renderCardView(filterBenefits(localUpcomingBenefits))}
           </section>
         )}
         {activeTab === 'completed' && (
           <section>
-            {viewMode === 'category' ? renderCategoryView(localCompletedBenefits) : renderCardView(localCompletedBenefits)}
+            {viewMode === 'category' ? renderCategoryView(filterBenefits(localCompletedBenefits)) : renderCardView(filterBenefits(localCompletedBenefits))}
           </section>
         )}
         {activeTab === 'not-usable' && (
           <section>
-            {viewMode === 'category' ? renderCategoryView(localNotUsableBenefits) : renderCardView(localNotUsableBenefits)}
+            {viewMode === 'category' ? renderCategoryView(filterBenefits(localNotUsableBenefits)) : renderCardView(filterBenefits(localNotUsableBenefits))}
           </section>
         )}
         {activeTab === 'scheduled' && (
@@ -641,7 +783,7 @@ export default function BenefitsDisplayClient({
                 </p>
               </div>
             </div>
-            {renderScheduledBenefitsList(localScheduledBenefits)}
+            {renderScheduledBenefitsList(filterBenefits(localScheduledBenefits))}
           </section>
         )}
       </div>

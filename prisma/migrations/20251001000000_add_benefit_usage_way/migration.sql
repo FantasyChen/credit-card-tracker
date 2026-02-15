@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "BenefitUsageWay" (
+CREATE TABLE IF NOT EXISTS "BenefitUsageWay" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
@@ -14,11 +14,25 @@ CREATE TABLE "BenefitUsageWay" (
 );
 
 -- AlterTable
-ALTER TABLE "PredefinedBenefit" ADD COLUMN "usageWayId" TEXT;
+ALTER TABLE "PredefinedBenefit" ADD COLUMN IF NOT EXISTS "usageWayId" TEXT;
 
 -- CreateIndex
-CREATE UNIQUE INDEX "BenefitUsageWay_slug_key" ON "BenefitUsageWay"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "BenefitUsageWay_slug_key" ON "BenefitUsageWay"("slug");
 
 -- AddForeignKey
-ALTER TABLE "PredefinedBenefit" ADD CONSTRAINT "PredefinedBenefit_usageWayId_fkey" FOREIGN KEY ("usageWayId") REFERENCES "BenefitUsageWay"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'PredefinedBenefit_usageWayId_fkey'
+  ) THEN
+    ALTER TABLE "PredefinedBenefit"
+      ADD CONSTRAINT "PredefinedBenefit_usageWayId_fkey"
+      FOREIGN KEY ("usageWayId")
+      REFERENCES "BenefitUsageWay"("id")
+      ON DELETE SET NULL
+      ON UPDATE CASCADE;
+  END IF;
+END $$;
 
