@@ -256,16 +256,89 @@ export default async function BenefitsDashboardPage() {
     return sum + Math.max(0, maxAmount - usedAmount);
   }, 0);
 
-  // Total used value counts usedAmount from ALL non-notUsable benefits (includes partial completions)
+  // Resolve the claimed dollar amount for a benefit status.
+  // For completed benefits with usedAmount=0 (legacy data before usedAmount tracking),
+  // fall back to maxAmount since the user claimed the full value.
+  const resolveClaimedAmount = (status: { isCompleted: boolean; usedAmount: number | null; benefit: { maxAmount: number | null } }) => {
+    const usedAmount = status.usedAmount ?? 0;
+    if (status.isCompleted && usedAmount === 0) {
+      return status.benefit.maxAmount ?? 0;
+    }
+    return usedAmount;
+  };
+
+  // Total used value counts claimed amount from ALL non-notUsable benefits (includes partial completions)
   const totalUsedValue = [...upcomingBenefits, ...completedBenefits].reduce((sum, status) => {
-    return sum + (status.usedAmount ?? 0);
+    return sum + resolveClaimedAmount(status);
   }, 0);
 
   const totalNotUsableValue = notUsableBenefits.reduce((sum, status) => {
     return sum + (status.benefit.maxAmount || 0);
   }, 0);
 
-  // --- Render Component --- 
+  // Per-card ROI: claimed value and annual fee by card name (for cards) and "Custom" for standalone benefits
+  const predefinedCardsForRoi = await prisma.predefinedCard.findMany({
+    where: { name: { in: Object.keys(cardCountsForFees) } },
+    select: { name: true, annualFee: true },
+  });
+  const annualFeeByCardName = new Map(
+    predefinedCardsForRoi.map((p) => [p.name, p.annualFee])
+  );
+
+  const claimedByCardKey = new Map<string, number>();
+  for (const status of [...upcomingBenefits, ...completedBenefits]) {
+    const used = resolveClaimedAmount(status);
+    const key = status.benefit.creditCard?.name ?? '⭐ Custom Benefits';
+    claimedByCardKey.set(key, (claimedByCardKey.get(key) ?? 0) + used);
+  }
+
+  const cardLevelRoi: Array<{
+    cardDisplayName: string;
+    cardName: string;
+    annualFee: number;
+    claimedValue: number;
+    netRoi: number;
+  }> = [];
+
+  // Include every user card (so cards with $0 claimed still show)
+  for (const cardName of Object.keys(cardCountsForFees)) {
+    const quantity = cardCountsForFees[cardName] ?? 1;
+    const feePerCard = annualFeeByCardName.get(cardName) ?? 0;
+    const annualFee = feePerCard * quantity;
+    const claimedValue = claimedByCardKey.get(cardName) ?? 0;
+    const netRoi = claimedValue - annualFee;
+    const displayName =
+      quantity > 1
+        ? `${cardName} (${quantity} cards)`
+        : (() => {
+            const firstCard = userCards.find((c) => c.name === cardName);
+            return firstCard ? (cardDisplayNameMap.get(firstCard.id) ?? cardName) : cardName;
+          })();
+    cardLevelRoi.push({
+      cardDisplayName: displayName,
+      cardName,
+      annualFee,
+      claimedValue,
+      netRoi,
+    });
+  }
+
+  // Add Custom Benefits row if user has any claimed from standalone benefits
+  const customClaimed = claimedByCardKey.get('⭐ Custom Benefits') ?? 0;
+  if (customClaimed > 0) {
+    cardLevelRoi.push({
+      cardDisplayName: '⭐ Custom Benefits',
+      cardName: '⭐ Custom Benefits',
+      annualFee: 0,
+      claimedValue: customClaimed,
+      netRoi: customClaimed,
+    });
+  }
+
+  // Sort by net ROI descending (best first), then by claimed value
+  cardLevelRoi.sort((a, b) => b.netRoi - a.netRoi || b.claimedValue - a.claimedValue);
+
+  // --- Render Component ---
   return (
     <BenefitsDisplayClient
       upcomingBenefits={upcomingBenefits}
@@ -276,6 +349,7 @@ export default async function BenefitsDashboardPage() {
       totalUsedValue={totalUsedValue}
       totalNotUsableValue={totalNotUsableValue}
       totalAnnualFees={totalAnnualFees}
+      cardLevelRoi={cardLevelRoi}
     />
   );
 }

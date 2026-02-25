@@ -6,7 +6,7 @@ import CategoryBenefitsGroup from '@/components/CategoryBenefitsGroup';
 import EmptyState from '@/components/ui/EmptyState';
 import type { DisplayBenefitStatus } from '@/app/benefits/page';
 import Link from 'next/link';
-import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 
 interface BenefitsDisplayProps {
   upcomingBenefits: DisplayBenefitStatus[];
@@ -17,6 +17,13 @@ interface BenefitsDisplayProps {
   totalUsedValue: number;
   totalNotUsableValue: number;
   totalAnnualFees: number;
+  cardLevelRoi?: Array<{
+    cardDisplayName: string;
+    cardName: string;
+    annualFee: number;
+    claimedValue: number;
+    netRoi: number;
+  }>;
 }
 
 export default function BenefitsDisplayClient({
@@ -28,12 +35,14 @@ export default function BenefitsDisplayClient({
   totalUsedValue,
   totalNotUsableValue,
   totalAnnualFees,
+  cardLevelRoi = [],
 }: BenefitsDisplayProps) {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterCard, setFilterCard] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [showRoiBreakdown, setShowRoiBreakdown] = useState(false);
 
   const [viewMode, setViewMode] = useState<'category' | 'card'>('card');
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
@@ -44,7 +53,26 @@ export default function BenefitsDisplayClient({
   const [localTotalUsedValue, setLocalTotalUsedValue] = useState(totalUsedValue);
   const [localTotalNotUsableValue, setLocalTotalNotUsableValue] = useState(totalNotUsableValue);
 
-
+  // Recompute per-card claimed value from local benefits so ROI breakdown updates when user marks complete
+  const cardLevelRoiLive = useMemo(() => {
+    if (cardLevelRoi.length === 0) return [];
+    const claimedByCard = new Map<string, number>();
+    for (const status of [...localUpcomingBenefits, ...localCompletedBenefits]) {
+      const key = status.benefit.creditCard?.name ?? '⭐ Custom Benefits';
+      const usedAmount = status.usedAmount ?? 0;
+      const used = (status.isCompleted && usedAmount === 0)
+        ? (status.benefit.maxAmount || 0)
+        : usedAmount;
+      claimedByCard.set(key, (claimedByCard.get(key) ?? 0) + used);
+    }
+    return cardLevelRoi
+      .map((row) => {
+        const claimedValue = claimedByCard.get(row.cardName) ?? 0;
+        const netRoi = claimedValue - row.annualFee;
+        return { ...row, claimedValue, netRoi };
+      })
+      .sort((a, b) => b.netRoi - a.netRoi || b.claimedValue - a.claimedValue);
+  }, [cardLevelRoi, localUpcomingBenefits, localCompletedBenefits]);
 
   const handleStatusChange = (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => {
     if (newIsCompleted) {
@@ -615,7 +643,52 @@ export default function BenefitsDisplayClient({
         </div>
       </div>
 
-
+      {/* Card-level ROI breakdown (collapsible) */}
+      {cardLevelRoiLive.length > 0 && (
+        <div className="mb-8 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow">
+          <button
+            type="button"
+            onClick={() => setShowRoiBreakdown(prev => !prev)}
+            className="w-full min-h-[44px] px-4 py-3 flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 active:bg-gray-200 dark:active:bg-gray-700 transition-colors cursor-pointer touch-manipulation"
+            aria-expanded={showRoiBreakdown}
+            aria-controls="roi-by-card-list"
+          >
+            <div className="text-left">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">ROI by card</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Claimed value vs annual fee per card</p>
+            </div>
+            <ChevronRightIcon
+              className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${showRoiBreakdown ? 'rotate-90' : ''}`}
+            />
+          </button>
+          {showRoiBreakdown && (
+            <ul id="roi-by-card-list" className="divide-y divide-gray-200 dark:divide-gray-700" role="region" aria-label="ROI by card breakdown">
+              {cardLevelRoiLive.map((row) => (
+                <li key={row.cardName} className="px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-gray-900 dark:text-white truncate">{row.cardDisplayName}</span>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      ${row.claimedValue.toFixed(2)} claimed
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      ${row.annualFee.toFixed(2)} fee
+                    </span>
+                    <span
+                      className={`font-semibold ${
+                        row.netRoi >= 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-red-600 dark:text-red-400'
+                      }`}
+                    >
+                      {row.netRoi >= 0 ? '+' : ''}${row.netRoi.toFixed(2)}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mb-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
