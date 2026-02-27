@@ -475,8 +475,8 @@ node scripts/check-database-connection.js  # Verify database connection
 - ✅ **NO MANUAL STEPS**: Vercel handles everything automatically
 - ✅ **AGENT NOTE**: AI agents should NOT attempt manual deployment - simply push to GitHub
 - Environment variables configured in Vercel dashboard
-- Build command: `prisma generate && next build`
-- Database migrations run automatically via `npx prisma migrate deploy`
+- Build command: `prisma generate && prisma migrate deploy && next build`
+- Database migrations run automatically as part of the build pipeline — no manual steps needed
 
 **Cron Jobs** (configured in `vercel.json`):
 - Daily benefit status updates: `/api/cron/check-benefits`
