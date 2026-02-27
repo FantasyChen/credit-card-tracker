@@ -21,12 +21,18 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:devdb": "node scripts/with-dev-db.js next dev",
     "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
     "postinstall": "prisma generate",
-    "migrate:status": "npx prisma migrate status",
+    "db:check": "node scripts/check-database-connection.js",
+    "db:dev:migrate": "node scripts/with-dev-db.js npx prisma migrate deploy",
+    "db:dev:status": "node scripts/with-dev-db.js npx prisma migrate status",
+    "db:dev:seed": "node scripts/with-dev-db.js npx prisma db seed",
+    "db:dev:reset": "node scripts/with-dev-db.js npx prisma migrate reset",
+    "db:prod:status": "npx prisma migrate status",
     "migrate:diff": "npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma"
   },
   "dependencies": {

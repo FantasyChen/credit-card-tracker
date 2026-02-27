@@ -234,29 +234,41 @@ SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 
 ### Database Safety Rules ⚠️
 
-**CRITICAL - NEVER RUN:**
+**Two-Database Setup:**
+- `DATABASE_URL` in `.env` → Production (Neon main: `ep-falling-butterfly`)
+- `DATABASE_URL_DEV` in `.env` → Development (Neon dev: `ep-frosty-snowflake`)
+
+**CRITICAL - NEVER RUN on production:**
 - `npx prisma migrate reset` (wipes ALL data)
 - `npx prisma db push --force-reset`
-- Any command with `--force-reset` on production
+- Any command with `--force-reset`
 
-**Safe Development Workflow:**
-1. Always use development database branch first
-2. Test schema changes on dev branch: `export DATABASE_URL=$DATABASE_URL_DEV`
-3. Use `npx prisma migrate dev` for schema changes
-4. Let Vercel handle production deployments automatically
+**npm Scripts for Database Operations:**
+```bash
+npm run db:check          # Check both databases and migration status
+npm run db:dev:migrate    # Apply pending migrations to dev DB
+npm run db:dev:status     # Show dev DB migration status
+npm run db:dev:seed       # Seed dev DB with predefined data
+npm run db:dev:reset      # Reset dev DB (safe, dev data only)
+npm run db:prod:status    # Show production DB migration status
+npm run dev:devdb         # Start dev server against dev DB
+```
+
+**Safe Development Workflow (always test on dev first):**
+1. `npm run db:check` — verify both databases
+2. Make schema changes in `prisma/schema.prisma`
+3. Create migration: `node scripts/with-dev-db.js npx prisma migrate dev --name your_migration`
+4. Test on dev: `npm run dev:devdb`
+5. Commit and push — Vercel applies migration to production automatically via `prisma migrate deploy`
 
 **Explicit user-approved production changes:**
-- If and only if the human user explicitly requests it, it is acceptable to run non-destructive operations against the production database after verifying `DATABASE_URL` points to production.
-- Allowed non-destructive ops include:
+- If and only if the human user explicitly requests it, non-destructive operations are acceptable after running `npm run db:check` to confirm the target.
+- Allowed non-destructive ops:
   - Seeding/upserting predefined catalog data: `npx prisma db seed`
   - Applying already-generated migrations: `npx prisma migrate deploy`
-- Still forbidden on production: destructive resets (`migrate reset`, `db push --force-reset`, manual `DROP` statements), or anything that erases/modifies user data outside of intended migrations.
-- Always:
-  - Echo/print `DATABASE_URL` (mask credentials) and confirm the target.
-  - Prefer read-only or upsert-style scripts for catalog updates.
-  - Document the action in commit messages or ops notes.
+- Still forbidden on production: destructive resets, manual `DROP` statements, anything that erases user data outside of migrations.
 
-**Database Environment Priority**: Shell variables override `.env` file. Use `unset DATABASE_URL` to clear overrides and use `.env` configuration. Always verify target with `node scripts/check-database-connection.js`.
+**Database Environment Priority**: Shell variables override `.env` file. Use `unset DATABASE_URL` to clear overrides. Always verify target with `npm run db:check`.
 
 ### Adding New Credit Cards
 
@@ -457,11 +469,17 @@ npm test                                    # Run all tests
 - **Server actions:** benefits (order, batch, partial), cards (`deleteCardAction`)
 - **Components:** `BenefitCardClient`, `BenefitsDisplayClient` (with mocks for child components and actions)
 
+**Database testing (use dev database):**
+```bash
+npm run db:check                            # Verify both databases
+npm run db:dev:migrate                      # Apply migrations to dev DB
+npm run dev:devdb                           # Start dev server against dev DB
+```
+
 **Other scripts:**
 ```bash
 node scripts/test-drag-drop.cjs            # Test reordering functionality
 node scripts/test-annual-fee-roi.cjs       # Test ROI calculations
-node scripts/check-database-connection.js  # Verify database connection
 ```
 
 ---
@@ -500,18 +518,17 @@ curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-noti
 - Development branch: Safe testing environment
 - Point-in-time recovery available for data incidents
 
-**Current verified status (Feb 2026):**
-- `DATABASE_URL_DEV` (`ep-frosty-snowflake-a6wht9o6`) schema is up to date
-- `DATABASE_URL` (`ep-falling-butterfly-a6pw6afh`) schema is up to date
-- Verify anytime with:
-  - `DATABASE_URL="$DATABASE_URL_DEV" npx prisma migrate status`
-  - `DATABASE_URL="$DATABASE_URL" npx prisma migrate status`
+**Verify status anytime:**
+```bash
+npm run db:check     # Shows both prod + dev status in one command
+```
 
-**Migration Process:**
-1. Test on development branch (optional)
-2. Commit migration files to main branch
-3. ✅ **Push to GitHub** → Vercel automatically runs `npx prisma migrate deploy`
-4. ✅ **No manual deployment steps required** - everything is automatic
+**Migration Process (dev-first):**
+1. Make schema changes in `prisma/schema.prisma`
+2. Create migration on dev: `node scripts/with-dev-db.js npx prisma migrate dev --name your_migration`
+3. Test on dev: `npm run dev:devdb`
+4. Commit migration files and push to main
+5. ✅ Vercel automatically runs `prisma migrate deploy` on production during build
 
 **Operational note for legacy migration drift:**
 - If a historical migration fails because objects already exist / do not exist, make the SQL idempotent (`IF EXISTS` / `IF NOT EXISTS`) and use:

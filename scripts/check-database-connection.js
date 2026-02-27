@@ -1,92 +1,103 @@
 #!/usr/bin/env node
 
 import dotenv from 'dotenv';
+import { execSync } from 'child_process';
 
-// Load environment variables
 dotenv.config();
 
-// Colors for terminal output
 const colors = {
   red: '\x1b[31m',
   green: '\x1b[32m',
   yellow: '\x1b[33m',
   blue: '\x1b[34m',
   reset: '\x1b[0m',
-  bold: '\x1b[1m'
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
 };
 
-const log = {
-  error: (msg) => console.log(`${colors.red}❌ ${msg}${colors.reset}`),
-  success: (msg) => console.log(`${colors.green}✅ ${msg}${colors.reset}`),
-  warning: (msg) => console.log(`${colors.yellow}⚠️  ${msg}${colors.reset}`),
-  info: (msg) => console.log(`${colors.blue}ℹ️  ${msg}${colors.reset}`),
-  step: (msg) => console.log(`${colors.bold}${colors.blue}🔄 ${msg}${colors.reset}`)
-};
+function mask(url) {
+  return url ? url.replace(/\/\/[^@]+@/, '//****@') : '(not set)';
+}
+
+function checkMigrationStatus(url, label) {
+  try {
+    const output = execSync(`npx prisma migrate status`, {
+      env: { ...process.env, DATABASE_URL: url },
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    if (output.includes('Database schema is up to date')) {
+      console.log(`  ${colors.green}✅ Schema is up to date${colors.reset}`);
+      return true;
+    }
+    const pending = output.match(/Following migration.*not yet been applied:\n([\s\S]*?)\n\nTo apply/);
+    if (pending) {
+      console.log(`  ${colors.yellow}⚠️  Pending migrations:${colors.reset}`);
+      pending[1].trim().split('\n').forEach(line => {
+        console.log(`     ${line.trim()}`);
+      });
+      return false;
+    }
+    console.log(`  ${colors.yellow}⚠️  Unknown status${colors.reset}`);
+    return false;
+  } catch (err) {
+    const stderr = err.stderr || '';
+    if (stderr.includes('P1001') || stderr.includes("Can't reach database")) {
+      console.log(`  ${colors.red}❌ Unreachable${colors.reset} — branch may be suspended or deleted`);
+    } else {
+      console.log(`  ${colors.red}❌ Error checking status${colors.reset}`);
+    }
+    return false;
+  }
+}
 
 console.log(`${colors.bold}${colors.blue}🔍 Database Connection Check${colors.reset}\n`);
 
-const currentUrl = process.env.DATABASE_URL;
+const prodUrl = process.env.DATABASE_URL;
 const devUrl = process.env.DATABASE_URL_DEV;
 
-// Check current connection
-if (!currentUrl && !devUrl) {
-  log.error('Neither DATABASE_URL nor DATABASE_URL_DEV is set');
-  process.exit(1);
-}
-
-console.log('📋 Current Configuration:');
-if (currentUrl) {
-  console.log(`DATABASE_URL: ${currentUrl.replace(/:[^:@]+@/, ':****@')}`);
+// --- Production ---
+console.log(`${colors.bold}📦 Production Database${colors.reset}`);
+if (prodUrl) {
+  console.log(`  URL: ${mask(prodUrl)}`);
+  checkMigrationStatus(prodUrl, 'Production');
 } else {
-  console.log('DATABASE_URL: Not set (good for development safety!)');
+  console.log(`  ${colors.red}❌ DATABASE_URL not set${colors.reset}`);
 }
 
+console.log('');
+
+// --- Development ---
+console.log(`${colors.bold}🧪 Development Database${colors.reset}`);
 if (devUrl) {
-  console.log(`DATABASE_URL_DEV: ${devUrl.replace(/:[^:@]+@/, ':****@')}`);
-} else {
-  log.warning('DATABASE_URL_DEV is not configured');
-}
-
-console.log('');
-
-// Determine which branch we're connected to
-if (!currentUrl && devUrl) {
-  log.info('DATABASE_URL not set - development mode');
-  console.log('✅ This is actually safer for development!');
-  console.log('💡 To use development branch:');
-  console.log(`  export DATABASE_URL=$DATABASE_URL_DEV`);
-  console.log('');
-  console.log('🔄 Development workflow:');
-  console.log(`  export DATABASE_URL=$DATABASE_URL_DEV`);
-  console.log('  npx prisma migrate dev --name your_migration');
-  console.log('  npm run dev');
-  console.log('  npm test');
-} else if (devUrl && currentUrl === devUrl) {
-  log.success('Connected to DEVELOPMENT branch');
-  console.log('✅ Safe to run migrations and tests');
-  console.log('✅ Safe to use: npx prisma migrate reset');
-  console.log('');
-  console.log('🔄 Development workflow:');
-  console.log('  npx prisma migrate dev --name your_migration');
-  console.log('  npm run dev');
-  console.log('  npm test');
-} else if (currentUrl && currentUrl.includes('neon.tech')) {
-  log.warning('Connected to PRODUCTION or unknown Neon database');
-  console.log('🚨 DO NOT run migrations directly on this database');
-  console.log('');
-  if (devUrl) {
-    console.log('💡 Switch to development branch:');
-    console.log(`  export DATABASE_URL=$DATABASE_URL_DEV`);
-  } else {
-    console.log('💡 Set up development branch:');
-    console.log('1. Create a development branch in Neon Console');
-    console.log('2. Add DATABASE_URL_DEV to your .env file');
-    console.log('3. Use: export DATABASE_URL=$DATABASE_URL_DEV');
+  console.log(`  URL: ${mask(devUrl)}`);
+  const devOk = checkMigrationStatus(devUrl, 'Development');
+  if (!devOk) {
+    console.log(`  ${colors.dim}💡 Run: npm run db:dev:migrate${colors.reset}`);
   }
-} else if (currentUrl) {
-  log.info('Connected to local or other database');
-  console.log('🔍 Verify this is your intended development environment');
+} else {
+  console.log(`  ${colors.yellow}⚠️  DATABASE_URL_DEV not set${colors.reset}`);
+  console.log(`  ${colors.dim}💡 Add DATABASE_URL_DEV to .env (Neon dev branch)${colors.reset}`);
 }
 
 console.log('');
-console.log('📖 Complete migration guide: docs/safe-migration-guide.md'); 
+
+// --- Active connection ---
+const activeUrl = process.env.DATABASE_URL;
+if (activeUrl && devUrl && activeUrl === devUrl) {
+  console.log(`${colors.green}🔒 Active target: DEVELOPMENT (safe for testing)${colors.reset}`);
+} else if (activeUrl) {
+  console.log(`${colors.yellow}🔒 Active target: PRODUCTION${colors.reset}`);
+  console.log(`   ${colors.dim}Local commands (dev server, Prisma CLI) use this by default.${colors.reset}`);
+  console.log(`   ${colors.dim}Use "npm run dev:devdb" to run dev server against the dev database.${colors.reset}`);
+}
+
+console.log('');
+console.log(`${colors.bold}Available Commands:${colors.reset}`);
+console.log(`  npm run db:check          — this check`);
+console.log(`  npm run db:dev:status     — dev DB migration status`);
+console.log(`  npm run db:dev:migrate    — apply migrations to dev DB`);
+console.log(`  npm run db:dev:seed       — seed dev DB`);
+console.log(`  npm run db:dev:reset      — reset dev DB (safe, dev only)`);
+console.log(`  npm run db:prod:status    — prod DB migration status`);
+console.log(`  npm run dev:devdb         — run dev server against dev DB`);

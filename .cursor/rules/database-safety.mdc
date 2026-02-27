@@ -9,24 +9,31 @@ alwaysApply: true
 when: always
 description: "CRITICAL: Never run destructive database commands that could affect production data. Always verify environment and use safe alternatives."
 
-## Forbidden Commands (NEVER RUN):
+## Two-Database Setup:
+- `DATABASE_URL` in `.env` → **Production** (Neon main branch: `ep-falling-butterfly`)
+- `DATABASE_URL_DEV` in `.env` → **Development** (Neon dev branch: `ep-frosty-snowflake`)
+- Run `npm run db:check` to see the status of both databases at any time
+
+## Forbidden Commands on Production (NEVER RUN):
 - `npx prisma migrate reset` - Wipes ALL data including production
 - `npx prisma migrate reset --force` - Force wipes ALL data 
 - `npx prisma db push --force-reset` - Force resets database schema
 - `DROP DATABASE` or similar SQL commands
 - Any command with `--force-reset` flag
 
-## Safe Alternatives:
-- For local development: Use `DATABASE_URL_DEV` environment variable to point to development database branch
-- For schema changes: Use `npx prisma migrate dev` (creates migration files)
-- For production: Use `npx prisma migrate deploy` (applies migrations safely)
-- For local reset: Switch to development branch first: `export DATABASE_URL=$DATABASE_URL_DEV`
+## Safe Development Workflow (use these npm scripts):
+1. `npm run db:check` — verify both databases and their migration status
+2. `npm run db:dev:migrate` — apply pending migrations to dev DB
+3. `npm run db:dev:seed` — seed the dev DB with predefined data
+4. `npm run dev:devdb` — start the dev server pointing at the dev DB
+5. `npm run db:dev:reset` — reset dev DB only (safe, destroys only dev data)
+6. Production migrations happen automatically via `npm run build` (Vercel)
 
-## Safe Development Workflow:
-1. Always use development database branch first
-2. Test schema changes on dev branch: `export DATABASE_URL=$DATABASE_URL_DEV`
-3. Use `npx prisma migrate dev` for schema changes
-4. Let Vercel handle production deployments automatically
+## Testing Changes — Always Dev First:
+1. Make schema changes in `prisma/schema.prisma`
+2. Create a migration: `node scripts/with-dev-db.js npx prisma migrate dev --name your_migration`
+3. Test on dev DB: `npm run dev:devdb`
+4. Once verified, commit and push — Vercel runs `prisma migrate deploy` on production automatically
 
 ## Explicit User-Approved Production Changes:
 If and only if the human user explicitly requests it, these non-destructive operations are acceptable after verifying DATABASE_URL points to production:
@@ -35,12 +42,12 @@ If and only if the human user explicitly requests it, these non-destructive oper
   - Applying already-generated migrations: `npx prisma migrate deploy`
 - **Still forbidden on production:** Destructive resets (`migrate reset`, `db push --force-reset`), manual `DROP` statements, or anything that erases/modifies user data outside of intended migrations
 - **Always required:**
-  - Echo/print `DATABASE_URL` (mask credentials) and confirm the target
+  - Run `npm run db:check` to confirm both targets
   - Prefer read-only or upsert-style scripts for catalog updates
   - Document the action in commit messages or ops notes
 
 ## Before ANY database operation:
-1. Check DATABASE_URL environment variable
+1. Run `npm run db:check` to see which DB you're targeting
 2. Confirm you're NOT connected to production database
 3. Use migration files instead of reset commands
 4. Always backup production data before schema changes

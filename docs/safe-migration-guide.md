@@ -1,38 +1,81 @@
 # Safe Migration Guide (Neon Dev + Prod)
 
-This project uses Neon PostgreSQL with two database URLs:
+This project uses **Neon PostgreSQL** with two database branches:
 
-- `DATABASE_URL`: production (main branch)
-- `DATABASE_URL_DEV`: development branch
+| Variable | Branch | Host | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | main | `ep-falling-butterfly` | Production |
+| `DATABASE_URL_DEV` | dev | `ep-frosty-snowflake` | Development / testing |
 
 ## Golden Rules
 
-- Always test migrations on `DATABASE_URL_DEV` first.
-- Never run destructive commands on shared/prod DBs:
+- **Always test migrations on dev first** before pushing to production.
+- **Never run destructive commands on production:**
   - `npx prisma migrate reset`
   - `npx prisma db push --force-reset`
-- Prefer `prisma migrate deploy` for applying existing migration files.
+- Production migrations run automatically via `prisma migrate deploy` during Vercel builds.
 
-## Standard Workflow
+## npm Scripts (Recommended)
 
 ```bash
-# 1) Verify current target
-node scripts/check-database-connection.js
+# Check both databases at once
+npm run db:check
 
-# 2) Apply migrations to dev
-DATABASE_URL="$DATABASE_URL_DEV" npx prisma migrate deploy
+# Development database operations
+npm run db:dev:status     # Show migration status
+npm run db:dev:migrate    # Apply pending migrations
+npm run db:dev:seed       # Seed with predefined data
+npm run db:dev:reset      # Reset dev DB (destroys dev data only)
+
+# Production database (read-only check)
+npm run db:prod:status    # Show migration status
+
+# Run dev server against dev database
+npm run dev:devdb
+```
+
+## Standard Development Workflow
+
+```bash
+# 1) Check current state
+npm run db:check
+
+# 2) Make schema changes in prisma/schema.prisma
+
+# 3) Create migration on dev database
+node scripts/with-dev-db.js npx prisma migrate dev --name your_migration_name
+
+# 4) Test locally against dev database
+npm run dev:devdb
+
+# 5) When satisfied, commit and push
+#    Vercel automatically runs: prisma generate && prisma migrate deploy && next build
+git add -A && git commit -m "feat: your changes" && git push
+```
+
+## Advanced: Direct Database URL Override
+
+For one-off commands, use the `scripts/with-dev-db.js` helper:
+
+```bash
+# Run any Prisma command against the dev database
+node scripts/with-dev-db.js npx prisma studio
+node scripts/with-dev-db.js npx prisma db seed
+node scripts/with-dev-db.js npx prisma migrate dev --name add_feature
+```
+
+Or use the shell variable override pattern:
+
+```bash
 DATABASE_URL="$DATABASE_URL_DEV" npx prisma migrate status
-
-# 3) Apply migrations to prod when approved
-DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy
-DATABASE_URL="$DATABASE_URL" npx prisma migrate status
+DATABASE_URL="$DATABASE_URL_DEV" npx prisma migrate deploy
 ```
 
 ## If a Migration Fails Mid-Deploy
 
-Typical causes in older environments:
-- object already exists (table/index/enum value/constraint)
-- object does not exist but migration assumes it does
+Typical causes:
+- Object already exists (table/index/enum value/constraint)
+- Object does not exist but migration assumes it does
 
 ### Recovery pattern
 
@@ -47,15 +90,19 @@ Typical causes in older environments:
 3. Re-run deployment:
    ```bash
    DATABASE_URL="<target>" npx prisma migrate deploy
-   DATABASE_URL="<target>" npx prisma migrate status
    ```
 
-## Quick Verification Commands
+## Deployment Pipeline
 
-```bash
-DATABASE_URL="$DATABASE_URL_DEV" npx prisma migrate status
-DATABASE_URL="$DATABASE_URL" npx prisma migrate status
+The build command in `package.json` is:
+
+```
+prisma generate && prisma migrate deploy && next build
 ```
 
-Expected healthy output:
-- `Database schema is up to date!`
+This means every Vercel deployment:
+1. Generates the Prisma client
+2. Applies any pending migrations to the production database
+3. Builds the Next.js application
+
+No manual migration steps are needed after pushing to main.
