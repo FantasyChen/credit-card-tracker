@@ -16,6 +16,7 @@ model User {
   email                   String           @unique
   emailVerified           DateTime?
   image                   String?
+  password                String?
   notifyNewBenefit        Boolean          @default(false)
   notifyBenefitExpiration Boolean          @default(false)
   notifyExpirationDays    Int              @default(7)
@@ -200,6 +201,24 @@ model LoyaltyAccount {
   @@unique([userId, loyaltyProgramId])
 }
 
+
+model EmailVerificationToken {
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@unique([email, token])
+}
+
+model PasswordResetToken {
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@unique([email, token])
+}
 
 enum BenefitFrequency {
   WEEKLY

@@ -3,31 +3,25 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from './prisma';
 import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
-// import FacebookProvider from 'next-auth/providers/facebook';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
 
 declare module "next-auth" {
-  /**
-   * Returned by `useSession`, `getSession` and received as a prop on the `SessionProvider` React Context
-   */
   interface Session {
     user: {
-      /** The user's id. */
       id: string;
       role?: 'USER' | 'MODERATOR' | 'ADMIN'
-    } & DefaultSession["user"]; // Add id to the default user type
+    } & DefaultSession["user"];
   }
 }
 
 declare module "next-auth/jwt" {
-  /** Returned by the `jwt` callback and `getToken`, when using JWT sessions */
   interface JWT {
-    /** OpenID ID Token */
-    id: string; // Add id to the JWT type
+    id: string;
   }
 }
 
 export const authOptions: NextAuthOptions = {
-  // Ensure the adapter is configured correctly, especially if it uses the User model
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
@@ -43,15 +37,42 @@ export const authOptions: NextAuthOptions = {
         },
       },
     }),
-    // FacebookProvider({
-    //   clientId: process.env.FACEBOOK_CLIENT_ID!,
-    //   clientSecret: process.env.FACEBOOK_CLIENT_SECRET!,
-    //   authorization: {
-    //     params: {
-    //     scope: 'email public_profile',
-    //     },
-    //   },
-    // }),
+    CredentialsProvider({
+      name: 'Email',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null;
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email.toLowerCase() },
+        });
+
+        if (!user || !user.password) {
+          return null;
+        }
+
+        const isValid = await bcrypt.compare(credentials.password, user.password);
+        if (!isValid) {
+          return null;
+        }
+
+        if (!user.emailVerified) {
+          throw new Error('EMAIL_NOT_VERIFIED');
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+        };
+      },
+    }),
   ],
   session: {
     strategy: 'jwt',
@@ -60,13 +81,10 @@ export const authOptions: NextAuthOptions = {
     signIn: '/auth/signin',
   },
   callbacks: {
-    // Add the user ID to the JWT in the jwt callback
-    // The user parameter is only passed on sign-in
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id; // Persist the user id
+        token.id = user.id;
       }
-      // Look up role once per session start or when missing
       if (!('role' in token) || !token.role) {
         try {
           const dbUser = await prisma.user.findUnique({ where: { id: token.id as string }, select: { role: true } });
@@ -79,7 +97,6 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-    // Add the user ID from the token to the session
     async session({ session, token }) {
       session.user.id = token.id as string;
       if ('role' in token) {
