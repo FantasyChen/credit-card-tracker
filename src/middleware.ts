@@ -22,6 +22,20 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (subdomain && LOYALTY_SUBDOMAINS.includes(subdomain)) {
+    // Redirect auth pages to main domain so OAuth uses registered callback URLs
+    if (pathname.startsWith('/auth/')) {
+      const mainHost = hostname.replace(`${subdomain}.`, '');
+      const protocol = hostname.includes('localhost') ? 'http' : 'https';
+      const url = request.nextUrl.clone();
+      url.hostname = mainHost.split(':')[0];
+      url.port = mainHost.includes(':') ? mainHost.split(':')[1] : '';
+      url.protocol = protocol;
+      if (!url.searchParams.has('callbackUrl')) {
+        url.searchParams.set('callbackUrl', `${protocol}://${hostname}/loyalty`);
+      }
+      return NextResponse.redirect(url);
+    }
+
     // On loyalty subdomain, rewrite root to the loyalty landing page
     if (pathname === '/') {
       const url = request.nextUrl.clone();
