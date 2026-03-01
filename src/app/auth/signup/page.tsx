@@ -2,9 +2,13 @@
 
 import React, { useState } from 'react';
 import { signIn } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function SignUpPage() {
+function SignUpContent() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/';
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,7 +54,7 @@ export default function SignUpPage() {
         // OAuth user added password — sign them in directly
         setSuccess(data.message + ' Redirecting...');
         setTimeout(() => {
-          signIn('credentials', { email, password, callbackUrl: '/' });
+          signIn('credentials', { email, password, callbackUrl });
         }, 1500);
       }
     } catch {
@@ -69,7 +73,10 @@ export default function SignUpPage() {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             Already have an account?{' '}
-            <Link href="/auth/signin" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+            <Link
+              href={callbackUrl !== '/' ? `/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}` : '/auth/signin'}
+              className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+            >
               Sign in
             </Link>
           </p>
@@ -181,7 +188,7 @@ export default function SignUpPage() {
 
         <div className="grid grid-cols-1 gap-3">
           <button
-            onClick={() => signIn('google', { callbackUrl: '/' })}
+            onClick={() => signIn('google', { callbackUrl })}
             className="group relative flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-3 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -194,7 +201,7 @@ export default function SignUpPage() {
           </button>
 
           <button
-            onClick={() => signIn('github', { callbackUrl: '/' })}
+            onClick={() => signIn('github', { callbackUrl })}
             className="group relative flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-3 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700"
           >
             <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
@@ -217,5 +224,13 @@ export default function SignUpPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <React.Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+      <SignUpContent />
+    </React.Suspense>
   );
 }

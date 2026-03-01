@@ -80,7 +80,49 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/auth/signin',
   },
+  // Share session cookie across subdomains (www, loyalty, apex) in production
+  cookies:
+    process.env.NODE_ENV === 'production' &&
+    process.env.NEXTAUTH_URL?.includes('coupon-cycle.site')
+      ? {
+          sessionToken: {
+            name: `__Secure-next-auth.session-token`,
+            options: {
+              httpOnly: true,
+              sameSite: 'lax',
+              path: '/',
+              secure: true,
+              domain: '.coupon-cycle.site',
+            },
+          },
+          callbackUrl: {
+            name: `__Secure-next-auth.callback-url`,
+            options: {
+              sameSite: 'lax',
+              path: '/',
+              secure: true,
+              domain: '.coupon-cycle.site',
+            },
+          },
+        }
+      : undefined,
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // Allow redirects to loyalty subdomain (same app, shared auth)
+      if (process.env.NEXTAUTH_URL) {
+        try {
+          const base = new URL(process.env.NEXTAUTH_URL);
+          base.hostname = base.hostname.replace(/^(www\.)?/, 'loyalty.');
+          if (url.startsWith(base.origin)) return url;
+        } catch {
+          // ignore
+        }
+      }
+      if (url.startsWith('http://loyalty.localhost')) return url;
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      if (url.startsWith(baseUrl)) return url;
+      return baseUrl;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

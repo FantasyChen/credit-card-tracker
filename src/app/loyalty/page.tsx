@@ -3,8 +3,19 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { LoyaltyAccountsClient } from './LoyaltyAccountsClient';
 import { Metadata } from 'next';
+
+/** Build callback URL so users return to loyalty subdomain after sign-in. */
+function getSignInRedirect(): string {
+  const host = headers().get('host') || '';
+  if (host.includes('loyalty.') || host.includes('loyalty.localhost')) {
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    return `/api/auth/signin?callbackUrl=${encodeURIComponent(`${protocol}://${host}/loyalty`)}`;
+  }
+  return '/api/auth/signin?callbackUrl=/loyalty';
+}
 
 export const metadata: Metadata = {
   title: "Loyalty Programs - Track Points & Miles",
@@ -24,7 +35,7 @@ export const metadata: Metadata = {
 export default async function LoyaltyPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    redirect('/api/auth/signin?callbackUrl=/loyalty');
+    redirect(getSignInRedirect());
   }
 
   // Fetch user's current loyalty accounts

@@ -1,8 +1,17 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+
+/** Build sign-in/sign-up callback URL so users stay on loyalty subdomain after login. */
+function getLoyaltyCallbackUrl(): string | null {
+  const host = headers().get('host') || '';
+  if (!host.includes('loyalty.') && !host.includes('loyalty.localhost')) return null;
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  return `${protocol}://${host}/loyalty`;
+}
 
 export const metadata: Metadata = {
   title: 'CouponCycle Loyalty - Never Let Points Expire Again',
@@ -24,6 +33,14 @@ export default async function LoyaltyLandingPage() {
     redirect('/loyalty');
   }
 
+  const loyaltyCallback = getLoyaltyCallbackUrl();
+  const signInHref = loyaltyCallback
+    ? `/auth/signin?callbackUrl=${encodeURIComponent(loyaltyCallback)}`
+    : '/auth/signin';
+  const signUpHref = loyaltyCallback
+    ? `/auth/signup?callbackUrl=${encodeURIComponent(loyaltyCallback)}`
+    : '/auth/signup';
+
   return (
     <div>
       {/* Hero */}
@@ -41,7 +58,7 @@ export default async function LoyaltyLandingPage() {
             </p>
             <div className="flex flex-col gap-4 sm:flex-row">
               <Link
-                href="/auth/signup"
+                href={signUpHref}
                 className="inline-flex items-center justify-center rounded-lg bg-purple-600 px-5 py-3 text-center text-base font-medium text-white hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-900"
               >
                 Get Started Free
@@ -58,7 +75,7 @@ export default async function LoyaltyLandingPage() {
                 </svg>
               </Link>
               <Link
-                href="/auth/signin"
+                href={signInHref}
                 className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-5 py-3 text-base font-medium text-gray-900 hover:bg-gray-100 focus:ring-4 focus:ring-gray-100 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700 dark:focus:ring-gray-800"
               >
                 Sign In
@@ -274,13 +291,13 @@ export default async function LoyaltyLandingPage() {
           </p>
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
-              href="/auth/signup"
+              href={signUpHref}
               className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-3 text-base font-medium text-purple-600 hover:bg-purple-50 focus:ring-4 focus:ring-purple-300"
             >
               Create Free Account
             </Link>
             <Link
-              href="/auth/signin"
+              href={signInHref}
               className="inline-flex items-center justify-center rounded-lg border border-white px-6 py-3 text-base font-medium text-white hover:bg-purple-700 focus:ring-4 focus:ring-purple-300"
             >
               Sign In with Google or GitHub
