@@ -27,7 +27,7 @@ description: "CRITICAL: Never run destructive database commands that could affec
 3. `npm run db:dev:seed` — seed the dev DB with predefined data
 4. `npm run dev:devdb` — start the dev server pointing at the dev DB
 5. `npm run db:dev:reset` — reset dev DB only (safe, destroys only dev data)
-6. Production migrations happen automatically via `npm run build` (Vercel)
+6. Production migrations happen automatically via `npm run build` (Vercel) using `DIRECT_URL` (non-pooler endpoint)
 
 ## Testing Changes — Always Dev First:
 1. Make schema changes in `prisma/schema.prisma`

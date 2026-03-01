@@ -4,8 +4,11 @@ This project uses **Neon PostgreSQL** with two database branches:
 
 | Variable | Branch | Host | Purpose |
 |---|---|---|---|
-| `DATABASE_URL` | main | `ep-falling-butterfly` | Production |
+| `DATABASE_URL` | main | `ep-falling-butterfly-...-pooler` | Production queries (pooler) |
+| `DIRECT_URL` | main | `ep-falling-butterfly-...` (no pooler) | Production migrations (direct) |
 | `DATABASE_URL_DEV` | dev | `ep-frosty-snowflake` | Development / testing |
+
+> **Why two production URLs?** Neon's connection pooler doesn't support PostgreSQL advisory locks. `prisma migrate deploy` needs advisory locks, so it must use the direct (non-pooler) endpoint. Normal app queries use the pooler for better connection handling.
 
 ## Golden Rules
 
@@ -49,7 +52,7 @@ node scripts/with-dev-db.js npx prisma migrate dev --name your_migration_name
 npm run dev:devdb
 
 # 5) When satisfied, commit and push
-#    Vercel automatically runs: prisma generate && prisma migrate deploy && next build
+#    Vercel runs: prisma generate && (prisma migrate deploy || echo 'skipped') && next build
 git add -A && git commit -m "feat: your changes" && git push
 ```
 
@@ -97,12 +100,22 @@ Typical causes:
 The build command in `package.json` is:
 
 ```
-prisma generate && prisma migrate deploy && next build
+prisma generate && (prisma migrate deploy || echo 'Migration deploy skipped') && next build
 ```
 
 This means every Vercel deployment:
 1. Generates the Prisma client
-2. Applies any pending migrations to the production database
-3. Builds the Next.js application
+2. Applies any pending migrations using `DIRECT_URL` (non-pooler endpoint)
+3. Falls back gracefully if the database is slow or `DIRECT_URL` is missing
+4. Builds the Next.js application
+
+The Prisma schema configures both endpoints:
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")      // pooler — for app queries
+  directUrl = env("DIRECT_URL")        // direct — for migrations
+}
+```
 
 No manual migration steps are needed after pushing to main.

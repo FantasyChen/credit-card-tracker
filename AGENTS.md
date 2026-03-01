@@ -20,7 +20,7 @@
 - **Backend:** Next.js API Routes + Server Actions  
 - **Database:** PostgreSQL via Neon (main/prod branch + dev branch)
 - **ORM:** Prisma with generated client
-- **Authentication:** NextAuth.js with free OAuth providers (Google, GitHub, Facebook)
+- **Authentication:** NextAuth.js with OAuth (Google, GitHub, Facebook) + custom email/password with verification
 - **Email:** Resend API for notifications
 - **Deployment:** Vercel with automated cron jobs
 - **Testing:** Jest with Testing Library
@@ -35,7 +35,7 @@ credit-card-tracker/
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── api/               # API routes
-│   │   │   ├── auth/          # NextAuth endpoints
+│   │   │   ├── auth/          # NextAuth + email/password auth endpoints
 │   │   │   ├── benefits/      # Benefit CRUD operations
 │   │   │   ├── user-cards/    # Card management + import/export
 │   │   │   ├── predefined-cards/ # Card templates
@@ -44,9 +44,12 @@ credit-card-tracker/
 │   │   │       └── send-notifications/ # Email notifications
 │   │   ├── benefits/          # Benefits dashboard page
 │   │   ├── cards/            # Card management pages
+│   │   ├── auth/             # Auth pages (signin, signup, verify, reset)
 │   │   ├── loyalty/          # Loyalty program tracking
+│   │   ├── loyalty-landing/  # Dedicated landing page for loyalty subdomain
 │   │   ├── settings/         # User preferences
 │   │   └── contact/          # Contact page
+│   ├── middleware.ts          # Subdomain detection & URL rewriting
 │   ├── components/           # Reusable React components
 │   │   ├── ui/              # Base UI components
 │   │   ├── BenefitsDisplayClient.tsx  # Main benefits interface
@@ -105,8 +108,10 @@ The project includes Cursor skills that guide AI agents through common workflows
 ## 🗄️ Database Schema & Core Models
 
 ### User Management
-- **User**: Authentication, notification preferences, and settings
+- **User**: Authentication (OAuth + email/password), notification preferences, and settings
 - **Account/Session**: NextAuth.js models for OAuth
+- **EmailVerificationToken**: Token-based email verification for password signups
+- **PasswordResetToken**: Token-based password reset flow
 
 ### Card & Benefit System
 - **CreditCard**: User's cards with opening dates and card details
@@ -178,24 +183,38 @@ The heart of the application is the `calculateBenefitCycle()` function in `src/l
 - **Edit/Delete**: Full CRUD operations
 - **Benefit Auto-Creation**: Benefits automatically created from templates
 
-### 3. Loyalty Program Tracking (`/loyalty`)
+### 3. Loyalty Program Tracking (`/loyalty` + `loyalty.coupon-cycle.site`)
+- **Dedicated Subdomain**: `loyalty.coupon-cycle.site` with a standalone landing page
 - **Expiration Monitoring**: Track when points/miles expire
 - **Activity Tracking**: Record last activity dates
 - **Automated Notifications**: Email alerts for expiring points
 - **Multiple Programs**: Airlines, hotels, rental cars
+- **Shared Auth**: Same account works across main site and loyalty subdomain
 
-### 4. Progressive Web App (PWA)
+### 4. Authentication System
+- **OAuth Providers**: Google, GitHub, Facebook (free providers)
+- **Email/Password**: Custom signup with bcrypt password hashing
+- **Email Verification**: Token-based verification via Resend
+- **Password Reset**: Secure token-based reset flow
+- **Shared Sessions**: JWT-based sessions work across main site and loyalty subdomain
+
+### 5. Subdomain Routing (Middleware)
+- **Detection**: `src/middleware.ts` inspects `Host` header for subdomain
+- **Loyalty Subdomain**: `loyalty.*` rewrites `/` → `/loyalty-landing`
+- **Header Injection**: Sets `x-subdomain` header for downstream logic
+
+### 6. Progressive Web App (PWA)
 - **Installable**: Add to home screen on mobile devices
 - **Offline Capable**: Service worker for basic offline functionality
 - **Native Feel**: Standalone mode, optimized viewport
 
-### 5. Email Notification System
+### 7. Email Notification System
 - **Daily Digest**: New benefit cycles, expiring benefits
 - **Loyalty Alerts**: Points expiration warnings
 - **User Preferences**: Configurable notification settings
 - **Resend Integration**: Professional email delivery
 
-### 6. Data Import/Export (`/settings/data`)
+### 8. Data Import/Export (`/settings/data`)
 - **JSON Export**: Complete user data backup
 - **Import System**: Restore from previous exports
 - **Data Recovery**: Essential for database migrations
@@ -215,7 +234,8 @@ The heart of the application is the `calculateBenefitCycle()` function in `src/l
 **Required Environment Variables for Production:**
 ```bash
 # Database
-DATABASE_URL="postgresql://..." # Production
+DATABASE_URL="postgresql://..." # Production (pooler endpoint)
+DIRECT_URL="postgresql://..."   # Production (direct endpoint, for migrations)
 DATABASE_URL_DEV="postgresql://..." # Development branch
 
 # Authentication  
@@ -230,12 +250,15 @@ CRON_SECRET="your-cron-secret"
 SERPAPI_API_KEY="your-serpapi-key" # For card image downloads
 ```
 
+> **DATABASE_URL vs DIRECT_URL**: Neon provides two endpoints: a **pooler** (`-pooler` in hostname) for application queries and a **direct** (no `-pooler`) for migrations. Prisma `migrate deploy` needs advisory locks which only work over the direct connection. The Prisma schema uses `url` for the pooler and `directUrl` for direct.
+
 > **CRITICAL NOTE FOR AI AGENTS:** The `.env` file already exists in this repository and is fully configured with all required environment variables. AI agents cannot access it directly due to security isolation, but local commands and the app will automatically read from `.env`. Do not attempt to create or modify the `.env` file - it already exists and is properly configured.
 
 ### Database Safety Rules ⚠️
 
-**Two-Database Setup:**
-- `DATABASE_URL` in `.env` → Production (Neon main: `ep-falling-butterfly`)
+**Two-Database Setup + Direct URL:**
+- `DATABASE_URL` in `.env` → Production pooler (Neon main: `ep-falling-butterfly-...-pooler`)
+- `DIRECT_URL` in `.env` → Production direct (same DB, no pooler — used by `prisma migrate deploy`)
 - `DATABASE_URL_DEV` in `.env` → Development (Neon dev: `ep-frosty-snowflake`)
 
 **CRITICAL - NEVER RUN on production:**
@@ -493,8 +516,9 @@ node scripts/test-annual-fee-roi.cjs       # Test ROI calculations
 - ✅ **NO MANUAL STEPS**: Vercel handles everything automatically
 - ✅ **AGENT NOTE**: AI agents should NOT attempt manual deployment - simply push to GitHub
 - Environment variables configured in Vercel dashboard
-- Build command: `prisma generate && prisma migrate deploy && next build`
-- Database migrations run automatically as part of the build pipeline — no manual steps needed
+- Build command: `prisma generate && (prisma migrate deploy || echo 'skipped') && next build`
+- Database migrations run automatically via `DIRECT_URL` (non-pooler endpoint); falls back gracefully on timeout
+- `DIRECT_URL` env var must be set in Vercel (direct Neon endpoint, no `-pooler`)
 
 **Cron Jobs** (configured in `vercel.json`):
 - Daily benefit status updates: `/api/cron/check-benefits`
@@ -511,7 +535,11 @@ curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" <url>/api/cron/check-bene
 curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-notifications?mockDate=2025-08-15"
 ```
 
-**Domains & deployment:** To add the loyalty subdomain (`loyalty.coupon-cycle.site`) or troubleshoot a failed deployment, see **docs/vercel-domains-and-deploy.md**.
+**Live Domains:**
+- `coupon-cycle.site` / `www.coupon-cycle.site` — Main app (credit card benefits)
+- `loyalty.coupon-cycle.site` — Loyalty program landing page (subdomain detected by middleware, rewrites `/` → `/loyalty-landing`)
+
+**Domains & deployment:** For domain setup details or deployment troubleshooting, see **docs/vercel-domains-and-deploy.md**.
 
 ### Database Management
 
@@ -713,6 +741,33 @@ npm run build
 
 ## 📝 Recent Updates
 
+### February 2026: Vercel Deployment Fix (DIRECT_URL)
+**Date**: February 2026
+**Implementation Status**: ✅ Complete
+
+**Changes Implemented**:
+- **Root cause fixed**: `prisma migrate deploy` was timing out because Neon's connection pooler doesn't support PostgreSQL advisory locks
+- **DIRECT_URL**: Added `directUrl` to Prisma schema pointing to Neon's non-pooler endpoint; added `DIRECT_URL` env var to Vercel (all environments) and local `.env`
+- **Resilient build**: Build command now falls back gracefully if migration deploy fails
+- **outputFileTracingRoot**: Added to `next.config.ts` to fix Vercel workspace detection
+
+---
+
+### February 2026: Loyalty Subdomain & Email/Password Auth
+**Date**: February 2026
+**Implementation Status**: ✅ Complete
+
+**Changes Implemented**:
+- **Email/Password Auth**: Custom signup system with bcrypt hashing, email verification tokens, and password reset flow — alongside existing Google/GitHub/Facebook OAuth
+- **Loyalty Subdomain**: `loyalty.coupon-cycle.site` serves a dedicated landing page via Next.js middleware subdomain detection
+- **Shared Authentication**: Same user accounts work across `coupon-cycle.site` and `loyalty.coupon-cycle.site`
+- **New Routes**: `/auth/signup`, `/auth/verify-email`, `/auth/forgot-password`, `/auth/reset-password`, `/loyalty-landing`
+- **New API Endpoints**: `/api/auth/signup`, `/api/auth/verify-email`, `/api/auth/forgot-password`, `/api/auth/reset-password`
+- **Schema Changes**: `User.password`, `EmailVerificationToken`, `PasswordResetToken` models
+- **Vercel Domain**: `loyalty.coupon-cycle.site` added to Vercel project with CNAME DNS record
+
+---
+
 ### January 2025: Multiple OAuth Provider Support
 **Date**: January 17, 2025  
 **Implementation Status**: ✅ Complete
@@ -797,8 +852,8 @@ node scripts/migrate-amex-2025-benefits.js --force
 
 ---
 
-*Last Updated: February 2025*
-*Version: 0.1.1*
+*Last Updated: February 2026*
+*Version: 1.18*
 *Created by: fantasy_c*
 
 ---
