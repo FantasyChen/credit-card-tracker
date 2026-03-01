@@ -22,7 +22,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:devdb": "node scripts/with-dev-db.js next dev",
-    "build": "prisma generate && (prisma migrate deploy || echo 'Migration deploy skipped — check DIRECT_URL') && next build",
+    "build": "prisma generate && (prisma migrate deploy || echo 'Migration deploy skipped — check DIRECT_URL') && (prisma db seed || echo 'Seed skipped') && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
