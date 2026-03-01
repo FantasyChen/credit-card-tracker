@@ -51,6 +51,7 @@ export default async function LoyaltyPage() {
           company: true,
           expirationMonths: true,
           hasExpiration: true,
+          expirationBasis: true,
           description: true,
           qualifyingActivities: true,
           website: true,
@@ -64,12 +65,12 @@ export default async function LoyaltyPage() {
   });
 
   // Fetch all available loyalty programs for adding new accounts
+  // Only apply notIn when user has accounts (Prisma notIn: [] can be inconsistent)
+  const excludeIds = userLoyaltyAccounts.map(account => account.loyaltyProgramId);
   const availablePrograms = await prisma.loyaltyProgram.findMany({
-    where: {
-      id: {
-        notIn: userLoyaltyAccounts.map(account => account.loyaltyProgramId)
-      }
-    },
+    where: excludeIds.length > 0
+      ? { id: { notIn: excludeIds } }
+      : {},
     orderBy: [
       { type: 'asc' },
       { company: 'asc' }

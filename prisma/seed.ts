@@ -2136,7 +2136,16 @@ The **American Express Gold Card** offers a **$7 monthly Dunkin credit** that ca
 
   // --- Seed Loyalty Programs (only ones with expiration) ---
   console.log('Seeding loyalty programs...');
-  
+
+  // Ensure expirationBasis column exists (migration 20260228000000 adds it; handles dev/prod drift)
+  try {
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "LoyaltyProgram" ADD COLUMN IF NOT EXISTS "expirationBasis" TEXT DEFAULT 'ACTIVITY'`
+    );
+  } catch {
+    // Ignore if column already exists or migration handles it
+  }
+
   const loyaltyPrograms = [
     // Airlines (with expiration)
     {
@@ -2158,6 +2167,98 @@ The **American Express Gold Card** offers a **$7 monthly Dunkin credit** that ca
       hasExpiration: true,
       website: 'https://www.alaskaair.com/mileageplan',
       description: 'Miles expire 24 months after earning or redeeming activity'
+    },
+    {
+      name: 'jal_mileage_bank',
+      displayName: 'JAL Mileage Bank',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'Japan Airlines',
+      expirationMonths: 36,
+      hasExpiration: true,
+      expirationBasis: 'EARNING',
+      website: 'https://www.jal.co.jp/jp/en/jmb/',
+      description: 'Fixed expiry: miles expire 36 months after earning. Use the date of your oldest unredeemed mile batch—new activity does not extend older miles.'
+    },
+    {
+      name: 'cathay_asia_miles',
+      displayName: 'Cathay Pacific Asia Miles',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'Cathay Pacific',
+      expirationMonths: 18,
+      hasExpiration: true,
+      website: 'https://www.cathaypacific.com/asia-miles',
+      description: 'Regular members: 18 months inactivity. Marco Polo Club: 36 months. Flying, partner activity, or redemptions reset the clock.'
+    },
+    {
+      name: 'singapore_krisflyer',
+      displayName: 'Singapore Airlines KrisFlyer',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'Singapore Airlines',
+      expirationMonths: 36,
+      hasExpiration: true,
+      expirationBasis: 'EARNING',
+      website: 'https://www.singaporeair.com/krisflyer',
+      description: 'Fixed expiry: miles expire 36 months after crediting. Use oldest earning date—new activity does not extend older batches.'
+    },
+    {
+      name: 'british_airways_avios',
+      displayName: 'British Airways Avios',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'British Airways',
+      expirationMonths: 36,
+      hasExpiration: true,
+      website: 'https://www.britishairways.com/executive-club',
+      description: 'Avios expire 36 months after last earning or redemption activity'
+    },
+    {
+      name: 'emirates_skywards',
+      displayName: 'Emirates Skywards',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'Emirates',
+      expirationMonths: 36,
+      hasExpiration: true,
+      website: 'https://www.emirates.com/skywards',
+      description: 'Miles expire 36 months after last account activity'
+    },
+    {
+      name: 'virgin_atlantic_flying_club',
+      displayName: 'Virgin Atlantic Flying Club',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'Virgin Atlantic',
+      expirationMonths: 36,
+      hasExpiration: true,
+      website: 'https://www.virginatlantic.com/flying-club',
+      description: 'Virgin Points expire 36 months after last earning or redemption activity'
+    },
+    {
+      name: 'qatar_privilege_club',
+      displayName: 'Qatar Airways Privilege Club',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'Qatar Airways',
+      expirationMonths: 36,
+      hasExpiration: true,
+      website: 'https://www.qatarairways.com/PrivilegeClub',
+      description: 'Qmiles expire 36 months after last earning or redemption activity'
+    },
+    {
+      name: 'southwest_rapid_rewards',
+      displayName: 'Southwest Rapid Rewards',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'Southwest Airlines',
+      expirationMonths: 24,
+      hasExpiration: true,
+      website: 'https://www.southwest.com/rapidrewards',
+      description: 'Points expire 24 months after last activity (Basic fare: 6 months; Choice fares: 12 months)'
+    },
+    {
+      name: 'air_canada_aeroplan',
+      displayName: 'Air Canada Aeroplan',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'Air Canada',
+      expirationMonths: 18,
+      hasExpiration: true,
+      website: 'https://www.aircanada.com/aeroplan',
+      description: 'Points expire 18 months after last activity (expiration currently paused until Nov 2025)'
     },
 
     // Hotels (with expiration)

@@ -13,6 +13,7 @@ type LoyaltyProgram = {
   company: string;
   expirationMonths: number | null;
   hasExpiration: boolean;
+  expirationBasis: string | null;
   description: string | null;
   qualifyingActivities: string | null;
   website: string | null;
@@ -98,7 +99,9 @@ export function EditLoyaltyAccountModal({
               <p className="text-gray-600 dark:text-gray-400">
                 <strong>Expiration:</strong>{' '}
                 {account.loyaltyProgram.hasExpiration 
-                  ? `${account.loyaltyProgram.expirationMonths} months after last activity`
+                  ? account.loyaltyProgram.expirationBasis === 'EARNING'
+                    ? `${account.loyaltyProgram.expirationMonths} months from earning (fixed per batch)`
+                    : `${account.loyaltyProgram.expirationMonths} months after last activity`
                   : 'Points/miles never expire'
                 }
               </p>
@@ -159,10 +162,12 @@ export function EditLoyaltyAccountModal({
             </p>
           </div>
 
-          {/* Last Activity Date */}
+          {/* Last Activity Date / Oldest Earning Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Last Activity Date *
+              {account.loyaltyProgram.expirationBasis === 'EARNING'
+                ? 'Oldest Earning Date *'
+                : 'Last Activity Date *'}
             </label>
             <Input
               type="date"
@@ -172,7 +177,9 @@ export function EditLoyaltyAccountModal({
               className="w-full"
             />
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              When did you last earn or redeem points/miles? This determines your expiration date.
+              {account.loyaltyProgram.expirationBasis === 'EARNING'
+                ? 'Date of your oldest unredeemed mile batch. Miles expire from earning—new activity does not extend older miles.'
+                : 'When did you last earn or redeem points/miles? This determines your expiration date.'}
             </p>
             {account.expirationDate && (
               <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">

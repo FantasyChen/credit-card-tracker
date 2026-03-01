@@ -1,8 +1,32 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+function getSwitchUrl(isLoyaltyContext: boolean): string {
+  if (!isLoyaltyContext) {
+    return '/loyalty';
+  }
+  if (typeof window === 'undefined') return '/';
+  const host = window.location.hostname;
+  const port = window.location.port;
+  const proto = window.location.protocol;
+  const isLocalhost = host.includes('localhost');
+  return isLocalhost
+    ? `${proto}//${host.replace(/^loyalty\./, '')}${port ? `:${port}` : ''}`
+    : 'https://www.coupon-cycle.site';
+}
 
 const Footer = () => {
+  const pathname = usePathname();
+  const [isLoyaltyContext, setIsLoyaltyContext] = useState<boolean | null>(null);
   const currentYear = new Date().getFullYear();
+
+  useEffect(() => {
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    setIsLoyaltyContext(pathname.startsWith('/loyalty') || host.includes('loyalty.'));
+  }, [pathname]);
 
   const footerLinks = {
     product: [
@@ -37,6 +61,16 @@ const Footer = () => {
               Product
             </h3>
             <ul className="space-y-3">
+              {isLoyaltyContext !== null && (
+                <li>
+                  <a
+                    href={getSwitchUrl(isLoyaltyContext)}
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
+                  >
+                    {isLoyaltyContext ? 'Credit Card Benefits →' : 'Loyalty Points →'}
+                  </a>
+                </li>
+              )}
               {footerLinks.product.map((link) => (
                 <li key={link.name}>
                   <Link

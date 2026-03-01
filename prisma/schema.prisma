@@ -176,6 +176,8 @@ model LoyaltyProgram {
   company              String
   expirationMonths     Int?
   hasExpiration        Boolean            @default(true)
+  /// ACTIVITY = last activity resets timer; EARNING = miles expire X months from earning (user enters oldest batch date)
+  expirationBasis      String?            @default("ACTIVITY")
   website              String?
   logoUrl              String?
   description          String?

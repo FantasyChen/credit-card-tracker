@@ -4,18 +4,17 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { useState, useMemo } from 'react';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useState, useMemo, useEffect } from 'react';
+import { Bars3Icon, XMarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 
 interface NavItem {
   name: string;
   href: string;
-  authRequired?: boolean; // Optional: true if link requires authentication
+  authRequired?: boolean;
 }
 
-// Define baseNavigation outside the component to avoid re-creating it
-const baseNavigation: NavItem[] = [
+const mainNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/' },
   { name: 'Cards', href: '/cards' },
   { name: 'Benefits', href: '/benefits' },
@@ -23,20 +22,53 @@ const baseNavigation: NavItem[] = [
   { name: 'Contact', href: '/contact' },
 ];
 
+const loyaltyNavigation: NavItem[] = [
+  { name: 'Loyalty Programs', href: '/loyalty' },
+  { name: 'Settings', href: '/settings' },
+  { name: 'Contact', href: '/contact' },
+];
+
+/** Build the URL to switch between main and loyalty contexts. */
+function getSwitchUrl(isLoyaltyContext: boolean): string {
+  if (!isLoyaltyContext) {
+    // Main → Loyalty: use same-origin /loyalty path (works on localhost and production)
+    return '/loyalty';
+  }
+  // Loyalty → Main: need to go back to main domain (since middleware rewrites / on loyalty subdomain)
+  if (typeof window === 'undefined') return '/';
+  const host = window.location.hostname;
+  const port = window.location.port;
+  const proto = window.location.protocol;
+  const isLocalhost = host.includes('localhost');
+  return isLocalhost
+    ? `${proto}//${host.replace(/^loyalty\./, '')}${port ? `:${port}` : ''}`
+    : 'https://www.coupon-cycle.site';
+}
+
 const Navbar = () => {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoyaltyContext, setIsLoyaltyContext] = useState<boolean | null>(null);
 
-  // Filter navigation items based on authentication status
+  useEffect(() => {
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    const loyaltyPath = pathname.startsWith('/loyalty');
+    const loyaltyHost = host.includes('loyalty.');
+    setIsLoyaltyContext(loyaltyPath || loyaltyHost);
+  }, [pathname]);
+
+  const baseNavigation = isLoyaltyContext ? loyaltyNavigation : mainNavigation;
+
   const navigation = useMemo(() => {
     return baseNavigation.filter(item => {
-      if (item.authRequired && !session) {
-        return false; // Don't show auth-required links if not logged in
-      }
+      if (item.authRequired && !session) return false;
       return true;
     });
-  }, [session]);
+  }, [session, baseNavigation]);
+
+  const switchLabel = isLoyaltyContext ? 'Credit Card Benefits' : 'Loyalty Points';
+  const switchHref = getSwitchUrl(isLoyaltyContext ?? false);
 
   return (
     <header role="banner">
@@ -75,8 +107,18 @@ const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center">
-            {/* Theme Toggle - visible on all screen sizes */}
+            {/* Site switcher - link to other product */}
             <div className="hidden sm:block">
+              <a
+                href={switchHref}
+                className="inline-flex items-center rounded-md px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
+              >
+                {switchLabel}
+                <ArrowRightIcon className="ml-1 h-4 w-4" aria-hidden="true" />
+              </a>
+            </div>
+            {/* Theme Toggle - visible on all screen sizes */}
+            <div className="hidden sm:block sm:ml-2">
               <ThemeToggle />
             </div>
             {/* Desktop Sign in/out button */}
@@ -137,7 +179,15 @@ const Navbar = () => {
                 {item.name}
               </Link>
             ))}
-            {/* Mobile Sign in/out button and Theme Toggle are now outside the main nav items, in the mobile header*/}
+            {/* Site switcher for mobile */}
+            <a
+              href={switchHref}
+              className="block rounded-md px-3 py-2 text-base font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
+              onClick={() => setIsMobileMenuOpen(false)}
+              role="menuitem"
+            >
+              {switchLabel} →
+            </a>
           </div>
            {/* Sign in/out button now part of the header for mobile too */}
            <div className="border-t border-gray-200 px-2 pt-3 pb-3 dark:border-gray-700">
