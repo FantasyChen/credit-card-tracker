@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
+import path from "path";
+import { fileURLToPath } from "url";
 import { PrismaPlugin } from '@prisma/nextjs-monorepo-workaround-plugin';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const nextConfig: NextConfig = {
+  // Lock workspace root so Vercel/Next doesn't pick a parent lockfile (avoids deploy failures)
+  outputFileTracingRoot: path.join(__dirname),
   /* config options here */
   eslint: {
     // Warning: This allows production builds to successfully complete even if

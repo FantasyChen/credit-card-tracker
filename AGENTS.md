@@ -511,6 +511,8 @@ curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" <url>/api/cron/check-bene
 curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-notifications?mockDate=2025-08-15"
 ```
 
+**Domains & deployment:** To add the loyalty subdomain (`loyalty.coupon-cycle.site`) or troubleshoot a failed deployment, see **docs/vercel-domains-and-deploy.md**.
+
 ### Database Management
 
 **Production Database**: Neon PostgreSQL with branching
