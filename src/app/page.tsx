@@ -199,11 +199,12 @@ export default async function Home() {
   const sevenDaysFromNow = new Date(now);
   sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
-  // Fetch benefits expiring within 7 days (urgent)
+  // Fetch benefits expiring within 7 days (urgent) - only those in active cycle
   const expiringSoonBenefits = await prisma.benefitStatus.findMany({
     where: {
       userId: userId,
       isCompleted: false,
+      cycleStartDate: { lte: now },
       cycleEndDate: { gte: now, lte: sevenDaysFromNow },
     },
     include: {
@@ -218,11 +219,12 @@ export default async function Home() {
     },
   }) as UpcomingBenefit[];
 
-  // Fetch upcoming benefits (expiring after 7 days, limit 5)
+  // Fetch upcoming benefits (in active cycle, expiring after 7 days, limit 5)
   const upcomingBenefits = await prisma.benefitStatus.findMany({
     where: {
       userId: userId,
       isCompleted: false,
+      cycleStartDate: { lte: now },
       cycleEndDate: { gt: sevenDaysFromNow },
     },
     include: {
