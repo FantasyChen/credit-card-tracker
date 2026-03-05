@@ -142,7 +142,7 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
       }
     }
 
-    // Build all email tasks, then send in parallel
+    // Build one digest email per user (consolidates up to 3 notification types into 1 email)
     const emailTasks: { to: string; subject: string; html: string }[] = [];
     const baseUrl = process.env.NEXTAUTH_URL || '';
 
@@ -150,48 +150,68 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
       if (!user.email) continue;
 
       const newBenefits = newByUser.get(user.id);
-      if (newBenefits && newBenefits.length > 0) {
-        const benefitsHtml = newBenefits.map(s =>
-          `<li><strong>${s.benefit.description}</strong> on your ${s.benefit.creditCard?.name ?? 'card'}. Cycle: ${fmtDate(s.cycleStartDate)} - ${fmtDate(s.cycleEndDate)}.</li>`
+      const expiring = expiringByUser.get(user.id);
+      const loyalty = loyaltyByUser.get(user.id);
+
+      const hasNew = newBenefits && newBenefits.length > 0;
+      const hasExpiring = expiring && expiring.length > 0;
+      const hasLoyalty = loyalty && loyalty.length > 0;
+      if (!hasNew && !hasExpiring && !hasLoyalty) continue;
+
+      const sections: string[] = [];
+      const sectionLabels: string[] = [];
+
+      if (hasNew) {
+        sectionLabels.push('New Benefits');
+        const items = newBenefits.map(s =>
+          `<li><strong>${s.benefit.description}</strong> on your ${s.benefit.creditCard?.name ?? 'card'}. Cycle: ${fmtDate(s.cycleStartDate)} – ${fmtDate(s.cycleEndDate)}.</li>`
         ).join('');
-        emailTasks.push({
-          to: user.email,
-          subject: 'Your New Benefit Cycles Have Started!',
-          html: `<h1>New Benefit Cycles!</h1><p>Hi ${user.name || 'there'},</p><p>The following new benefit cycles have started for you:</p><ul>${benefitsHtml}</ul><p>Make sure to use them!</p><a href="${baseUrl}/benefits">View Your Benefits</a>`,
-        });
+        sections.push(
+          `<h2 style="color:#4F46E5;margin:24px 0 8px;">New Benefit Cycles</h2>` +
+          `<p>The following benefit cycles have started:</p><ul>${items}</ul>` +
+          `<p><a href="${baseUrl}/benefits" style="color:#4F46E5;">View Your Benefits &rarr;</a></p>`
+        );
       }
 
-      const expiring = expiringByUser.get(user.id);
-      if (expiring && expiring.length > 0) {
-        const benefitsHtml = expiring.map(s =>
+      if (hasExpiring) {
+        sectionLabels.push('Expiring Benefits');
+        const items = expiring.map(s =>
           `<li><strong>${s.benefit.description}</strong> on your ${s.benefit.creditCard?.name ?? 'card'}, expiring on ${fmtDate(s.cycleEndDate)} (in ${user.notifyExpirationDays} day(s)).</li>`
         ).join('');
-        emailTasks.push({
-          to: user.email,
-          subject: 'Benefit Expiration Reminders',
-          html: `<h1>Benefits Expiring Soon!</h1><p>Hi ${user.name || 'there'},</p><p>The following benefits are expiring soon for you:</p><ul>${benefitsHtml}</ul><p>Don't miss out!</p><a href="${baseUrl}/benefits">View Your Benefits</a>`,
-        });
+        sections.push(
+          `<h2 style="color:#DC2626;margin:24px 0 8px;">Benefits Expiring Soon</h2>` +
+          `<p>Don't miss out on these benefits:</p><ul>${items}</ul>` +
+          `<p><a href="${baseUrl}/benefits" style="color:#4F46E5;">View Your Benefits &rarr;</a></p>`
+        );
       }
 
-      const loyalty = loyaltyByUser.get(user.id);
-      if (loyalty && loyalty.length > 0) {
-        const loyaltyHtml = loyalty.map(a => {
+      if (hasLoyalty) {
+        sectionLabels.push('Expiring Points');
+        const items = loyalty.map(a => {
           const expDate = a.expirationDate ? fmtDate(a.expirationDate) : 'Unknown';
           return `<li><strong>${a.loyaltyProgram.displayName}</strong> points expiring on ${expDate} (in ${user.pointsExpirationDays} day(s)).${a.accountNumber ? ` Account: ${a.accountNumber}` : ''}</li>`;
         }).join('');
-        emailTasks.push({
-          to: user.email,
-          subject: 'Loyalty Points Expiring Soon!',
-          html: `<h1>Loyalty Points Expiring Soon!</h1><p>Hi ${user.name || 'there'},</p><p>The following loyalty program points are expiring soon:</p><ul>${loyaltyHtml}</ul><p>Consider earning or redeeming points to prevent expiration!</p><a href="${baseUrl}/loyalty">Manage Your Loyalty Accounts</a>`,
-        });
+        sections.push(
+          `<h2 style="color:#D97706;margin:24px 0 8px;">Loyalty Points Expiring Soon</h2>` +
+          `<p>Consider earning or redeeming to prevent expiration:</p><ul>${items}</ul>` +
+          `<p><a href="${baseUrl}/loyalty" style="color:#4F46E5;">Manage Loyalty Accounts &rarr;</a></p>`
+        );
       }
+
+      const subject = sectionLabels.length === 1
+        ? digestSubjectForSection(sectionLabels[0])
+        : 'Your CouponCycle Daily Update';
+
+      const html = buildDigestHtml(user.name || 'there', sections, baseUrl);
+
+      emailTasks.push({ to: user.email, subject, html });
     }
 
-    // Send all emails in parallel (batch of 10 to avoid rate limits)
+    // Send all emails in parallel (batch of 10 to stay under 2 req/s rate limit)
     let emailsSent = 0;
 
     if (dryRun) {
-      console.log(`🔍 [DRY RUN] Would send ${emailTasks.length} emails — skipping`);
+      console.log(`🔍 [DRY RUN] Would send ${emailTasks.length} digest emails — skipping`);
       for (const task of emailTasks) {
         console.log(`  📧 → ${task.to}: ${task.subject}`);
       }
@@ -203,12 +223,19 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
         const results = await Promise.allSettled(
           batch.map(task => sendEmail({ to: task.to, subject: task.subject, html: task.html }))
         );
-        emailsSent += results.filter(r => r.status === 'fulfilled' && r.value).length;
+        for (let j = 0; j < results.length; j++) {
+          const r = results[j];
+          if (r.status === 'fulfilled' && r.value) {
+            emailsSent++;
+          } else {
+            console.warn(`Failed to send '${batch[j].subject}' email to ${batch[j].to}`);
+          }
+        }
       }
     }
 
     const totalMs = Date.now() - startMs;
-    console.log(`✅ Done in ${totalMs}ms: ${usersToNotify.length} users, ${emailsSent}/${emailTasks.length} emails sent`);
+    console.log(`✅ Done in ${totalMs}ms: ${usersToNotify.length} users, ${emailsSent}/${emailTasks.length} digest emails sent`);
 
     return NextResponse.json({
       message: dryRun ? 'Notification dry run completed.' : 'Notification cron job executed.',
@@ -223,6 +250,29 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
     console.error(`💥 send-notifications failed after ${totalMs}ms:`, error);
     return NextResponse.json({ message: 'Error executing cron job.', durationMs: totalMs }, { status: 500 });
   }
+}
+
+function digestSubjectForSection(label: string): string {
+  switch (label) {
+    case 'New Benefits': return 'New Benefit Cycles Have Started!';
+    case 'Expiring Benefits': return 'Benefits Expiring Soon!';
+    case 'Expiring Points': return 'Loyalty Points Expiring Soon!';
+    default: return 'Your CouponCycle Daily Update';
+  }
+}
+
+function buildDigestHtml(name: string, sections: string[], baseUrl: string): string {
+  return [
+    `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1F2937;">`,
+    `<h1 style="color:#4F46E5;border-bottom:2px solid #E5E7EB;padding-bottom:12px;">CouponCycle Update</h1>`,
+    `<p>Hi ${name},</p>`,
+    `<p>Here's what needs your attention today:</p>`,
+    sections.join('<hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0;">'),
+    `<hr style="border:none;border-top:2px solid #E5E7EB;margin:32px 0 16px;">`,
+    `<p style="color:#6B7280;font-size:13px;">You're receiving this because you enabled notifications in your ` +
+      `<a href="${baseUrl}/settings" style="color:#4F46E5;">CouponCycle settings</a>.</p>`,
+    `</div>`,
+  ].join('');
 }
 
 function fmtDate(d: Date): string {
