@@ -176,7 +176,9 @@ export function AddLoyaltyAccountModal({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               {selectedProgram?.expirationBasis === 'EARNING'
                 ? 'Oldest Earning Date *'
-                : 'Last Activity Date *'}
+                : selectedProgram?.hasExpiration === false
+                  ? 'Last Activity *'
+                  : 'Last Activity Date *'}
             </label>
             <Input
               type="date"
@@ -188,7 +190,9 @@ export function AddLoyaltyAccountModal({
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {selectedProgram?.expirationBasis === 'EARNING'
                 ? 'Date of your oldest unredeemed mile batch. Miles expire from earning—new activity does not extend older miles.'
-                : 'When did you last earn or redeem points/miles? This determines your expiration date.'}
+                : selectedProgram?.hasExpiration === false
+                  ? 'For your records only—points never expire.'
+                  : 'When did you last earn or redeem points/miles? This determines your expiration date.'}
             </p>
           </div>
 

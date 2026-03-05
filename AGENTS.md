@@ -85,6 +85,7 @@ The project includes Cursor skills that guide AI agents through common workflows
 |-------|----------|---------|
 | `add-new-credit-card` | `.cursor/skills/add-new-credit-card/` | Add new cards with images and benefits |
 | `update-card-benefits` | `.cursor/skills/update-card-benefits/` | Update benefits for existing cards |
+| `session-recap` | `.cursor/skills/session-recap/` | Post-session self-reflection and documentation updates |
 
 **How to use skills**: AI agents automatically detect when these skills are relevant based on user requests. The skills provide step-by-step guidance for complex multi-step workflows.
 
@@ -521,9 +522,11 @@ node scripts/test-annual-fee-roi.cjs       # Test ROI calculations
 - `DIRECT_URL` env var must be set in Vercel (direct Neon endpoint, no `-pooler`)
 
 **Cron Jobs** (configured in `vercel.json`):
-- Daily benefit status updates: `/api/cron/check-benefits`
-- Daily email notifications: `/api/cron/send-notifications`
+- `/api/cron/check-benefits` — Daily at `0 5 * * *` (5:00 AM UTC). Uses bulk SQL `INSERT ... ON CONFLICT` to upsert all benefit statuses in 2-3 queries (~1.2s for 11K rows). Must complete within 10s (Hobby tier limit).
+- `/api/cron/send-notifications` — Daily at `30 5 * * *` (5:30 AM UTC, 30 min after check-benefits). Uses 3 bulk queries + parallel email sends (~2s). Runs after check-benefits so statuses exist before notifications reference them.
 - Both require the header `Authorization: Bearer <CRON_SECRET>`
+- Both export `maxDuration = 10` (Vercel Hobby tier ceiling)
+- **Hobby tier constraint**: 2 cron slots max, daily schedule only — both slots are used
 
 Manual trigger examples:
 
@@ -532,6 +535,7 @@ Manual trigger examples:
 curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" <url>/api/cron/check-benefits
 
 # Notifications cron supports an optional mockDate (non-production only)
+# ⚠️ NEVER trigger send-notifications against production locally — it sends real emails
 curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-notifications?mockDate=2025-08-15"
 ```
 
@@ -728,6 +732,9 @@ npm run build
 - **Documentation**: This file and `/docs` folder
 - **Support Creator**: [Buy me a coffee](https://coff.ee/fantasy_c)
 
+### Community Posts (Announcements)
+- **美卡论坛 (US Card Forum)** — [做了个极简工具追踪里程/积分活动日期 + expire前邮件提醒](https://www.uscardforum.com/t/topic/487571) (Mar 2026) — Loyalty subdomain launch post in 航空常旅客 (aviation/travel) section; promotes [loyalty.coupon-cycle.site](https://loyalty.coupon-cycle.site/) for tracking miles/points activity dates and email reminders; cross-references main site for credit card coupon tracking
+
 ---
 
 ## 📄 License & Legal
@@ -740,6 +747,25 @@ npm run build
 ---
 
 ## 📝 Recent Updates
+
+### March 2026: Cron Performance Optimization for Hobby Tier
+**Date**: March 2026
+**Implementation Status**: ✅ Complete
+
+**Changes Implemented**:
+- **check-benefits rewrite**: Replaced ~11,224 individual `prisma.benefitStatus.upsert()` calls with bulk SQL `INSERT ... ON CONFLICT` (2-3 queries). Execution time: 63s → 1.2s (52x faster)
+- **send-notifications rewrite**: Replaced ~1,400 per-user DB queries with 3 bulk queries + in-memory grouping. Parallelized email sends in batches of 10. Execution time: 25.7s → 2.1s (12x faster)
+- **Separated cron schedules**: `check-benefits` at `0 5 * * *`, `send-notifications` at `30 5 * * *` (staggered by 30 min)
+- **maxDuration = 10**: Both crons explicitly set to Hobby tier ceiling
+
+**Root Cause**: Vercel Hobby tier enforces 10s serverless function timeout. Both crons were exceeding this limit due to thousands of individual DB round trips, causing silent daily failures and missing benefit statuses.
+
+**Technical Notes**:
+- `check-benefits` uses `prisma.$executeRawUnsafe()` with `INSERT ... ON CONFLICT` for bulk upsert — bypasses Prisma ORM type safety, so any `BenefitStatus` schema changes require updating the raw SQL manually
+- `send-notifications` fetches all potentially relevant data in 3 queries (new statuses, expiring statuses, expiring loyalty accounts) then filters per-user in memory based on each user's notification settings
+- Both Vercel Hobby cron slots are now used (2/2 max)
+
+---
 
 ### February 2026: Vercel Deployment Fix (DIRECT_URL)
 **Date**: February 2026
@@ -852,8 +878,8 @@ node scripts/migrate-amex-2025-benefits.js --force
 
 ---
 
-*Last Updated: February 2026*
-*Version: 1.18*
+*Last Updated: March 2026*
+*Version: 1.19*
 *Created by: fantasy_c*
 
 ---

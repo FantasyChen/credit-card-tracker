@@ -179,7 +179,9 @@ export function EditLoyaltyAccountModal({
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {account.loyaltyProgram.expirationBasis === 'EARNING'
                 ? 'Date of your oldest unredeemed mile batch. Miles expire from earning—new activity does not extend older miles.'
-                : 'When did you last earn or redeem points/miles? This determines your expiration date.'}
+                : account.loyaltyProgram.hasExpiration === false
+                  ? 'For your records only—points never expire.'
+                  : 'When did you last earn or redeem points/miles? This determines your expiration date.'}
             </p>
             {account.expirationDate && (
               <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">

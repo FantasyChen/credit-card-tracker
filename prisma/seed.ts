@@ -2134,7 +2134,7 @@ The **American Express Gold Card** offers a **$7 monthly Dunkin credit** that ca
 
   console.log(`✅ Seeded ${usageWays.length} benefit usage ways.`);
 
-  // --- Seed Loyalty Programs (only ones with expiration) ---
+  // --- Seed Loyalty Programs (with and without expiration) ---
   console.log('Seeding loyalty programs...');
 
   // Ensure expirationBasis column exists (migration 20260228000000 adds it; handles dev/prod drift)
@@ -2261,6 +2261,38 @@ The **American Express Gold Card** offers a **$7 monthly Dunkin credit** that ca
       description: 'Points expire 18 months after last activity (expiration currently paused until Nov 2025)'
     },
 
+    // Airlines (never expire)
+    {
+      name: 'united_mileageplus',
+      displayName: 'United MileagePlus',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'United Airlines',
+      expirationMonths: null,
+      hasExpiration: false,
+      website: 'https://www.united.com/mileageplus',
+      description: 'Miles never expire. Keep account active to avoid forfeiture.'
+    },
+    {
+      name: 'delta_skymiles',
+      displayName: 'Delta SkyMiles',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'Delta Air Lines',
+      expirationMonths: null,
+      hasExpiration: false,
+      website: 'https://www.delta.com/skymiles',
+      description: 'Miles never expire due to inactivity.'
+    },
+    {
+      name: 'jetblue_trueblue',
+      displayName: 'JetBlue TrueBlue',
+      type: LoyaltyProgramType.AIRLINE,
+      company: 'JetBlue',
+      expirationMonths: null,
+      hasExpiration: false,
+      website: 'https://www.jetblue.com/trueblue',
+      description: 'Points never expire as long as your account remains open.'
+    },
+
     // Hotels (with expiration)
     {
       name: 'marriott_bonvoy',
@@ -2376,7 +2408,7 @@ The **American Express Gold Card** offers a **$7 monthly Dunkin credit** that ca
     });
   }
 
-  console.log(`✅ Seeded ${loyaltyPrograms.length} loyalty programs (only those with expiration)`);
+  console.log(`✅ Seeded ${loyaltyPrograms.length} loyalty programs`);
   console.log(`Seeding finished.`);
 }
 

@@ -1,0 +1,24 @@
+# Testing Safety Rules
+# Prevents accidental side effects on real users during local testing.
+
+when: always
+description: "CRITICAL: Never trigger endpoints that send emails, push notifications, or produce other external side effects against production data during testing. Always use the dev database or skip side-effect-producing endpoints entirely."
+
+## Forbidden During Local Testing:
+- Triggering `/api/cron/send-notifications` while connected to the production database — this sends real emails to real users via Resend
+- Any endpoint that calls `sendEmail()` against production user data
+- Any manual curl/fetch to production URLs for endpoints with side effects
+
+## Safe Testing Alternatives:
+1. **Use the dev database**: `npm run dev:devdb` — dev DB has no real users, so emails go nowhere
+2. **Test only side-effect-free endpoints**: e.g. `/api/cron/check-benefits` only writes to the DB, safe to test against production
+3. **Verify timing from code review**: If the logic is structurally identical (same query pattern, same parallelism), trust the measured timing from a safe endpoint and skip testing the dangerous one
+4. **Use mockDate parameter**: `send-notifications` supports `?mockDate=YYYY-MM-DD` in non-production mode, but this still sends emails if users match the criteria
+
+## Incident Reference:
+- March 2026: During local testing of the cron optimization, `send-notifications` was triggered against production, sending 4 real notification emails to users. The check-benefits test alone (1.2s) was sufficient to validate the performance fix — the notification test was unnecessary.
+
+## Before Triggering Any Endpoint Locally:
+1. Identify if the endpoint produces external side effects (emails, webhooks, third-party API calls)
+2. If yes: use dev DB or skip the test
+3. If no: safe to test against any database

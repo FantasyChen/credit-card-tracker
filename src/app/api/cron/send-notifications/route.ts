@@ -1,21 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
-import { BenefitStatus, User, Benefit, CreditCard, LoyaltyAccount, LoyaltyProgram } from '@/generated/prisma';
 
-// Extend Prisma types to ensure relations are included for type safety
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-interface UserWithNotificationPrefs extends User {}
-interface BenefitStatusWithDetails extends BenefitStatus {
-  benefit: Benefit & { creditCard: CreditCard };
-  user: UserWithNotificationPrefs;
-}
-interface LoyaltyAccountWithDetails extends LoyaltyAccount {
-  loyaltyProgram: LoyaltyProgram;
-}
+export const maxDuration = 10;
 
-// Shared core logic for sending notifications
-async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
+async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun = false) {
   let today = new Date();
   if (requestUrlForMockDate) {
     const { searchParams } = new URL(requestUrlForMockDate);
@@ -24,256 +13,257 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string) {
       const parsedMockDate = new Date(mockDateString);
       if (!isNaN(parsedMockDate.getTime())) {
         today = parsedMockDate;
-        console.log(`Core send-notifications logic: Using mock date: ${today.toISOString()}`);
+        console.log(`send-notifications: Using mock date: ${today.toISOString()}`);
       } else {
-        console.warn(`Core send-notifications logic: Invalid mockDate format received: ${mockDateString}. Using current date.`);
+        console.warn(`send-notifications: Invalid mockDate: ${mockDateString}`);
       }
     }
   }
 
   today.setUTCHours(0, 0, 0, 0);
-  console.log(`Core send-notifications logic started for date: ${today.toISOString()}`);
-
-  let emailsSent = 0;
-  let usersProcessed = 0;
+  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  const startMs = Date.now();
+  console.log(`🚀 send-notifications started for: ${today.toISOString()}${dryRun ? ' [DRY RUN]' : ''}`);
 
   try {
     const usersToNotify = await prisma.user.findMany({
       where: {
         AND: [
-          {
-            OR: [
-              { notifyNewBenefit: true },
-              { notifyBenefitExpiration: true },
-              { notifyPointsExpiration: true },
-            ],
-          },
-          {
-            email: { contains: '@' }
-          },
+          { OR: [{ notifyNewBenefit: true }, { notifyBenefitExpiration: true }, { notifyPointsExpiration: true }] },
+          { email: { contains: '@' } },
         ],
       },
       select: {
-        id: true,
-        email: true,
-        name: true,
-        notifyNewBenefit: true,
-        notifyBenefitExpiration: true,
-        notifyExpirationDays: true,
-        notifyPointsExpiration: true,
+        id: true, email: true, name: true,
+        notifyNewBenefit: true, notifyBenefitExpiration: true,
+        notifyExpirationDays: true, notifyPointsExpiration: true,
         pointsExpirationDays: true,
       },
     });
 
-    usersProcessed = usersToNotify.length;
-    if (usersProcessed === 0) {
-      console.log('Core logic: No users with notification preferences enabled.');
+    if (usersToNotify.length === 0) {
+      console.log('No users with notification preferences.');
       return NextResponse.json({ message: 'No users to notify.' }, { status: 200 });
     }
 
-    for (const user of usersToNotify) {
-      if (!user.email) continue; 
+    const userMap = new Map(usersToNotify.map(u => [u.id, u]));
 
-      const newBenefitCyclesToNotify: BenefitStatusWithDetails[] = [];
-      const expiringBenefitsToNotify: BenefitStatusWithDetails[] = [];
-      const expiringLoyaltyAccountsToNotify: LoyaltyAccountWithDetails[] = [];
+    const newBenefitUserIds = usersToNotify.filter(u => u.notifyNewBenefit).map(u => u.id);
+    const expirationUsers = usersToNotify.filter(u => u.notifyBenefitExpiration && u.notifyExpirationDays && u.notifyExpirationDays > 0);
+    const expirationUserIds = expirationUsers.map(u => u.id);
+    const maxExpirationDays = expirationUsers.length > 0
+      ? Math.max(...expirationUsers.map(u => u.notifyExpirationDays!))
+      : 0;
+    const loyaltyUsers = usersToNotify.filter(u => u.notifyPointsExpiration && u.pointsExpirationDays && u.pointsExpirationDays > 0);
+    const loyaltyUserIds = loyaltyUsers.map(u => u.id);
+    const maxPointsDays = loyaltyUsers.length > 0
+      ? Math.max(...loyaltyUsers.map(u => u.pointsExpirationDays!))
+      : 0;
 
-      if (user.notifyNewBenefit) {
-        const newBenefitStatuses = await prisma.benefitStatus.findMany({
-          where: {
-            userId: user.id,
-            isCompleted: false,
-            cycleStartDate: { 
-              gte: today, 
-              lt: new Date(today.getTime() + 24 * 60 * 60 * 1000) 
-            }
-          },
-          include: {
-            benefit: { include: { creditCard: true } },
-            user: true 
-          },
-        }) as BenefitStatusWithDetails[];
-        newBenefitCyclesToNotify.push(...newBenefitStatuses);
-      }
+    // 3 bulk queries instead of N×3 per-user queries
+    const maxWindow = new Date(today.getTime() + Math.max(maxExpirationDays, maxPointsDays) * 24 * 60 * 60 * 1000);
+    maxWindow.setUTCHours(23, 59, 59, 999);
 
-      if (user.notifyBenefitExpiration && user.notifyExpirationDays && user.notifyExpirationDays > 0) {
-        const reminderDate = new Date(today);
-        reminderDate.setDate(today.getDate() + user.notifyExpirationDays);
-        const reminderDateStart = new Date(reminderDate);
-        reminderDateStart.setUTCHours(0,0,0,0);
-        const reminderDateEnd = new Date(reminderDate);
-        reminderDateEnd.setUTCHours(23,59,59,999);
+    const [newStatuses, expiringStatuses, expiringLoyalty] = await Promise.all([
+      newBenefitUserIds.length > 0
+        ? prisma.benefitStatus.findMany({
+            where: {
+              userId: { in: newBenefitUserIds },
+              isCompleted: false,
+              cycleStartDate: { gte: today, lt: tomorrow },
+            },
+            include: { benefit: { include: { creditCard: true } }, user: true },
+          })
+        : Promise.resolve([]),
 
-        const expiringStatuses = await prisma.benefitStatus.findMany({
-          where: {
-            userId: user.id,
-            isCompleted: false,
-            cycleEndDate: { 
-              gte: reminderDateStart, 
-              lte: reminderDateEnd
-            }
-          },
-          include: {
-            benefit: { include: { creditCard: true } },
-            user: true
-          },
-        }) as BenefitStatusWithDetails[];
-        expiringBenefitsToNotify.push(...expiringStatuses);
-      }
+      expirationUserIds.length > 0 && maxExpirationDays > 0
+        ? prisma.benefitStatus.findMany({
+            where: {
+              userId: { in: expirationUserIds },
+              isCompleted: false,
+              cycleEndDate: { gte: today, lte: maxWindow },
+            },
+            include: { benefit: { include: { creditCard: true } }, user: true },
+          })
+        : Promise.resolve([]),
 
-      // Check for expiring loyalty program points
-      if (user.notifyPointsExpiration && user.pointsExpirationDays && user.pointsExpirationDays > 0) {
-        const loyaltyReminderDate = new Date(today);
-        loyaltyReminderDate.setDate(today.getDate() + user.pointsExpirationDays);
-        const loyaltyReminderDateStart = new Date(loyaltyReminderDate);
-        loyaltyReminderDateStart.setUTCHours(0,0,0,0);
-        const loyaltyReminderDateEnd = new Date(loyaltyReminderDate);
-        loyaltyReminderDateEnd.setUTCHours(23,59,59,999);
+      loyaltyUserIds.length > 0 && maxPointsDays > 0
+        ? prisma.loyaltyAccount.findMany({
+            where: {
+              userId: { in: loyaltyUserIds },
+              isActive: true,
+              expirationDate: { not: null, gte: today, lte: maxWindow },
+            },
+            include: { loyaltyProgram: true },
+          })
+        : Promise.resolve([]),
+    ]);
 
-        const expiringLoyaltyAccounts = await prisma.loyaltyAccount.findMany({
-          where: {
-            userId: user.id,
-            isActive: true,
-            expirationDate: {
-              not: null, // Only accounts with expiration dates
-              gte: loyaltyReminderDateStart,
-              lte: loyaltyReminderDateEnd
-            }
-          },
-          include: {
-            loyaltyProgram: true
-          },
-        }) as LoyaltyAccountWithDetails[];
-        expiringLoyaltyAccountsToNotify.push(...expiringLoyaltyAccounts);
-      }
+    const fetchMs = Date.now() - startMs;
+    console.log(`📊 Fetched ${newStatuses.length} new, ${expiringStatuses.length} expiring, ${expiringLoyalty.length} loyalty in ${fetchMs}ms`);
 
-      if (newBenefitCyclesToNotify.length > 0) {
-        const subject = "Your New Benefit Cycles Have Started!";
-        const benefitsListHtml = newBenefitCyclesToNotify.map(status => 
-          `<li>
-             <strong>${status.benefit.description}</strong> on your ${status.benefit.creditCard.name} card.
-             Cycle: ${status.cycleStartDate.toLocaleDateString('en-US', { timeZone: 'UTC' })} - ${status.cycleEndDate.toLocaleDateString('en-US', { timeZone: 'UTC' })}.
-           </li>`
-        ).join('');
+    // Group new statuses by user
+    const newByUser = new Map<string, typeof newStatuses>();
+    for (const s of newStatuses) {
+      const list = newByUser.get(s.userId) || [];
+      list.push(s);
+      newByUser.set(s.userId, list);
+    }
 
-        const htmlBody = `
-          <h1>New Benefit Cycles!</h1>
-          <p>Hi ${user.name || 'there'},</p>
-          <p>The following new benefit cycles have started for you:</p>
-          <ul>${benefitsListHtml}</ul>
-          <p>Make sure to use them!</p>
-          <a href="${process.env.NEXTAUTH_URL}/benefits">View Your Benefits</a>
-        `;
-        const success = await sendEmail({ to: user.email, subject, html: htmlBody });
-        if (success) {
-          emailsSent++;
-        } else {
-          console.warn(`Failed to send '${subject}' email to ${user.email}. sendEmail returned false.`);
-        }
-      }
-
-      if (expiringBenefitsToNotify.length > 0) {
-        const subject = "Benefit Expiration Reminders";
-        const benefitsListHtml = expiringBenefitsToNotify.map(status => 
-          `<li>
-             <strong>${status.benefit.description}</strong> on your ${status.benefit.creditCard.name} card,
-             expiring on ${status.cycleEndDate.toLocaleDateString('en-US', { timeZone: 'UTC' })} (in ${user.notifyExpirationDays} day(s)).
-           </li>`
-        ).join('');
-        
-        const htmlBody = `
-          <h1>Benefits Expiring Soon!</h1>
-          <p>Hi ${user.name || 'there'},</p>
-          <p>The following benefits are expiring soon for you:</p>
-          <ul>${benefitsListHtml}</ul>
-          <p>Don\'t miss out!</p>
-          <a href="${process.env.NEXTAUTH_URL}/benefits">View Your Benefits</a>
-        `;
-        const success = await sendEmail({ to: user.email, subject, html: htmlBody });
-        if (success) {
-          emailsSent++;
-        } else {
-          console.warn(`Failed to send '${subject}' email to ${user.email}. sendEmail returned false.`);
-        }
-      }
-
-      if (expiringLoyaltyAccountsToNotify.length > 0) {
-        const subject = "Loyalty Points Expiring Soon!";
-        const loyaltyListHtml = expiringLoyaltyAccountsToNotify.map(account => {
-          const expirationDateStr = account.expirationDate 
-            ? account.expirationDate.toLocaleDateString('en-US', { timeZone: 'UTC' })
-            : 'Unknown';
-          return `<li>
-             <strong>${account.loyaltyProgram.displayName}</strong> points
-             expiring on ${expirationDateStr} (in ${user.pointsExpirationDays} day(s)).
-             ${account.accountNumber ? `Account: ${account.accountNumber}` : ''}
-           </li>`;
-        }).join('');
-        
-        const htmlBody = `
-          <h1>Loyalty Points Expiring Soon!</h1>
-          <p>Hi ${user.name || 'there'},</p>
-          <p>The following loyalty program points are expiring soon:</p>
-          <ul>${loyaltyListHtml}</ul>
-          <p>Consider earning or redeeming points to prevent expiration!</p>
-          <a href="${process.env.NEXTAUTH_URL}/loyalty">Manage Your Loyalty Accounts</a>
-        `;
-        const success = await sendEmail({ to: user.email, subject, html: htmlBody });
-        if (success) {
-          emailsSent++;
-        } else {
-          console.warn(`Failed to send '${subject}' email to ${user.email}. sendEmail returned false.`);
-        }
+    // Filter expiring statuses per-user (each user has their own expirationDays)
+    const expiringByUser = new Map<string, typeof expiringStatuses>();
+    for (const s of expiringStatuses) {
+      const user = userMap.get(s.userId);
+      if (!user?.notifyExpirationDays) continue;
+      const reminderDate = new Date(today);
+      reminderDate.setDate(today.getDate() + user.notifyExpirationDays);
+      const dayStart = new Date(Date.UTC(reminderDate.getUTCFullYear(), reminderDate.getUTCMonth(), reminderDate.getUTCDate(), 0, 0, 0, 0));
+      const dayEnd = new Date(Date.UTC(reminderDate.getUTCFullYear(), reminderDate.getUTCMonth(), reminderDate.getUTCDate(), 23, 59, 59, 999));
+      if (s.cycleEndDate >= dayStart && s.cycleEndDate <= dayEnd) {
+        const list = expiringByUser.get(s.userId) || [];
+        list.push(s);
+        expiringByUser.set(s.userId, list);
       }
     }
 
-    console.log(`Core logic: Processed ${usersProcessed} users. Sent ${emailsSent} emails.`);
-    return NextResponse.json({ message: 'Notification cron job executed.', usersProcessed, emailsSent }, { status: 200 });
+    // Filter loyalty accounts per-user (each user has their own pointsExpirationDays)
+    const loyaltyByUser = new Map<string, typeof expiringLoyalty>();
+    for (const a of expiringLoyalty) {
+      const user = userMap.get(a.userId);
+      if (!user?.pointsExpirationDays || !a.expirationDate) continue;
+      const reminderDate = new Date(today);
+      reminderDate.setDate(today.getDate() + user.pointsExpirationDays);
+      const dayStart = new Date(Date.UTC(reminderDate.getUTCFullYear(), reminderDate.getUTCMonth(), reminderDate.getUTCDate(), 0, 0, 0, 0));
+      const dayEnd = new Date(Date.UTC(reminderDate.getUTCFullYear(), reminderDate.getUTCMonth(), reminderDate.getUTCDate(), 23, 59, 59, 999));
+      if (a.expirationDate >= dayStart && a.expirationDate <= dayEnd) {
+        const list = loyaltyByUser.get(a.userId) || [];
+        list.push(a);
+        loyaltyByUser.set(a.userId, list);
+      }
+    }
 
+    // Build all email tasks, then send in parallel
+    const emailTasks: { to: string; subject: string; html: string }[] = [];
+    const baseUrl = process.env.NEXTAUTH_URL || '';
+
+    for (const user of usersToNotify) {
+      if (!user.email) continue;
+
+      const newBenefits = newByUser.get(user.id);
+      if (newBenefits && newBenefits.length > 0) {
+        const benefitsHtml = newBenefits.map(s =>
+          `<li><strong>${s.benefit.description}</strong> on your ${s.benefit.creditCard?.name ?? 'card'}. Cycle: ${fmtDate(s.cycleStartDate)} - ${fmtDate(s.cycleEndDate)}.</li>`
+        ).join('');
+        emailTasks.push({
+          to: user.email,
+          subject: 'Your New Benefit Cycles Have Started!',
+          html: `<h1>New Benefit Cycles!</h1><p>Hi ${user.name || 'there'},</p><p>The following new benefit cycles have started for you:</p><ul>${benefitsHtml}</ul><p>Make sure to use them!</p><a href="${baseUrl}/benefits">View Your Benefits</a>`,
+        });
+      }
+
+      const expiring = expiringByUser.get(user.id);
+      if (expiring && expiring.length > 0) {
+        const benefitsHtml = expiring.map(s =>
+          `<li><strong>${s.benefit.description}</strong> on your ${s.benefit.creditCard?.name ?? 'card'}, expiring on ${fmtDate(s.cycleEndDate)} (in ${user.notifyExpirationDays} day(s)).</li>`
+        ).join('');
+        emailTasks.push({
+          to: user.email,
+          subject: 'Benefit Expiration Reminders',
+          html: `<h1>Benefits Expiring Soon!</h1><p>Hi ${user.name || 'there'},</p><p>The following benefits are expiring soon for you:</p><ul>${benefitsHtml}</ul><p>Don't miss out!</p><a href="${baseUrl}/benefits">View Your Benefits</a>`,
+        });
+      }
+
+      const loyalty = loyaltyByUser.get(user.id);
+      if (loyalty && loyalty.length > 0) {
+        const loyaltyHtml = loyalty.map(a => {
+          const expDate = a.expirationDate ? fmtDate(a.expirationDate) : 'Unknown';
+          return `<li><strong>${a.loyaltyProgram.displayName}</strong> points expiring on ${expDate} (in ${user.pointsExpirationDays} day(s)).${a.accountNumber ? ` Account: ${a.accountNumber}` : ''}</li>`;
+        }).join('');
+        emailTasks.push({
+          to: user.email,
+          subject: 'Loyalty Points Expiring Soon!',
+          html: `<h1>Loyalty Points Expiring Soon!</h1><p>Hi ${user.name || 'there'},</p><p>The following loyalty program points are expiring soon:</p><ul>${loyaltyHtml}</ul><p>Consider earning or redeeming points to prevent expiration!</p><a href="${baseUrl}/loyalty">Manage Your Loyalty Accounts</a>`,
+        });
+      }
+    }
+
+    // Send all emails in parallel (batch of 10 to avoid rate limits)
+    let emailsSent = 0;
+
+    if (dryRun) {
+      console.log(`🔍 [DRY RUN] Would send ${emailTasks.length} emails — skipping`);
+      for (const task of emailTasks) {
+        console.log(`  📧 → ${task.to}: ${task.subject}`);
+      }
+      emailsSent = emailTasks.length;
+    } else {
+      const BATCH = 10;
+      for (let i = 0; i < emailTasks.length; i += BATCH) {
+        const batch = emailTasks.slice(i, i + BATCH);
+        const results = await Promise.allSettled(
+          batch.map(task => sendEmail({ to: task.to, subject: task.subject, html: task.html }))
+        );
+        emailsSent += results.filter(r => r.status === 'fulfilled' && r.value).length;
+      }
+    }
+
+    const totalMs = Date.now() - startMs;
+    console.log(`✅ Done in ${totalMs}ms: ${usersToNotify.length} users, ${emailsSent}/${emailTasks.length} emails sent`);
+
+    return NextResponse.json({
+      message: dryRun ? 'Notification dry run completed.' : 'Notification cron job executed.',
+      dryRun,
+      usersProcessed: usersToNotify.length,
+      emailsSent,
+      emailsAttempted: emailTasks.length,
+      durationMs: totalMs,
+    }, { status: 200 });
   } catch (error) {
-    console.error('Core send-notifications logic failed:', error);
-    return NextResponse.json({ message: 'Error executing cron job.' }, { status: 500 });
+    const totalMs = Date.now() - startMs;
+    console.error(`💥 send-notifications failed after ${totalMs}ms:`, error);
+    return NextResponse.json({ message: 'Error executing cron job.', durationMs: totalMs }, { status: 500 });
   }
 }
 
-// GET handler for Vercel Cron (defaults to GET)
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString('en-US', { timeZone: 'UTC' });
+}
+
+function parseDryRun(request: Request): boolean {
+  const { searchParams } = new URL(request.url);
+  return searchParams.get('dryRun') === 'true';
+}
+
 export async function GET(request: Request) {
   const authorizationHeader = request.headers.get('authorization');
   const expectedSecret = process.env.CRON_SECRET;
 
-  console.log(`send-notifications GET: Received authorization header: "${authorizationHeader}"`);
-  console.log(`send-notifications GET: Expected CRON_SECRET from env: "${expectedSecret}"`);
-
   if (!expectedSecret) {
-    console.error('CRON_SECRET is not set for GET handler.');
+    console.error('CRON_SECRET is not set.');
     return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
   }
 
   if (authorizationHeader !== `Bearer ${expectedSecret}`) {
-    console.warn('Unauthorized GET cron job attempt for send-notifications.');
+    console.warn('Unauthorized cron attempt for send-notifications.');
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
-  console.log("Authorized GET request for send-notifications. Running core logic...");
-  return await runSendNotificationsLogic(request.url); // Pass request.url for mockDate handling
+
+  return await runSendNotificationsLogic(request.url, parseDryRun(request));
 }
 
-// POST handler for manual trigger or other services
 export async function POST(request: Request) {
   const authorizationHeader = request.headers.get('authorization');
   const expectedSecret = process.env.CRON_SECRET;
 
-  console.log(`send-notifications POST: Received authorization header: "${authorizationHeader}"`);
-  console.log(`send-notifications POST: Expected CRON_SECRET from env: "${expectedSecret}"`);
-
   if (!expectedSecret) {
-    console.error('CRON_SECRET is not set for POST handler.');
+    console.error('CRON_SECRET is not set.');
     return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
   }
 
   if (authorizationHeader !== `Bearer ${expectedSecret}`) {
-    console.warn('Unauthorized POST cron job attempt for send-notifications.');
+    console.warn('Unauthorized cron attempt for send-notifications.');
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
-  console.log("Authorized POST request for send-notifications. Running core logic...");
-  return await runSendNotificationsLogic(request.url); // Pass request.url for mockDate handling
+
+  return await runSendNotificationsLogic(request.url, parseDryRun(request));
 }
