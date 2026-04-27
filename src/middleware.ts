@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const LOYALTY_SUBDOMAINS = ['loyalty'];
+const OLD_DOMAIN = 'coupon-cycle.site';
+const NEW_DOMAIN = 'perks-reminder.com';
 
 function getSubdomain(hostname: string): string | null {
   const parts = hostname.split('.');
   // localhost:3000 → no subdomain
   if (parts.length <= 2 && !hostname.includes('localhost')) return null;
-  // loyalty.coupon-cycle.site → "loyalty"
+  // loyalty.perks-reminder.com → "loyalty"
   if (parts.length >= 3) return parts[0];
   // loyalty.localhost → "loyalty" (dev)
   if (hostname.includes('localhost') && parts.length >= 2 && parts[0] !== 'localhost') {
@@ -20,6 +22,23 @@ export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const subdomain = getSubdomain(hostname);
   const { pathname } = request.nextUrl;
+  const hostnameWithoutPort = hostname.split(':')[0];
+
+  if (hostnameWithoutPort === OLD_DOMAIN || hostnameWithoutPort === `www.${OLD_DOMAIN}`) {
+    const url = request.nextUrl.clone();
+    url.protocol = 'https';
+    url.hostname = `www.${NEW_DOMAIN}`;
+    url.port = '';
+    return NextResponse.redirect(url, 308);
+  }
+
+  if (hostnameWithoutPort === `loyalty.${OLD_DOMAIN}`) {
+    const url = request.nextUrl.clone();
+    url.protocol = 'https';
+    url.hostname = `loyalty.${NEW_DOMAIN}`;
+    url.port = '';
+    return NextResponse.redirect(url, 308);
+  }
 
   if (subdomain && LOYALTY_SUBDOMAINS.includes(subdomain)) {
     // Redirect auth pages to main domain so OAuth uses registered callback URLs

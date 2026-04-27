@@ -15,7 +15,7 @@ function getSwitchUrl(isLoyaltyContext: boolean): string {
   const isLocalhost = host.includes('localhost');
   return isLocalhost
     ? `${proto}//${host.replace(/^loyalty\./, '')}${port ? `:${port}` : ''}`
-    : 'https://www.coupon-cycle.site';
+    : `${proto}//${host.replace(/^loyalty\./, 'www.')}`;
 }
 
 const Footer = () => {
@@ -44,8 +44,8 @@ const Footer = () => {
       { name: 'Terms of Service', href: '/terms' },
     ],
     community: [
-      { name: 'GitHub', href: 'https://github.com/FantasyChen/credit-card-tracker', external: true },
-      { name: 'Report an Issue', href: 'https://github.com/FantasyChen/credit-card-tracker/issues', external: true },
+      { name: 'GitHub', href: 'https://github.com/lifan-builds/perks-reminder', external: true },
+      { name: 'Report an Issue', href: 'https://github.com/lifan-builds/perks-reminder/issues', external: true },
       { name: 'Contact', href: '/contact' },
     ],
   };
@@ -163,7 +163,7 @@ const Footer = () => {
             <div className="flex items-center gap-2">
               <span className="text-xl">💳</span>
               <span className="text-sm text-gray-500 dark:text-gray-400">
-                &copy; {currentYear} CouponCycle. All rights reserved.
+                &copy; {currentYear} Perks Reminder. All rights reserved.
               </span>
             </div>
 

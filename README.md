@@ -1,23 +1,23 @@
-# CouponCycle 💳
+# Perks Reminder 💳
 
 **Stop losing hundreds of dollars in credit card benefits every year.**
 
-CouponCycle is a free, open-source tool that tracks your credit card perks and ensures you never miss valuable benefits again. Track, optimize, and maximize your credit card rewards like a pro.
+Perks Reminder is a free, open-source tool that tracks your credit card perks and ensures you never miss valuable benefits again. Track, optimize, and maximize your credit card rewards like a pro.
 
-[![CouponCycle Hero](public/hero-image.jpg)](https://www.coupon-cycle.site/)
+[![Perks Reminder Hero](public/hero-image.jpg)](https://www.perks-reminder.com/)
 
 ## 🚀 Try It Now
 
-**[Launch CouponCycle →](https://www.coupon-cycle.site/)**
+**[Launch Perks Reminder →](https://www.perks-reminder.com/)**
 
 ### 📱 Install on Your Phone
 This is a Progressive Web App (PWA) - install it for a native app experience:
 - **iPhone/iPad:** Open in Safari → Share → "Add to Home Screen"
 - **Android:** Open in Chrome → Menu (⋮) → "Install app"
 
-## ✨ Why CouponCycle?
+## ✨ Why Perks Reminder?
 
-Credit card users lose an average of **$300-600 annually** by forgetting to use benefits that expire. CouponCycle solves this with:
+Credit card users lose an average of **$300-600 annually** by forgetting to use benefits that expire. Perks Reminder solves this with:
 
 - **🔔 Smart Notifications** - Get reminders before benefits expire
 - **📊 ROI Tracking** - See if your annual fees are worth it
@@ -59,8 +59,8 @@ Credit card benefits change frequently. **Help keep our data current!**
 
 ### Quick Start
 ```bash
-git clone https://github.com/FantasyChen/credit-card-tracker.git
-cd credit-card-tracker
+git clone https://github.com/lifan-builds/perks-reminder.git
+cd perks-reminder
 npm install
 npx prisma migrate dev
 npm run dev
@@ -84,7 +84,7 @@ npm test   # Jest: unit, API routes, server actions, component tests
 
 ### Database Environments (Dev + Prod)
 
-CouponCycle uses Neon PostgreSQL with two URLs:
+Perks Reminder uses Neon PostgreSQL with two URLs:
 
 - `DATABASE_URL` = production (Neon main branch)
 - `DATABASE_URL_DEV` = development branch (safe for testing migrations)
@@ -115,11 +115,11 @@ See our **[Contributing Guide](CONTRIBUTING.md)** for complete development setup
 
 ## 🏠 Self-Hosting
 
-Want complete control over your data? Self-hosting CouponCycle gives you full ownership of your credit card tracking.
+Want complete control over your data? Self-hosting Perks Reminder gives you full ownership of your credit card tracking.
 
 ```bash
-git clone https://github.com/FantasyChen/credit-card-tracker.git
-cd credit-card-tracker
+git clone https://github.com/lifan-builds/perks-reminder.git
+cd perks-reminder
 npm install
 npx prisma migrate deploy
 npm run build
@@ -141,11 +141,11 @@ npm start
 - [ ] **Advanced Analytics** - Detailed spending and benefit reports
 - [ ] **Multi-User Support** - Household account management
 
-Have ideas? [Open an issue](https://github.com/FantasyChen/credit-card-tracker/issues) and let's discuss!
+Have ideas? [Open an issue](https://github.com/lifan-builds/perks-reminder/issues) and let's discuss!
 
 ## 💖 Support the Project
 
-CouponCycle is **completely free** with no ads or hidden costs. If it saves you money, consider:
+Perks Reminder is **completely free** with no ads or hidden costs. If it saves you money, consider:
 
 - ⭐ **Starring the repo** - Helps others discover the project
 - 🐛 **Reporting issues** - Makes the tool better for everyone  
@@ -161,4 +161,4 @@ CouponCycle is **completely free** with no ads or hidden costs. If it saves you 
 
 ---
 
-**Built by [@fantasy_c](https://github.com/FantasyChen)** • **[Live App](https://www.coupon-cycle.site/)** • **[Issues](https://github.com/FantasyChen/credit-card-tracker/issues)** • **[Discussions](https://github.com/FantasyChen/credit-card-tracker/discussions)**
+**Built by [@fantasy_c](https://github.com/lifan-builds)** • **[Live App](https://www.perks-reminder.com/)** • **[Issues](https://github.com/lifan-builds/perks-reminder/issues)** • **[Discussions](https://github.com/lifan-builds/perks-reminder/discussions)**

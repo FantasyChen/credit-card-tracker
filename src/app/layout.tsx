@@ -10,6 +10,8 @@ import { Analytics } from '@vercel/analytics/next';
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { ErrorBoundary } from "@/lib/monitoring/errorBoundary";
+import { PRIMARY_SITE_URL, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
+import DomainMigrationBanner from "@/components/DomainMigrationBanner";
 // import { ThemeProviders } from "@/components/ThemeProviders"; // Removed
 // import { ensureCurrentBenefitStatuses } from "@/lib/actions/benefitActions"; // Keep import commented out or remove
 
@@ -18,10 +20,10 @@ const geistMono = GeistMono;
 
 export const metadata: Metadata = {
   title: {
-    default: "CouponCycle - Credit Card Benefits Tracker | Never Miss Rewards Again",
-    template: "%s | CouponCycle"
+    default: `${SITE_NAME} - Credit Card Benefits Tracker | Never Miss Rewards Again`,
+    template: `%s | ${SITE_NAME}`
   },
-  description: "Track credit card benefits, maximize rewards, and never miss expiring perks again. Free tool for Chase, Amex, Capital One, and 50+ premium cards. Get ROI insights and smart notifications.",
+  description: `${SITE_DESCRIPTION} Free tool for Chase, Amex, Capital One, and 50+ premium cards. Get ROI insights and smart notifications.`,
   keywords: [
     "credit card benefits tracker",
     "credit card rewards tracker", 
@@ -38,24 +40,24 @@ export const metadata: Metadata = {
     "credit card benefit calendar",
     "premium credit card tracker"
   ],
-  authors: [{ name: "CouponCycle Team" }],
-  creator: "CouponCycle",
-  publisher: "CouponCycle",
+  authors: [{ name: `${SITE_NAME} Team` }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   formatDetection: {
     telephone: false,
   },
-  metadataBase: new URL('https://www.coupon-cycle.site'),
+  metadataBase: new URL(PRIMARY_SITE_URL),
   openGraph: {
-    title: "CouponCycle - Credit Card Benefits Tracker",
+    title: `${SITE_NAME} - Credit Card Benefits Tracker`,
     description: "Never miss a credit card benefit again. Track every perk and maximize your annual fees.",
-    url: 'https://www.coupon-cycle.site',
-    siteName: 'CouponCycle',
+    url: PRIMARY_SITE_URL,
+    siteName: SITE_NAME,
     images: [
       {
         url: '/hero-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'CouponCycle - Credit Card Benefits Tracker',
+        alt: `${SITE_NAME} - Credit Card Benefits Tracker`,
       },
     ],
     locale: 'en_US',
@@ -63,7 +65,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: "CouponCycle - Credit Card Benefits Tracker",
+    title: `${SITE_NAME} - Credit Card Benefits Tracker`,
     description: "Never miss a credit card benefit again. Track every perk and maximize your annual fees.",
     images: ['/hero-image.jpg'],
     creator: '@fantasy_c',
@@ -93,7 +95,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "CouponCycle",
+    title: SITE_NAME,
   },
 };
 
@@ -121,8 +123,8 @@ export default async function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="CouponCycle" />
-        <meta name="application-name" content="CouponCycle" />
+        <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
+        <meta name="application-name" content={SITE_NAME} />
         <meta name="msapplication-TileColor" content="#3b82f6" />
         <meta name="msapplication-tap-highlight" content="no" />
         <link rel="apple-touch-icon" href="/favicon.png" />
@@ -165,6 +167,7 @@ export default async function RootLayout({
             <SkipLink />
             <div className="flex min-h-full flex-col bg-gray-50 dark:bg-gray-950">
               <Navbar />
+              <DomainMigrationBanner />
               <main 
                 id="main-content" 
                 className="container mx-auto flex-grow px-4 py-8"

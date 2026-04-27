@@ -13,7 +13,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Settings - Manage Your Preferences",
-  description: "Manage your CouponCycle account settings, notification preferences, and data.",
+  description: "Manage your Perks Reminder account settings, notification preferences, and data.",
   alternates: {
     canonical: '/settings',
   },
@@ -197,4 +197,3 @@ export default async function SettingsPage() {
     </div>
   );
 }
-

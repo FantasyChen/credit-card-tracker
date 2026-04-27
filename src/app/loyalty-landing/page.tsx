@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { SITE_NAME } from '@/lib/site';
 
 /** Build sign-in/sign-up callback URL so users stay on loyalty subdomain after login. */
 function getLoyaltyCallbackUrl(): string | null {
@@ -14,7 +15,7 @@ function getLoyaltyCallbackUrl(): string | null {
 }
 
 export const metadata: Metadata = {
-  title: 'CouponCycle Loyalty - Never Let Points Expire Again',
+  title: `${SITE_NAME} Loyalty - Never Let Points Expire Again`,
   description:
     'Track airline miles, hotel points, and loyalty program expirations. Get alerts before your points expire. Free, private, no bank access required.',
   keywords: [
@@ -54,7 +55,7 @@ export default async function LoyaltyLandingPage() {
               Stop Losing Points &amp; Miles to Expiration
             </h1>
             <p className="mb-6 max-w-2xl font-light text-gray-500 dark:text-gray-300 md:text-lg lg:mb-8 lg:text-xl">
-              Airlines, hotels, and loyalty programs quietly expire your hard-earned points. CouponCycle tracks every program, sends timely alerts, and helps you keep your rewards alive.
+              Airlines, hotels, and loyalty programs quietly expire your hard-earned points. {SITE_NAME} tracks every program, sends timely alerts, and helps you keep your rewards alive.
             </p>
             <div className="flex flex-col gap-4 sm:flex-row">
               <Link
@@ -287,7 +288,7 @@ export default async function LoyaltyLandingPage() {
             Start Protecting Your Points Today
           </h2>
           <p className="mx-auto mb-8 max-w-xl text-purple-100">
-            Join CouponCycle and never lose another mile or point to expiration. It&apos;s free forever.
+            Join {SITE_NAME} and never lose another mile or point to expiration. It&apos;s free forever.
           </p>
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
@@ -310,7 +311,7 @@ export default async function LoyaltyLandingPage() {
       <section className="border-t border-gray-200 bg-gray-50 py-12 dark:border-gray-700 dark:bg-gray-900">
         <div className="container mx-auto max-w-screen-xl px-4 text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            CouponCycle also helps you{' '}
+            {SITE_NAME} also helps you{' '}
             <Link
               href="/"
               className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"

@@ -66,7 +66,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return {
-    title: `${usageWay.title} | CouponCycle`,
+    title: `${usageWay.title} | Perks Reminder`,
     description: usageWay.description || `Learn how to maximize your credit card benefits with our comprehensive guide: ${usageWay.title}`,
     keywords: [
       usageWay.title,
@@ -401,4 +401,3 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
     </div>
   );
 }
-

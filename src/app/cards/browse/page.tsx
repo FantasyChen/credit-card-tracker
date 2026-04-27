@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { prisma } from '@/lib/prisma';
 
 export const metadata: Metadata = {
-  title: 'Browse Credit Cards | CouponCycle',
+  title: 'Browse Credit Cards | Perks Reminder',
   description: 'Browse our complete catalog of 50+ credit cards with trackable benefits. Find cards from Chase, American Express, Capital One, Citi, and more.',
   keywords: [
     'credit cards',
@@ -201,4 +201,3 @@ export default async function BrowseCardsPage() {
     </div>
   );
 }
-

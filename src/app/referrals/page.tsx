@@ -4,8 +4,8 @@ import Image from 'next/image';
 import { prisma } from '@/lib/prisma';
 
 export const metadata: Metadata = {
-  title: 'Credit Card Referral Links | CouponCycle',
-  description: 'Support CouponCycle by using our referral links when applying for credit cards. Same great bonuses, and you help keep our free service running.',
+  title: 'Credit Card Referral Links | Perks Reminder',
+  description: 'Support Perks Reminder by using our referral links when applying for credit cards. Same great bonuses, and you help keep our free service running.',
   keywords: [
     'credit card referral',
     'credit card application',
@@ -98,7 +98,7 @@ export default async function ReferralsPage() {
           Credit Card Referral Links
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-          Support CouponCycle by using our referral links when applying for credit cards. 
+          Support Perks Reminder by using our referral links when applying for credit cards. 
           You get the same great welcome bonuses, and you help keep our free service running.
         </p>
       </div>
@@ -128,7 +128,7 @@ export default async function ReferralsPage() {
             </div>
             <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Support Free Tools</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Helps us maintain and improve CouponCycle for everyone
+              Helps us maintain and improve Perks Reminder for everyone
             </p>
           </div>
           <div className="text-center">
@@ -231,7 +231,7 @@ export default async function ReferralsPage() {
           Affiliate Disclosure
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          CouponCycle may receive compensation when you apply for credit cards through our referral links. 
+          Perks Reminder may receive compensation when you apply for credit cards through our referral links. 
           This helps support our free service. All opinions and recommendations are our own, and we only 
           recommend cards we believe provide genuine value. Your approval is not guaranteed and depends 
           on your creditworthiness.
@@ -241,7 +241,7 @@ export default async function ReferralsPage() {
       {/* Other Ways to Support */}
       <div className="mt-8 text-center">
         <p className="text-gray-600 dark:text-gray-400 mb-4">
-          Want to support CouponCycle in other ways?
+          Want to support Perks Reminder in other ways?
         </p>
         <a
           href="https://coff.ee/fantasy_c"
@@ -258,7 +258,6 @@ export default async function ReferralsPage() {
     </div>
   );
 }
-
 
 
 

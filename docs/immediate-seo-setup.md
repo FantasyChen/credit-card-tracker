@@ -2,7 +2,7 @@
 
 ## 🚀 Week 1 Action Items
 
-This guide will walk you through setting up the essential SEO tools and monitoring systems for CouponCycle.
+This guide will walk you through setting up the essential SEO tools and monitoring systems for Perks Reminder.
 
 ---
 
@@ -12,7 +12,7 @@ This guide will walk you through setting up the essential SEO tools and monitori
 1. Go to [Google Search Console](https://search.google.com/search-console/)
 2. Sign in with your Google account
 3. Click "Add Property"
-4. Choose "URL prefix" and enter: `https://www.coupon-cycle.site`
+4. Choose "URL prefix" and enter: `https://www.perks-reminder.com`
 
 ### Step 2: Verify Domain Ownership
 Choose one of these verification methods:
@@ -28,17 +28,17 @@ Choose one of these verification methods:
 #### Option B: HTML File Upload
 1. Download the verification HTML file from Google
 2. Upload it to your `/public` directory
-3. Access the file at `https://www.coupon-cycle.site/google123abc.html`
+3. Access the file at `https://www.perks-reminder.com/google123abc.html`
 
 ### Step 3: Submit Sitemap
 1. In Search Console, go to "Sitemaps" in the left sidebar
 2. Enter: `sitemap.xml`
 3. Click "Submit"
-4. Your sitemap will be available at: `https://www.coupon-cycle.site/sitemap.xml`
+4. Your sitemap will be available at: `https://www.perks-reminder.com/sitemap.xml`
 
 ### Step 4: Request Indexing
 1. Go to "URL Inspection" tool
-2. Enter your homepage URL: `https://www.coupon-cycle.site/`
+2. Enter your homepage URL: `https://www.perks-reminder.com/`
 3. Click "Request Indexing"
 4. Repeat for `/guide` page
 
@@ -49,8 +49,8 @@ Choose one of these verification methods:
 ### Step 1: Create Google Analytics Account
 1. Go to [Google Analytics](https://analytics.google.com/)
 2. Click "Start measuring"
-3. Create an account named "CouponCycle"
-4. Create a property with website URL: `https://www.coupon-cycle.site`
+3. Create an account named "Perks Reminder"
+4. Create a property with website URL: `https://www.perks-reminder.com`
 
 ### Step 2: Get Tracking ID
 1. Go to "Admin" → "Data Streams"
@@ -117,8 +117,8 @@ Monitor rankings for:
 
 ### Step 1: Google Mobile-Friendly Test
 1. Go to [Google Mobile-Friendly Test](https://search.google.com/test/mobile-friendly)
-2. Test your homepage: `https://www.coupon-cycle.site`
-3. Test your guide page: `https://www.coupon-cycle.site/guide`
+2. Test your homepage: `https://www.perks-reminder.com`
+3. Test your guide page: `https://www.perks-reminder.com/guide`
 
 ### Step 2: Google PageSpeed Insights
 1. Go to [PageSpeed Insights](https://pagespeed.web.dev/)

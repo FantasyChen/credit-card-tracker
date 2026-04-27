@@ -5,6 +5,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
+import { getSharedCookieDomain } from './site';
 
 declare module "next-auth" {
   interface Session {
@@ -20,6 +21,8 @@ declare module "next-auth/jwt" {
     id: string;
   }
 }
+
+const sharedCookieDomain = getSharedCookieDomain(process.env.NEXTAUTH_URL);
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -83,7 +86,7 @@ export const authOptions: NextAuthOptions = {
   // Share session cookie across subdomains (www, loyalty, apex) in production
   cookies:
     process.env.NODE_ENV === 'production' &&
-    process.env.NEXTAUTH_URL?.includes('coupon-cycle.site')
+    sharedCookieDomain
       ? {
           sessionToken: {
             name: `__Secure-next-auth.session-token`,
@@ -92,7 +95,7 @@ export const authOptions: NextAuthOptions = {
               sameSite: 'lax',
               path: '/',
               secure: true,
-              domain: '.coupon-cycle.site',
+              domain: sharedCookieDomain,
             },
           },
           callbackUrl: {
@@ -101,7 +104,7 @@ export const authOptions: NextAuthOptions = {
               sameSite: 'lax',
               path: '/',
               secure: true,
-              domain: '.coupon-cycle.site',
+              domain: sharedCookieDomain,
             },
           },
         }

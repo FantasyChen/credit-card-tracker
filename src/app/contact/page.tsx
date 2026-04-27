@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: "Contact Us",
-  description: "Get in touch with the CouponCycle team. Send us your feedback, feature requests, or questions about tracking your credit card benefits.",
+  description: "Get in touch with the Perks Reminder team. Send us your feedback, feature requests, or questions about tracking your credit card benefits.",
   alternates: {
     canonical: '/contact',
   },
@@ -28,7 +28,7 @@ export default function ContactPage() {
         <div className="border-t pt-6 mt-6 border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Support the Developer</h2>
           <p className="text-gray-700 mb-4 dark:text-gray-300">
-            Hi! I&apos;m the developer behind CouponCycle. If you find this app helpful for tracking your credit card benefits, consider buying me a coffee to support continued development and new features!
+            Hi! I&apos;m the developer behind Perks Reminder. If you find this app helpful for tracking your credit card benefits, consider buying me a coffee to support continued development and new features!
           </p>
           <p className="text-sm text-gray-600 mb-4 dark:text-gray-400">
             Your support helps me maintain the app, add new cards, and implement user-requested features. Every contribution is greatly appreciated! ☕
@@ -49,7 +49,7 @@ export default function ContactPage() {
         </div>
         
         <p className="text-lg text-gray-700 text-center font-medium mt-6 dark:text-gray-300">
-          Let&apos;s make CouponCycle even better, together!
+          Let&apos;s make Perks Reminder even better, together!
         </p>
       </div>
     </div>

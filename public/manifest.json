@@ -1,6 +1,6 @@
 {
-  "name": "CouponCycle - Credit Card Benefits Tracker",
-  "short_name": "CouponCycle",
+  "name": "Perks Reminder - Credit Card Benefits Tracker",
+  "short_name": "Perks Reminder",
   "description": "Never miss a credit card benefit again. Track every perk and maximize your annual fees.",
   "start_url": "/",
   "display": "standalone",

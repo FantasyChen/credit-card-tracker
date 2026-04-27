@@ -1,5 +1,5 @@
 {
-  "name": "coupon-cycle",
+  "name": "perks-reminder",
   "version": "0.1.0",
   "description": "A smart credit card benefits tracking application that helps you maximize your rewards and never miss valuable perks",
   "type": "module",
@@ -13,11 +13,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/FantasyChen/credit-card-tracker.git"
+    "url": "https://github.com/lifan-builds/perks-reminder.git"
   },
-  "homepage": "https://github.com/FantasyChen/credit-card-tracker#readme",
+  "homepage": "https://github.com/lifan-builds/perks-reminder#readme",
   "bugs": {
-    "url": "https://github.com/FantasyChen/credit-card-tracker/issues"
+    "url": "https://github.com/lifan-builds/perks-reminder/issues"
   },
   "scripts": {
     "dev": "next dev",

@@ -7,6 +7,7 @@ import { BenefitStatus, Benefit, CreditCard as PrismaCreditCard } from '@/genera
 import { CreditCardIcon } from '@heroicons/react/24/outline';
 import SupportedCreditCards from '@/components/SupportedCreditCards';
 import DashboardBenefitRow from '@/components/DashboardBenefitRow';
+import { PRIMARY_SITE_URL, SITE_NAME } from '@/lib/site';
 
 // Define a type for the upcoming benefits data
 interface UpcomingBenefit extends BenefitStatus {
@@ -20,9 +21,9 @@ export default async function Home() {
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    "name": "CouponCycle",
+    "name": SITE_NAME,
     "description": "Track credit card benefits, maximize rewards, and never miss expiring perks again. Free tool for Chase, Amex, Capital One, and 50+ premium cards.",
-    "url": "https://www.coupon-cycle.site",
+    "url": PRIMARY_SITE_URL,
     "applicationCategory": "FinanceApplication",
     "operatingSystem": "Web Browser",
     "offers": {
@@ -42,7 +43,7 @@ export default async function Home() {
       "Loyalty Program Management",
       "Data Export/Import"
     ],
-    "screenshot": "https://www.coupon-cycle.site/hero-image.jpg"
+    "screenshot": `${PRIMARY_SITE_URL}/hero-image.jpg`
   };
 
   if (!session?.user?.id) {
@@ -112,7 +113,7 @@ export default async function Home() {
           <div className="hidden lg:col-span-5 lg:mt-0 lg:flex lg:items-center lg:justify-center relative">
             <Image 
               src="/hero-image.jpg" 
-              alt="CouponCycle - Maximize your credit card benefits" 
+              alt={`${SITE_NAME} - Maximize your credit card benefits`} 
               fill
               className="rounded-lg object-contain"
               priority

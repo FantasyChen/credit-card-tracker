@@ -1,8 +1,9 @@
 import { MetadataRoute } from 'next'
 import { prisma } from '@/lib/prisma'
+import { PRIMARY_SITE_URL } from '@/lib/site'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://www.coupon-cycle.site'
+  const baseUrl = PRIMARY_SITE_URL
   
   // Fetch all benefit usage way slugs for dynamic pages
   let usageWays: { slug: string; updatedAt: Date }[] = []

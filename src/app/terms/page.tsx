@@ -3,8 +3,8 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service - CouponCycle',
-  description: 'Terms of use for CouponCycle. Use the app responsibly; we provide it as-is for tracking credit card benefits.',
+  title: 'Terms of Service - Perks Reminder',
+  description: 'Terms of use for Perks Reminder. Use the app responsibly; we provide it as-is for tracking credit card benefits.',
   alternates: {
     canonical: '/terms',
   },
@@ -26,7 +26,7 @@ export default function TermsPage() {
             Acceptance of Terms
           </h2>
           <p>
-            By using CouponCycle, you agree to these terms. If you do not agree, please do not use the service.
+            By using Perks Reminder, you agree to these terms. If you do not agree, please do not use the service.
           </p>
         </section>
 
@@ -35,7 +35,7 @@ export default function TermsPage() {
             Description of Service
           </h2>
           <p>
-            CouponCycle is a free web app that helps you track credit card benefits, cycles, and loyalty programs. We do not provide financial, tax, or legal advice. Benefit details are for reference; always confirm with your card issuer.
+            Perks Reminder is a free web app that helps you track credit card benefits, cycles, and loyalty programs. We do not provide financial, tax, or legal advice. Benefit details are for reference; always confirm with your card issuer.
           </p>
         </section>
 
@@ -62,7 +62,7 @@ export default function TermsPage() {
             Limitation of Liability
           </h2>
           <p>
-            To the fullest extent permitted by law, CouponCycle and its maintainers are not liable for any indirect, incidental, or consequential damages arising from your use of the service.
+            To the fullest extent permitted by law, Perks Reminder and its maintainers are not liable for any indirect, incidental, or consequential damages arising from your use of the service.
           </p>
         </section>
 

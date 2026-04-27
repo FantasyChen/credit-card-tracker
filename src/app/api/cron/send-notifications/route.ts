@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
+import { SITE_NAME } from '@/lib/site';
 
 export const maxDuration = 10;
 
@@ -200,7 +201,7 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
 
       const subject = sectionLabels.length === 1
         ? digestSubjectForSection(sectionLabels[0])
-        : 'Your CouponCycle Daily Update';
+        : `Your ${SITE_NAME} Daily Update`;
 
       const html = buildDigestHtml(user.name || 'there', sections, baseUrl);
 
@@ -257,20 +258,20 @@ function digestSubjectForSection(label: string): string {
     case 'New Benefits': return 'New Benefit Cycles Have Started!';
     case 'Expiring Benefits': return 'Benefits Expiring Soon!';
     case 'Expiring Points': return 'Loyalty Points Expiring Soon!';
-    default: return 'Your CouponCycle Daily Update';
+    default: return `Your ${SITE_NAME} Daily Update`;
   }
 }
 
 function buildDigestHtml(name: string, sections: string[], baseUrl: string): string {
   return [
     `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1F2937;">`,
-    `<h1 style="color:#4F46E5;border-bottom:2px solid #E5E7EB;padding-bottom:12px;">CouponCycle Update</h1>`,
+    `<h1 style="color:#4F46E5;border-bottom:2px solid #E5E7EB;padding-bottom:12px;">${SITE_NAME} Update</h1>`,
     `<p>Hi ${name},</p>`,
     `<p>Here's what needs your attention today:</p>`,
     sections.join('<hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0;">'),
     `<hr style="border:none;border-top:2px solid #E5E7EB;margin:32px 0 16px;">`,
     `<p style="color:#6B7280;font-size:13px;">You're receiving this because you enabled notifications in your ` +
-      `<a href="${baseUrl}/settings" style="color:#4F46E5;">CouponCycle settings</a>.</p>`,
+      `<a href="${baseUrl}/settings" style="color:#4F46E5;">${SITE_NAME} settings</a>.</p>`,
     `</div>`,
   ].join('');
 }

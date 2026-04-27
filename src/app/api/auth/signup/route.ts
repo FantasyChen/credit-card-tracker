@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { createVerificationToken } from '@/lib/tokens';
 import { sendEmail } from '@/lib/email';
+import { SITE_NAME } from '@/lib/site';
 
 export async function POST(request: Request) {
   try {
@@ -75,10 +76,10 @@ export async function POST(request: Request) {
 
     await sendEmail({
       to: normalizedEmail,
-      subject: 'Verify your CouponCycle email',
+      subject: `Verify your ${SITE_NAME} email`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #4F46E5;">Welcome to CouponCycle!</h1>
+          <h1 style="color: #4F46E5;">Welcome to ${SITE_NAME}!</h1>
           <p>Please verify your email address by clicking the button below:</p>
           <a href="${verifyUrl}" style="display: inline-block; background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin: 16px 0;">
             Verify Email
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
           <p style="color: #999; font-size: 12px;">This link expires in 24 hours.</p>
         </div>
       `,
-      text: `Welcome to CouponCycle! Verify your email: ${verifyUrl}`,
+      text: `Welcome to ${SITE_NAME}! Verify your email: ${verifyUrl}`,
     });
 
     return NextResponse.json({

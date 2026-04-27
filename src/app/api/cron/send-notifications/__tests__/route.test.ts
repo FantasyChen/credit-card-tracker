@@ -188,7 +188,7 @@ describe('/api/cron/send-notifications', () => {
         expect(sendEmailArgs.to).toBe('user1@example.com');
         expect(sendEmailArgs.subject).toBe('New Benefit Cycles Have Started!');
         expect(sendEmailArgs.html).toContain('New Benefit Cycles');
-        expect(sendEmailArgs.html).toContain('CouponCycle Update');
+        expect(sendEmailArgs.html).toContain('Perks Reminder Update');
     });
 
     it('should send digest email for expiring benefits', async () => {
@@ -217,7 +217,7 @@ describe('/api/cron/send-notifications', () => {
             html: expect.stringContaining(`expiring on ${expiryDate.toLocaleDateString('en-US', {timeZone: 'UTC'})}`)
         }));
         expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
-            html: expect.stringContaining('CouponCycle Update')
+            html: expect.stringContaining('Perks Reminder Update')
         }));
     });
 
@@ -251,7 +251,7 @@ describe('/api/cron/send-notifications', () => {
             html: expect.stringContaining(`expiring on ${loyaltyExpiryDate.toLocaleDateString('en-US', {timeZone: 'UTC'})}`)
         }));
         expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
-            html: expect.stringContaining('CouponCycle Update')
+            html: expect.stringContaining('Perks Reminder Update')
         }));
     });
 

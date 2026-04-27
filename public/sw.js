@@ -1,5 +1,5 @@
 /**
- * Enhanced Service Worker for CouponCycle PWA
+ * Enhanced Service Worker for Perks Reminder PWA
  * Implements intelligent caching strategies for better offline experience
  */
 

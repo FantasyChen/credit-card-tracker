@@ -1,7 +1,7 @@
-# SEO Strategy for CouponCycle
+# SEO Strategy for Perks Reminder
 
 ## Overview
-This document outlines the comprehensive SEO strategy implemented for CouponCycle to improve Google search rankings and organic traffic.
+This document outlines the comprehensive SEO strategy implemented for Perks Reminder to improve Google search rankings and organic traffic.
 
 ## ✅ Implemented SEO Improvements
 

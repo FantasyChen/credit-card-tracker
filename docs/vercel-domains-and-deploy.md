@@ -4,9 +4,12 @@
 
 | Domain | Purpose | Status |
 |--------|---------|--------|
-| `coupon-cycle.site` | Main app — credit card benefits | ✅ Live |
-| `www.coupon-cycle.site` | Alias for main app | ✅ Live |
-| `loyalty.coupon-cycle.site` | Loyalty program landing page | ✅ Live |
+| `perks-reminder.com` | Main app — credit card benefits | Pending |
+| `www.perks-reminder.com` | Primary main app domain | Pending |
+| `loyalty.perks-reminder.com` | Loyalty program landing page | Pending |
+| `coupon-cycle.site` | Legacy main app redirect | ✅ Live |
+| `www.coupon-cycle.site` | Legacy main app redirect | ✅ Live |
+| `loyalty.coupon-cycle.site` | Legacy loyalty redirect | ✅ Live |
 
 All domains point to the same Vercel deployment. The `loyalty` subdomain is detected by Next.js middleware (`src/middleware.ts`) which rewrites `/` → `/loyalty-landing`.
 
@@ -17,7 +20,7 @@ All domains point to the same Vercel deployment. The `loyalty` subdomain is dete
    # Temporarily switch to coupon-cycle project
    cp .vercel/project.json .vercel/project.json.bak
    echo '{"projectId":"prj_x0VAgiuO3PAem4IUmeVo9dsRMCsx","orgId":"team_IVhBm6B2M4mIXzermYdxeqRK","projectName":"coupon-cycle"}' > .vercel/project.json
-   vercel domains add <subdomain>.coupon-cycle.site
+   vercel domains add <subdomain>.perks-reminder.com
    cp .vercel/project.json.bak .vercel/project.json && rm .vercel/project.json.bak
    ```
 
@@ -50,7 +53,7 @@ prisma generate && (prisma migrate deploy || echo 'Migration deploy skipped — 
 | `DATABASE_URL` | Neon **pooler** endpoint (has `-pooler` in hostname) |
 | `DIRECT_URL` | Neon **direct** endpoint (no `-pooler`) — required for `prisma migrate deploy` |
 | `DATABASE_URL_DEV` | Development database branch |
-| `NEXTAUTH_URL` | Production URL (`https://coupon-cycle.site`) |
+| `NEXTAUTH_URL` | Production URL (`https://www.perks-reminder.com`) |
 | `NEXTAUTH_SECRET` | NextAuth secret key |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |

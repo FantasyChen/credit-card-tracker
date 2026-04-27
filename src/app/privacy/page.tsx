@@ -3,8 +3,8 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy - CouponCycle',
-  description: 'How CouponCycle collects, uses, and protects your data. We store only what is needed to run the app and never sell your information.',
+  title: 'Privacy Policy - Perks Reminder',
+  description: 'How Perks Reminder collects, uses, and protects your data. We store only what is needed to run the app and never sell your information.',
   alternates: {
     canonical: '/privacy',
   },
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
             Overview
           </h2>
           <p>
-            CouponCycle is a free, open-source app that helps you track credit card benefits.
+            Perks Reminder is a free, open-source app that helps you track credit card benefits.
             We take your privacy seriously. This policy describes what data we collect and how we use it.
           </p>
         </section>

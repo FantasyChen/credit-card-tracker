@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createPasswordResetToken } from '@/lib/tokens';
 import { sendEmail } from '@/lib/email';
+import { SITE_NAME } from '@/lib/site';
 
 export async function POST(request: Request) {
   try {
@@ -37,11 +38,11 @@ export async function POST(request: Request) {
 
     await sendEmail({
       to: normalizedEmail,
-      subject: 'Reset your CouponCycle password',
+      subject: `Reset your ${SITE_NAME} password`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #4F46E5;">Password Reset</h1>
-          <p>You requested a password reset for your CouponCycle account. Click the button below to set a new password:</p>
+          <p>You requested a password reset for your ${SITE_NAME} account. Click the button below to set a new password:</p>
           <a href="${resetUrl}" style="display: inline-block; background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin: 16px 0;">
             Reset Password
           </a>
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
           <p style="color: #999; font-size: 12px;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
         </div>
       `,
-      text: `Reset your CouponCycle password: ${resetUrl}`,
+      text: `Reset your ${SITE_NAME} password: ${resetUrl}`,
     });
 
     return successResponse;

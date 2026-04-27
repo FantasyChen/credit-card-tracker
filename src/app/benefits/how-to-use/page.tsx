@@ -57,7 +57,7 @@ export default async function HowToUseIndexPage() {
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl">
           Learn how to maximize your credit card benefits with our comprehensive step-by-step guides. 
-          From airline credits to dining rewards, we'll show you exactly how to use each benefit.
+          From airline credits to dining rewards, we&apos;ll show you exactly how to use each benefit.
         </p>
       </div>
 
@@ -120,7 +120,7 @@ export default async function HowToUseIndexPage() {
             Track Your Benefits Automatically
           </h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
-            Don't just learn how to use your benefits — let CouponCycle track them for you. 
+            Don&apos;t just learn how to use your benefits — let Perks Reminder track them for you. 
             Get reminders before credits expire and maximize your credit card ROI.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -145,4 +145,3 @@ export default async function HowToUseIndexPage() {
     </div>
   );
 }
-

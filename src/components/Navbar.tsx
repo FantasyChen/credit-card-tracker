@@ -42,7 +42,7 @@ function getSwitchUrl(isLoyaltyContext: boolean): string {
   const isLocalhost = host.includes('localhost');
   return isLocalhost
     ? `${proto}//${host.replace(/^loyalty\./, '')}${port ? `:${port}` : ''}`
-    : 'https://www.coupon-cycle.site';
+    : `${proto}//${host.replace(/^loyalty\./, 'www.')}`;
 }
 
 const Navbar = () => {
@@ -80,12 +80,12 @@ const Navbar = () => {
               <Link href="/" className="flex items-center text-xl font-bold text-gray-900 dark:text-white">
                 <Image 
                   src="/favicon.png"
-                  alt="CouponCycle Logo" 
+                  alt="Perks Reminder Logo" 
                   width={32}
                   height={32}
                   className="mr-2"
                 />
-                CouponCycle
+                Perks Reminder
               </Link>
             </div>
             {/* Desktop navigation links */}

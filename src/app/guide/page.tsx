@@ -101,7 +101,7 @@ export default function GuidePage() {
         
         <h3>1. Set Up Automated Tracking</h3>
         <p>
-          Use tools like CouponCycle to automatically track your benefit cycles and get notifications 
+          Use tools like Perks Reminder to automatically track your benefit cycles and get notifications 
           before benefits expire. Manual tracking often leads to missed opportunities.
         </p>
 
@@ -159,7 +159,7 @@ export default function GuidePage() {
         
         <ol>
           <li>Listing all your current credit cards and their benefits</li>
-          <li>Setting up a tracking system (like CouponCycle)</li>
+          <li>Setting up a tracking system (like Perks Reminder)</li>
           <li>Calculating the ROI for each card</li>
           <li>Setting up reminders for benefit expirations</li>
           <li>Creating a plan to use benefits throughout the year</li>
@@ -168,7 +168,7 @@ export default function GuidePage() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-8">
           <h3>Start Tracking Your Benefits Today</h3>
           <p>
-            CouponCycle makes it easy to track all your credit card benefits in one place. 
+            Perks Reminder makes it easy to track all your credit card benefits in one place. 
             Get smart notifications, calculate ROI, and never miss a valuable benefit again.
           </p>
           <Link 

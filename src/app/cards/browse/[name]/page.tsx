@@ -17,12 +17,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!card) {
     return {
-      title: 'Card Not Found | CouponCycle',
+      title: 'Card Not Found | Perks Reminder',
     };
   }
 
   return {
-    title: `${card.name} Benefits | CouponCycle`,
+    title: `${card.name} Benefits | Perks Reminder`,
     description: `Track ${card.name} benefits including all recurring credits and perks. ${card.issuer} card with $${card.annualFee} annual fee.`,
     keywords: [
       card.name,
@@ -363,4 +363,3 @@ export default async function CardDetailPage({ params }: PageProps) {
     </div>
   );
 }
-
