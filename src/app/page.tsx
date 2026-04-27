@@ -8,7 +8,6 @@ import { CreditCardIcon } from '@heroicons/react/24/outline';
 import SupportedCreditCards from '@/components/SupportedCreditCards';
 import DashboardBenefitRow from '@/components/DashboardBenefitRow';
 import { PRIMARY_SITE_URL, SITE_NAME } from '@/lib/site';
-import MigrationNotice from '@/components/MigrationNotice';
 
 // Define a type for the upcoming benefits data
 interface UpcomingBenefit extends BenefitStatus {
@@ -55,7 +54,6 @@ export default async function Home() {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
-      <MigrationNotice />
       <section className="bg-gray-100 dark:bg-gray-900">
         <div className="container mx-auto grid min-h-screen max-w-screen-xl px-4 py-8 lg:grid-cols-12 lg:gap-8 lg:py-16 xl:gap-0">
           <div className="mr-auto place-self-center lg:col-span-7">
@@ -245,8 +243,6 @@ export default async function Home() {
 
   return (
     <div>
-      <MigrationNotice />
-
       <div className="sm:flex sm:items-center sm:justify-between">
         <div className="sm:flex-auto">
           <h1 className="text-2xl font-semibold leading-6 text-gray-900 dark:text-white">
