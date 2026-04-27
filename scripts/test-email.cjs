@@ -26,9 +26,9 @@ async function testEmail() {
   const testEmailOptions = {
     from: process.env.FROM_EMAIL,
     to: 'fantasychen2016@gmail.com',
-    subject: 'Test Email from CouponCycle',
+    subject: 'Test Email from Perks Reminder',
     html: `
-      <h1>Hello from CouponCycle!</h1>
+      <h1>Hello from Perks Reminder!</h1>
       <p>This is a test email to verify that our email system is working correctly.</p>
       <p>If you're receiving this, it means:</p>
       <ul>
@@ -36,14 +36,14 @@ async function testEmail() {
         <li>✅ Email sending functionality is operational</li>
         <li>✅ Your domain configuration is correct</li>
       </ul>
-      <p>Best regards,<br>The CouponCycle Team</p>
+      <p>Best regards,<br>The Perks Reminder Team</p>
       <hr>
       <p style="font-size: 12px; color: #666;">
-        This is a test email sent from your CouponCycle application.
+        This is a test email sent from your Perks Reminder application.
       </p>
     `,
     text: `
-Hello from CouponCycle!
+Hello from Perks Reminder!
 
 This is a test email to verify that our email system is working correctly.
 
@@ -53,10 +53,10 @@ If you're receiving this, it means:
 - Your domain configuration is correct
 
 Best regards,
-The CouponCycle Team
+The Perks Reminder Team
 
 ---
-This is a test email sent from your CouponCycle application.
+This is a test email sent from your Perks Reminder application.
     `
   };
 

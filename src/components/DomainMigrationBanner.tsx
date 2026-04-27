@@ -12,28 +12,22 @@ export default function DomainMigrationBanner() {
     setHostname(window.location.hostname);
   }, []);
 
-  if (!hostname.includes(OLD_DOMAIN) && !hostname.includes(NEW_DOMAIN)) {
+  if (!hostname.includes(OLD_DOMAIN)) {
     return null;
   }
 
-  const isOldDomain = hostname.includes(OLD_DOMAIN);
   const href = hostname.startsWith('loyalty.')
     ? `https://loyalty.${NEW_DOMAIN}`
     : `https://www.${NEW_DOMAIN}`;
 
   return (
     <div className="bg-indigo-50 px-4 py-2 text-center text-sm text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100">
-      {isOldDomain ? (
-        <>
-          CouponCycle is moving to{' '}
-          <a className="font-semibold underline" href={href}>
-            {href.replace('https://', '')}
-          </a>
-          . Your account and data will stay the same.
-        </>
-      ) : (
-        <>CouponCycle is now Perks Reminder. Your account and data stayed the same.</>
-      )}
+      <span className="font-semibold">CouponCycle is now Perks Reminder.</span>{' '}
+      Please update your bookmarks to{' '}
+      <a className="font-semibold underline" href={href}>
+        {href.replace('https://', '')}
+      </a>{' '}
+      before May 27, 2026. Your account and data are unchanged.
     </div>
   );
 }

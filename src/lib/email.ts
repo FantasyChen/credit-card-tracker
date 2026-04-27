@@ -48,7 +48,7 @@ export async function sendEmail({
   try {
     const resend = getResendClient();
     const { data, error } = await resend.emails.send({
-      from: fromEmail, // e.g., 'CouponCycle <notifications@yourdomain.com>'
+      from: fromEmail, // e.g., 'Perks Reminder <notifications@yourdomain.com>'
       to: to,
       subject: subject,
       html: html,
