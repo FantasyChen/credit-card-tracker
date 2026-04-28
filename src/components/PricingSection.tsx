@@ -67,7 +67,7 @@ export default function PricingSection() {
               <span className="text-gray-500 dark:text-gray-400 ml-1">/forever</span>
             </div>
             <Link
-              href="/auth/signin"
+              href="/auth/signup"
               className="block w-full text-center rounded-xl border-2 border-gray-300 dark:border-gray-600 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200"
             >
               Get Started Free
@@ -98,7 +98,7 @@ export default function PricingSection() {
               <span className="text-gray-500 dark:text-gray-400 ml-1">/mo during beta</span>
             </div>
             <Link
-              href="/auth/signin"
+              href="/auth/signup"
               className="block w-full text-center rounded-xl bg-indigo-600 hover:bg-indigo-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-200"
             >
               Sign Up — Get Pro Free
