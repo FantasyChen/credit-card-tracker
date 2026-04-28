@@ -17,7 +17,7 @@ async function testEmail() {
   
   if (!process.env.FROM_EMAIL) {
     console.error('❌ FROM_EMAIL is not set in environment variables');
-    console.log('💡 You can set it temporarily for testing, e.g.: FROM_EMAIL="CouponCycle <test@yourdomain.com>"');
+    console.log('💡 You can set it temporarily for testing, e.g.: FROM_EMAIL="Perks Reminder <test@yourdomain.com>"');
     return;
   }
   

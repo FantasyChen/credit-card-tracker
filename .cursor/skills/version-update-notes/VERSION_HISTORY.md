@@ -1,4 +1,4 @@
-# CouponCycle 版本更新记录 / Version Update Notes
+# Perks Reminder 版本更新记录 / Version Update Notes
 
 **当前版本 / Current version: v1.18**
 
@@ -12,7 +12,7 @@
 
 ## 历史记录 / History
 
-V1.18：积分追踪独立入口上线！loyalty.coupon-cycle.site 提供专属落地页，专注航司里程、酒店积分到期提醒。和信用卡福利追踪共享同一账号，无需重复注册。
+V1.18：积分追踪独立入口上线！loyalty.perks-reminder.com 提供专属落地页，专注航司里程、酒店积分到期提醒。和信用卡福利追踪共享同一账号，无需重复注册。
 
 V1.17：新增邮箱密码注册登录，不再只能用 Google/GitHub。支持邮箱验证和忘记密码重置，老用户也可以给已有账号绑定密码作为备用登录方式。
 

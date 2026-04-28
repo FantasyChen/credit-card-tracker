@@ -3,10 +3,10 @@
  * Implements intelligent caching strategies for better offline experience
  */
 
-const CACHE_NAME = 'couponcycle-v1';
-const STATIC_CACHE = 'couponcycle-static-v1';
-const DYNAMIC_CACHE = 'couponcycle-dynamic-v1';
-const IMAGE_CACHE = 'couponcycle-images-v1';
+const CACHE_NAME = 'perks-reminder-v1';
+const STATIC_CACHE = 'perks-reminder-static-v1';
+const DYNAMIC_CACHE = 'perks-reminder-dynamic-v1';
+const IMAGE_CACHE = 'perks-reminder-images-v1';
 
 // Resources to cache immediately
 const STATIC_ASSETS = [

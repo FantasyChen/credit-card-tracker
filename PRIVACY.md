@@ -1,6 +1,6 @@
 # Privacy Policy
 
-CouponCycle respects your privacy. The application stores only the data necessary to provide core functionality.
+Perks Reminder respects your privacy. The application stores only the data necessary to provide core functionality.
 
 - No ads, no sale of personal data
 - Authentication via Google OAuth (email and basic profile info)

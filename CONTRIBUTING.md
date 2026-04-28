@@ -1,6 +1,6 @@
-# Contributing to CouponCycle
+# Contributing to Perks Reminder
 
-Thank you for considering contributing to CouponCycle! 🎉 This guide provides detailed information for developers and contributors who want to help improve the project.
+Thank you for considering contributing to Perks Reminder! 🎉 This guide provides detailed information for developers and contributors who want to help improve the project.
 
 ## 📋 Table of Contents
 
@@ -27,8 +27,8 @@ Before you begin, ensure you have:
 
 1. **Fork and clone the repository**
    ```bash
-   git clone https://github.com/your-username/credit-card-tracker.git
-   cd credit-card-tracker
+   git clone https://github.com/your-username/perks-reminder.git
+   cd perks-reminder
    npm install
    ```
 
@@ -120,7 +120,7 @@ node scripts/test-email.cjs
 ### 🛠️ Two Ways to Contribute Updates
 
 #### Option A: In-App Suggestion System (Recommended)
-1. Sign in to [CouponCycle](https://www.coupon-cycle.site/)
+1. Sign in to [Perks Reminder](https://www.perks-reminder.com/)
 2. Go to `Settings → Suggest`
 3. Submit a JSON payload with your updates and source links
 4. Moderators review suggestions in `Settings → Review`
@@ -342,4 +342,4 @@ Fixes #123
 - **General issues** - Within 1 week
 - **Pull requests** - Within 1 week
 
-Thank you for contributing to CouponCycle! 🚀
+Thank you for contributing to Perks Reminder! 🚀

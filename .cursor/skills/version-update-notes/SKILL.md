@@ -1,9 +1,9 @@
 ---
 name: version-update-notes
-description: Generate CouponCycle version update notes in Chinese (一行格式) and track versions. Use when the user asks for a version note, release note, update note, 更新说明, 版本说明, or to add or bump a version.
+description: Generate Perks Reminder version update notes in Chinese (一行格式) and track versions. Use when the user asks for a version note, release note, update note, 更新说明, 版本说明, or to add or bump a version.
 ---
 
-# Version Update Notes (CouponCycle)
+# Version Update Notes (Perks Reminder)
 
 Generate release/version update text in the project's standard format and keep [VERSION_HISTORY.md](VERSION_HISTORY.md) in sync.
 

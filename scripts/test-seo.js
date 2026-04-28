@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * SEO Testing Script for CouponCycle
+ * SEO Testing Script for Perks Reminder
  * 
  * This script tests various SEO implementations to ensure they're working correctly.
  * Run with: node scripts/test-seo.js
@@ -10,7 +10,7 @@
 import https from 'https';
 import http from 'http';
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.coupon-cycle.site';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.perks-reminder.com';
 
 // Test functions
 async function testUrl(url, description) {
@@ -91,7 +91,7 @@ async function testMetaTags(url, description) {
 }
 
 async function runSEOTests() {
-  console.log('🚀 Starting SEO Tests for CouponCycle\n');
+  console.log('🚀 Starting SEO Tests for Perks Reminder\n');
   console.log(`Testing URL: ${BASE_URL}\n`);
   
   // Test basic accessibility

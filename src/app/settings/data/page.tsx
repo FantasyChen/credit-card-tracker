@@ -112,7 +112,7 @@ export default function DataManagementPage() {
       <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Import Data</h2>
         <p className="text-gray-600 dark:text-gray-300 mb-4">
-          Upload a previously exported JSON file (`couponcycle_data_*.json`) to add cards to your account.
+          Upload a previously exported JSON file (`perks_reminder_data_*.json` or `couponcycle_data_*.json`) to add cards to your account.
           Existing cards with the same name, issuer, and opening date will be skipped.
         </p>
         <div className="space-y-4">

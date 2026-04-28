@@ -1,9 +1,9 @@
 ---
 name: update-card-benefits
-description: Update, add, or remove benefits from existing credit cards in CouponCycle. Use when the user asks to update card benefits, add a new benefit to a card, remove a benefit, change benefit values, or mentions annual fee updates for cards like Amex Platinum, Chase Sapphire Reserve.
+description: Update, add, or remove benefits from existing credit cards in Perks Reminder. Use when the user asks to update card benefits, add a new benefit to a card, remove a benefit, change benefit values, or mentions annual fee updates for cards like Amex Platinum, Chase Sapphire Reserve.
 ---
 
-# Update Card Benefits in CouponCycle
+# Update Card Benefits in Perks Reminder
 
 This skill guides you through updating benefits for existing credit cards. This is a **3-step process** to ensure all users (new and existing) see the changes.
 

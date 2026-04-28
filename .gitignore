@@ -55,6 +55,7 @@ src/generated/prisma/
 
 # Log files
 *.log
+announcement-state/
 
 # Editor directories and files
 .idea

@@ -35,7 +35,7 @@ export async function GET() {
       })),
     };
 
-    const filename = `couponcycle_data_${new Date().toISOString().split('T')[0]}.json`;
+    const filename = `perks_reminder_data_${new Date().toISOString().split('T')[0]}.json`;
 
     return new NextResponse(JSON.stringify(exportData, null, 2), {
       status: 200,

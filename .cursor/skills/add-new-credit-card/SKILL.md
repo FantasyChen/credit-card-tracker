@@ -1,9 +1,9 @@
 ---
 name: add-new-credit-card
-description: Add a new credit card to the CouponCycle application with its image and benefits. Use when the user asks to add a new card, create a card template, download a card image, or mentions adding cards like "Amex", "Chase", "Citi" to the system.
+description: Add a new credit card to the Perks Reminder application with its image and benefits. Use when the user asks to add a new card, create a card template, download a card image, or mentions adding cards like "Amex", "Chase", "Citi" to the system.
 ---
 
-# Add New Credit Card to CouponCycle
+# Add New Credit Card to Perks Reminder
 
 This skill guides you through adding a new credit card to the application's predefined card catalog.
 

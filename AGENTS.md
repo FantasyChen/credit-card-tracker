@@ -1,10 +1,10 @@
-# CouponCycle - Complete Project Documentation for AI Agents
+# Perks Reminder - Complete Project Documentation for AI Agents
 
 > **🤖 PRIMARY AI REFERENCE**: This document is the main source of truth for AI agents working on this project. It contains complete system architecture, business logic, development guidelines, and operational procedures. Always reference this document when making changes or additions to the codebase.
 
 ## 🎯 Project Overview
 
-**CouponCycle** is a free, open-source Progressive Web App that helps users maximize their credit card benefits by tracking recurring perks, managing loyalty programs, and ensuring no valuable benefits expire unused. 
+**Perks Reminder** is a free, open-source Progressive Web App that helps users maximize their credit card benefits by tracking recurring perks, managing loyalty programs, and ensuring no valuable benefits expire unused. 
 
 **Problem it Solves:** Credit card users lose hundreds of dollars annually by forgetting to use benefits like annual credits, free nights, and other perks that reset on monthly, quarterly, or yearly cycles.
 
@@ -31,7 +31,7 @@
 ### Project Structure
 
 ```
-credit-card-tracker/
+perks-reminder/
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── api/               # API routes
@@ -184,8 +184,8 @@ The heart of the application is the `calculateBenefitCycle()` function in `src/l
 - **Edit/Delete**: Full CRUD operations
 - **Benefit Auto-Creation**: Benefits automatically created from templates
 
-### 3. Loyalty Program Tracking (`/loyalty` + `loyalty.coupon-cycle.site`)
-- **Dedicated Subdomain**: `loyalty.coupon-cycle.site` with a standalone landing page
+### 3. Loyalty Program Tracking (`/loyalty` + `loyalty.perks-reminder.com`)
+- **Dedicated Subdomain**: `loyalty.perks-reminder.com` with a standalone landing page
 - **Expiration Monitoring**: Track when points/miles expire
 - **Activity Tracking**: Record last activity dates
 - **Automated Notifications**: Email alerts for expiring points
@@ -540,8 +540,8 @@ curl -i -X GET -H "Authorization: Bearer $CRON_SECRET" "<url>/api/cron/send-noti
 ```
 
 **Live Domains:**
-- `coupon-cycle.site` / `www.coupon-cycle.site` — Main app (credit card benefits)
-- `loyalty.coupon-cycle.site` — Loyalty program landing page (subdomain detected by middleware, rewrites `/` → `/loyalty-landing`)
+- `perks-reminder.com` / `www.perks-reminder.com` — Main app (credit card benefits)
+- `loyalty.perks-reminder.com` — Loyalty program landing page (subdomain detected by middleware, rewrites `/` → `/loyalty-landing`)
 
 **Domains & deployment:** For domain setup details or deployment troubleshooting, see **docs/vercel-domains-and-deploy.md**.
 
@@ -727,13 +727,13 @@ npm run build
 - **Email**: Contact form on website for sensitive issues
 
 ### Community Resources
-- **Live App**: [www.coupon-cycle.site](https://www.coupon-cycle.site/)
-- **Repository**: [GitHub](https://github.com/FantasyChen/credit-card-tracker)
+- **Live App**: [www.perks-reminder.com](https://www.perks-reminder.com/)
+- **Repository**: [GitHub](https://github.com/lifan-builds/perks-reminder)
 - **Documentation**: This file and `/docs` folder
 - **Support Creator**: [Buy me a coffee](https://coff.ee/fantasy_c)
 
 ### Community Posts (Announcements)
-- **美卡论坛 (US Card Forum)** — [做了个极简工具追踪里程/积分活动日期 + expire前邮件提醒](https://www.uscardforum.com/t/topic/487571) (Mar 2026) — Loyalty subdomain launch post in 航空常旅客 (aviation/travel) section; promotes [loyalty.coupon-cycle.site](https://loyalty.coupon-cycle.site/) for tracking miles/points activity dates and email reminders; cross-references main site for credit card coupon tracking
+- **美卡论坛 (US Card Forum)** — [做了个极简工具追踪里程/积分活动日期 + expire前邮件提醒](https://www.uscardforum.com/t/topic/487571) (Mar 2026) — Loyalty subdomain launch post in 航空常旅客 (aviation/travel) section; promotes [loyalty.perks-reminder.com](https://loyalty.perks-reminder.com/) for tracking miles/points activity dates and email reminders; cross-references main site for credit card benefit tracking
 
 ---
 
@@ -785,12 +785,12 @@ npm run build
 
 **Changes Implemented**:
 - **Email/Password Auth**: Custom signup system with bcrypt hashing, email verification tokens, and password reset flow — alongside existing Google/GitHub/Facebook OAuth
-- **Loyalty Subdomain**: `loyalty.coupon-cycle.site` serves a dedicated landing page via Next.js middleware subdomain detection
-- **Shared Authentication**: Same user accounts work across `coupon-cycle.site` and `loyalty.coupon-cycle.site`
+- **Loyalty Subdomain**: `loyalty.perks-reminder.com` serves a dedicated landing page via Next.js middleware subdomain detection
+- **Shared Authentication**: Same user accounts work across `perks-reminder.com` and `loyalty.perks-reminder.com`
 - **New Routes**: `/auth/signup`, `/auth/verify-email`, `/auth/forgot-password`, `/auth/reset-password`, `/loyalty-landing`
 - **New API Endpoints**: `/api/auth/signup`, `/api/auth/verify-email`, `/api/auth/forgot-password`, `/api/auth/reset-password`
 - **Schema Changes**: `User.password`, `EmailVerificationToken`, `PasswordResetToken` models
-- **Vercel Domain**: `loyalty.coupon-cycle.site` added to Vercel project with CNAME DNS record
+- **Vercel Domain**: `loyalty.perks-reminder.com` added to Vercel project with CNAME DNS record
 
 ---
 
@@ -884,4 +884,4 @@ node scripts/migrate-amex-2025-benefits.js --force
 
 ---
 
-> **Note for AI Agents**: This document provides complete context for the CouponCycle project. Use this information to understand the system architecture, business logic, and development practices when assisting with code changes, feature additions, or debugging. Always follow the database safety rules and maintain the high code quality standards established in this project. 
+> **Note for AI Agents**: This document provides complete context for the Perks Reminder project. Use this information to understand the system architecture, business logic, and development practices when assisting with code changes, feature additions, or debugging. Always follow the database safety rules and maintain the high code quality standards established in this project. 
