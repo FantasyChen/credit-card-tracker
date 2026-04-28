@@ -9,6 +9,7 @@ import {
   CreditCardIcon,
   UserCircleIcon,
   ShieldCheckIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { getUserSubscriptionStatus } from '@/lib/subscription';
 
@@ -69,6 +70,14 @@ export default async function SettingsPage() {
   }
 
   const subscription = await getUserSubscriptionStatus(session.user.id);
+  const planName = subscription.tier === 'PRO'
+    ? subscription.isBetaUser ? 'Beta Pro' : 'Pro'
+    : 'Free';
+  const planDescription = subscription.tier === 'PRO'
+    ? subscription.isBetaUser
+      ? 'Pro features are active for your account during the beta period.'
+      : 'Your account has Pro access.'
+    : 'Your account is on the Free plan.';
 
   const settingsItems = [
     {
@@ -119,8 +128,14 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      {/* Account Info */}
+      {/* Account and Plan */}
       <div className="mb-8 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800">
+        <div className="mb-5 flex items-center gap-2">
+          <SparklesIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Account & Plan
+          </h2>
+        </div>
         <div className="flex items-center gap-4">
           <div className="flex-shrink-0">
             {session.user.image ? (
@@ -151,7 +166,7 @@ export default async function SettingsPage() {
             {subscription.tier === 'PRO' ? (
               <div className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center gap-2">
                 <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                  {subscription.isBetaUser ? 'Beta Pro Plan' : 'Pro Plan'}
+                  {planName} Plan
                 </span>
               </div>
             ) : (
@@ -161,6 +176,22 @@ export default async function SettingsPage() {
                 </span>
               </div>
             )}
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 border-t border-indigo-100 pt-5 text-sm dark:border-indigo-800 sm:grid-cols-3">
+          <div>
+            <p className="font-medium text-gray-900 dark:text-white">Current plan</p>
+            <p className="mt-1 text-gray-600 dark:text-gray-400">{planName}</p>
+          </div>
+          <div>
+            <p className="font-medium text-gray-900 dark:text-white">Plan status</p>
+            <p className="mt-1 text-gray-600 dark:text-gray-400">{planDescription}</p>
+          </div>
+          <div>
+            <p className="font-medium text-gray-900 dark:text-white">Manage plan</p>
+            <Link href="/#pricing" className="mt-1 inline-block text-indigo-600 hover:underline dark:text-indigo-400">
+              View plan details
+            </Link>
           </div>
         </div>
       </div>
