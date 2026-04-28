@@ -12,6 +12,8 @@ All existing users receive one clear announcement that CouponCycle is now Perks 
 - [ ] Send remaining users in daily capped batches after quota resets.
 - [ ] Re-audit remaining list after each batch.
 
+- [~] Resume and finish the one-time domain migration announcement email in safe batches. (switched away 2026-04-28)
+- [x] Updating context docs (done 2026-04-28)
 ## Findings
 - Intended recipient count is 481 after excluding `@example.com` test accounts.
 - First quota failure was `mlee092161@gmail.com`.

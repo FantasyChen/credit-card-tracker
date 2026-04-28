@@ -10,6 +10,7 @@ import {
   UserCircleIcon,
   ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
+import { getUserSubscriptionStatus } from '@/lib/subscription';
 
 export const metadata: Metadata = {
   title: "Settings - Manage Your Preferences",
@@ -66,6 +67,8 @@ export default async function SettingsPage() {
   if (!session?.user?.id) {
     redirect('/api/auth/signin?callbackUrl=/settings');
   }
+
+  const subscription = await getUserSubscriptionStatus(session.user.id);
 
   const settingsItems = [
     {
@@ -138,11 +141,26 @@ export default async function SettingsPage() {
               {session.user.email}
             </p>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
-            <ShieldCheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
-            <span className="text-sm font-medium text-green-700 dark:text-green-300">
-              Verified
-            </span>
+          <div className="flex flex-col items-end gap-2">
+            <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center gap-2">
+              <ShieldCheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                Verified
+              </span>
+            </div>
+            {subscription.tier === 'PRO' ? (
+              <div className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center gap-2">
+                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                  {subscription.isBetaUser ? 'Beta Pro Plan' : 'Pro Plan'}
+                </span>
+              </div>
+            ) : (
+              <div className="px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Free Plan
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

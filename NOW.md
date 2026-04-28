@@ -1,14 +1,14 @@
 # Now
 
 ## Current Focus
-Resume and finish the one-time domain migration announcement email in safe batches.
+(none)
 
 ## Active Blockers
-- Resend daily quota is exhausted for today; wait for reset or upgrade before sending the next batch.
+- None.
 
 ## Immediate Next Step
-After quota resets, send a capped batch from `announcement-state/migration-announcement-remaining.txt`.
+Pick a task or review PLAN.md.
 
 ## Session State
-- Last modified: 2026-04-27T23:04:48Z
-- Files touched: CONTEXT.md, NOW.md, PLAN.md, .gitignore, scripts/send-migration-announcement.js, scripts/audit-migration-announcement.js
+- Last modified: 2026-04-28T03:19:04.906Z
+- Files touched: (none yet)

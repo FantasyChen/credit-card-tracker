@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
 import { SITE_NAME } from '@/lib/site';
+import { getEffectiveExpirationDays, getEffectiveTier, TIER_LIMITS } from '@/lib/subscription';
 
 export const maxDuration = 10;
 
@@ -39,6 +40,10 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
         notifyNewBenefit: true, notifyBenefitExpiration: true,
         notifyExpirationDays: true, notifyPointsExpiration: true,
         pointsExpirationDays: true,
+        subscriptionTier: true,
+        isBetaUser: true,
+        emailAlertsUsed: true,
+        emailAlertsResetAt: true,
       },
     });
 
@@ -50,10 +55,20 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
     const userMap = new Map(usersToNotify.map(u => [u.id, u]));
 
     const newBenefitUserIds = usersToNotify.filter(u => u.notifyNewBenefit).map(u => u.id);
-    const expirationUsers = usersToNotify.filter(u => u.notifyBenefitExpiration && u.notifyExpirationDays && u.notifyExpirationDays > 0);
+    const effectiveExpirationDaysByUser = new Map(
+      usersToNotify.map(user => [
+        user.id,
+        getEffectiveExpirationDays(getEffectiveTier(user), user.notifyExpirationDays),
+      ])
+    );
+
+    const expirationUsers = usersToNotify.filter(u => {
+      const effectiveDays = effectiveExpirationDaysByUser.get(u.id);
+      return u.notifyBenefitExpiration && effectiveDays && effectiveDays > 0;
+    });
     const expirationUserIds = expirationUsers.map(u => u.id);
     const maxExpirationDays = expirationUsers.length > 0
-      ? Math.max(...expirationUsers.map(u => u.notifyExpirationDays!))
+      ? Math.max(...expirationUsers.map(u => effectiveExpirationDaysByUser.get(u.id)!))
       : 0;
     const loyaltyUsers = usersToNotify.filter(u => u.notifyPointsExpiration && u.pointsExpirationDays && u.pointsExpirationDays > 0);
     const loyaltyUserIds = loyaltyUsers.map(u => u.id);
@@ -115,9 +130,10 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
     const expiringByUser = new Map<string, typeof expiringStatuses>();
     for (const s of expiringStatuses) {
       const user = userMap.get(s.userId);
-      if (!user?.notifyExpirationDays) continue;
+      const effectiveExpirationDays = user ? effectiveExpirationDaysByUser.get(user.id) : undefined;
+      if (!effectiveExpirationDays) continue;
       const reminderDate = new Date(today);
-      reminderDate.setDate(today.getDate() + user.notifyExpirationDays);
+      reminderDate.setDate(today.getDate() + effectiveExpirationDays);
       const dayStart = new Date(Date.UTC(reminderDate.getUTCFullYear(), reminderDate.getUTCMonth(), reminderDate.getUTCDate(), 0, 0, 0, 0));
       const dayEnd = new Date(Date.UTC(reminderDate.getUTCFullYear(), reminderDate.getUTCMonth(), reminderDate.getUTCDate(), 23, 59, 59, 999));
       if (s.cycleEndDate >= dayStart && s.cycleEndDate <= dayEnd) {
@@ -144,7 +160,7 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
     }
 
     // Build one digest email per user (consolidates up to 3 notification types into 1 email)
-    const emailTasks: { to: string; subject: string; html: string }[] = [];
+    const emailTasks: { to: string; userId: string; subject: string; html: string }[] = [];
     const baseUrl = process.env.NEXTAUTH_URL || '';
 
     for (const user of usersToNotify) {
@@ -176,8 +192,9 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
 
       if (hasExpiring) {
         sectionLabels.push('Expiring Benefits');
+        const effectiveExpirationDays = effectiveExpirationDaysByUser.get(user.id) ?? user.notifyExpirationDays;
         const items = expiring.map(s =>
-          `<li><strong>${s.benefit.description}</strong> on your ${s.benefit.creditCard?.name ?? 'card'}, expiring on ${fmtDate(s.cycleEndDate)} (in ${user.notifyExpirationDays} day(s)).</li>`
+          `<li><strong>${s.benefit.description}</strong> on your ${s.benefit.creditCard?.name ?? 'card'}, expiring on ${fmtDate(s.cycleEndDate)} (in ${effectiveExpirationDays} day(s)).</li>`
         ).join('');
         sections.push(
           `<h2 style="color:#DC2626;margin:24px 0 8px;">Benefits Expiring Soon</h2>` +
@@ -205,11 +222,14 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
 
       const html = buildDigestHtml(user.name || 'there', sections, baseUrl);
 
-      emailTasks.push({ to: user.email, subject, html });
+      emailTasks.push({ to: user.email, userId: user.id, subject, html });
     }
 
     // Send all emails in parallel (batch of 10 to stay under 2 req/s rate limit)
     let emailsSent = 0;
+
+    // Check email alert limits per user before sending
+    let emailsSkippedByLimit = 0;
 
     if (dryRun) {
       console.log(`🔍 [DRY RUN] Would send ${emailTasks.length} digest emails — skipping`);
@@ -222,13 +242,29 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
       for (let i = 0; i < emailTasks.length; i += BATCH) {
         const batch = emailTasks.slice(i, i + BATCH);
         const results = await Promise.allSettled(
-          batch.map(task => sendEmail({ to: task.to, subject: task.subject, html: task.html }))
+          batch.map(async (task) => {
+            const user = userMap.get(task.userId);
+            const allowed = user ? canSendEmailAlertForUser(user, today) : false;
+            if (!allowed) {
+              console.log(`⏭️ Skipping email to ${task.to} — Free tier limit reached`);
+              emailsSkippedByLimit++;
+              return null;
+            }
+            const sent = await sendEmail({ to: task.to, subject: task.subject, html: task.html });
+            if (sent) {
+              const tier = user ? getEffectiveTier(user) : 'FREE';
+              if (TIER_LIMITS[tier].maxEmailAlertsPerMonth !== Infinity) {
+                await incrementEmailAlertCountForUser(task.userId, today);
+              }
+            }
+            return sent;
+          })
         );
         for (let j = 0; j < results.length; j++) {
           const r = results[j];
           if (r.status === 'fulfilled' && r.value) {
             emailsSent++;
-          } else {
+          } else if (r.status === 'rejected' || (r.status === 'fulfilled' && r.value === false)) {
             console.warn(`Failed to send '${batch[j].subject}' email to ${batch[j].to}`);
           }
         }
@@ -236,7 +272,7 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
     }
 
     const totalMs = Date.now() - startMs;
-    console.log(`✅ Done in ${totalMs}ms: ${usersToNotify.length} users, ${emailsSent}/${emailTasks.length} digest emails sent`);
+    console.log(`✅ Done in ${totalMs}ms: ${usersToNotify.length} users, ${emailsSent}/${emailTasks.length} digest emails sent, ${emailsSkippedByLimit} skipped (tier limit)`);
 
     return NextResponse.json({
       message: dryRun ? 'Notification dry run completed.' : 'Notification cron job executed.',
@@ -244,6 +280,7 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
       usersProcessed: usersToNotify.length,
       emailsSent,
       emailsAttempted: emailTasks.length,
+      emailsSkippedByLimit,
       durationMs: totalMs,
     }, { status: 200 });
   } catch (error) {
@@ -251,6 +288,57 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
     console.error(`💥 send-notifications failed after ${totalMs}ms:`, error);
     return NextResponse.json({ message: 'Error executing cron job.', durationMs: totalMs }, { status: 500 });
   }
+}
+
+function canSendEmailAlertForUser(user: {
+  subscriptionTier: 'FREE' | 'PRO';
+  isBetaUser: boolean;
+  emailAlertsUsed: number;
+  emailAlertsResetAt: Date | null;
+}, today: Date): boolean {
+  const tier = getEffectiveTier(user);
+  const limits = TIER_LIMITS[tier];
+  if (limits.maxEmailAlertsPerMonth === Infinity) return true;
+
+  if (isDifferentUtcMonth(today, user.emailAlertsResetAt)) {
+    return true;
+  }
+
+  return user.emailAlertsUsed < limits.maxEmailAlertsPerMonth;
+}
+
+async function incrementEmailAlertCountForUser(userId: string, today: Date): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { subscriptionTier: true, isBetaUser: true, emailAlertsResetAt: true },
+  });
+  if (!user || TIER_LIMITS[getEffectiveTier(user)].maxEmailAlertsPerMonth === Infinity) {
+    return;
+  }
+
+  if (isDifferentUtcMonth(today, user.emailAlertsResetAt)) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        emailAlertsUsed: 1,
+        emailAlertsResetAt: today,
+      },
+    });
+    return;
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      emailAlertsUsed: { increment: 1 },
+    },
+  });
+}
+
+function isDifferentUtcMonth(referenceDate: Date, previousDate: Date | null): boolean {
+  return !previousDate ||
+    referenceDate.getUTCMonth() !== previousDate.getUTCMonth() ||
+    referenceDate.getUTCFullYear() !== previousDate.getUTCFullYear();
 }
 
 function digestSubjectForSection(label: string): string {

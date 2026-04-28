@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { updateNotificationSettingsAction } from './actions'; // Import the server action
 import NotificationSettingsForm from './NotificationSettingsForm'; // New client component
+import { getEmailAlertUsage, getUserTier } from '@/lib/subscription';
 
 export default async function NotificationSettingsPage() {
   const session = await getServerSession(authOptions);
@@ -29,6 +30,9 @@ export default async function NotificationSettingsPage() {
     throw new Error('User not found.');
   }
 
+  const emailAlertUsage = await getEmailAlertUsage(session.user.id);
+  const subscriptionTier = await getUserTier(session.user.id);
+
   return (
     <div className="container mx-auto p-4 max-w-2xl">
       <h1 className="text-3xl font-bold mb-6 dark:text-white">Notification Settings</h1>
@@ -36,6 +40,8 @@ export default async function NotificationSettingsPage() {
       <NotificationSettingsForm 
         initialSettings={user}
         updateAction={updateNotificationSettingsAction}
+        emailAlertUsage={emailAlertUsage}
+        subscriptionTier={subscriptionTier}
       />
 
       {/* Additional Settings Section */}

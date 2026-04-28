@@ -110,12 +110,20 @@ describe('/api/cron/send-notifications', () => {
         notifyExpirationDays?: number;
         notifyPointsExpiration?: boolean;
         pointsExpirationDays?: number;
+        subscriptionTier?: 'FREE' | 'PRO';
+        isBetaUser?: boolean;
+        emailAlertsUsed?: number;
+        emailAlertsResetAt?: Date | null;
     }
 
     const mockUser = (prefs: PartialUserPrefs = {}) => ({
         id: 'user1', email: 'user1@example.com', name: 'Test User',
         notifyNewBenefit: true, notifyBenefitExpiration: true, notifyExpirationDays: 7,
         notifyPointsExpiration: true, pointsExpirationDays: 30,
+        subscriptionTier: 'PRO' as const,
+        isBetaUser: false,
+        emailAlertsUsed: 0,
+        emailAlertsResetAt: null,
         ...prefs
     });
 
@@ -219,6 +227,36 @@ describe('/api/cron/send-notifications', () => {
         expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
             html: expect.stringContaining('Perks Reminder Update')
         }));
+    });
+
+    it('should use the default 7-day benefit expiration window for free users', async () => {
+        const systemTime = utcDate(2023, 8, 15, 11, 0, 0);
+        const sevenDayExpiry = utcDate(2023, 8, 22, 12, 0, 0);
+        const thirtyDayExpiry = utcDate(2023, 9, 14, 12, 0, 0);
+
+        jest.useFakeTimers().setSystemTime(systemTime);
+        (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([
+            mockUser({
+                subscriptionTier: 'FREE',
+                isBetaUser: false,
+                notifyExpirationDays: 30,
+                notifyNewBenefit: false,
+                notifyPointsExpiration: false,
+            }),
+        ]);
+
+        (prisma.benefitStatus.findMany as jest.Mock)
+            .mockResolvedValueOnce([
+                mockBenefitStatus('seven-days', utcDate(2023, 7, 23), sevenDayExpiry),
+                mockBenefitStatus('thirty-days', utcDate(2023, 7, 23), thirtyDayExpiry),
+            ]);
+
+        await GET(createMockReq('?dryRun=true'));
+
+        const response = await (NextResponse.json as jest.Mock).mock.results.at(-1)?.value.json();
+        const expiringQuery = (prisma.benefitStatus.findMany as jest.Mock).mock.calls[0][0];
+        expect(response.emailsAttempted).toBe(1);
+        expect(expiringQuery.where.cycleEndDate.lte).toEqual(utcDate(2023, 8, 22, 23, 59, 59, 999));
     });
 
     it('should send digest email for expiring loyalty program points', async () => {

@@ -6,12 +6,15 @@ import GitHubProvider from 'next-auth/providers/github';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { getSharedCookieDomain } from './site';
+import { enrollBetaUser, getEffectiveTier, isBetaMode } from './subscription';
 
 declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      role?: 'USER' | 'MODERATOR' | 'ADMIN'
+      role?: 'USER' | 'MODERATOR' | 'ADMIN';
+      subscriptionTier?: 'FREE' | 'PRO';
+      isBetaUser?: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -19,6 +22,10 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     id: string;
+    role?: 'USER' | 'MODERATOR' | 'ADMIN';
+    subscriptionTier?: 'FREE' | 'PRO';
+    storedSubscriptionTier?: 'FREE' | 'PRO';
+    isBetaUser?: boolean;
   }
 }
 
@@ -130,11 +137,17 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
       }
-      if (!('role' in token) || !token.role) {
+      if (!token.role || !token.storedSubscriptionTier || !('isBetaUser' in token)) {
         try {
-          const dbUser = await prisma.user.findUnique({ where: { id: token.id as string }, select: { role: true } });
-          if (dbUser?.role) {
-            (token as Record<string, unknown>).role = dbUser.role;
+          const dbUser = await prisma.user.findUnique({ 
+            where: { id: token.id as string }, 
+            select: { role: true, subscriptionTier: true, isBetaUser: true } 
+          });
+          if (dbUser) {
+            token.role = dbUser.role;
+            token.storedSubscriptionTier = dbUser.subscriptionTier;
+            token.subscriptionTier = getEffectiveTier(dbUser);
+            token.isBetaUser = dbUser.isBetaUser;
           }
         } catch {
           // ignore
@@ -144,10 +157,27 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       session.user.id = token.id as string;
-      if ('role' in token) {
-        session.user.role = token.role as 'USER' | 'MODERATOR' | 'ADMIN';
+      if (token.role) {
+        session.user.role = token.role;
+      }
+      if (token.storedSubscriptionTier) {
+        session.user.subscriptionTier = getEffectiveTier({
+          subscriptionTier: token.storedSubscriptionTier,
+          isBetaUser: Boolean(token.isBetaUser),
+        });
+      }
+      if ('isBetaUser' in token) {
+        session.user.isBetaUser = token.isBetaUser;
       }
       return session;
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      // Enroll new OAuth users as beta users when beta mode is active
+      if (isBetaMode() && user.id) {
+        await enrollBetaUser(user.id);
+      }
     },
   },
   debug: process.env.NODE_ENV === 'development',

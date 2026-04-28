@@ -122,14 +122,21 @@ const Navbar = () => {
               <ThemeToggle />
             </div>
             {/* Desktop Sign in/out button */}
-            <div className="hidden sm:ml-2 sm:block">
+            <div className="hidden sm:ml-2 sm:flex sm:items-center sm:space-x-3">
               {session ? (
-                <button
-                  onClick={() => signOut()}
-                  className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
-                >
-                  Sign out
-                </button>
+                <>
+                  {session.user.subscriptionTier === 'PRO' && (
+                    <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10 dark:bg-indigo-400/10 dark:text-indigo-400 dark:ring-indigo-400/30">
+                      {session.user.isBetaUser ? 'Beta Pro' : 'Pro'}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => signOut()}
+                    className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
+                  >
+                    Sign out
+                  </button>
+                </>
               ) : (
                 <Link
                   href="/auth/signin"
@@ -192,12 +199,21 @@ const Navbar = () => {
            {/* Sign in/out button now part of the header for mobile too */}
            <div className="border-t border-gray-200 px-2 pt-3 pb-3 dark:border-gray-700">
             {session ? (
-                <button
-                  onClick={() => { signOut(); setIsMobileMenuOpen(false); }}
-                  className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
-                >
-                  Sign out
-                </button>
+                <>
+                  {session.user.subscriptionTier === 'PRO' && (
+                    <div className="mb-3 px-3">
+                      <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10 dark:bg-indigo-400/10 dark:text-indigo-400 dark:ring-indigo-400/30">
+                        {session.user.isBetaUser ? 'Beta Pro' : 'Pro'}
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => { signOut(); setIsMobileMenuOpen(false); }}
+                    className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                  >
+                    Sign out
+                  </button>
+                </>
               ) : (
                 <Link
                   href="/auth/signin"

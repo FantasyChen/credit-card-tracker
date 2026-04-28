@@ -7,6 +7,9 @@ import { BenefitStatus, Benefit, CreditCard as PrismaCreditCard } from '@/genera
 import { CreditCardIcon } from '@heroicons/react/24/outline';
 import SupportedCreditCards from '@/components/SupportedCreditCards';
 import DashboardBenefitRow from '@/components/DashboardBenefitRow';
+import HowItWorks from '@/components/HowItWorks';
+import PricingSection from '@/components/PricingSection';
+import FAQ from '@/components/FAQ';
 import { PRIMARY_SITE_URL, SITE_NAME } from '@/lib/site';
 
 // Define a type for the upcoming benefits data
@@ -47,82 +50,103 @@ export default async function Home() {
   };
 
   if (!session?.user?.id) {
-    // If not signed in, show a landing page with a sign-in button
+    // If not signed in, show the landing page
     return (
       <div>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
-      <section className="bg-gray-100 dark:bg-gray-900">
-        <div className="container mx-auto grid min-h-screen max-w-screen-xl px-4 py-8 lg:grid-cols-12 lg:gap-8 lg:py-16 xl:gap-0">
-          <div className="mr-auto place-self-center lg:col-span-7">
-            <h1 className="mb-4 max-w-2xl text-4xl font-extrabold leading-none tracking-tight text-gray-900 dark:text-white md:text-5xl xl:text-6xl">
-              Never Miss a Credit Card Benefit Again
-            </h1>
-            <p className="mb-6 max-w-2xl font-light text-gray-500 dark:text-gray-300 md:text-lg lg:mb-8 lg:text-xl">
-              Track credit card benefits, maximize rewards, and never miss expiring perks. Free tool for Chase Sapphire, Amex Platinum, Capital One Venture, and 50+ premium cards. Get ROI insights and smart notifications.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link
-                href="/auth/signin"
-                className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-3 text-center text-base font-medium text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-900"
-              >
-                Get Started - Sign In
-                <svg className="ml-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                  <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"></path>
-                </svg>
-              </Link>
-              <Link 
-                href="/guide" 
-                className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:ring-gray-100 dark:text-white dark:border-gray-700 dark:hover:bg-gray-700 dark:focus:ring-gray-800"
-              >
-                Learn How to Maximize Benefits
-              </Link>
-            </div>
 
-            {/* Trust Badges */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              {/* 100% Free Badge */}
-              <div className="inline-flex items-center gap-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 px-4 py-3">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {/* ── Hero Section ── */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+          <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-indigo-100/50 dark:bg-indigo-900/20 blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-purple-100/50 dark:bg-purple-900/20 blur-3xl" />
+        </div>
+
+        <div className="relative container mx-auto max-w-screen-xl px-4 py-16 lg:py-24">
+          <div className="grid lg:grid-cols-12 lg:gap-12 items-center">
+            <div className="lg:col-span-7 mb-12 lg:mb-0">
+              {/* Beta badge */}
+              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 px-4 py-1.5 mb-6">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                </span>
+                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                  Pro is free during Beta — sign up now
+                </span>
+              </div>
+
+              <h1 className="mb-6 max-w-2xl text-4xl font-extrabold leading-[1.1] tracking-tight text-gray-900 dark:text-white md:text-5xl xl:text-6xl">
+                Stop Leaving{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
+                  Money
+                </span>{' '}
+                on the Table
+              </h1>
+              <p className="mb-8 max-w-xl text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
+                Track every credit card perk, get reminded before they expire, and see your annual fee ROI at a glance. Supports 50+ premium cards.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 mb-8">
+                <Link
+                  href="/auth/signin"
+                  className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-700 hover:shadow-indigo-500/30 transition-all duration-200 focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-900"
+                >
+                  Get Started Free
+                  <svg className="ml-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </Link>
+                <a
+                  href="#how-it-works"
+                  className="inline-flex items-center justify-center px-6 py-3.5 text-base font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200"
+                >
+                  See How It Works ↓
+                </a>
+              </div>
+
+              {/* Trust Badges */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="inline-flex items-center gap-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 px-4 py-2.5">
+                  <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">Free plan available</p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400">Pro free during beta</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">100% Free Forever</p>
-                  <p className="text-xs text-indigo-600 dark:text-indigo-400">No subscriptions, no premium tiers, no hidden fees</p>
-                </div>
-              </div>
-
-              {/* Privacy Badge */}
-              <div className="inline-flex items-center gap-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-4 py-3">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="inline-flex items-center gap-2.5 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-4 py-2.5">
+                  <svg className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-green-800 dark:text-green-200">No bank access required</p>
-                  <p className="text-xs text-green-600 dark:text-green-400">We never ask for banking credentials</p>
+                  <div>
+                    <p className="text-sm font-semibold text-green-800 dark:text-green-200">No bank access needed</p>
+                    <p className="text-xs text-green-600 dark:text-green-400">We never ask for credentials</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div className="hidden lg:col-span-5 lg:mt-0 lg:flex lg:items-center lg:justify-center relative">
-            <Image 
-              src="/hero-image.jpg" 
-              alt={`${SITE_NAME} - Maximize your credit card benefits`} 
-              fill
-              className="rounded-lg object-contain"
-              priority
-            />
+
+            <div className="hidden lg:col-span-5 lg:flex lg:items-center lg:justify-center relative">
+              <div className="relative w-full aspect-[4/3]">
+                <Image
+                  src="/hero-image.jpg"
+                  alt={`${SITE_NAME} - Maximize your credit card benefits`}
+                  fill
+                  className="rounded-2xl object-contain"
+                  priority
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Value Stats Section */}
+      {/* ── Value Stats ── */}
       <section className="bg-white dark:bg-gray-800 py-12 border-y border-gray-200 dark:border-gray-700">
         <div className="container mx-auto max-w-screen-xl px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
@@ -145,8 +169,38 @@ export default async function Home() {
         </div>
       </section>
 
-        {/* Add the Supported Credit Cards section */}
-        <SupportedCreditCards />
+      {/* ── How It Works ── */}
+      <HowItWorks />
+
+      {/* ── Features + Supported Cards ── */}
+      <SupportedCreditCards />
+
+      {/* ── Pricing ── */}
+      <PricingSection />
+
+      {/* ── FAQ ── */}
+      <FAQ />
+
+      {/* ── Bottom CTA ── */}
+      <section className="py-20 bg-gradient-to-br from-indigo-600 to-purple-700 dark:from-indigo-800 dark:to-purple-900">
+        <div className="container mx-auto max-w-screen-xl px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Ready to stop wasting your card benefits?
+          </h2>
+          <p className="text-lg text-indigo-100 dark:text-indigo-200 max-w-2xl mx-auto mb-8">
+            Join during beta and get Pro features free. Track your benefits, get smart reminders, and maximize your ROI.
+          </p>
+          <Link
+            href="/auth/signin"
+            className="inline-flex items-center px-8 py-4 bg-white text-indigo-700 font-semibold rounded-xl shadow-xl shadow-indigo-900/20 hover:bg-indigo-50 transition-colors duration-200 text-lg"
+          >
+            Get Started Free
+            <svg className="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </Link>
+        </div>
+      </section>
       </div>
     );
   }

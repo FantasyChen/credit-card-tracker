@@ -26,6 +26,11 @@ model User {
   notifyPointsExpiration  Boolean?         @default(true)
   pointsExpirationDays    Int?             @default(30)
   role                    UserRole         @default(USER)
+  subscriptionTier        SubscriptionTier @default(FREE)
+  isBetaUser              Boolean          @default(false)
+  betaEnrolledAt          DateTime?
+  emailAlertsUsed         Int              @default(0)
+  emailAlertsResetAt      DateTime?
   accounts                Account[]
   benefitStatuses         BenefitStatus[]
   creditCards             CreditCard[]
@@ -247,5 +252,10 @@ enum UserRole {
   USER
   MODERATOR
   ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
 }
 

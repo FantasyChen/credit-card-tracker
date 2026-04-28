@@ -13,11 +13,19 @@ interface NotificationSettings {
 interface NotificationSettingsFormProps {
   initialSettings: NotificationSettings;
   updateAction: (formData: FormData) => Promise<void>;
+  emailAlertUsage: {
+    used: number;
+    limit: number | null;
+    canSend: boolean;
+  };
+  subscriptionTier: string;
 }
 
 export default function NotificationSettingsForm({
   initialSettings,
   updateAction,
+  emailAlertUsage,
+  subscriptionTier,
 }: NotificationSettingsFormProps) {
   const [isPending, startTransition] = useTransition();
   const [saveStatus, setSaveStatus] = useState<{
@@ -78,6 +86,36 @@ export default function NotificationSettingsForm({
         </div>
       )}
 
+      {/* Subscription Tier Info Banner */}
+      {emailAlertUsage.limit !== null && (
+        <div className="mb-6 p-4 rounded-lg bg-indigo-50 border border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 mt-0.5">
+              <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
+                Free Tier Email Limit: {emailAlertUsage.used} / {emailAlertUsage.limit} used this month
+              </h3>
+              <div className="mt-1 text-sm text-indigo-700 dark:text-indigo-300">
+                <p>
+                  You can receive up to {emailAlertUsage.limit} email alerts per month on the Free plan. 
+                  {!emailAlertUsage.canSend && ' You have reached your limit for this month. Alerts will resume next month.'}
+                </p>
+                <p className="mt-2">
+                  <a href="/#pricing" className="font-semibold underline hover:text-indigo-900 dark:hover:text-indigo-100">
+                    Upgrade to Pro
+                  </a>
+                  {' '}for unlimited email alerts and custom notification days.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form 
         onSubmit={handleSubmit}
         className="space-y-6 bg-white p-6 rounded-lg shadow dark:bg-gray-800 dark:shadow-lg dark:shadow-indigo-500/20"
@@ -131,12 +169,17 @@ export default function NotificationSettingsForm({
               id="notifyExpirationDays"
               name="notifyExpirationDays"
               min="1"
-              defaultValue={initialSettings.notifyExpirationDays}
+              defaultValue={subscriptionTier === 'FREE' ? 7 : initialSettings.notifyExpirationDays}
+              disabled={subscriptionTier === 'FREE'}
               required
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm max-w-xs dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-500 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm max-w-xs dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-500 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-gray-800"
             />
           </div>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter the number of days before the benefit cycle end date to receive the reminder.</p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {subscriptionTier === 'FREE' 
+              ? 'Free tier users receive reminders 7 days before expiration. Upgrade to Pro to customize this.'
+              : 'Enter the number of days before the benefit cycle end date to receive the reminder.'}
+          </p>
         </div>
 
         {/* Loyalty Points Expiration Notification Setting */}

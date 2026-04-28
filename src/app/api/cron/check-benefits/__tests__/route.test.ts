@@ -22,6 +22,7 @@ jest.mock('@/lib/prisma', () => ({
     loyaltyAccount: {
       findMany: jest.fn(),
     },
+    $executeRawUnsafe: jest.fn(),
   },
 }));
 
@@ -66,6 +67,7 @@ describe('/api/cron/check-benefits', () => {
     (prisma.user.findMany as jest.Mock).mockResolvedValue([]); // Notification users
     (prisma.loyaltyAccount.findMany as jest.Mock).mockResolvedValue([]); // Loyalty accounts
     (prisma.benefitStatus.upsert as jest.Mock).mockResolvedValue({});
+    (prisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(0);
     (NextResponse.json as jest.Mock).mockClear(); // Clear call history for NextResponse.json
   });
 
@@ -117,7 +119,7 @@ describe('/api/cron/check-benefits', () => {
         const mockRequest = new Request('http://localhost', { headers: { 'authorization': 'Bearer test-secret' } });
         await handler(mockRequest);
         expect(prisma.creditCard.findMany).toHaveBeenCalled(); // Core logic was reached
-        expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'Cron job executed successfully.' }), { status: 200 });
+        expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'Cron job executed successfully.' }));
       });
     });
   });
@@ -137,14 +139,13 @@ describe('/api/cron/check-benefits', () => {
         await GET(createMockRequest());
         expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ 
             message: 'Cron job executed successfully.', 
-            upsertsAttempted: 0, 
-            upsertsSuccessful: 0,
-            upsertsFailed: 0,
-            benefitsProcessed: 0,
+            rowsCalculated: 0,
+            rowsUpserted: 0,
             cardsProcessed: 0,
-            cardsSuccessful: 0,
-            cardsFailed: 0
-        }), { status: 200 });
+            standaloneBenefitsProcessed: 0,
+            skipped: 0,
+            calcErrors: 0,
+        }));
     });
 
     it('should process a monthly benefit and call upsert', async () => {
@@ -161,22 +162,17 @@ describe('/api/cron/check-benefits', () => {
 
         await GET(createMockRequest());
 
-        expect(prisma.benefitStatus.upsert).toHaveBeenCalledTimes(1);
-        expect(prisma.benefitStatus.upsert).toHaveBeenCalledWith({
-            where: { benefitId_userId_cycleStartDate_occurrenceIndex: { benefitId: 'b1', userId: 'user1', cycleStartDate: utcDate(2023,7,1), occurrenceIndex: 0 } },
-            update: expect.objectContaining({ cycleEndDate: utcDate(2023,7,31) }),
-            create: { benefitId: 'b1', userId: 'user1', cycleStartDate: utcDate(2023,7,1), cycleEndDate: utcDate(2023,7,31), occurrenceIndex: 0, isCompleted: false, usedAmount: 0 }
-        });
+        expect(prisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
+        const rawArgs = (prisma.$executeRawUnsafe as jest.Mock).mock.calls[0];
+        expect(rawArgs[0]).toContain('INSERT INTO "BenefitStatus"');
+        expect(rawArgs.slice(2, 7)).toEqual(['b1', 'user1', utcDate(2023,7,1), utcDate(2023,7,31), 0]);
         expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ 
             message: 'Cron job executed successfully.', 
-            upsertsAttempted: 1, 
-            upsertsSuccessful: 1,
-            upsertsFailed: 0,
-            benefitsProcessed: 1,
+            rowsCalculated: 1,
             cardsProcessed: 1,
-            cardsSuccessful: 1,
-            cardsFailed: 0
-        }), { status: 200 });
+            skipped: 0,
+            calcErrors: 0,
+        }));
     });
 
     it('should skip YEARLY anniversary benefit if card openedDate is missing', async () => {
@@ -186,18 +182,14 @@ describe('/api/cron/check-benefits', () => {
         };
         (prisma.creditCard.findMany as jest.Mock).mockResolvedValueOnce([mockCard]);
         await GET(createMockRequest());
-        expect(prisma.benefitStatus.upsert).not.toHaveBeenCalled();
-        expect(consoleWarnSpy).toHaveBeenCalledWith('Skipping YEARLY (anniversary based) benefit cycle for benefit b2 on card card2 as card has no openedDate.');
+        expect(prisma.$executeRawUnsafe).not.toHaveBeenCalled();
         expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ 
             message: 'Cron job executed successfully.', 
-            upsertsAttempted: 0, 
-            upsertsSuccessful: 0,
-            upsertsFailed: 0,
-            benefitsProcessed: 1,
+            rowsCalculated: 0,
+            rowsUpserted: 0,
             cardsProcessed: 1,
-            cardsSuccessful: 1,
-            cardsFailed: 0
-        }), { status: 200 });
+            skipped: 1,
+        }));
     });
     
     it('should process YEARLY CALENDAR_FIXED benefit even if card openedDate is missing', async () => {
@@ -213,25 +205,20 @@ describe('/api/cron/check-benefits', () => {
         (calculateBenefitCycle as jest.Mock).mockReturnValueOnce({ cycleStartDate: utcDate(2023,1,1), cycleEndDate: utcDate(2023,12,31) });
         
         await GET(createMockRequest());
-        expect(prisma.benefitStatus.upsert).toHaveBeenCalledTimes(1);
+        expect(prisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
         expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ 
             message: 'Cron job executed successfully.', 
-            upsertsAttempted: 1, 
-            upsertsSuccessful: 1,
-            upsertsFailed: 0,
-            benefitsProcessed: 1,
+            rowsCalculated: 1,
             cardsProcessed: 1,
-            cardsSuccessful: 1,
-            cardsFailed: 0
-        }), { status: 200 });
+        }));
     });
 
     it('should log and return 500 if prisma.creditCard.findMany fails', async () => {
         (prisma.creditCard.findMany as jest.Mock).mockRejectedValueOnce(new Error('DB findMany failed'));
         await GET(createMockRequest());
-        expect(consoleErrorSpy).toHaveBeenCalledWith('💥 GLOBAL FAILURE in improved check-benefits logic:', 'DB findMany failed');
+        expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('💥 Failed after'), 'DB findMany failed');
         expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ 
-            message: 'Cron job failed globally.', 
+            message: 'Cron job failed.', 
             error: 'DB findMany failed'
         }), { status: 500 });
     });
@@ -251,31 +238,19 @@ describe('/api/cron/check-benefits', () => {
 
         await GET(createMockRequest());
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Error calculating cycle for benefit bA1 (user: userA, card: cardA):', 'Calc fail for bA1');
-        expect(prisma.benefitStatus.upsert).toHaveBeenCalledTimes(1); // Only bB1 should be upserted
-        expect(prisma.benefitStatus.upsert).toHaveBeenCalledWith(expect.objectContaining({
-            where: { 
-                benefitId_userId_cycleStartDate_occurrenceIndex: { 
-                    benefitId: 'bB1', 
-                    userId: 'userB',
-                    cycleStartDate: utcDate(2023,8,1),
-                    occurrenceIndex: 0
-                }
-            }
-        }));
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Cycle error benefit bA1:', 'Calc fail for bA1');
+        expect(prisma.$executeRawUnsafe).toHaveBeenCalledTimes(1); // Only bB1 should be upserted
+        const rawArgs = (prisma.$executeRawUnsafe as jest.Mock).mock.calls[0];
+        expect(rawArgs.slice(2, 7)).toEqual(['bB1', 'userB', utcDate(2023,8,1), utcDate(2023,8,31), 0]);
         expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ 
             message: 'Cron job executed successfully.', 
-            upsertsAttempted: 1, 
-            upsertsSuccessful: 1,
-            upsertsFailed: 0,
-            benefitsProcessed: 2,
+            rowsCalculated: 1,
             cardsProcessed: 2,
-            cardsSuccessful: 2,
-            cardsFailed: 0
-        }), { status: 200 });
+            calcErrors: 1,
+        }));
     });
 
-    it('should attempt all upserts and log error if one prisma.benefitStatus.upsert fails', async () => {
+    it('should return 500 if the bulk upsert fails', async () => {
         const mockCards = [
             { id: 'cardC', openedDate: null, user: {id: 'userC'}, benefits: [{ id: 'bC1', frequency: BenefitFrequency.MONTHLY }] },
             { id: 'cardD', openedDate: null, user: {id: 'userD'}, benefits: [{ id: 'bD1', frequency: BenefitFrequency.QUARTERLY }] }
@@ -285,25 +260,15 @@ describe('/api/cron/check-benefits', () => {
             .mockReturnValueOnce({ cycleStartDate: utcDate(2023,9,1), cycleEndDate: utcDate(2023,9,30) }) // For bC1
             .mockReturnValueOnce({ cycleStartDate: utcDate(2023,10,1), cycleEndDate: utcDate(2023,12,31) }); // For bD1
         
-        (prisma.benefitStatus.upsert as jest.Mock)
-            .mockResolvedValueOnce({}) // Success for bC1
-            .mockRejectedValueOnce(new Error('Upsert fail for bD1')); // Fail for bD1
+        (prisma.$executeRawUnsafe as jest.Mock).mockRejectedValueOnce(new Error('Bulk upsert failed'));
 
         await GET(createMockRequest());
         
-        expect(prisma.benefitStatus.upsert).toHaveBeenCalledTimes(2);
-        // With Promise.allSettled, individual failures are logged as warnings, not global failures
-        // Updated for improved error handling - errors are now logged per card
+        expect(prisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
         expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ 
-            message: 'Cron job executed successfully.', 
-            upsertsAttempted: 2, 
-            upsertsSuccessful: 1,
-            upsertsFailed: 1,
-            benefitsProcessed: 2,
-            cardsProcessed: 2,
-            cardsSuccessful: 2,
-            cardsFailed: 0
-        }), { status: 200 });
+            message: 'Cron job failed.', 
+            error: 'Bulk upsert failed',
+        }), { status: 500 });
     });
 
     // More tests for runCheckBenefitsLogic will be added here

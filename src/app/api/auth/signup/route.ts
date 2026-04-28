@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { createVerificationToken } from '@/lib/tokens';
 import { sendEmail } from '@/lib/email';
 import { SITE_NAME } from '@/lib/site';
+import { isBetaMode } from '@/lib/subscription';
 
 export async function POST(request: Request) {
   try {
@@ -60,11 +61,13 @@ export async function POST(request: Request) {
     } else {
       // Brand new user
       const hashedPassword = await bcrypt.hash(password, 12);
+      const betaFields = isBetaMode() ? { isBetaUser: true, betaEnrolledAt: new Date() } : {};
       await prisma.user.create({
         data: {
           email: normalizedEmail,
           password: hashedPassword,
           name: name || null,
+          ...betaFields,
         },
       });
     }
