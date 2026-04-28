@@ -105,7 +105,7 @@ export default function NotificationSettingsForm({
                   {!emailAlertUsage.canSend && ' You have reached your limit for this month. Alerts will resume next month.'}
                 </p>
                 <p className="mt-2">
-                  <a href="/#pricing" className="font-semibold underline hover:text-indigo-900 dark:hover:text-indigo-100">
+                  <a href="/pricing" className="font-semibold underline hover:text-indigo-900 dark:hover:text-indigo-100">
                     Upgrade to Pro
                   </a>
                   {' '}for unlimited email alerts and custom notification days.

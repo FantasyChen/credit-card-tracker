@@ -189,7 +189,7 @@ export default async function SettingsPage() {
           </div>
           <div>
             <p className="font-medium text-gray-900 dark:text-white">Manage plan</p>
-            <Link href="/#pricing" className="mt-1 inline-block text-indigo-600 hover:underline dark:text-indigo-400">
+            <Link href="/pricing" className="mt-1 inline-block text-indigo-600 hover:underline dark:text-indigo-400">
               View plan details
             </Link>
           </div>
