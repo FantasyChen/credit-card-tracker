@@ -25,7 +25,7 @@ export default async function Home() {
     "@context": "https://schema.org",
     "@type": "WebApplication",
     "name": SITE_NAME,
-    "description": "Track credit card benefits, maximize rewards, and never miss expiring perks again. Free tool for Chase, Amex, Capital One, and 50+ premium cards.",
+    "description": "Track credit card benefits, maximize rewards, and never miss expiring perks again. Free tool for Chase, Amex, Capital One, and a growing catalog of premium cards.",
     "url": PRIMARY_SITE_URL,
     "applicationCategory": "FinanceApplication",
     "operatingSystem": "Web Browser",
@@ -87,7 +87,7 @@ export default async function Home() {
                 on the Table
               </h1>
               <p className="mb-8 max-w-xl text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
-                Track every credit card perk, get reminded before they expire, and see your annual fee ROI at a glance. Supports 50+ premium cards.
+                Track every credit card perk, get reminded before they expire, and see your annual fee ROI at a glance. Supports a growing catalog of premium cards.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-8">

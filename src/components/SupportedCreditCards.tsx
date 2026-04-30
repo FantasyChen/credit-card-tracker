@@ -62,6 +62,7 @@ export default function SupportedCreditCards() {
 
   // Show only first 6 cards initially, or all if showAll is true
   const displayedCards = showAll ? filteredCards : filteredCards.slice(0, 6);
+  const cardCountLabel = `${cards.length} popular credit card${cards.length === 1 ? '' : 's'}`;
 
   // Group cards by issuer for better organization
   const cardsByIssuer = displayedCards.reduce((acc, card) => {
@@ -146,7 +147,7 @@ export default function SupportedCreditCards() {
               Supported Credit Cards
             </h2>
             <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              Track benefits from {cards.length}+ popular credit cards. We support cards from major issuers with detailed benefit tracking and automated cycle management.
+              Track benefits from {cardCountLabel}. We support cards from major issuers with detailed benefit tracking and automated cycle management.
             </p>
             {cards.length > 0 && (
               <div className="mt-8 flex justify-center space-x-8 text-sm text-gray-500 dark:text-gray-400">

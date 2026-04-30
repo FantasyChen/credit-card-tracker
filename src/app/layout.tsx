@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     default: `${SITE_NAME} - Credit Card Benefits Tracker | Never Miss Rewards Again`,
     template: `%s | ${SITE_NAME}`
   },
-  description: `${SITE_DESCRIPTION} Free tool for Chase, Amex, Capital One, and 50+ premium cards. Get ROI insights and smart notifications.`,
+  description: `${SITE_DESCRIPTION} Free tool for Chase, Amex, Capital One, and a growing catalog of premium cards. Get ROI insights and smart notifications.`,
   keywords: [
     "credit card benefits tracker",
     "credit card rewards tracker", 

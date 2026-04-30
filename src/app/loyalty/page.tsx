@@ -6,15 +6,12 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { LoyaltyAccountsClient } from './LoyaltyAccountsClient';
 import { Metadata } from 'next';
+import { buildLoyaltySignInRedirect } from '@/lib/loyalty-links';
 
 /** Build callback URL so users return to loyalty subdomain after sign-in. */
-function getSignInRedirect(): string {
-  const host = headers().get('host') || '';
-  if (host.includes('loyalty.') || host.includes('loyalty.localhost')) {
-    const protocol = host.includes('localhost') ? 'http' : 'https';
-    return `/api/auth/signin?callbackUrl=${encodeURIComponent(`${protocol}://${host}/loyalty`)}`;
-  }
-  return '/api/auth/signin?callbackUrl=/loyalty';
+async function getSignInRedirect(): Promise<string> {
+  const headerList = await headers();
+  return buildLoyaltySignInRedirect(headerList.get('host') || '');
 }
 
 export const metadata: Metadata = {
@@ -35,7 +32,7 @@ export const metadata: Metadata = {
 export default async function LoyaltyPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    redirect(getSignInRedirect());
+    redirect(await getSignInRedirect());
   }
 
   // Fetch user's current loyalty accounts
@@ -92,4 +89,4 @@ export default async function LoyaltyPage() {
       />
     </div>
   );
-} 
+}

@@ -17,6 +17,7 @@ type LoyaltyProgram = {
   company: string;
   expirationMonths: number | null;
   hasExpiration: boolean;
+  expirationBasis: string | null;
   description: string | null;
   qualifyingActivities: string | null;
   website: string | null;
@@ -41,6 +42,7 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
   const [isPending, startTransition] = useTransition();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<LoyaltyAccount | null>(null);
+  const [sortMode, setSortMode] = useState<'urgency' | 'program' | 'type'>('urgency');
 
   const handleAddAccount = (formData: FormData) => {
     startTransition(async () => {
@@ -102,6 +104,24 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
     }
   };
 
+  const sortedAccounts = [...userAccounts].sort((a, b) => {
+    if (sortMode === 'program') {
+      return a.loyaltyProgram.displayName.localeCompare(b.loyaltyProgram.displayName);
+    }
+
+    if (sortMode === 'type') {
+      return a.loyaltyProgram.type.localeCompare(b.loyaltyProgram.type)
+        || a.loyaltyProgram.displayName.localeCompare(b.loyaltyProgram.displayName);
+    }
+
+    const aDays = calculateDaysUntilExpiration(a.expirationDate);
+    const bDays = calculateDaysUntilExpiration(b.expirationDate);
+    const aRank = aDays === null ? Number.POSITIVE_INFINITY : aDays;
+    const bRank = bDays === null ? Number.POSITIVE_INFINITY : bDays;
+
+    return aRank - bRank || a.loyaltyProgram.displayName.localeCompare(b.loyaltyProgram.displayName);
+  });
+
   return (
     <div className="space-y-6">
       {/* Summary Stats */}
@@ -157,16 +177,29 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
       </div>
 
       {/* Add New Account Button */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold dark:text-white">Your Loyalty Accounts</h2>
-        <Button 
-          onClick={() => setShowAddModal(true)}
-          disabled={isPending || availablePrograms.length === 0}
-          className="flex items-center space-x-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add Program</span>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="loyalty-sort" className="sr-only">Sort loyalty accounts</label>
+          <select
+            id="loyalty-sort"
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
+            className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+          >
+            <option value="urgency">Expiring soon</option>
+            <option value="program">Program name</option>
+            <option value="type">Program type</option>
+          </select>
+          <Button
+            onClick={() => setShowAddModal(true)}
+            disabled={isPending || availablePrograms.length === 0}
+            className="flex items-center space-x-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Program</span>
+          </Button>
+        </div>
       </div>
 
       {/* Accounts Grid */}
@@ -190,7 +223,7 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {userAccounts.map((account) => {
+          {sortedAccounts.map((account) => {
             const expirationStatus = getExpirationStatus(account);
             return (
               <Card key={account.id} className="relative">
@@ -295,4 +328,4 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
       )}
     </div>
   );
-} 
+}

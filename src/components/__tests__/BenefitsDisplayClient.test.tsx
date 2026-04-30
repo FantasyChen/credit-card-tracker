@@ -74,4 +74,12 @@ describe('BenefitsDisplayClient', () => {
     expect(screen.getByRole('button', { name: /Group by Category/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Group by Card/i })).toBeInTheDocument();
   });
+
+  it('offers benefit sorting controls for daily prioritization', () => {
+    render(<BenefitsDisplayClient {...defaultProps} />);
+
+    expect(screen.getByLabelText('Sort benefits')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Expires soon' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Highest value' })).toBeInTheDocument();
+  });
 });

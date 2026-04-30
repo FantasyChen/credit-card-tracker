@@ -5,13 +5,12 @@ import { headers } from 'next/headers';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { SITE_NAME } from '@/lib/site';
+import { buildLoyaltyCallbackUrl } from '@/lib/loyalty-links';
 
 /** Build sign-in/sign-up callback URL so users stay on loyalty subdomain after login. */
-function getLoyaltyCallbackUrl(): string | null {
-  const host = headers().get('host') || '';
-  if (!host.includes('loyalty.') && !host.includes('loyalty.localhost')) return null;
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  return `${protocol}://${host}/loyalty`;
+async function getLoyaltyCallbackUrl(): Promise<string | null> {
+  const headerList = await headers();
+  return buildLoyaltyCallbackUrl(headerList.get('host') || '');
 }
 
 export const metadata: Metadata = {
@@ -34,7 +33,7 @@ export default async function LoyaltyLandingPage() {
     redirect('/loyalty');
   }
 
-  const loyaltyCallback = getLoyaltyCallbackUrl();
+  const loyaltyCallback = await getLoyaltyCallbackUrl();
   const signInHref = loyaltyCallback
     ? `/auth/signin?callbackUrl=${encodeURIComponent(loyaltyCallback)}`
     : '/auth/signin';

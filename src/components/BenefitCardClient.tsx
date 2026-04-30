@@ -370,7 +370,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                       <button
                         type="submit"
                         disabled={isPending}
-                        className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-yellow-500 hover:bg-yellow-600 text-white shadow-lg hover:shadow-xl focus:ring-yellow-500 dark:bg-yellow-600 dark:hover:bg-yellow-700 ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                        className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 focus:ring-amber-500 dark:bg-amber-900/20 dark:hover:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {isPending ? (
                           <div className="flex items-center justify-center">
@@ -397,7 +397,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                         type="button"
                         onClick={handleFullCompletion}
                         disabled={isPending}
-                        className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl focus:ring-green-500 dark:bg-green-600 dark:hover:bg-green-700 ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                        className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 bg-green-600 hover:bg-green-700 text-white shadow-sm focus:ring-green-500 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {isPending ? (
                           <div className="flex items-center justify-center">
@@ -421,13 +421,13 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                           type="button"
                           onClick={() => setShowPartialModal(true)}
                           disabled={isPending}
-                          className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-amber-500 hover:bg-amber-600 text-white shadow-lg hover:shadow-xl focus:ring-amber-500 dark:bg-amber-600 dark:hover:bg-amber-700 ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                          className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 focus:ring-amber-500 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 dark:border-gray-600 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <div className="flex items-center justify-center">
                             <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                             </svg>
-                            Partial Complete
+                            Add Amount
                           </div>
                         </button>
                       )}
@@ -444,11 +444,11 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                   <button
                     type="submit"
                     disabled={isPending}
-                    className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                    className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                       isNotUsable
-                        ? 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-lg hover:shadow-xl focus:ring-indigo-500 dark:bg-indigo-600 dark:hover:bg-indigo-700'
-                        : 'bg-gray-500 hover:bg-gray-600 text-white shadow-lg hover:shadow-xl focus:ring-gray-500 dark:bg-gray-600 dark:hover:bg-gray-700'
-                    } ${isPending ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                        ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 focus:ring-indigo-500 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30 dark:text-indigo-200 dark:border-indigo-800'
+                        : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 focus:ring-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
+                    } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     {isPending ? (
                       <div className="flex items-center justify-center">
@@ -487,7 +487,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                   type="button"
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={isPending || isDeleting}
-                  className="w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl focus:ring-red-500 dark:bg-red-600 dark:hover:bg-red-700 hover:scale-105"
+                  className="w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 focus:ring-red-500 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-200 dark:border-red-800"
                 >
                   <div className="flex items-center justify-center">
                     <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -642,4 +642,4 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
       )}
     </div>
   );
-} 
+}

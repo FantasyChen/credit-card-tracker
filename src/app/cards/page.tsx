@@ -214,16 +214,32 @@ export default function UserCardsPage() {
       
       {/* Updated error handling */}
       {error && (
-        <div className="text-center py-10 px-4 border border-dashed rounded-lg dark:border-gray-700">
+        <div className="overflow-hidden rounded-xl border border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-green-50 px-6 py-10 text-center dark:border-indigo-800 dark:from-indigo-950/30 dark:via-gray-900 dark:to-green-950/20">
           {error === "Please sign in to view your cards." ? (
-            <>
-              <p className="text-gray-500 mb-4 dark:text-gray-400">
-                Please sign in to manage your cards.
+            <div className="mx-auto max-w-2xl">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                <span aria-hidden="true" className="text-xl">💳</span>
+              </div>
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                Track your card perks in one place
+              </h2>
+              <p className="mt-3 text-gray-600 dark:text-gray-300">
+                Add your cards once, then let Perks Reminder calculate every cycle, from monthly credits to annual anniversary perks.
               </p>
-              <Link href="/auth/signin?callbackUrl=/cards" className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200 dark:bg-blue-600 dark:hover:bg-blue-700">
-                Sign In
-              </Link>
-            </>
+              <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                <Link href="/auth/signin?callbackUrl=/cards" className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors">
+                  Sign in to view cards
+                </Link>
+                <Link href="/auth/signup?callbackUrl=/cards" className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700">
+                  Create free account
+                </Link>
+              </div>
+              <div className="mt-6 grid gap-3 text-left text-sm text-gray-600 dark:text-gray-300 sm:grid-cols-3">
+                <div className="rounded-lg bg-white/70 p-3 ring-1 ring-gray-200 dark:bg-gray-800/60 dark:ring-gray-700">Automatic cycle dates</div>
+                <div className="rounded-lg bg-white/70 p-3 ring-1 ring-gray-200 dark:bg-gray-800/60 dark:ring-gray-700">Annual fee ROI</div>
+                <div className="rounded-lg bg-white/70 p-3 ring-1 ring-gray-200 dark:bg-gray-800/60 dark:ring-gray-700">Expiration reminders</div>
+              </div>
+            </div>
           ) : (
             <p className="text-red-500 dark:text-red-400">Error: {error}</p>
           )}
@@ -256,4 +272,4 @@ export default function UserCardsPage() {
       /> */}
     </div>
   );
-} 
+}

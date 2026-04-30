@@ -20,7 +20,6 @@ const mainNavigation: NavItem[] = [
   { name: 'Benefits', href: '/benefits' },
   { name: 'Notifications', href: '/settings/notifications', authRequired: true },
   { name: 'Account', href: '/settings', authRequired: true },
-  { name: 'Contact', href: '/contact' },
 ];
 
 const loyaltyNavigation: NavItem[] = [
@@ -112,7 +111,7 @@ const Navbar = () => {
             <div className="hidden sm:block">
               <a
                 href={switchHref}
-                className="inline-flex items-center rounded-md px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
+                className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
               >
                 {switchLabel}
                 <ArrowRightIcon className="ml-1 h-4 w-4" aria-hidden="true" />

@@ -45,6 +45,7 @@ export default function BenefitsDisplayClient({
   const [showRoiBreakdown, setShowRoiBreakdown] = useState(false);
 
   const [viewMode, setViewMode] = useState<'category' | 'card'>('card');
+  const [sortMode, setSortMode] = useState<'expires' | 'value' | 'card'>('expires');
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
   const [localNotUsableBenefits, setLocalNotUsableBenefits] = useState(notUsableBenefits);
@@ -226,6 +227,25 @@ export default function BenefitsDisplayClient({
     });
   };
 
+  const sortBenefits = (benefits: DisplayBenefitStatus[]): DisplayBenefitStatus[] => {
+    return [...benefits].sort((a, b) => {
+      if (sortMode === 'value') {
+        return (b.benefit.maxAmount || 0) - (a.benefit.maxAmount || 0)
+          || new Date(a.cycleEndDate).getTime() - new Date(b.cycleEndDate).getTime();
+      }
+
+      if (sortMode === 'card') {
+        const aCard = a.benefit.creditCard?.displayName ?? 'Custom Benefits';
+        const bCard = b.benefit.creditCard?.displayName ?? 'Custom Benefits';
+        return aCard.localeCompare(bCard)
+          || new Date(a.cycleEndDate).getTime() - new Date(b.cycleEndDate).getTime();
+      }
+
+      return new Date(a.cycleEndDate).getTime() - new Date(b.cycleEndDate).getTime()
+        || (b.benefit.maxAmount || 0) - (a.benefit.maxAmount || 0);
+    });
+  };
+
   // Get unique categories and cards from all benefits for filter dropdowns
   const allBenefitsForTab = useMemo(() => {
     switch (activeTab) {
@@ -243,12 +263,12 @@ export default function BenefitsDisplayClient({
   }, [activeTab, localUpcomingBenefits, localCompletedBenefits, localNotUsableBenefits, localScheduledBenefits]);
 
   const uniqueCategories = useMemo(
-    () => [...new Set(allBenefitsForTab.map((b) => b.benefit.category))].sort(),
+    () => Array.from(new Set(allBenefitsForTab.map((b) => b.benefit.category))).sort(),
     [allBenefitsForTab]
   );
   const uniqueCards = useMemo(
     () =>
-      [...new Set(allBenefitsForTab.map((b) => b.benefit.creditCard?.name ?? '⭐ Custom Benefits'))].sort((a, b) => {
+      Array.from(new Set(allBenefitsForTab.map((b) => b.benefit.creditCard?.name ?? '⭐ Custom Benefits'))).sort((a, b) => {
         if (a === '⭐ Custom Benefits') return -1;
         if (b === '⭐ Custom Benefits') return 1;
         return a.localeCompare(b);
@@ -471,13 +491,18 @@ export default function BenefitsDisplayClient({
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold dark:text-white">Benefits Dashboard</h1>
+      <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold dark:text-white">Benefits Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Prioritize what expires soon, record claimed value, and keep annual fees honest.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
           {/* Add Custom Benefit Button */}
           <Link
             href="/benefits/custom"
-            className="px-4 py-2 rounded-md text-sm font-medium transition-colors bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg"
+            className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
           >
             <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -486,10 +511,10 @@ export default function BenefitsDisplayClient({
           </Link>
           <button
             onClick={setCategoryView}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               viewMode === 'category' 
-                ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                : 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200'
+                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200'
             }`}
           >
             <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -499,10 +524,10 @@ export default function BenefitsDisplayClient({
           </button>
           <button
             onClick={setCardView}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               viewMode === 'card' 
-                ? 'bg-green-600 hover:bg-green-700 text-white' 
-                : 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200'
+                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200'
             }`}
           >
             <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -514,13 +539,13 @@ export default function BenefitsDisplayClient({
       </div>
 
       {/* Summary Widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {/* Upcoming Benefits Widget */}
-        <div className="group overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300 dark:from-blue-900/20 dark:to-indigo-800/20 border border-blue-200 dark:border-blue-700">
-          <div className="p-6">
+        <div className="overflow-hidden rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="p-3 bg-blue-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <div className="p-2 bg-blue-500 rounded-lg">
                   <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -530,7 +555,7 @@ export default function BenefitsDisplayClient({
                 <dl>
                   <dt className="text-sm font-medium text-blue-600 dark:text-blue-300">Upcoming Benefits</dt>
                   <dd>
-                    <div className="text-xl sm:text-2xl font-bold text-blue-900 dark:text-blue-100">${localTotalUnusedValue.toFixed(2)}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">${localTotalUnusedValue.toFixed(2)}</div>
                   </dd>
                 </dl>
               </div>
@@ -539,11 +564,11 @@ export default function BenefitsDisplayClient({
         </div>
 
         {/* Claimed Benefits Widget */}
-        <div className="group overflow-hidden rounded-xl bg-gradient-to-br from-green-50 to-emerald-100 shadow-lg hover:shadow-xl transition-all duration-300 dark:from-green-900/20 dark:to-emerald-800/20 border border-green-200 dark:border-green-700">
-          <div className="p-6">
+        <div className="overflow-hidden rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="p-3 bg-green-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <div className="p-2 bg-green-500 rounded-lg">
                   <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
@@ -553,7 +578,7 @@ export default function BenefitsDisplayClient({
                 <dl>
                   <dt className="text-sm font-medium text-green-600 dark:text-green-300">Claimed Benefits</dt>
                   <dd>
-                    <div className="text-xl sm:text-2xl font-bold text-green-900 dark:text-green-100">${localTotalUsedValue.toFixed(2)}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">${localTotalUsedValue.toFixed(2)}</div>
                   </dd>
                 </dl>
               </div>
@@ -562,11 +587,11 @@ export default function BenefitsDisplayClient({
         </div>
 
         {/* Not Usable Benefits Widget */}
-        <div className="group overflow-hidden rounded-xl bg-gradient-to-br from-gray-50 to-slate-100 shadow-lg hover:shadow-xl transition-all duration-300 dark:from-gray-900/20 dark:to-slate-800/20 border border-gray-200 dark:border-gray-700">
-          <div className="p-6">
+        <div className="overflow-hidden rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="p-3 bg-gray-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <div className="p-2 bg-gray-500 rounded-lg">
                   <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
                   </svg>
@@ -585,15 +610,15 @@ export default function BenefitsDisplayClient({
         </div>
 
         {/* Annual Fee ROI Widget */}
-        <div className={`group overflow-hidden rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border ${
+        <div className={`overflow-hidden rounded-lg shadow-sm border ${
           localTotalUsedValue >= totalAnnualFees 
-            ? 'bg-gradient-to-br from-emerald-50 to-green-100 dark:from-emerald-900/20 dark:to-green-800/20 border-emerald-200 dark:border-emerald-700' 
-            : 'bg-gradient-to-br from-orange-50 to-red-100 dark:from-orange-900/20 dark:to-red-800/20 border-orange-200 dark:border-orange-700'
+            ? 'bg-white dark:bg-gray-800 border-emerald-200 dark:border-emerald-700'
+            : 'bg-white dark:bg-gray-800 border-orange-200 dark:border-orange-700'
         }`}>
-          <div className="p-6">
+          <div className="p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className={`p-3 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 ${
+                <div className={`p-2 rounded-lg ${
                   localTotalUsedValue >= totalAnnualFees 
                     ? 'bg-emerald-500' 
                     : 'bg-orange-500'
@@ -756,6 +781,18 @@ export default function BenefitsDisplayClient({
             />
           </div>
           <div className="flex items-center gap-2">
+            <label htmlFor="sort-benefits" className="sr-only">Sort benefits</label>
+            <select
+              id="sort-benefits"
+              aria-label="Sort benefits"
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-800 dark:text-white"
+            >
+              <option value="expires">Expires soon</option>
+              <option value="value">Highest value</option>
+              <option value="card">Card name</option>
+            </select>
             <button
               type="button"
               onClick={() => setShowFilters(!showFilters)}
@@ -831,17 +868,17 @@ export default function BenefitsDisplayClient({
       <div>
         {activeTab === 'upcoming' && (
           <section>
-            {viewMode === 'category' ? renderCategoryView(filterBenefits(localUpcomingBenefits)) : renderCardView(filterBenefits(localUpcomingBenefits))}
+            {viewMode === 'category' ? renderCategoryView(sortBenefits(filterBenefits(localUpcomingBenefits))) : renderCardView(sortBenefits(filterBenefits(localUpcomingBenefits)))}
           </section>
         )}
         {activeTab === 'completed' && (
           <section>
-            {viewMode === 'category' ? renderCategoryView(filterBenefits(localCompletedBenefits)) : renderCardView(filterBenefits(localCompletedBenefits))}
+            {viewMode === 'category' ? renderCategoryView(sortBenefits(filterBenefits(localCompletedBenefits))) : renderCardView(sortBenefits(filterBenefits(localCompletedBenefits)))}
           </section>
         )}
         {activeTab === 'not-usable' && (
           <section>
-            {viewMode === 'category' ? renderCategoryView(filterBenefits(localNotUsableBenefits)) : renderCardView(filterBenefits(localNotUsableBenefits))}
+            {viewMode === 'category' ? renderCategoryView(sortBenefits(filterBenefits(localNotUsableBenefits))) : renderCardView(sortBenefits(filterBenefits(localNotUsableBenefits)))}
           </section>
         )}
         {activeTab === 'scheduled' && (
@@ -856,10 +893,10 @@ export default function BenefitsDisplayClient({
                 </p>
               </div>
             </div>
-            {renderScheduledBenefitsList(filterBenefits(localScheduledBenefits))}
+            {renderScheduledBenefitsList(sortBenefits(filterBenefits(localScheduledBenefits)))}
           </section>
         )}
       </div>
     </div>
   );
-} 
+}

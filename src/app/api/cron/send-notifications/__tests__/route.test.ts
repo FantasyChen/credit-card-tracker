@@ -127,13 +127,23 @@ describe('/api/cron/send-notifications', () => {
         ...prefs
     });
 
-    const mockBenefitStatus = (id: string, startDate: Date, endDate: Date, userId = 'user1') => {
+    const mockBenefitStatus = (
+        id: string,
+        startDate: Date,
+        endDate: Date,
+        userId = 'user1',
+        benefitOverrides: Record<string, unknown> = {}
+    ) => {
         const benefitDetails = {
             id: `benefit-${id}`,
             description: `Benefit ${id}`,
-            creditCard: { id: `card-${id}`, name: `Card ${id}` }
+            creditCard: { id: `card-${id}`, name: `Card ${id}` },
+            ...benefitOverrides,
         };
-        console.log(`mockBenefitStatus generating for id '${id}': desc='${benefitDetails.description}', cardName='${benefitDetails.creditCard.name}'`);
+        const cardName = benefitDetails.creditCard && typeof benefitDetails.creditCard === 'object' && 'name' in benefitDetails.creditCard
+            ? benefitDetails.creditCard.name
+            : 'none';
+        console.log(`mockBenefitStatus generating for id '${id}': desc='${benefitDetails.description}', cardName='${cardName}'`);
         return {
             id: `status-${id}`, benefitId: `benefit-${id}`, userId,
             cycleStartDate: startDate, cycleEndDate: endDate, isCompleted: false,
@@ -304,6 +314,68 @@ describe('/api/cron/send-notifications', () => {
 
         await GET(createMockReq());
         expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('should not send benefit notifications for standalone custom benefits', async () => {
+        const systemTime = utcDate(2023, 8, 15, 10, 0, 0);
+        const queryStartDate = utcDate(2023, 8, 15);
+        const expiryDate = utcDate(2023, 8, 22, 12, 0, 0);
+
+        jest.useFakeTimers().setSystemTime(systemTime);
+        (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser()]);
+        (prisma.benefitStatus.findMany as jest.Mock)
+            .mockResolvedValueOnce([
+                mockBenefitStatus('custom-new', queryStartDate, utcDate(2023, 9, 14), 'user1', {
+                    creditCard: null,
+                    creditCardId: null,
+                    userId: 'user1',
+                    frequency: 'MONTHLY',
+                }),
+            ])
+            .mockResolvedValueOnce([
+                mockBenefitStatus('custom-expiring', utcDate(2023, 7, 23), expiryDate, 'user1', {
+                    creditCard: null,
+                    creditCardId: null,
+                    userId: 'user1',
+                    frequency: 'MONTHLY',
+                }),
+            ]);
+
+        await GET(createMockReq());
+
+        expect(sendEmail).not.toHaveBeenCalled();
+        const response = await (NextResponse.json as jest.Mock).mock.results.at(-1)?.value.json();
+        expect(response.emailsAttempted).toBe(0);
+    });
+
+    it('should not send benefit notifications for cycles shorter than a month', async () => {
+        const systemTime = utcDate(2023, 8, 15, 10, 0, 0);
+        const queryStartDate = utcDate(2023, 8, 15);
+        const shortCycleEndDate = utcDate(2023, 8, 21, 23, 59, 59, 999);
+        const expiryDate = utcDate(2023, 8, 22, 12, 0, 0);
+        const shortExpiringStartDate = utcDate(2023, 8, 16);
+
+        jest.useFakeTimers().setSystemTime(systemTime);
+        (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser()]);
+        (prisma.benefitStatus.findMany as jest.Mock)
+            .mockResolvedValueOnce([
+                mockBenefitStatus('weekly-new', queryStartDate, shortCycleEndDate, 'user1', {
+                    creditCardId: 'card-weekly-new',
+                    frequency: 'WEEKLY',
+                }),
+            ])
+            .mockResolvedValueOnce([
+                mockBenefitStatus('weekly-expiring', shortExpiringStartDate, expiryDate, 'user1', {
+                    creditCardId: 'card-weekly-expiring',
+                    frequency: 'WEEKLY',
+                }),
+            ]);
+
+        await GET(createMockReq());
+
+        expect(sendEmail).not.toHaveBeenCalled();
+        const response = await (NextResponse.json as jest.Mock).mock.results.at(-1)?.value.json();
+        expect(response.emailsAttempted).toBe(0);
     });
 
     it('should not send expiring benefit email if user.notifyBenefitExpiration is false', async () => {

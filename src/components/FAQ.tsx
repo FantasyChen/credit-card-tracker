@@ -22,7 +22,7 @@ const faqs = [
   },
   {
     question: 'What cards are supported?',
-    answer: 'We support 50+ premium cards from major issuers including American Express, Chase, Capital One, Citi, Bank of America, US Bank, and more. We\'re constantly adding new cards based on user requests.',
+    answer: 'We support a growing catalog of premium cards from major issuers including American Express, Chase, Capital One, Citi, Bank of America, US Bank, and more. We\'re constantly adding new cards based on user requests.',
   },
   {
     question: 'Can I track loyalty points too?',

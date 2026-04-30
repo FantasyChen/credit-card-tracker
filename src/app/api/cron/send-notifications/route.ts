@@ -3,8 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
 import { SITE_NAME } from '@/lib/site';
 import { getEffectiveExpirationDays, getEffectiveTier, TIER_LIMITS } from '@/lib/subscription';
+import { BenefitFrequency } from '@/generated/prisma';
 
 export const maxDuration = 10;
+
+const MIN_EMAILABLE_BENEFIT_CYCLE_MS = 28 * 24 * 60 * 60 * 1000 - 1;
 
 async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun = false) {
   let today = new Date();
@@ -115,20 +118,27 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
         : Promise.resolve([]),
     ]);
 
+    const emailEligibleNewStatuses = newStatuses.filter(isEmailEligibleBenefitStatus);
+    const emailEligibleExpiringStatuses = expiringStatuses.filter(isEmailEligibleBenefitStatus);
+
     const fetchMs = Date.now() - startMs;
-    console.log(`📊 Fetched ${newStatuses.length} new, ${expiringStatuses.length} expiring, ${expiringLoyalty.length} loyalty in ${fetchMs}ms`);
+    console.log(
+      `📊 Fetched ${newStatuses.length} new (${emailEligibleNewStatuses.length} email-eligible), ` +
+      `${expiringStatuses.length} expiring (${emailEligibleExpiringStatuses.length} email-eligible), ` +
+      `${expiringLoyalty.length} loyalty in ${fetchMs}ms`
+    );
 
     // Group new statuses by user
-    const newByUser = new Map<string, typeof newStatuses>();
-    for (const s of newStatuses) {
+    const newByUser = new Map<string, typeof emailEligibleNewStatuses>();
+    for (const s of emailEligibleNewStatuses) {
       const list = newByUser.get(s.userId) || [];
       list.push(s);
       newByUser.set(s.userId, list);
     }
 
     // Filter expiring statuses per-user (each user has their own expirationDays)
-    const expiringByUser = new Map<string, typeof expiringStatuses>();
-    for (const s of expiringStatuses) {
+    const expiringByUser = new Map<string, typeof emailEligibleExpiringStatuses>();
+    for (const s of emailEligibleExpiringStatuses) {
       const user = userMap.get(s.userId);
       const effectiveExpirationDays = user ? effectiveExpirationDaysByUser.get(user.id) : undefined;
       if (!effectiveExpirationDays) continue;
@@ -288,6 +298,26 @@ async function runSendNotificationsLogic(requestUrlForMockDate?: string, dryRun 
     console.error(`💥 send-notifications failed after ${totalMs}ms:`, error);
     return NextResponse.json({ message: 'Error executing cron job.', durationMs: totalMs }, { status: 500 });
   }
+}
+
+function isEmailEligibleBenefitStatus(status: {
+  cycleStartDate: Date;
+  cycleEndDate: Date;
+  benefit: {
+    creditCard?: unknown | null;
+    creditCardId?: string | null;
+    frequency?: BenefitFrequency | string | null;
+  };
+}): boolean {
+  if (status.benefit.creditCard === null || status.benefit.creditCardId === null) {
+    return false;
+  }
+
+  if (status.benefit.frequency === BenefitFrequency.WEEKLY) {
+    return false;
+  }
+
+  return status.cycleEndDate.getTime() - status.cycleStartDate.getTime() >= MIN_EMAILABLE_BENEFIT_CYCLE_MS;
 }
 
 function canSendEmailAlertForUser(user: {
