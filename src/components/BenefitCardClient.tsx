@@ -169,11 +169,11 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
         isScheduled ? 'bg-purple-500' : isCompleted ? 'bg-green-500' : isNotUsable ? 'bg-gray-500' : 'bg-indigo-500'
       }`} />
       
-      <div className="p-4 sm:p-6">
+      <div className="p-3 sm:p-6">
         {/* Mobile-first layout: Stack content vertically on small screens */}
         <div className="space-y-4">
           {/* Top section: Icon, title, and amount */}
-          <div className="flex items-start space-x-3">
+          <div className="flex items-start gap-3">
             <div className={`flex-shrink-0 p-2 rounded-lg ${
               isScheduled
                 ? 'bg-purple-100 dark:bg-purple-800/30'
@@ -244,15 +244,17 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
           </div>
           
           {/* Card info - more compact on mobile */}
-          <div className="pl-11 space-y-1.5">
+          <div className="space-y-1.5 sm:pl-11">
             {status.benefit.creditCard ? (
               // Regular credit card benefit
               <>
-                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                <div className="flex items-start text-sm text-gray-600 dark:text-gray-300">
                   <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                   </svg>
-                  <span className="font-medium truncate">{status.benefit.creditCard.displayName}</span>
+                  <span className="min-w-0 font-medium leading-snug break-words" title={status.benefit.creditCard.displayName}>
+                    {status.benefit.creditCard.displayName}
+                  </span>
                   <span className="mx-2 hidden sm:inline">•</span>
                   <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">{status.benefit.creditCard.issuer}</span>
                 </div>
@@ -290,7 +292,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
           
           {/* Usage Guide Link */}
           {status.usageWaySlug && (
-            <div className="pl-11">
+            <div className="sm:pl-11">
               <Link
                 href={`/benefits/how-to-use/${status.usageWaySlug}`}
                 className="inline-flex items-center text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors"
@@ -307,7 +309,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
           )}
 
           {/* Benefit notes */}
-          <div className="pl-11">
+          <div className="sm:pl-11">
             {showNotesEditor ? (
               <form onSubmit={handleNotesSubmit} className="space-y-2">
                 <textarea
@@ -357,7 +359,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
           </div>
           
           {/* Action buttons - full width on mobile, fixed width on larger screens */}
-          <div className="pl-11">
+          <div className="sm:pl-11">
             <div className="flex flex-col sm:flex-row gap-2">
               {/* Completion buttons - hide for scheduled benefits */}
               {!isScheduled && !isNotUsable && (

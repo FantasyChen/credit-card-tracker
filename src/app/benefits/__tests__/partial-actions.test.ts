@@ -49,6 +49,7 @@ const mockBenefitStatus = {
   isCompleted: false,
   completedAt: null,
   usedAmount: 0,
+  notes: null,
   isNotUsable: false,
   orderIndex: null,
   occurrenceIndex: 0,

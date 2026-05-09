@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
-import { calculateBenefitCycle, calculateOneTimeBenefitLifetime } from '@/lib/benefit-cycle';
+import { calculateOneTimeBenefitLifetime } from '@/lib/benefit-cycle';
 import { z } from 'zod';
 import { redirect } from 'next/navigation';
 

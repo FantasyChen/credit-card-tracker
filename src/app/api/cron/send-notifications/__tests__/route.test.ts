@@ -211,8 +211,6 @@ describe('/api/cron/send-notifications', () => {
 
     it('should send digest email for expiring benefits', async () => {
         const systemTime = utcDate(2023, 8, 15, 11, 0, 0); 
-        const queryToday = utcDate(2023, 8, 15);
-
         const userNotifyDays = 7;
         // The benefit expires exactly userNotifyDays from today
         const expiryDate = utcDate(2023, 8, 15 + userNotifyDays, 12, 0, 0);
@@ -405,7 +403,6 @@ describe('/api/cron/send-notifications', () => {
 
         const mockDateParam = utcDate(2024, 1, 10, 14, 0, 0); // Feb 10, 2024, 2 PM UTC
         const queryMockDateStart = utcDate(2024, 1, 10); // Route logic will set to 00:00:00
-        const queryMockDateEnd = utcDate(2024, 1, 11);   // Next day 00:00:00 for <
 
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({id: 'user-mockdate'})]);
         (prisma.benefitStatus.findMany as jest.Mock)

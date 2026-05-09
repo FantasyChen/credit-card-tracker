@@ -30,12 +30,6 @@ interface CreditCardWithDisplayName extends PrismaCreditCard {
   displayName: string;
 }
 
-// Type for standalone (custom) benefits without a card
-interface StandaloneBenefitDisplay {
-  displayName: string;
-  isCustomBenefit: true;
-}
-
 // Updated Type combining BenefitStatus with Benefit and Card details (with displayName) for display
 // creditCard can be null for standalone/custom benefits
 export interface DisplayBenefitStatus extends BenefitStatus { // Export for use in client component
@@ -200,7 +194,7 @@ export default async function BenefitsDashboardPage() {
     
     // For each group, keep the "best" record
     const result: DisplayBenefitStatus[] = [];
-    for (const [, statuses] of groups) {
+    for (const statuses of Array.from(groups.values())) {
       if (statuses.length === 1) {
         result.push(statuses[0]);
       } else {

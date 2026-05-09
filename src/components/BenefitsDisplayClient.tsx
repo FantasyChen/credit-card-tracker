@@ -7,6 +7,10 @@ import EmptyState from '@/components/ui/EmptyState';
 import type { DisplayBenefitStatus } from '@/app/benefits/page';
 import Link from 'next/link';
 import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import {
+  applyBenefitDashboardFilters,
+  type BenefitDashboardFrequency,
+} from '@/lib/benefit-dashboard';
 
 interface BenefitsDisplayProps {
   upcomingBenefits: DisplayBenefitStatus[];
@@ -41,6 +45,8 @@ export default function BenefitsDisplayClient({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterCard, setFilterCard] = useState('');
+  const [filterFrequency, setFilterFrequency] = useState<BenefitDashboardFrequency>('ALL');
+  const [freeNightOnly, setFreeNightOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showRoiBreakdown, setShowRoiBreakdown] = useState(false);
 
@@ -49,7 +55,7 @@ export default function BenefitsDisplayClient({
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
   const [localNotUsableBenefits, setLocalNotUsableBenefits] = useState(notUsableBenefits);
-  const [localScheduledBenefits, setLocalScheduledBenefits] = useState(scheduledBenefits);
+  const [localScheduledBenefits] = useState(scheduledBenefits);
   const [localTotalUnusedValue, setLocalTotalUnusedValue] = useState(totalUnusedValue);
   const [localTotalUsedValue, setLocalTotalUsedValue] = useState(totalUsedValue);
   const [localTotalNotUsableValue, setLocalTotalNotUsableValue] = useState(totalNotUsableValue);
@@ -95,8 +101,6 @@ export default function BenefitsDisplayClient({
         
         // Update totals: add the difference in usedAmount to totalUsedValue
         const addedValue = finalUsedAmount - previousUsedAmount;
-        const remainingValue = maxAmount - finalUsedAmount;
-        
         // Upcoming loses the remaining value, Used gains the added value
         setLocalTotalUnusedValue(prev => prev - (maxAmount - previousUsedAmount));
         setLocalTotalUsedValue(prev => prev + addedValue);
@@ -133,7 +137,6 @@ export default function BenefitsDisplayClient({
       // Stay in upcoming but update usedAmount
       setLocalUpcomingBenefits(prev => prev.map(b => {
         if (b.id === statusId) {
-          const maxAmount = b.benefit.maxAmount || 0;
           const previousUsedAmount = b.usedAmount ?? 0;
           const addedValue = newUsedAmount - previousUsedAmount;
           
@@ -276,11 +279,20 @@ export default function BenefitsDisplayClient({
     [allBenefitsForTab]
   );
 
-  const hasActiveFilters = searchQuery.trim() || filterCategory || filterCard;
+  const hasActiveFilters = searchQuery.trim() || filterCategory || filterCard || filterFrequency !== 'ALL' || freeNightOnly;
   const clearFilters = () => {
     setSearchQuery('');
     setFilterCategory('');
     setFilterCard('');
+    setFilterFrequency('ALL');
+    setFreeNightOnly(false);
+  };
+
+  const applyPowerUserFilters = (benefits: DisplayBenefitStatus[]): DisplayBenefitStatus[] => {
+    return applyBenefitDashboardFilters(benefits, {
+      frequency: filterFrequency,
+      freeNightOnly,
+    });
   };
 
   // Group benefits by category
@@ -324,50 +336,6 @@ export default function BenefitsDisplayClient({
       const bTotal = b.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
       return bTotal - aTotal;
     });
-  };
-
-  const renderBenefitsList = (benefits: DisplayBenefitStatus[]) => {
-    if (benefits.length === 0) {
-      const emptyStateProps = {
-        upcoming: {
-          icon: 'clock' as const,
-          title: 'No upcoming benefits',
-          description: 'Add credit cards with benefits to start tracking your rewards and credits.',
-          actionLabel: 'Add Your First Card',
-          actionHref: '/cards/new',
-        },
-        completed: {
-          icon: 'check' as const,
-          title: 'No completed benefits yet',
-          description: 'Mark benefits as complete when you use them to track your ROI.',
-        },
-        'not-usable': {
-          icon: 'x-circle' as const,
-          title: 'No not usable benefits',
-          description: 'Benefits marked as not usable will appear here.',
-        },
-      };
-      const props = emptyStateProps[activeTab as keyof typeof emptyStateProps] || emptyStateProps.upcoming;
-      return <EmptyState {...props} />;
-    }
-
-
-
-    return (
-      <div className="space-y-4">
-        {benefits.map(status => (
-          <BenefitCardClient 
-            key={status.id} 
-            status={status} 
-            onStatusChange={handleStatusChange} 
-            onNotUsableChange={handleNotUsableChange}
-            onDelete={handleDeleteBenefit}
-            onPartialCompletionChange={handlePartialCompletionChange}
-            isScheduled={false}
-          />
-        ))}
-      </div>
-    );
   };
 
   const renderScheduledBenefitsList = (benefits: DisplayBenefitStatus[]) => {
@@ -490,7 +458,7 @@ export default function BenefitsDisplayClient({
   };
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto px-2 py-4 sm:p-4">
       <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold dark:text-white">Benefits Dashboard</h1>
@@ -793,6 +761,33 @@ export default function BenefitsDisplayClient({
               <option value="value">Highest value</option>
               <option value="card">Card name</option>
             </select>
+            <label htmlFor="filter-frequency" className="sr-only">Filter by frequency</label>
+            <select
+              id="filter-frequency"
+              aria-label="Filter by frequency"
+              value={filterFrequency}
+              onChange={(e) => setFilterFrequency(e.target.value as BenefitDashboardFrequency)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-800 dark:text-white"
+            >
+              <option value="ALL">All cycles</option>
+              <option value="WEEKLY">Weekly</option>
+              <option value="MONTHLY">Monthly</option>
+              <option value="QUARTERLY">Quarterly</option>
+              <option value="YEARLY">Yearly</option>
+              <option value="ONE_TIME">One-time</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => setFreeNightOnly((value) => !value)}
+              className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                freeNightOnly
+                  ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+              aria-pressed={freeNightOnly}
+            >
+              Free Night / Cert
+            </button>
             <button
               type="button"
               onClick={() => setShowFilters(!showFilters)}
@@ -868,17 +863,17 @@ export default function BenefitsDisplayClient({
       <div>
         {activeTab === 'upcoming' && (
           <section>
-            {viewMode === 'category' ? renderCategoryView(sortBenefits(filterBenefits(localUpcomingBenefits))) : renderCardView(sortBenefits(filterBenefits(localUpcomingBenefits)))}
+            {viewMode === 'category' ? renderCategoryView(sortBenefits(applyPowerUserFilters(filterBenefits(localUpcomingBenefits)))) : renderCardView(sortBenefits(applyPowerUserFilters(filterBenefits(localUpcomingBenefits))))}
           </section>
         )}
         {activeTab === 'completed' && (
           <section>
-            {viewMode === 'category' ? renderCategoryView(sortBenefits(filterBenefits(localCompletedBenefits))) : renderCardView(sortBenefits(filterBenefits(localCompletedBenefits)))}
+            {viewMode === 'category' ? renderCategoryView(sortBenefits(applyPowerUserFilters(filterBenefits(localCompletedBenefits)))) : renderCardView(sortBenefits(applyPowerUserFilters(filterBenefits(localCompletedBenefits))))}
           </section>
         )}
         {activeTab === 'not-usable' && (
           <section>
-            {viewMode === 'category' ? renderCategoryView(sortBenefits(filterBenefits(localNotUsableBenefits))) : renderCardView(sortBenefits(filterBenefits(localNotUsableBenefits)))}
+            {viewMode === 'category' ? renderCategoryView(sortBenefits(applyPowerUserFilters(filterBenefits(localNotUsableBenefits)))) : renderCardView(sortBenefits(applyPowerUserFilters(filterBenefits(localNotUsableBenefits))))}
           </section>
         )}
         {activeTab === 'scheduled' && (
@@ -893,7 +888,7 @@ export default function BenefitsDisplayClient({
                 </p>
               </div>
             </div>
-            {renderScheduledBenefitsList(sortBenefits(filterBenefits(localScheduledBenefits)))}
+            {renderScheduledBenefitsList(sortBenefits(applyPowerUserFilters(filterBenefits(localScheduledBenefits))))}
           </section>
         )}
       </div>

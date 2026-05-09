@@ -45,8 +45,6 @@ export class MigrationValidator {
     recommendations.push(...this.generateRecommendations(checks, plan));
 
     const failedChecks = checks.filter(check => check.status === 'fail');
-    const warningChecks = checks.filter(check => check.status === 'warning');
-
     return {
       isValid: failedChecks.length === 0,
       summary: this.generateSummary(checks),

@@ -1,7 +1,7 @@
 # Context
 
 ## Project
-Perks Reminder is a Next.js 15 / React 19 / TypeScript PWA for tracking recurring credit card benefits, loyalty program expirations, and reminder emails. It operates on a Freemium model (Free/Pro tiers) restricting limits on cards and email alerts. It uses Prisma with Neon Postgres, NextAuth, Resend, Vercel cron jobs, Tailwind CSS, and Jest.
+Perks Reminder is a free, open-source Next.js 15 / React 19 / TypeScript PWA for tracking recurring credit card benefits, free nights/certificates, loyalty program expirations, and reminder emails. It uses Prisma with Neon Postgres, NextAuth, Resend, Vercel cron jobs, Tailwind CSS, and Jest.
 
 ## Structure
 ```
@@ -46,3 +46,4 @@ announcement-state/ Local ignored state for one-time announcement batches
 - Announcement sends should use `Perks Reminder <notifications@perks-reminder.com>` explicitly because local `.env` may still contain the old `coupon-cycle.site` sender.
 - Old `coupon-cycle.site` and `loyalty.coupon-cycle.site` aliases currently redirect to the new domains at Vercel level.
 - **NextAuth Session State:** You can expose database fields (like `subscriptionTier` and `isBetaUser`) to the client without repeated DB hits by mapping them in the NextAuth `jwt` and `session` callbacks.
+- Nitan competitor research shows the clearest product wedge is privacy-first manual tracking plus community-verified benefit/loyalty data, not bank-link automation against MaxRewards/CardPointers.

@@ -16,8 +16,6 @@ import type {
   MigrationError,
   PreMigrationCheck,
   UserMigrationContext,
-  UserMigrationPlan,
-  BenefitMigrationStep,
   CardUpdateDefinition
 } from './types';
 

@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Metadata } from 'next';
 import {
   BellIcon,
@@ -139,9 +140,11 @@ export default async function SettingsPage() {
         <div className="flex items-center gap-4">
           <div className="flex-shrink-0">
             {session.user.image ? (
-              <img
+              <Image
                 src={session.user.image}
                 alt={session.user.name || 'User'}
+                width={64}
+                height={64}
                 className="h-16 w-16 rounded-full ring-4 ring-white dark:ring-gray-800"
               />
             ) : (

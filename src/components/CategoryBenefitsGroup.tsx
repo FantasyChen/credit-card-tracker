@@ -4,6 +4,8 @@ import React, { useState, useTransition } from 'react';
 import BenefitCardClient from '@/components/BenefitCardClient';
 import { batchCompleteBenefitsByCategoryAction } from '@/app/benefits/actions';
 import type { DisplayBenefitStatus } from '@/app/benefits/page';
+import { formatDate } from '@/lib/dateUtils';
+import { calculateBenefitGroupSummary } from '@/lib/benefit-dashboard';
 
 interface CategoryBenefitsGroupProps {
   category: string;
@@ -164,6 +166,7 @@ export default function CategoryBenefitsGroup({
   const completedTotal = benefits
     .filter(benefit => benefit.isCompleted)
     .reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
+  const groupSummary = calculateBenefitGroupSummary(benefits);
 
   const handleBatchComplete = async () => {
     if (completableBenefits.length === 0) return;
@@ -189,23 +192,29 @@ export default function CategoryBenefitsGroup({
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Category Header */}
-      <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+      <div className="px-3 py-3 sm:px-6 sm:py-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center space-x-3">
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="flex items-center space-x-3 text-left w-full hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+              className="flex min-w-0 items-center space-x-3 text-left w-full hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
             >
               <div className="p-2 bg-indigo-100 dark:bg-indigo-800/30 rounded-lg text-indigo-600 dark:text-indigo-400">
                 {getCategoryIcon(category)}
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 break-words">
                   {category}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {benefits.length} benefit{benefits.length !== 1 ? 's' : ''} • ${categoryTotal.toFixed(2)} total
                   {completedTotal > 0 && ` • $${completedTotal.toFixed(2)} claimed`}
+                </p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  ${groupSummary.remainingValue.toFixed(2)} remaining
+                  {' '}• ${groupSummary.claimedValue.toFixed(2)} claimed
+                  {groupSummary.partialCount > 0 && ` • ${groupSummary.partialCount} partial`}
+                  {groupSummary.soonestDueDate && ` • next due ${formatDate(groupSummary.soonestDueDate)}`}
                 </p>
               </div>
             </button>
@@ -226,7 +235,7 @@ export default function CategoryBenefitsGroup({
             <button
               onClick={handleBatchComplete}
               disabled={isPending}
-              className={`ml-4 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              className={`w-full sm:ml-4 sm:w-auto px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 isPending
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
                   : 'bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md'
@@ -240,7 +249,7 @@ export default function CategoryBenefitsGroup({
 
       {/* Benefits List */}
       {isExpanded && (
-        <div className="p-6">
+        <div className="p-2 sm:p-6">
           <div className="space-y-4">
             {benefits.map(benefit => (
               <BenefitCardClient 

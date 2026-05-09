@@ -1,11 +1,9 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeftIcon, SparklesIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { createCustomBenefitAction } from '../actions';
-import { Metadata } from 'next';
 
 const categories = [
   { value: 'Travel', label: 'Travel', icon: '✈️' },
@@ -25,7 +23,6 @@ const frequencies = [
 ];
 
 export default function AddCustomBenefitPage() {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedFrequency, setSelectedFrequency] = useState('MONTHLY');
@@ -294,4 +291,3 @@ export default function AddCustomBenefitPage() {
     </div>
   );
 }
-

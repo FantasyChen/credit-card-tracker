@@ -55,16 +55,22 @@ export async function getOptimizedBenefitsData(userId: string) {
   const cardDisplayNameMap = createCardDisplayNameMap(result.creditCards);
 
   // Add display names to benefit statuses
-  const enrichedStatuses = result.benefitStatuses.map(status => ({
-    ...status,
-    benefit: {
-      ...status.benefit,
-      creditCard: {
-        ...status.benefit.creditCard,
-        displayName: cardDisplayNameMap.get(status.benefit.creditCard.id) || status.benefit.creditCard.name,
+  const enrichedStatuses = result.benefitStatuses.map(status => {
+    const creditCard = status.benefit.creditCard;
+
+    return {
+      ...status,
+      benefit: {
+        ...status.benefit,
+        creditCard: creditCard
+          ? {
+              ...creditCard,
+              displayName: cardDisplayNameMap.get(creditCard.id) || creditCard.name,
+            }
+          : null,
       },
-    },
-  }));
+    };
+  });
 
   // Calculate annual fees efficiently
   const cardCounts = result.creditCards.reduce((acc, card) => {
