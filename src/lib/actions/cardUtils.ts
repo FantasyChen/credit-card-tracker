@@ -1,7 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { calculateBenefitCycle, calculateOneTimeBenefitLifetime } from '@/lib/benefit-cycle';
-import { normalizeCycleDate } from '@/lib/dateUtils';
-import { BenefitFrequency } from '@/generated/prisma';
+import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
 import { canAddCard } from '@/lib/subscription';
 
 interface CreateCardResult {
@@ -103,56 +101,30 @@ export async function createCardForUser(
         }
       });
 
-      // Calculate and create initial BenefitStatus records (multiple if occurrencesInCycle > 1)
-      let cycleInfo: { cycleStartDate: Date; cycleEndDate: Date };
-      if (newBenefit.frequency === BenefitFrequency.ONE_TIME) {
-        cycleInfo = calculateOneTimeBenefitLifetime(newBenefit.startDate);
-      } else {
-        const rawCycleInfo = calculateBenefitCycle(
-          newBenefit.frequency,
-          now, // Reference date is now
-          openedDate, // Use the determined openedDate for cycle calculation
-          newBenefit.cycleAlignment,
-          newBenefit.fixedCycleStartMonth,
-          newBenefit.fixedCycleDurationMonths
-        );
-        
-        // CRITICAL: Normalize cycleStartDate to midnight UTC to prevent duplicate records
-        cycleInfo = {
-          cycleStartDate: normalizeCycleDate(rawCycleInfo.cycleStartDate),
-          cycleEndDate: rawCycleInfo.cycleEndDate
-        };
-
-        // SOURCE-LEVEL PROTECTION: Validate benefit cycles during card creation
-        // Log validation warnings but don't block card creation
-        const { validateBenefitCycle } = await import('@/lib/benefit-validation');
-        const validation = validateBenefitCycle(
-          {
-            description: newBenefit.description,
-            fixedCycleStartMonth: newBenefit.fixedCycleStartMonth,
-            fixedCycleDurationMonths: newBenefit.fixedCycleDurationMonths
-          },
-          cycleInfo
-        );
-        
-        if (!validation.isValid) {
-          // Log warning but continue - don't block card creation
-          console.warn(`⚠️ BENEFIT VALIDATION WARNING for "${newBenefit.description}":`, validation.error);
-          console.warn(`   Cycle: ${cycleInfo.cycleStartDate.toISOString()} → ${cycleInfo.cycleEndDate.toISOString()}`);
-          console.warn(`   Continuing with card creation...`);
+      const materialized = materializeBenefitStatusRows(
+        {
+          ...newBenefit,
+          userId,
+        },
+        {
+          referenceDate: now,
+          cardOpenedDate: openedDate,
+          validateCycles: true,
         }
+      );
+      for (const warning of materialized.warnings) {
+        console.warn(`⚠️ BENEFIT VALIDATION WARNING for "${newBenefit.description}":`, warning);
+        console.warn(`   Continuing with card creation...`);
       }
 
-      // Create multiple BenefitStatus records based on occurrencesInCycle
-      const occurrences = newBenefit.occurrencesInCycle || 1;
-      for (let occurrenceIndex = 0; occurrenceIndex < occurrences; occurrenceIndex++) {
+      for (const row of materialized.rows) {
         await prisma.benefitStatus.create({
           data: {
-            benefitId: newBenefit.id,
-            userId: userId,
-            cycleStartDate: cycleInfo.cycleStartDate,
-            cycleEndDate: cycleInfo.cycleEndDate,
-            occurrenceIndex: occurrenceIndex,
+            benefitId: row.benefitId,
+            userId: row.userId,
+            cycleStartDate: row.cycleStartDate,
+            cycleEndDate: row.cycleEndDate,
+            occurrenceIndex: row.occurrenceIndex,
             isCompleted: false,
           }
         });
@@ -177,4 +149,4 @@ export async function createCardForUser(
     }
     return { success: false, message: message };
   }
-} 
+}

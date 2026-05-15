@@ -5,7 +5,15 @@ import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
-import { calculateOneTimeBenefitLifetime } from '@/lib/benefit-cycle';
+import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
+import {
+  transitionAddPartialCompletion,
+  transitionFullCompletion,
+  transitionResetCompletion,
+  transitionSetUsedAmount,
+  transitionToggleCompletion,
+  transitionToggleNotUsable,
+} from '@/lib/benefit-status-transitions';
 import { z } from 'zod';
 import { redirect } from 'next/navigation';
 
@@ -50,18 +58,17 @@ export async function toggleBenefitStatusAction(formData: FormData) {
       throw new Error('Benefit status not found or permission denied.');
     }
 
-    const maxAmount = existingStatus.benefit.maxAmount ?? 0;
+    const transition = transitionToggleCompletion(existingStatus);
 
-    // Update with usedAmount: set to maxAmount when completing, 0 when uncompleting
     const updatedStatus = await prisma.benefitStatus.updateMany({
       where: {
         id: benefitStatusId,
         userId: session.user.id, // Ensure user owns this status record
       },
       data: {
-        isCompleted: newIsCompleted,
-        completedAt: newIsCompleted ? new Date() : null,
-        usedAmount: newIsCompleted ? maxAmount : 0,
+        isCompleted: transition.isCompleted,
+        completedAt: transition.completedAt,
+        usedAmount: transition.usedAmount,
       },
     });
 
@@ -70,7 +77,7 @@ export async function toggleBenefitStatusAction(formData: FormData) {
       throw new Error('Benefit status not found or permission denied.');
     }
 
-    console.log(`Benefit status ${benefitStatusId} toggled to ${newIsCompleted} with usedAmount ${newIsCompleted ? maxAmount : 0}`);
+    console.log(`Benefit status ${benefitStatusId} toggled to ${newIsCompleted} with usedAmount ${transition.usedAmount}`);
 
     // Revalidate the benefits page and dashboard to show the change
     revalidatePath('/benefits');
@@ -123,37 +130,27 @@ export async function addPartialCompletionAction(formData: FormData) {
       throw new Error('Benefit status not found or permission denied.');
     }
 
-    const maxAmount = existingStatus.benefit.maxAmount ?? 0;
-    const currentUsedAmount = existingStatus.usedAmount ?? 0;
-    
-    // Calculate new used amount, capped at maxAmount
-    let newUsedAmount = currentUsedAmount + amount;
-    if (maxAmount > 0) {
-      newUsedAmount = Math.min(newUsedAmount, maxAmount);
-    }
-
-    // Determine if this completes the benefit
-    const isNowComplete = maxAmount > 0 && newUsedAmount >= maxAmount;
+    const transition = transitionAddPartialCompletion(existingStatus, amount);
 
     await prisma.benefitStatus.update({
       where: { id: benefitStatusId },
       data: {
-        usedAmount: newUsedAmount,
-        isCompleted: isNowComplete,
-        completedAt: isNowComplete ? new Date() : null,
+        usedAmount: transition.usedAmount,
+        isCompleted: transition.isCompleted,
+        completedAt: transition.completedAt,
       },
     });
 
-    console.log(`Added partial completion: ${amount} to benefit ${benefitStatusId}. Total: ${newUsedAmount}/${maxAmount}. Complete: ${isNowComplete}`);
+    console.log(`Added partial completion: ${amount} to benefit ${benefitStatusId}. Total: ${transition.usedAmount}/${existingStatus.benefit.maxAmount ?? 0}. Complete: ${transition.isCompleted}`);
 
     revalidatePath('/benefits');
     revalidatePath('/');
 
     return { 
       success: true, 
-      newUsedAmount, 
-      isComplete: isNowComplete,
-      maxAmount,
+      newUsedAmount: transition.usedAmount,
+      isComplete: transition.isCompleted,
+      maxAmount: existingStatus.benefit.maxAmount ?? 0,
     };
 
   } catch (error) {
@@ -193,23 +190,23 @@ export async function markFullCompletionAction(formData: FormData) {
       throw new Error('Benefit status not found or permission denied.');
     }
 
-    const maxAmount = existingStatus.benefit.maxAmount ?? 0;
+    const transition = transitionFullCompletion(existingStatus);
 
     await prisma.benefitStatus.update({
       where: { id: benefitStatusId },
       data: {
-        usedAmount: maxAmount,
-        isCompleted: true,
-        completedAt: new Date(),
+        usedAmount: transition.usedAmount,
+        isCompleted: transition.isCompleted,
+        completedAt: transition.completedAt,
       },
     });
 
-    console.log(`Marked full completion for benefit ${benefitStatusId}. usedAmount set to ${maxAmount}`);
+    console.log(`Marked full completion for benefit ${benefitStatusId}. usedAmount set to ${transition.usedAmount}`);
 
     revalidatePath('/benefits');
     revalidatePath('/');
 
-    return { success: true, usedAmount: maxAmount };
+    return { success: true, usedAmount: transition.usedAmount };
 
   } catch (error) {
     console.error('Error marking full completion:', error);
@@ -233,15 +230,16 @@ export async function resetBenefitCompletionAction(formData: FormData) {
   }
 
   try {
+    const transition = transitionResetCompletion();
     const updatedStatus = await prisma.benefitStatus.updateMany({
       where: {
         id: benefitStatusId,
         userId: session.user.id,
       },
       data: {
-        usedAmount: 0,
-        isCompleted: false,
-        completedAt: null,
+        usedAmount: transition.usedAmount,
+        isCompleted: transition.isCompleted,
+        completedAt: transition.completedAt,
       },
     });
 
@@ -298,34 +296,25 @@ export async function updateUsedAmountAction(formData: FormData) {
       throw new Error('Benefit status not found or permission denied.');
     }
 
-    const maxAmount = existingStatus.benefit.maxAmount ?? 0;
-    
-    // Clamp new amount to maxAmount if it exists
-    let clampedAmount = newAmount;
-    if (maxAmount > 0) {
-      clampedAmount = Math.min(newAmount, maxAmount);
-    }
-
-    // Determine completion status
-    const isComplete = maxAmount > 0 && clampedAmount >= maxAmount;
+    const transition = transitionSetUsedAmount(existingStatus, newAmount);
 
     await prisma.benefitStatus.update({
       where: { id: benefitStatusId },
       data: {
-        usedAmount: clampedAmount,
-        isCompleted: isComplete,
-        completedAt: isComplete ? (existingStatus.completedAt ?? new Date()) : null,
+        usedAmount: transition.usedAmount,
+        isCompleted: transition.isCompleted,
+        completedAt: transition.completedAt,
       },
     });
 
-    console.log(`Updated used amount for benefit ${benefitStatusId} to ${clampedAmount}. Complete: ${isComplete}`);
+    console.log(`Updated used amount for benefit ${benefitStatusId} to ${transition.usedAmount}. Complete: ${transition.isCompleted}`);
 
     revalidatePath('/benefits');
 
     return { 
       success: true, 
-      usedAmount: clampedAmount,
-      isComplete,
+      usedAmount: transition.usedAmount,
+      isComplete: transition.isCompleted,
     };
 
   } catch (error) {
@@ -350,16 +339,31 @@ export async function markBenefitAsNotUsableAction(formData: FormData) {
   const newIsNotUsable = !currentIsNotUsable;
 
   try {
-    // Verify the status belongs to the current user before updating
+    const existingStatus = await prisma.benefitStatus.findFirst({
+      where: {
+        id: benefitStatusId,
+        userId: session.user.id,
+      },
+      include: {
+        benefit: true,
+      },
+    });
+
+    if (!existingStatus) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
+
+    const transition = transitionToggleNotUsable(existingStatus);
+
     const updatedStatus = await prisma.benefitStatus.updateMany({
       where: {
         id: benefitStatusId,
         userId: session.user.id, // Ensure user owns this status record
       },
       data: {
-        isNotUsable: newIsNotUsable,
-        // If marking as not usable, also ensure it's not marked as completed
-        ...(newIsNotUsable && { isCompleted: false, completedAt: null }),
+        isNotUsable: transition.isNotUsable,
+        isCompleted: transition.isCompleted,
+        completedAt: transition.completedAt,
       },
     });
 
@@ -561,64 +565,32 @@ export async function createCustomBenefitAction(formData: FormData) {
       },
     });
 
-    // Calculate the initial cycle dates
-    // For custom benefits, the cycle is anchored to the user's start date
-    let cycleStartDate: Date;
-    let cycleEndDate: Date;
-
-    if (frequency === 'ONE_TIME') {
-      const cycle = calculateOneTimeBenefitLifetime(startDate);
-      cycleStartDate = cycle.cycleStartDate;
-      cycleEndDate = cycle.cycleEndDate;
-    } else {
-      // For recurring custom benefits, use the start date as the cycle anchor
-      // Normalize start date to midnight UTC
-      cycleStartDate = new Date(Date.UTC(
-        startDate.getUTCFullYear(),
-        startDate.getUTCMonth(),
-        startDate.getUTCDate(),
-        0, 0, 0, 0
-      ));
-      
-      // Calculate cycle end based on frequency
-      switch (frequency) {
-        case 'WEEKLY':
-          // Weekly: 7 days from start (due on day 7, next cycle on day 8)
-          cycleEndDate = new Date(cycleStartDate.getTime() + (7 * 24 * 60 * 60 * 1000) - 1);
-          break;
-        case 'MONTHLY':
-          // Monthly: same date next month minus 1 day
-          cycleEndDate = new Date(cycleStartDate);
-          cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + 1);
-          cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
-          break;
-        case 'QUARTERLY':
-          // Quarterly: 3 months from start
-          cycleEndDate = new Date(cycleStartDate);
-          cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + 3);
-          cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
-          break;
-        case 'YEARLY':
-          // Yearly: 1 year from start
-          cycleEndDate = new Date(cycleStartDate);
-          cycleEndDate.setUTCFullYear(cycleEndDate.getUTCFullYear() + 1);
-          cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
-          break;
-        default:
-          throw new Error(`Unsupported frequency: ${frequency}`);
+    const materialized = materializeBenefitStatusRows(
+      {
+        id: benefit.id,
+        userId,
+        frequency: frequency as BenefitFrequency,
+        startDate,
+        description: desc,
+        cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+        occurrencesInCycle: 1,
+      },
+      {
+        referenceDate: startDate,
       }
-    }
+    );
+    const initialStatus = materialized.rows[0];
 
     // Create the initial benefit status
     await prisma.benefitStatus.create({
       data: {
-        benefitId: benefit.id,
-        userId,
-        cycleStartDate,
-        cycleEndDate,
+        benefitId: initialStatus.benefitId,
+        userId: initialStatus.userId,
+        cycleStartDate: initialStatus.cycleStartDate,
+        cycleEndDate: initialStatus.cycleEndDate,
         isCompleted: false,
         usedAmount: 0,
-        occurrenceIndex: 0,
+        occurrenceIndex: initialStatus.occurrenceIndex,
       },
     });
 

@@ -13,7 +13,7 @@ import {
   updateBenefitNotesAction,
 } from '@/app/benefits/actions';
 import { PencilSquareIcon } from '@heroicons/react/24/outline';
-import type { DisplayBenefitStatus } from '@/app/benefits/page';
+import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard';
 import { calculateCompletionPercentage } from '@/lib/partial-completion';
 
 interface BenefitCardClientProps {

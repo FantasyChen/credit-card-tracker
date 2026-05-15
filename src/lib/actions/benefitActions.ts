@@ -4,8 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
-import { calculateBenefitCycle } from '@/lib/benefit-cycle';
-import { normalizeCycleDate } from '@/lib/dateUtils';
+import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
 
 /**
  * Ensures that BenefitStatus records exist for the current cycle
@@ -30,6 +29,7 @@ export async function ensureCurrentBenefitStatuses() {
         benefits: {
           select: {
             id: true,
+            description: true,
             frequency: true,
             cycleAlignment: true,
             fixedCycleStartMonth: true,
@@ -60,61 +60,49 @@ export async function ensureCurrentBenefitStatuses() {
              return; 
         }
 
-        // Calculate the expected dates for the *current* cycle based on 'now'
         try {
-          const { cycleStartDate: rawCycleStartDate, cycleEndDate } = calculateBenefitCycle(
-            benefit.frequency,
-            now, // Reference date is now
-            cardOpenedDateForCalc,
-            benefit.cycleAlignment, // Pass new field
-            benefit.fixedCycleStartMonth, // Pass new field
-            benefit.fixedCycleDurationMonths // Pass new field
+          const materialized = materializeBenefitStatusRows(
+            {
+              ...benefit,
+              userId,
+            },
+            {
+              referenceDate: now,
+              cardOpenedDate: cardOpenedDateForCalc,
+            }
           );
 
-          // CRITICAL: Normalize cycleStartDate to midnight UTC to prevent duplicate records
-          const cycleStartDate = normalizeCycleDate(rawCycleStartDate);
-
-          // Optional: Add a check to avoid creating statuses for cycles that ended long ago?
-          // const bufferDays = 30; // e.g., don't create if cycle ended more than 30 days ago
-          // const cutoffDate = new Date(now.getTime() - bufferDays * 24 * 60 * 60 * 1000);
-          // if (cycleEndDate < cutoffDate) {
-          //   return;
-          // }
-
-          // Create multiple BenefitStatus records based on occurrencesInCycle
-          const occurrences = benefit.occurrencesInCycle || 1;
-          
-          for (let occurrenceIndex = 0; occurrenceIndex < occurrences; occurrenceIndex++) {
+          for (const row of materialized.rows) {
             // Upsert the status: Create if not exists for this cycle start date and occurrence
             upsertPromises.push(
               prisma.benefitStatus.upsert({
                 where: {
                   benefitId_userId_cycleStartDate_occurrenceIndex: {
-                    benefitId: benefit.id,
-                    userId: userId,
-                    cycleStartDate: cycleStartDate,
-                    occurrenceIndex: occurrenceIndex,
+                    benefitId: row.benefitId,
+                    userId: row.userId,
+                    cycleStartDate: row.cycleStartDate,
+                    occurrenceIndex: row.occurrenceIndex,
                   }
                 },
                 update: {
                   // Ensure end date is updated if calculation logic changes between runs
-                  cycleEndDate: cycleEndDate,
+                  cycleEndDate: row.cycleEndDate,
                 },
                 create: {
-                  benefitId: benefit.id,
-                  userId: userId,
-                  cycleStartDate: cycleStartDate,
-                  cycleEndDate: cycleEndDate,
-                  occurrenceIndex: occurrenceIndex,
+                  benefitId: row.benefitId,
+                  userId: row.userId,
+                  cycleStartDate: row.cycleStartDate,
+                  cycleEndDate: row.cycleEndDate,
+                  occurrenceIndex: row.occurrenceIndex,
                   isCompleted: false, // New cycles start as not completed
                 },
               })
             );
           }
         } catch (error) { // Explicitly type error if possible, otherwise use unknown or any
-            // Add type check for error if necessary, e.g., if (error instanceof Error)
-            console.error(`Error calculating cycle for benefit ${benefit.id}:`, error instanceof Error ? error.message : error);
-            // Continue with other benefits
+          // Add type check for error if necessary, e.g., if (error instanceof Error)
+          console.error(`Error calculating cycle for benefit ${benefit.id}:`, error instanceof Error ? error.message : error);
+          // Continue with other benefits
         }
 
       });

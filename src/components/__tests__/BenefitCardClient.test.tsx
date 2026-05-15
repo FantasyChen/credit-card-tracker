@@ -5,7 +5,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import BenefitCardClient from '../BenefitCardClient';
-import type { DisplayBenefitStatus } from '@/app/benefits/page';
+import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard';
 
 jest.mock('@/app/benefits/actions', () => ({
   toggleBenefitStatusAction: jest.fn().mockResolvedValue(undefined),

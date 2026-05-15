@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
-import { calculateBenefitCycle } from '@/lib/benefit-cycle';
-import { normalizeCycleDate } from '@/lib/dateUtils';
-import { validateBenefitCycle } from '@/lib/benefit-validation';
+import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
 import { randomUUID } from 'crypto';
 
 export const maxDuration = 10;
@@ -31,6 +29,7 @@ async function runCheckBenefitsLogic(dryRun = false) {
             where: { frequency: { not: BenefitFrequency.ONE_TIME } },
             select: {
               id: true,
+              description: true,
               frequency: true,
               cycleAlignment: true,
               fixedCycleStartMonth: true,
@@ -49,6 +48,7 @@ async function runCheckBenefitsLogic(dryRun = false) {
         },
         select: {
           id: true,
+          description: true,
           userId: true,
           frequency: true,
           startDate: true,
@@ -81,38 +81,26 @@ async function runCheckBenefitsLogic(dryRun = false) {
         ) { skipped++; continue; }
 
         try {
-          const { cycleStartDate: raw, cycleEndDate } = calculateBenefitCycle(
-            benefit.frequency,
-            now,
-            card.openedDate,
-            benefit.cycleAlignment,
-            benefit.fixedCycleStartMonth,
-            benefit.fixedCycleDurationMonths
-          );
-          const cycleStartDate = normalizeCycleDate(raw);
-
-          const validation = validateBenefitCycle(
+          const materialized = materializeBenefitStatusRows(
             {
-              description: `Benefit ${benefit.id}`,
-              fixedCycleStartMonth: benefit.fixedCycleStartMonth,
-              fixedCycleDurationMonths: benefit.fixedCycleDurationMonths,
+              ...benefit,
+              userId,
             },
-            { cycleStartDate, cycleEndDate }
+            {
+              referenceDate: now,
+              cardOpenedDate: card.openedDate,
+              validateCycles: true,
+            }
           );
-          if (!validation.isValid) {
-            validationWarnings++;
-            console.error(`❌ Validation: benefit ${benefit.id}: ${validation.error}`);
+          validationWarnings += materialized.warnings.length;
+          for (const warning of materialized.warnings) {
+            console.error(`❌ Validation: benefit ${benefit.id}: ${warning}`);
           }
 
-          const occurrences = benefit.occurrencesInCycle || 1;
-          for (let i = 0; i < occurrences; i++) {
+          for (const row of materialized.rows) {
             rows.push({
               id: randomUUID(),
-              benefitId: benefit.id,
-              userId,
-              cycleStartDate,
-              cycleEndDate,
-              occurrenceIndex: i,
+              ...row,
             });
           }
         } catch (e) {
@@ -125,19 +113,25 @@ async function runCheckBenefitsLogic(dryRun = false) {
     for (const benefit of standaloneBenefits) {
       if (!benefit.userId) { skipped++; continue; }
       try {
-        const { cycleStartDate: raw, cycleEndDate } = calculateStandaloneCycle(
-          benefit.frequency, now, new Date(benefit.startDate)
+        const materialized = materializeBenefitStatusRows(
+          {
+            ...benefit,
+            userId: benefit.userId,
+          },
+          {
+            referenceDate: now,
+            validateCycles: true,
+          }
         );
-        const cycleStartDate = normalizeCycleDate(raw);
-        const occurrences = benefit.occurrencesInCycle || 1;
-        for (let i = 0; i < occurrences; i++) {
+        validationWarnings += materialized.warnings.length;
+        for (const warning of materialized.warnings) {
+          console.error(`❌ Validation: benefit ${benefit.id}: ${warning}`);
+        }
+
+        for (const row of materialized.rows) {
           rows.push({
             id: randomUUID(),
-            benefitId: benefit.id,
-            userId: benefit.userId,
-            cycleStartDate,
-            cycleEndDate,
-            occurrenceIndex: i,
+            ...row,
           });
         }
       } catch (e) {
@@ -192,62 +186,6 @@ async function runCheckBenefitsLogic(dryRun = false) {
       timestamp: now.toISOString(),
     }, { status: 500 });
   }
-}
-
-function calculateStandaloneCycle(
-  frequency: BenefitFrequency,
-  now: Date,
-  startDate: Date
-): { cycleStartDate: Date; cycleEndDate: Date } {
-  const nowTime = now.getTime();
-  const startTime = startDate.getTime();
-
-  let cycleDurationMs: number;
-  switch (frequency) {
-    case BenefitFrequency.WEEKLY:
-      cycleDurationMs = 7 * 24 * 60 * 60 * 1000;
-      break;
-    case BenefitFrequency.MONTHLY:
-      cycleDurationMs = 30 * 24 * 60 * 60 * 1000;
-      break;
-    case BenefitFrequency.QUARTERLY:
-      cycleDurationMs = 91 * 24 * 60 * 60 * 1000;
-      break;
-    case BenefitFrequency.YEARLY:
-      cycleDurationMs = 365 * 24 * 60 * 60 * 1000;
-      break;
-    default:
-      throw new Error(`Unsupported frequency: ${frequency}`);
-  }
-
-  const cyclesPassed = Math.floor((nowTime - startTime) / cycleDurationMs);
-  let cycleStartDate: Date;
-  let cycleEndDate: Date;
-
-  if (frequency === BenefitFrequency.WEEKLY) {
-    cycleStartDate = new Date(startTime + cyclesPassed * cycleDurationMs);
-    cycleEndDate = new Date(cycleStartDate.getTime() + cycleDurationMs - 1);
-  } else if (frequency === BenefitFrequency.MONTHLY) {
-    cycleStartDate = new Date(startDate);
-    cycleStartDate.setUTCMonth(cycleStartDate.getUTCMonth() + cyclesPassed);
-    cycleEndDate = new Date(cycleStartDate);
-    cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + 1);
-    cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
-  } else if (frequency === BenefitFrequency.QUARTERLY) {
-    cycleStartDate = new Date(startDate);
-    cycleStartDate.setUTCMonth(cycleStartDate.getUTCMonth() + cyclesPassed * 3);
-    cycleEndDate = new Date(cycleStartDate);
-    cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + 3);
-    cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
-  } else {
-    cycleStartDate = new Date(startDate);
-    cycleStartDate.setUTCFullYear(cycleStartDate.getUTCFullYear() + cyclesPassed);
-    cycleEndDate = new Date(cycleStartDate);
-    cycleEndDate.setUTCFullYear(cycleEndDate.getUTCFullYear() + 1);
-    cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
-  }
-
-  return { cycleStartDate, cycleEndDate };
 }
 
 async function bulkUpsertBenefitStatuses(rows: UpsertRow[]): Promise<number> {

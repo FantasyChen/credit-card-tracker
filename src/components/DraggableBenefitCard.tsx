@@ -4,7 +4,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import BenefitCardClient from '@/components/BenefitCardClient';
-import type { DisplayBenefitStatus } from '@/app/benefits/page';
+import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard';
 
 interface DraggableBenefitCardProps {
   status: DisplayBenefitStatus;
@@ -55,4 +55,4 @@ export default function DraggableBenefitCard({ status, isDragMode, onStatusChang
       </div>
     </div>
   );
-} 
+}

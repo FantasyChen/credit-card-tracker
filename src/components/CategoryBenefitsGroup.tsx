@@ -3,7 +3,7 @@
 import React, { useState, useTransition } from 'react';
 import BenefitCardClient from '@/components/BenefitCardClient';
 import { batchCompleteBenefitsByCategoryAction } from '@/app/benefits/actions';
-import type { DisplayBenefitStatus } from '@/app/benefits/page';
+import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard';
 import { formatDate } from '@/lib/dateUtils';
 import { calculateBenefitGroupSummary } from '@/lib/benefit-dashboard';
 

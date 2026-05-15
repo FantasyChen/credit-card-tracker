@@ -4,12 +4,15 @@ import React, { useState, useMemo } from 'react';
 import BenefitCardClient from '@/components/BenefitCardClient';
 import CategoryBenefitsGroup from '@/components/CategoryBenefitsGroup';
 import EmptyState from '@/components/ui/EmptyState';
-import type { DisplayBenefitStatus } from '@/app/benefits/page';
 import Link from 'next/link';
 import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import {
   applyBenefitDashboardFilters,
+  CUSTOM_BENEFITS_CARD_NAME,
+  resolveBenefitClaimedValue,
+  type CardLevelRoi,
   type BenefitDashboardFrequency,
+  type DisplayBenefitStatus,
 } from '@/lib/benefit-dashboard';
 
 interface BenefitsDisplayProps {
@@ -21,13 +24,7 @@ interface BenefitsDisplayProps {
   totalUsedValue: number;
   totalNotUsableValue: number;
   totalAnnualFees: number;
-  cardLevelRoi?: Array<{
-    cardDisplayName: string;
-    cardName: string;
-    annualFee: number;
-    claimedValue: number;
-    netRoi: number;
-  }>;
+  cardLevelRoi?: CardLevelRoi[];
 }
 
 export default function BenefitsDisplayClient({
@@ -65,11 +62,8 @@ export default function BenefitsDisplayClient({
     if (cardLevelRoi.length === 0) return [];
     const claimedByCard = new Map<string, number>();
     for (const status of [...localUpcomingBenefits, ...localCompletedBenefits]) {
-      const key = status.benefit.creditCard?.name ?? '⭐ Custom Benefits';
-      const usedAmount = status.usedAmount ?? 0;
-      const used = (status.isCompleted && usedAmount === 0)
-        ? (status.benefit.maxAmount || 0)
-        : usedAmount;
+      const key = status.benefit.creditCard?.name ?? CUSTOM_BENEFITS_CARD_NAME;
+      const used = resolveBenefitClaimedValue(status);
       claimedByCard.set(key, (claimedByCard.get(key) ?? 0) + used);
     }
     return cardLevelRoi
@@ -224,7 +218,7 @@ export default function BenefitsDisplayClient({
         (status.benefit.creditCard?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
         status.benefit.category.toLowerCase().includes(searchQuery.toLowerCase());
       const categoryMatch = !filterCategory || status.benefit.category === filterCategory;
-      const cardName = status.benefit.creditCard?.name ?? '⭐ Custom Benefits';
+      const cardName = status.benefit.creditCard?.name ?? CUSTOM_BENEFITS_CARD_NAME;
       const cardMatch = !filterCard || cardName === filterCard;
       return descMatch && categoryMatch && cardMatch;
     });
@@ -271,9 +265,9 @@ export default function BenefitsDisplayClient({
   );
   const uniqueCards = useMemo(
     () =>
-      Array.from(new Set(allBenefitsForTab.map((b) => b.benefit.creditCard?.name ?? '⭐ Custom Benefits'))).sort((a, b) => {
-        if (a === '⭐ Custom Benefits') return -1;
-        if (b === '⭐ Custom Benefits') return 1;
+      Array.from(new Set(allBenefitsForTab.map((b) => b.benefit.creditCard?.name ?? CUSTOM_BENEFITS_CARD_NAME))).sort((a, b) => {
+        if (a === CUSTOM_BENEFITS_CARD_NAME) return -1;
+        if (b === CUSTOM_BENEFITS_CARD_NAME) return 1;
         return a.localeCompare(b);
       }),
     [allBenefitsForTab]
@@ -318,7 +312,7 @@ export default function BenefitsDisplayClient({
   const groupBenefitsByCard = (benefits: DisplayBenefitStatus[]) => {
     const grouped = benefits.reduce((acc, benefit) => {
       // Use "Custom Benefits" as the group name for standalone benefits
-      const cardName = benefit.benefit.creditCard?.name || '⭐ Custom Benefits';
+      const cardName = benefit.benefit.creditCard?.name || CUSTOM_BENEFITS_CARD_NAME;
       if (!acc[cardName]) {
         acc[cardName] = [];
       }
@@ -329,8 +323,8 @@ export default function BenefitsDisplayClient({
     // Sort cards by total value (descending), but always put "Custom Benefits" first
     return Object.entries(grouped).sort(([keyA, a], [keyB, b]) => {
       // Put custom benefits first
-      if (keyA === '⭐ Custom Benefits') return -1;
-      if (keyB === '⭐ Custom Benefits') return 1;
+      if (keyA === CUSTOM_BENEFITS_CARD_NAME) return -1;
+      if (keyB === CUSTOM_BENEFITS_CARD_NAME) return 1;
       
       const aTotal = a.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
       const bTotal = b.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);

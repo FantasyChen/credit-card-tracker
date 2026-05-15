@@ -7,8 +7,8 @@
 import { prisma } from '@/lib/prisma';
 import { calculateBenefitCycle } from '@/lib/benefit-cycle';
 import { validateBenefitCycle } from '@/lib/benefit-validation';
-import { normalizeCycleDate } from '@/lib/dateUtils';
 import { BenefitFrequency } from '@/generated/prisma';
+import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
 import type {
   MigrationPlan,
   MigrationResult,
@@ -491,58 +491,32 @@ export class BenefitMigrationEngine {
           }
         });
 
-        // Calculate and validate cycle
-        let cycleInfo: { cycleStartDate: Date; cycleEndDate: Date };
-        
-        if (benefitData.frequency === BenefitFrequency.ONE_TIME) {
-          // For ONE_TIME benefits, create a simple cycle from start date
-          cycleInfo = {
-            cycleStartDate: normalizeCycleDate(cardUpdate.effectiveDate || now),
-            cycleEndDate: new Date(cardUpdate.effectiveDate?.getTime() || now.getTime() + 365 * 24 * 60 * 60 * 1000) // 1 year from start
-          };
-        } else {
-          const rawCycleInfo = calculateBenefitCycle(
-            benefitData.frequency,
-            now,
-            card.openedDate,
-            benefitData.cycleAlignment,
-            benefitData.fixedCycleStartMonth,
-            benefitData.fixedCycleDurationMonths
-          );
-          
-          // CRITICAL: Normalize cycleStartDate to midnight UTC to prevent duplicate records
-          cycleInfo = {
-            cycleStartDate: normalizeCycleDate(rawCycleInfo.cycleStartDate),
-            cycleEndDate: rawCycleInfo.cycleEndDate
-          };
-
-          // Validate the cycle if requested
-          if (this.options.validateCycles) {
-            const validation = validateBenefitCycle(
-              {
-                description: benefitData.description,
-                fixedCycleStartMonth: benefitData.fixedCycleStartMonth,
-                fixedCycleDurationMonths: benefitData.fixedCycleDurationMonths
-              },
-              cycleInfo
-            );
-
-            if (!validation.isValid) {
-              throw new Error(`Benefit validation failed: ${validation.error}`);
-            }
+        const materialized = materializeBenefitStatusRows(
+          {
+            ...benefitData,
+            id: newBenefit.id,
+            userId: card.user.id,
+            startDate: cardUpdate.effectiveDate || now,
+          },
+          {
+            referenceDate: now,
+            cardOpenedDate: card.openedDate,
+            validateCycles: this.options.validateCycles,
           }
+        );
+
+        if (materialized.warnings.length > 0) {
+          throw new Error(`Benefit validation failed: ${materialized.warnings.join('; ')}`);
         }
 
-        // Create benefit status records
-        const occurrences = benefitData.occurrencesInCycle || 1;
-        for (let occurrenceIndex = 0; occurrenceIndex < occurrences; occurrenceIndex++) {
+        for (const row of materialized.rows) {
           await tx.benefitStatus.create({
             data: {
-              benefitId: newBenefit.id,
-              userId: card.user.id,
-              cycleStartDate: cycleInfo.cycleStartDate,
-              cycleEndDate: cycleInfo.cycleEndDate,
-              occurrenceIndex: occurrenceIndex,
+              benefitId: row.benefitId,
+              userId: row.userId,
+              cycleStartDate: row.cycleStartDate,
+              cycleEndDate: row.cycleEndDate,
+              occurrenceIndex: row.occurrenceIndex,
               isCompleted: false
             }
           });
