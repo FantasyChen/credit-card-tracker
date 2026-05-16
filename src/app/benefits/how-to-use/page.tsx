@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { BenefitUsageWay } from '@/generated/prisma';
+import PageHeader from '@/components/ui/PageHeader';
 
 export const metadata: Metadata = {
   title: 'How to Use Credit Card Benefits - Complete Guide',
@@ -49,17 +50,11 @@ export default async function HowToUseIndexPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-12">
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-          How to Use Your Credit Card Benefits
-        </h1>
-        <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl">
-          Learn how to maximize your credit card benefits with our comprehensive step-by-step guides. 
-          From airline credits to dining rewards, we&apos;ll show you exactly how to use each benefit.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <PageHeader
+        title="How to Use Your Credit Card Benefits"
+        description="Step-by-step guides for credits, certificates, travel perks, and dining rewards, written for quick use before a benefit expires."
+      />
 
       {/* Guides Grid by Category */}
       <div className="space-y-12">
@@ -77,7 +72,7 @@ export default async function HowToUseIndexPage() {
                   href={`/benefits/how-to-use/${way.slug}`}
                   className="group block"
                 >
-                  <div className="h-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm hover:shadow-lg transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600">
+                  <div className="h-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600">
                     <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                       {way.title}
                     </h3>
@@ -114,7 +109,7 @@ export default async function HowToUseIndexPage() {
       </div>
 
       {/* CTA Section */}
-      <div className="mt-16 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-2xl p-8 border border-indigo-200 dark:border-indigo-700">
+      <div className="mt-16 rounded-lg border border-indigo-200 bg-indigo-50 p-8 dark:border-indigo-800 dark:bg-indigo-950/20">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
             Track Your Benefits Automatically

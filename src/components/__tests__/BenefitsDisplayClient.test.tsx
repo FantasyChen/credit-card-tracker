@@ -115,7 +115,7 @@ describe('BenefitsDisplayClient', () => {
 
     expect(screen.getByText('Claimed Benefits')).toBeInTheDocument();
     expect(screen.getByText('Annual Fee ROI')).toBeInTheDocument();
-    expect(screen.getByText(/\$50\.00 earned vs \$95\.00 fees/)).toBeInTheDocument();
+    expect(screen.getByText(/\$50\.00 claimed vs \$95\.00 fees/)).toBeInTheDocument();
   });
 
   it('shows empty state when no upcoming benefits', () => {

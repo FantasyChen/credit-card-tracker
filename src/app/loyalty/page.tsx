@@ -7,6 +7,7 @@ import { headers } from 'next/headers';
 import { LoyaltyAccountsClient } from './LoyaltyAccountsClient';
 import { Metadata } from 'next';
 import { buildLoyaltySignInRedirect } from '@/lib/loyalty-links';
+import PageHeader from '@/components/ui/PageHeader';
 
 /** Build callback URL so users return to loyalty subdomain after sign-in. */
 async function getSignInRedirect(): Promise<string> {
@@ -75,13 +76,11 @@ export default async function LoyaltyPage() {
   });
 
   return (
-    <div className="container mx-auto p-4 max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 dark:text-white">Loyalty Programs</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Track your loyalty program accounts and prevent points from expiring.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <PageHeader
+        title="Loyalty Programs"
+        description="Track your loyalty program accounts and prevent points from expiring."
+      />
 
       <LoyaltyAccountsClient 
         userAccounts={userLoyaltyAccounts}

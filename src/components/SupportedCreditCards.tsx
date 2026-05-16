@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import type { PredefinedCard, PredefinedBenefit } from '@/generated/prisma';
 import { searchCards } from '@/lib/cardSearchUtils';
 import SearchInput from './SearchInput';
+import CardImageWell from '@/components/ui/CardImageWell';
 
 // Interface for card with benefits
 interface CardWithBenefits extends PredefinedCard {
@@ -102,8 +102,8 @@ export default function SupportedCreditCards() {
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="bg-indigo-100 dark:bg-indigo-900/30 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900/30">
                 <svg className="w-8 h-8 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -113,8 +113,8 @@ export default function SupportedCreditCards() {
                 Automatically tracks monthly, quarterly, and annual benefit cycles. Never manually calculate dates again.
               </p>
             </div>
-            <div className="text-center">
-              <div className="bg-green-100 dark:bg-green-900/30 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-900/30">
                 <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
@@ -124,8 +124,8 @@ export default function SupportedCreditCards() {
                 See if your annual fees are worth it with real-time ROI calculations based on claimed benefits.
               </p>
             </div>
-            <div className="text-center">
-              <div className="bg-yellow-100 dark:bg-yellow-900/30 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-900/30">
                 <svg className="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
                 </svg>
@@ -215,20 +215,18 @@ export default function SupportedCreditCards() {
                   {issuerCards.map((card) => (
                     <div
                       key={card.id}
-                      className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow duration-200"
+                      className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600"
                     >
-                      {card.imageUrl && (
-                        <div className="relative h-32 w-full mb-4 rounded-lg overflow-hidden bg-white">
-                          <Image
-                            src={card.imageUrl}
-                            alt={card.name}
-                            fill
-                            className="object-contain"
-                            unoptimized
-                          />
-                        </div>
-                      )}
-                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      <CardImageWell
+                        imageUrl={card.imageUrl}
+                        alt={card.name}
+                        issuer={card.issuer}
+                        className="h-32 rounded-none border-x-0 border-t-0"
+                        sizes="220px"
+                        unoptimized
+                      />
+                      <div className="p-5">
+                      <h4 className="mb-2 text-lg font-semibold leading-snug text-gray-900 dark:text-white">
                         {card.name}
                       </h4>
                       <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
@@ -258,6 +256,7 @@ export default function SupportedCreditCards() {
                           </div>
                         </div>
                       )}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -1,16 +1,17 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { BenefitFrequency } from '@/generated/prisma';
+import CardImageWell from '@/components/ui/CardImageWell';
 
 interface PageProps {
-  params: { name: string };
+  params: Promise<{ name: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const cardName = decodeURIComponent(params.name);
+  const { name } = await params;
+  const cardName = decodeURIComponent(name);
   const card = await prisma.predefinedCard.findUnique({
     where: { name: cardName },
   });
@@ -85,7 +86,8 @@ const issuerUrls: Record<string, string> = {
 };
 
 export default async function CardDetailPage({ params }: PageProps) {
-  const cardName = decodeURIComponent(params.name);
+  const { name } = await params;
+  const cardName = decodeURIComponent(name);
   
   const card = await prisma.predefinedCard.findUnique({
     where: { name: cardName },
@@ -134,7 +136,7 @@ export default async function CardDetailPage({ params }: PageProps) {
   }, {} as Record<string, typeof card.benefits>);
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
       {/* Breadcrumb */}
       <nav className="mb-8 flex items-center text-sm text-gray-600 dark:text-gray-400">
         <Link href="/cards/browse" className="hover:text-indigo-600 dark:hover:text-indigo-400">
@@ -147,26 +149,17 @@ export default async function CardDetailPage({ params }: PageProps) {
       </nav>
 
       {/* Card Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-lg mb-8">
+      <div className="mb-8 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="md:flex">
-          {/* Card Image */}
-          <div className="md:w-1/3 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 p-8 flex items-center justify-center">
-            {card.imageUrl ? (
-              <div className="relative w-full max-w-[280px]" style={{ aspectRatio: '1.586/1' }}>
-                <Image
-                  src={card.imageUrl}
-                  alt={card.name}
-                  fill
-                  className="object-contain drop-shadow-lg"
-                  sizes="280px"
-                  priority
-                />
-              </div>
-            ) : (
-              <svg className="h-32 w-32 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-              </svg>
-            )}
+          <div className="md:w-1/3">
+            <CardImageWell
+              imageUrl={card.imageUrl}
+              alt={card.name}
+              issuer={card.issuer}
+              className="h-full min-h-64 rounded-none border-0 md:aspect-auto"
+              priority
+              sizes="280px"
+            />
           </div>
 
           {/* Card Info */}
@@ -184,20 +177,20 @@ export default async function CardDetailPage({ params }: PageProps) {
             </div>
 
             {/* Value Stats */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center dark:border-gray-700 dark:bg-gray-900/40">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
                   ${card.annualFee}
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">Annual Fee</div>
               </div>
-              <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center dark:border-emerald-800 dark:bg-emerald-950/20">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                   ${totalAnnualValue.toLocaleString()}
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">Potential Value/yr</div>
               </div>
-              <div className={`text-center p-4 rounded-lg ${netValue >= 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+              <div className={`rounded-lg border p-4 text-center ${netValue >= 0 ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20' : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20'}`}>
                 <div className={`text-2xl font-bold ${netValue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   {netValue >= 0 ? '+' : ''}${netValue.toLocaleString()}
                 </div>
@@ -254,7 +247,7 @@ export default async function CardDetailPage({ params }: PageProps) {
                 {benefits.map((benefit) => (
                   <div
                     key={benefit.id}
-                    className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow"
+                    className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
                   >
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex-1">
@@ -312,20 +305,14 @@ export default async function CardDetailPage({ params }: PageProps) {
                 href={`/cards/browse/${encodeURIComponent(relatedCard.name)}`}
                 className="group block"
               >
-                <div className="h-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden hover:shadow-lg transition-all hover:border-indigo-300 dark:hover:border-indigo-600">
-                  <div className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 p-3 flex items-center justify-center" style={{ aspectRatio: '16/10' }}>
-                    {relatedCard.imageUrl && (
-                      <div className="relative w-full h-full max-w-[140px]" style={{ aspectRatio: '1.586/1' }}>
-                        <Image
-                          src={relatedCard.imageUrl}
-                          alt={relatedCard.name}
-                          fill
-                          className="object-contain drop-shadow-md"
-                          sizes="140px"
-                        />
-                      </div>
-                    )}
-                  </div>
+                <div className="h-full overflow-hidden rounded-lg border border-gray-200 bg-white transition-all hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600">
+                  <CardImageWell
+                    imageUrl={relatedCard.imageUrl}
+                    alt={relatedCard.name}
+                    issuer={relatedCard.issuer}
+                    className="rounded-none border-x-0 border-t-0 p-3"
+                    sizes="140px"
+                  />
                   <div className="p-4">
                     <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors text-sm truncate">
                       {relatedCard.name}
@@ -343,7 +330,7 @@ export default async function CardDetailPage({ params }: PageProps) {
       )}
 
       {/* CTA */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-2xl p-8 border border-indigo-200 dark:border-indigo-700 text-center">
+      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-8 text-center dark:border-indigo-800 dark:bg-indigo-950/20">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
           Track Your {card.name} Benefits
         </h2>

@@ -118,9 +118,10 @@ export default function NotificationSettingsForm({
 
       <form 
         onSubmit={handleSubmit}
-        className="space-y-6 bg-white p-6 rounded-lg shadow dark:bg-gray-800 dark:shadow-lg dark:shadow-indigo-500/20"
+        className="space-y-6 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"
       >
         {/* New Benefit Notification Setting */}
+        <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
         <div className="flex items-start">
           <div className="flex items-center h-5">
             <input
@@ -138,8 +139,10 @@ export default function NotificationSettingsForm({
             <p className="text-gray-500 dark:text-gray-400">Send an email when a new benefit cycle becomes available (e.g., start of month/quarter/year).</p>
           </div>
         </div>
+        </div>
 
         {/* Benefit Expiration Notification Setting */}
+        <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
         <div className="flex items-start">
           <div className="flex items-center h-5">
             <input
@@ -156,6 +159,7 @@ export default function NotificationSettingsForm({
             </label>
             <p className="text-gray-500 dark:text-gray-400">Send an email reminder before a benefit cycle is about to expire.</p>
           </div>
+        </div>
         </div>
 
         {/* Benefit Expiration Days Setting */}
@@ -183,6 +187,7 @@ export default function NotificationSettingsForm({
         </div>
 
         {/* Loyalty Points Expiration Notification Setting */}
+        <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
         <div className="flex items-start">
           <div className="flex items-center h-5">
             <input
@@ -199,6 +204,7 @@ export default function NotificationSettingsForm({
             </label>
             <p className="text-gray-500 dark:text-gray-400">Send an email reminder before your loyalty program points/miles are about to expire.</p>
           </div>
+        </div>
         </div>
 
         {/* Points Expiration Days Setting */}

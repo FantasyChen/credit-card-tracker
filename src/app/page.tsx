@@ -59,17 +59,12 @@ export default async function Home() {
         />
 
       {/* ── Hero Section ── */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-          <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-indigo-100/50 dark:bg-indigo-900/20 blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-purple-100/50 dark:bg-purple-900/20 blur-3xl" />
-        </div>
-
+      <section className="relative overflow-hidden border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
         <div className="relative container mx-auto max-w-screen-xl px-4 py-16 lg:py-24">
           <div className="grid lg:grid-cols-12 lg:gap-12 items-center">
             <div className="lg:col-span-7 mb-12 lg:mb-0">
               {/* Beta badge */}
-              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 px-4 py-1.5 mb-6">
+              <div className="inline-flex items-center gap-2 rounded-md border border-indigo-200 bg-white px-3 py-1.5 shadow-sm dark:border-indigo-800 dark:bg-gray-900">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
@@ -79,21 +74,17 @@ export default async function Home() {
                 </span>
               </div>
 
-              <h1 className="mb-6 max-w-2xl text-4xl font-extrabold leading-[1.1] tracking-tight text-gray-900 dark:text-white md:text-5xl xl:text-6xl">
-                Stop Leaving{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
-                  Money
-                </span>{' '}
-                on the Table
+              <h1 className="mb-6 mt-6 max-w-2xl text-4xl font-semibold leading-tight tracking-tight text-gray-950 dark:text-white md:text-5xl xl:text-6xl">
+                Credit card benefit tracker
               </h1>
               <p className="mb-8 max-w-xl text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
-                Track every credit card perk, get reminded before they expire, and see your annual fee ROI at a glance. Supports a growing catalog of premium cards.
+                Track recurring credits, reset windows, loyalty expirations, and annual fee ROI without giving Perks Reminder bank access.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <Link
                   href="/auth/signin"
-                  className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-700 hover:shadow-indigo-500/30 transition-all duration-200 focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-900"
+                  className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-6 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors duration-200 focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-900"
                 >
                   Get Started Free
                   <svg className="ml-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
@@ -102,15 +93,15 @@ export default async function Home() {
                 </Link>
                 <a
                   href="#how-it-works"
-                  className="inline-flex items-center justify-center px-6 py-3.5 text-base font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200"
+                  className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-6 py-3.5 text-base font-medium text-gray-700 transition-colors duration-200 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
-                  See How It Works ↓
+                  See How It Works
                 </a>
               </div>
 
               {/* Trust Badges */}
               <div className="flex flex-col sm:flex-row gap-3">
-                <div className="inline-flex items-center gap-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 px-4 py-2.5">
+                <div className="inline-flex items-center gap-2.5 rounded-lg border border-indigo-200 bg-white px-4 py-2.5 shadow-sm dark:border-indigo-800 dark:bg-gray-900">
                   <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -119,7 +110,7 @@ export default async function Home() {
                     <p className="text-xs text-indigo-600 dark:text-indigo-400">Pro free during beta</p>
                   </div>
                 </div>
-                <div className="inline-flex items-center gap-2.5 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-4 py-2.5">
+                <div className="inline-flex items-center gap-2.5 rounded-lg border border-green-200 bg-white px-4 py-2.5 shadow-sm dark:border-green-800 dark:bg-gray-900">
                   <svg className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
@@ -137,7 +128,7 @@ export default async function Home() {
                   src="/hero-image.jpg"
                   alt={`${SITE_NAME} - Maximize your credit card benefits`}
                   fill
-                  className="rounded-2xl object-contain"
+                className="rounded-lg object-contain"
                   priority
                 />
               </div>
@@ -182,17 +173,17 @@ export default async function Home() {
       <FAQ />
 
       {/* ── Bottom CTA ── */}
-      <section className="py-20 bg-gradient-to-br from-indigo-600 to-purple-700 dark:from-indigo-800 dark:to-purple-900">
+      <section className="border-y border-indigo-200 bg-indigo-50 py-20 dark:border-indigo-900 dark:bg-indigo-950/20">
         <div className="container mx-auto max-w-screen-xl px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-950 dark:text-white mb-4">
             Ready to stop wasting your card benefits?
           </h2>
-          <p className="text-lg text-indigo-100 dark:text-indigo-200 max-w-2xl mx-auto mb-8">
+          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-8">
             Join during beta and get Pro features free. Track your benefits, get smart reminders, and maximize your ROI.
           </p>
           <Link
             href="/auth/signin"
-            className="inline-flex items-center px-8 py-4 bg-white text-indigo-700 font-semibold rounded-xl shadow-xl shadow-indigo-900/20 hover:bg-indigo-50 transition-colors duration-200 text-lg"
+            className="inline-flex items-center rounded-lg bg-indigo-600 px-8 py-4 text-lg font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-indigo-700"
           >
             Get Started Free
             <svg className="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

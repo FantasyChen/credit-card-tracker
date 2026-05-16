@@ -89,7 +89,7 @@ const Navbar = () => {
               </Link>
             </div>
             {/* Desktop navigation links */}
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <div className="hidden lg:ml-6 lg:flex lg:space-x-8">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
@@ -108,7 +108,7 @@ const Navbar = () => {
           </div>
           <div className="flex items-center">
             {/* Site switcher - link to other product */}
-            <div className="hidden sm:block">
+            <div className="hidden lg:block">
               <a
                 href={switchHref}
                 className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
@@ -118,11 +118,11 @@ const Navbar = () => {
               </a>
             </div>
             {/* Theme Toggle - visible on all screen sizes */}
-            <div className="hidden sm:block sm:ml-2">
+            <div className="hidden lg:block lg:ml-2">
               <ThemeToggle />
             </div>
             {/* Desktop Sign in/out button */}
-            <div className="hidden sm:ml-2 sm:flex sm:items-center sm:space-x-3">
+            <div className="hidden lg:ml-2 lg:flex lg:items-center lg:space-x-3">
               {session ? (
                 <>
                   {session.user.subscriptionTier === 'PRO' && (
@@ -147,7 +147,7 @@ const Navbar = () => {
               )}
             </div>
             {/* Mobile menu button & Theme Toggle */}
-            <div className="ml-2 flex items-center sm:hidden">
+            <div className="ml-2 flex items-center lg:hidden">
               <ThemeToggle />
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -168,7 +168,7 @@ const Navbar = () => {
 
       {/* Mobile menu, show/hide based on menu state. */}
       {isMobileMenuOpen && (
-        <div className="sm:hidden" id="mobile-menu" role="menu" aria-label="Mobile navigation menu">
+        <div className="lg:hidden" id="mobile-menu" role="menu" aria-label="Mobile navigation menu">
           <div className="space-y-1 px-2 pb-3 pt-2">
             {navigation.map((item) => (
               <Link

@@ -13,6 +13,7 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { getUserSubscriptionStatus } from '@/lib/subscription';
+import PageHeader from '@/components/ui/PageHeader';
 
 export const metadata: Metadata = {
   title: "Settings - Manage Your Preferences",
@@ -34,9 +35,9 @@ function SettingsCard({ href, icon, title, description, badge }: SettingsCardPro
   return (
     <Link
       href={href}
-      className="group relative flex items-start gap-4 p-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-lg transition-all duration-200"
+      className="group relative flex items-start gap-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600"
     >
-      <div className="flex-shrink-0 p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 transition-colors">
+      <div className="flex-shrink-0 rounded-lg bg-indigo-50 p-3 transition-colors group-hover:bg-indigo-100 dark:bg-indigo-900/30 dark:group-hover:bg-indigo-900/50">
         {icon}
       </div>
       <div className="flex-1 min-w-0">
@@ -118,26 +119,18 @@ export default async function SettingsPage() {
   ];
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Settings
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Manage your account preferences and data.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+      <PageHeader title="Settings" description="Manage your account preferences and data." />
 
       {/* Account and Plan */}
-      <div className="mb-8 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800">
+      <div className="mb-8 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-5 flex items-center gap-2">
           <SparklesIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Account & Plan
           </h2>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex-shrink-0">
             {session.user.image ? (
               <Image
@@ -159,7 +152,7 @@ export default async function SettingsPage() {
               {session.user.email}
             </p>
           </div>
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-wrap gap-2 sm:ml-auto sm:flex-col sm:items-end">
             <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center gap-2">
               <ShieldCheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
               <span className="text-sm font-medium text-green-700 dark:text-green-300">

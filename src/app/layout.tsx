@@ -157,12 +157,12 @@ export default async function RootLayout({
           <meta name="google-site-verification" content={process.env.GOOGLE_SEARCH_CONSOLE_VERIFICATION} />
         )}
       </head>
-      {/* <ThemeProviders> */}
-      <Providers session={session}>{/* Use original Providers */}
-        <ErrorBoundary>
-          <body
-            className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
-          >
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
+      >
+        {/* <ThemeProviders> */}
+        <Providers session={session}>{/* Use original Providers */}
+          <ErrorBoundary>
             <SkipLink />
             <div className="flex min-h-full flex-col bg-gray-50 dark:bg-gray-950">
               <Navbar />
@@ -179,10 +179,10 @@ export default async function RootLayout({
               <Footer />
               <Analytics />
             </div>
-          </body>
-        </ErrorBoundary>
-      </Providers>
-      {/* </ThemeProviders> */}
+          </ErrorBoundary>
+        </Providers>
+        {/* </ThemeProviders> */}
+      </body>
     </html>
   );
 }

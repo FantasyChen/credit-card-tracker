@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { updateNotificationSettingsAction } from './actions'; // Import the server action
 import NotificationSettingsForm from './NotificationSettingsForm'; // New client component
 import { getEmailAlertUsage, getUserTier } from '@/lib/subscription';
+import PageHeader from '@/components/ui/PageHeader';
 
 export default async function NotificationSettingsPage() {
   const session = await getServerSession(authOptions);
@@ -34,8 +35,11 @@ export default async function NotificationSettingsPage() {
   const subscriptionTier = await getUserTier(session.user.id);
 
   return (
-    <div className="container mx-auto p-4 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6 dark:text-white">Notification Settings</h1>
+    <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+      <PageHeader
+        title="Notification Settings"
+        description="Choose which benefit and loyalty reminders should reach your inbox."
+      />
 
       <NotificationSettingsForm 
         initialSettings={user}
@@ -45,7 +49,7 @@ export default async function NotificationSettingsPage() {
       />
 
       {/* Additional Settings Section */}
-      <div className="mt-8 bg-white p-6 rounded-lg shadow dark:bg-gray-800 dark:shadow-lg dark:shadow-indigo-500/20">
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Additional Settings</h2>
         <div className="space-y-4">
           <div>

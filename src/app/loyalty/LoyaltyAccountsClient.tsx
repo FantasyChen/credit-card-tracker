@@ -4,7 +4,7 @@ import React, { useState, useTransition } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Calendar, AlertTriangle, Edit, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Calendar, AlertTriangle, Edit, Trash2, ExternalLink, Plane, Hotel, Car, CreditCard, Gift } from 'lucide-react';
 import { addLoyaltyAccountAction, updateLoyaltyAccountAction, deleteLoyaltyAccountAction } from './actions';
 import { AddLoyaltyAccountModal } from './AddLoyaltyAccountModal';
 import { EditLoyaltyAccountModal } from './EditLoyaltyAccountModal';
@@ -77,30 +77,30 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
 
   const getExpirationStatus = (account: LoyaltyAccount) => {
     if (!account.loyaltyProgram.hasExpiration) {
-      return { status: 'never', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' };
+      return { status: 'never', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300', border: 'border-l-green-500' };
     }
     
     const daysUntilExpiration = calculateDaysUntilExpiration(account.expirationDate);
-    if (daysUntilExpiration === null) return { status: 'unknown', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' };
+    if (daysUntilExpiration === null) return { status: 'unknown', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', border: 'border-l-gray-400' };
     
     if (daysUntilExpiration <= 0) {
-      return { status: 'expired', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' };
+      return { status: 'expired', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300', border: 'border-l-red-500' };
     } else if (daysUntilExpiration <= 30) {
-      return { status: `${daysUntilExpiration} days`, color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300' };
+      return { status: `${daysUntilExpiration} days`, color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300', border: 'border-l-orange-500' };
     } else if (daysUntilExpiration <= 90) {
-      return { status: `${daysUntilExpiration} days`, color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' };
+      return { status: `${daysUntilExpiration} days`, color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300', border: 'border-l-yellow-500' };
     } else {
-      return { status: `${daysUntilExpiration} days`, color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' };
+      return { status: `${daysUntilExpiration} days`, color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300', border: 'border-l-green-500' };
     }
   };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'AIRLINE': return '✈️';
-      case 'HOTEL': return '🏨';
-      case 'RENTAL_CAR': return '🚗';
-      case 'CREDIT_CARD': return '💳';
-      default: return '🎁';
+      case 'AIRLINE': return <Plane className="h-5 w-5" />;
+      case 'HOTEL': return <Hotel className="h-5 w-5" />;
+      case 'RENTAL_CAR': return <Car className="h-5 w-5" />;
+      case 'CREDIT_CARD': return <CreditCard className="h-5 w-5" />;
+      default: return <Gift className="h-5 w-5" />;
     }
   };
 
@@ -125,9 +125,9 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
   return (
     <div className="space-y-6">
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-5">
             <div className="flex items-center space-x-2">
               <div className="p-2 bg-blue-100 rounded-lg dark:bg-blue-900">
                 <Plus className="h-5 w-5 text-blue-600 dark:text-blue-300" />
@@ -141,7 +141,7 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
         </Card>
         
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-5">
             <div className="flex items-center space-x-2">
               <div className="p-2 bg-orange-100 rounded-lg dark:bg-orange-900">
                 <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-300" />
@@ -160,7 +160,7 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
         </Card>
         
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-5">
             <div className="flex items-center space-x-2">
               <div className="p-2 bg-green-100 rounded-lg dark:bg-green-900">
                 <Calendar className="h-5 w-5 text-green-600 dark:text-green-300" />
@@ -178,7 +178,7 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
 
       {/* Add New Account Button */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold dark:text-white">Your Loyalty Accounts</h2>
+        <h2 className="text-xl font-semibold text-gray-950 dark:text-white">Your Loyalty Accounts</h2>
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="loyalty-sort" className="sr-only">Sort loyalty accounts</label>
           <select
@@ -222,18 +222,18 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {sortedAccounts.map((account) => {
             const expirationStatus = getExpirationStatus(account);
             return (
-              <Card key={account.id} className="relative">
+              <Card key={account.id} className={`relative border-l-4 ${expirationStatus.border}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-2xl">{getTypeIcon(account.loyaltyProgram.type)}</span>
-                      <div>
-                        <CardTitle className="text-lg">{account.loyaltyProgram.displayName}</CardTitle>
-                        <CardDescription>{account.loyaltyProgram.company}</CardDescription>
+                    <div className="flex min-w-0 items-center space-x-3">
+                      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">{getTypeIcon(account.loyaltyProgram.type)}</span>
+                      <div className="min-w-0">
+                        <CardTitle className="truncate text-lg leading-snug">{account.loyaltyProgram.displayName}</CardTitle>
+                        <CardDescription className="truncate">{account.loyaltyProgram.company}</CardDescription>
                       </div>
                     </div>
                     <div className="flex space-x-1">
@@ -257,24 +257,24 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
                   </div>
                 </CardHeader>
                 
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-4">
                   {/* Account Number */}
                   {account.accountNumber && (
                     <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Account Number</p>
-                      <p className="text-sm font-mono dark:text-white">{account.accountNumber}</p>
+                      <p className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Account Number</p>
+                      <p className="break-all text-sm font-mono dark:text-white">{account.accountNumber}</p>
                     </div>
                   )}
                   
                   {/* Last Activity */}
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Activity</p>
+                    <p className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Last Activity</p>
                     <p className="text-sm dark:text-white">{new Date(account.lastActivityDate).toLocaleDateString('en-US', { timeZone: 'UTC' })}</p>
                   </div>
                   
                   {/* Expiration Status */}
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Expiration</p>
+                    <p className="mb-1 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Expiration</p>
                     <Badge className={expirationStatus.color}>
                       {expirationStatus.status === 'never' ? 'Never expires' : 
                        expirationStatus.status === 'expired' ? 'Expired' :

@@ -16,6 +16,8 @@ const config = {
   },
   // preset: 'ts-jest', // Removed: next/jest handles transpilation
   moduleNameMapper: {
+    // Next/SWC may rewrite tsconfig aliases to long relative paths in tests.
+    '^(?:\\.\\./)+\\.\\/src\\/(.*)$': '<rootDir>/src/$1',
     // Handle module aliases (this will be automatically configured for you soon)
     '^@/components/(.*)$': '<rootDir>/src/components/$1',
     '^@/lib/(.*)$': '<rootDir>/src/lib/$1',
@@ -32,4 +34,4 @@ const config = {
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
-export default createJestConfig(config); 
+export default createJestConfig(config);

@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "LoyaltyProgram" ADD COLUMN "expirationBasis" TEXT DEFAULT 'ACTIVITY';
+ALTER TABLE "LoyaltyProgram" ADD COLUMN IF NOT EXISTS "expirationBasis" TEXT DEFAULT 'ACTIVITY';

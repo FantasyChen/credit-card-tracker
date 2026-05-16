@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useTransition, useMemo } from 'react'; // Add useMemo
 import Link from 'next/link';
-import Image from 'next/image';
 import { deleteCardAction } from './actions'; // Import the delete action
 import type { CreditCard, Benefit } from '@/generated/prisma'; // Removed unused PredefinedCard
 import { generateCardDisplayNames } from '@/lib/cardDisplayUtils';
 import { CardsPageSkeleton } from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import CardImageWell from '@/components/ui/CardImageWell';
+import PageHeader from '@/components/ui/PageHeader';
 
 // Type for cards fetched from the API, assuming benefits are included
 interface FetchedUserCard extends CreditCard {
@@ -43,6 +44,7 @@ const formatOpenedDate = (date: Date | null): string => {
 // Client Component for displaying a single card with delete functionality
 function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.Dispatch<React.SetStateAction<FetchedUserCard[]>> }) {
   const [isPending, startTransition] = useTransition();
+  const totalPotentialValue = card.benefits.reduce((total, benefit) => total + (benefit.maxAmount ?? 0), 0);
 
   const handleDelete = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -60,38 +62,32 @@ function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.D
   };
 
   return (
-    <div className="border rounded-lg p-4 shadow-md bg-white flex flex-col justify-between h-full dark:bg-gray-800 dark:border-gray-700 dark:shadow-lg dark:shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-200">
+    <div className="flex h-full flex-col justify-between overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600">
        <div> {/* Content wrapper */}
         {/* Card Image */}
-        {card.imageUrl ? (
-          <div className="relative h-40 w-full mb-4 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-700">
-            <Image
-              src={card.imageUrl}
-              alt={card.displayName || card.name}
-              fill
-              className="object-contain"
-              unoptimized
-            />
-          </div>
-        ) : (
-          <div className="relative h-40 w-full mb-4 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-12 h-8 mx-auto mb-2 bg-gray-300 dark:bg-gray-600 rounded border-2 border-gray-400 dark:border-gray-500 flex items-center justify-center">
-                <span className="text-xs font-bold text-gray-600 dark:text-gray-400">💳</span>
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                {card.issuer}
-              </p>
-            </div>
-          </div>
-        )}
+        <CardImageWell
+          imageUrl={card.imageUrl}
+          alt={card.displayName || card.name}
+          issuer={card.issuer}
+          className="h-40 rounded-none border-x-0 border-t-0"
+          imageClassName="p-2"
+          sizes="220px"
+          unoptimized
+        />
         
-        <div className="flex-grow">
-          <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100 leading-tight">{card.displayName || card.name}</h2> {/* Use displayName */}
-          <div className="space-y-1 mb-3">
-            <p className="text-gray-600 dark:text-gray-300 text-sm">
-              <span className="font-medium">Issuer:</span> {card.issuer}
-            </p>
+        <div className="flex-grow p-4">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+              {card.issuer}
+            </span>
+            {totalPotentialValue > 0 && (
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-800">
+                ${totalPotentialValue.toFixed(0)} tracked value
+              </span>
+            )}
+          </div>
+          <h2 className="mb-3 text-lg font-semibold leading-snug text-gray-950 dark:text-gray-100">{card.displayName || card.name}</h2> {/* Use displayName */}
+          <div className="space-y-1.5 mb-3">
             {card.lastFourDigits && (
                <p className="text-gray-500 dark:text-gray-400 text-sm">
                  <span className="font-medium">Last {card.lastFourDigits.length}:</span> {'•'.repeat(card.lastFourDigits.length)}{card.lastFourDigits}
@@ -105,13 +101,13 @@ function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.D
           </div>
 
           {card.benefits.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-700">
               <h3 className="text-sm font-semibold mb-2 text-gray-800 dark:text-gray-200">
-                Key Benefits ({card.benefits.length}):
+                Key benefits ({card.benefits.length})
               </h3>
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1 dark:text-gray-300">
+              <ul className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
                 {card.benefits.slice(0, 3).map(benefit => (
-                  <li key={benefit.id} className="leading-relaxed">{benefit.description}</li>
+                  <li key={benefit.id} className="leading-relaxed">- {benefit.description}</li>
                 ))}
                 {card.benefits.length > 3 && (
                   <li className="text-blue-600 dark:text-blue-400 font-medium">
@@ -125,21 +121,21 @@ function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.D
        </div>
 
        {/* Action Buttons */}
-       <div className="mt-6 flex justify-between items-center pt-3 border-t border-gray-200 dark:border-gray-700">
+       <div className="flex items-center justify-between gap-2 border-t border-gray-200 p-4 dark:border-gray-700">
           <Link
             href={`/cards/${card.id}/edit`}
-            className="flex-1 mr-2 text-center text-sm px-4 py-2 rounded-md transition duration-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-800/30 font-medium"
+            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-center text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
           >
-            ✏️ Edit
+            Edit
           </Link>
-          <form onSubmit={handleDelete} className="flex-1 ml-2">
+          <form onSubmit={handleDelete} className="flex-1">
             <input type="hidden" name="cardId" value={card.id} />
             <button
                type="submit"
                disabled={isPending} // Disable button while deleting
-               className={`w-full text-sm px-4 py-2 rounded-md transition duration-200 font-medium ${isPending ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400' : 'bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-800/30'}`}
+               className={`w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors ${isPending ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400' : 'bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-800/30'}`}
              >
-               {isPending ? '🔄 Removing...' : '🗑️ Remove'}
+               {isPending ? 'Removing...' : 'Remove'}
              </button>
           </form>
        </div>
@@ -199,16 +195,14 @@ export default function UserCardsPage() {
   // --- Rendering Logic --- 
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold dark:text-white">My Cards</h1>
-        {/* Conditionally render Add New Card button */}
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <PageHeader title="My Cards" description="Manage the cards whose benefits you track.">
         {!isLoading && !error && (
-          <Link href="/cards/new" className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition duration-200 dark:bg-green-600 dark:hover:bg-green-700">
+          <Link href="/cards/new" className="inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700">
             Add New Card
           </Link>
         )}
-      </div>
+      </PageHeader>
 
       {isLoading && <CardsPageSkeleton />}
       

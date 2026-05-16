@@ -28,9 +28,11 @@ if (args.length === 0) {
 const maskedUrl = devUrl.replace(/\/\/[^@]+@/, '//****@');
 console.log(`\x1b[34m🔧 Using DEV database: ${maskedUrl}\x1b[0m\n`);
 
+const devDirectUrl = devUrl.replace('-pooler.', '.');
+
 const child = spawn(args[0], args.slice(1), {
   stdio: 'inherit',
-  env: { ...process.env, DATABASE_URL: devUrl },
+  env: { ...process.env, DATABASE_URL: devUrl, DIRECT_URL: devDirectUrl },
   shell: true,
 });
 

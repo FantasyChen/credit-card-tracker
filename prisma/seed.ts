@@ -1,4 +1,5 @@
 import { PrismaClient, BenefitFrequency, CreditCard as PrismaCreditCard, PredefinedCard as PrismaPredefinedCard, BenefitCycleAlignment, LoyaltyProgramType } from '../src/generated/prisma'; // Adjust path if necessary
+import { inferBenefitUsageWaySlug } from '../src/lib/benefit-usage-matching';
 
 const prisma = new PrismaClient();
 
@@ -107,7 +108,7 @@ async function main() {
         {
           description: '10,000 Anniversary Bonus Miles',
           category: 'Bonus',
-          maxAmount: 0, 
+          maxAmount: 0,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -213,7 +214,7 @@ async function main() {
       name: 'Chase Ink Business Preferred',
       issuer: 'Chase',
       annualFee: 95,
-      imageUrl: '/images/cards/chase-ink-business-preferred.png',
+      imageUrl: '/images/cards/chase-ink-business-preferred.jpg',
       benefits: [],
     },
     {
@@ -234,17 +235,17 @@ async function main() {
           fixedCycleDurationMonths: 12, // Calendar year
         },
         {
-          description: '$15 Monthly Uber Cash ($35 in December)', 
+          description: '$15 Monthly Uber Cash ($35 in December)',
           category: 'Travel',
-          maxAmount: 15, 
+          maxAmount: 15,
           frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
         {
-          description: '$20 Additional Uber Cash (December)', 
+          description: '$20 Additional Uber Cash (December)',
           category: 'Travel',
           maxAmount: 20,
-          frequency: BenefitFrequency.YEARLY, 
+          frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED, // Specific to December
           fixedCycleStartMonth: 12, // December
@@ -254,7 +255,7 @@ async function main() {
           description: '$50 Saks Fifth Avenue Credit (Jan-Jun)',
           category: 'Shopping',
           maxAmount: 50,
-          frequency: BenefitFrequency.YEARLY, 
+          frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
           fixedCycleStartMonth: 1,
@@ -264,7 +265,7 @@ async function main() {
           description: '$50 Saks Fifth Avenue Credit (Jul-Dec)',
           category: 'Shopping',
           maxAmount: 50,
-          frequency: BenefitFrequency.YEARLY, 
+          frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
           fixedCycleStartMonth: 7,
@@ -564,7 +565,7 @@ async function main() {
           description: '$200 Semi-Annual Hilton Resort Credit (Jan-Jun)',
           category: 'Travel',
           maxAmount: 200,
-          frequency: BenefitFrequency.YEARLY, 
+          frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
           fixedCycleStartMonth: 1,
@@ -574,7 +575,7 @@ async function main() {
           description: '$200 Semi-Annual Hilton Resort Credit (Jul-Dec)',
           category: 'Travel',
           maxAmount: 200,
-          frequency: BenefitFrequency.YEARLY, 
+          frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
           fixedCycleStartMonth: 7,
@@ -714,7 +715,7 @@ async function main() {
         {
           description: 'Annual Anniversary Free Night (up to 40k points)',
           category: 'Travel',
-          maxAmount: 0, 
+          maxAmount: 0,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -729,7 +730,7 @@ async function main() {
         {
           description: 'Annual Anniversary Free Night (up to 40k points)',
           category: 'Travel',
-          maxAmount: 0, 
+          maxAmount: 0,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -744,7 +745,7 @@ async function main() {
         {
           description: 'Annual Free Night Award (up to 85k points)',
           category: 'Travel',
-          maxAmount: 0, 
+          maxAmount: 0,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -761,7 +762,7 @@ async function main() {
       name: 'Chase United Explorer Card',
       issuer: 'Chase',
       annualFee: 150,
-      imageUrl: '/images/cards/chase-united-explorer-card.png',
+      imageUrl: '/images/cards/chase-united-explorer-card.avif',
       benefits: [
         {
           description: '2 United Club one-time passes',
@@ -940,7 +941,7 @@ async function main() {
         {
           description: 'Annual Free Night Award (up to 35k points)',
           category: 'Travel',
-          maxAmount: 0, 
+          maxAmount: 0,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -955,7 +956,7 @@ async function main() {
         {
           description: "Alaska\'s Famous Companion Fare™ (from $122)",
           category: 'Travel',
-          maxAmount: 0, 
+          maxAmount: 0,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
         },
@@ -1387,7 +1388,7 @@ async function main() {
 
   // === Seed Benefit Usage Ways ===
   console.log('Seeding benefit usage ways...');
-  
+
   const usageWays = [
     {
       title: 'How to Use Airline Fee Credits',
@@ -1419,6 +1420,10 @@ Be aware these typically don't count:
 - ❌ Bookings through third-party sites (Expedia, Kayak, etc.)
 - ❌ Gift cards (some issuers restrict this)
 - ❌ Travel packages or vacation bundles
+
+## Watch Outs
+
+Refund-based airline workarounds and travel-bank style methods can change quickly and may be clawed back. The dependable workflow is to use the credit for real eligible incidental fees on the selected airline and keep receipts until the credit posts.
 
 ## Pro Tips
 
@@ -1489,67 +1494,330 @@ For cards offering Lyft credits:
     {
       title: 'How to Use Hotel Credits',
       slug: 'hotel-credits',
-      description: 'Book hotels and get automatic statement credits',
+      description: 'General fallback for hotel credits that do not fit a more specific guide',
       category: 'Travel',
-      content: `## Booking Process
+      content: `## First Identify the Credit Type
 
-To receive your hotel credit:
+Hotel credits are not interchangeable. Before booking, confirm whether your benefit is tied to:
 
-1. **Book through the qualifying portal** - Requirements vary by card issuer
-2. **Use your enrolled credit card** - Pay with the card that offers the benefit
-3. **Credit posts after checkout** - Not at booking time, but after your stay completes
+- A bank travel portal
+- A named hotel collection such as FHR, THC, The Edit, or Renowned Hotels
+- A hotel brand such as Hilton
+- A stay length requirement, prepaid requirement, or semi-annual window
 
-## Qualifying Booking Portals
+## Practical Workflow
 
-**American Express:**
-- Amex Travel portal
-- Fine Hotels & Resorts program
-- The Hotel Collection
+1. Open the card issuer's benefit terms for the specific credit.
+2. Book through the required channel, not a similar-looking third-party site.
+3. Pay with the card that carries the benefit.
+4. Keep the confirmation, hotel folio, and statement credit record.
+5. Leave enough time before the benefit window ends for the credit to post.
 
-**Chase:**
-- Chase Travel Portal (Chase Ultimate Rewards)
-- Direct hotel bookings (card-specific)
+## Watch Outs
 
-**Capital One:**
-- Capital One Travel portal
-- Direct hotel bookings
+Hotel credits need to be separated by program because refund behavior, clawback risk, and posting timing vary. Use this generic guide only when no specific guide matches the benefit.
 
-**Citi:**
-- Citi Travel Portal
-- Prestige Hotel Collection
+## Common Mistakes
 
-## Important Requirements
-
-- 💰 Some require minimum annual spend ($500-$1,000)
-- ⏳ Credits may take 8-12 weeks to post
-- 📋 Read your specific issuer's terms carefully
-- 🏨 Must complete the stay (not just book)
-
-## Maximizing Your Credit
-
-**Booking Strategy:**
-- Book early to ensure credit posts before year-end
-- Combine with hotel loyalty programs
-- Look for properties that double-dip (credit + points)
-- Consider extended stays to meet minimum spend requirements
-
-**Credit Timing:**
-- Book at least 3 months before credit expiration
-- Account for statement closing dates
-- Contact issuer if credit doesn't post within timeframe
-
-## Common Mistakes to Avoid
-
-❌ Booking through third-party sites (Booking.com, Hotels.com)
-❌ Using points instead of cash payment
-❌ Cancelling before the stay is completed
-❌ Not meeting minimum spend requirements`,
+- Booking through the wrong portal
+- Assuming a brand credit works at every related property
+- Forgetting a two-night or prepaid requirement
+- Cancelling after a credit posts and expecting the credit to remain
+- Waiting until the last few days of the cycle`,
       tips: [
-        'Book early to ensure credit posts before expiration',
-        'Confirm you\'re using the correct booking platform',
-        'Credits post AFTER checkout, not at booking',
-        'Track your statement to verify the credit appears',
-        'Some credits require minimum annual hotel spend'
+        'Hotel credits need program-specific handling',
+        'Confirm portal, prepaid, stay-length, and date-window requirements',
+        'Keep the hotel folio until the statement credit is final',
+        'Use the more specific guide when one is available'
+      ]
+    },
+    {
+      title: 'How to Use Amex FHR and THC Hotel Credits',
+      slug: 'amex-fhr-thc-hotel-credit',
+      description: 'Use Amex hotel credits for prepaid Fine Hotels + Resorts and The Hotel Collection bookings',
+      category: 'Travel',
+      content: `## What This Credit Is For
+
+This guide applies to Amex hotel credits labeled FHR, Fine Hotels + Resorts, THC, or The Hotel Collection.
+
+## Booking Steps
+
+1. Go through Amex Travel while signed into the account that has the card.
+2. Filter for Fine Hotels + Resorts or The Hotel Collection.
+3. For THC, confirm the stay meets the minimum night requirement shown at checkout.
+4. Choose a prepaid or Pay Now rate when the benefit requires prepaid booking.
+5. Pay with the eligible Amex card, then save both the Amex Travel confirmation and final hotel folio.
+
+## Timing
+
+- The credit is tied to the benefit window, so do not wait until the final days.
+- The charge can post before the stay, but adjustments can still happen later.
+- Check both the original charge and any hotel-side incidental charges separately.
+
+## Watch Outs
+
+These credits are not the same as generic travel portal credits. Treat cancellation or rollover tricks as risky data points, not a dependable product workflow.
+
+## Avoid
+
+- Booking a non-FHR/THC hotel and expecting the credit
+- Using points or a third-party agency instead of the required Amex Travel flow
+- Missing the THC minimum-stay rule
+- Relying on refund behavior to preserve a credit`,
+      tips: [
+        'Use Amex Travel and verify FHR or THC branding at checkout',
+        'THC bookings commonly require a minimum stay shown in the portal',
+        'Use prepaid or Pay Now when the benefit requires it',
+        'Keep the Amex Travel confirmation and final hotel folio'
+      ]
+    },
+    {
+      title: 'How to Use Chase The Edit Hotel Credits',
+      slug: 'chase-the-edit-hotel-credit',
+      description: 'Use Chase Sapphire Reserve hotel credits at The Edit properties',
+      category: 'Travel',
+      content: `## Where to Book
+
+This applies to benefits labeled The Edit by Chase. Book through Chase Travel and make sure the property is shown as part of The Edit collection before checkout.
+
+## Booking Steps
+
+1. Open Chase Travel from the account that has the eligible Sapphire card.
+2. Search hotels and select a property marked The Edit.
+3. Check the benefit period, such as Jan-Jun or Jul-Dec, before paying.
+4. Pay with the eligible Chase card.
+5. Save the booking confirmation and final folio.
+
+## Practical Use
+
+- Use it for a stay you expect to complete.
+- Track each semi-annual window separately.
+- Do not assume ordinary Chase Travel hotels qualify.
+- Watch for prepaid versus pay-at-property terms in checkout.
+
+## Watch Outs
+
+The Edit is its own hotel collection, separate from generic Chase Travel credits. Cancelled bookings can be adjusted later, so the safer workflow is to use the credit for a completed eligible stay.
+
+## Avoid
+
+- Booking a regular Chase Travel hotel without The Edit branding
+- Treating a cancelled booking as reliable value
+- Waiting until the last week of the benefit period
+- Paying with a different card`,
+      tips: [
+        'Confirm The Edit branding before checkout',
+        'Track Jan-Jun and Jul-Dec credits separately',
+        'Use the eligible Chase card for payment',
+        'Cancelled bookings can carry clawback risk'
+      ]
+    },
+    {
+      title: 'How to Use Hilton Property and Resort Credits',
+      slug: 'hilton-property-credits',
+      description: 'Use Hilton quarterly, semi-annual, and resort credits with Hilton properties',
+      category: 'Travel',
+      content: `## Match the Hilton Credit Type
+
+Hilton credits in the catalog are not all identical:
+
+- Aspire resort credits are tied to eligible Hilton resort properties.
+- Surpass and Hilton Business quarterly credits are broader Hilton-property credits.
+- Some benefits are calendar quarters; some are semi-annual windows.
+
+## Booking Steps
+
+1. Book directly with Hilton or through the Hilton app when possible.
+2. Confirm the property type if the benefit says resort.
+3. Pay eligible room, tax, resort-fee, dining, or incidental charges with the card carrying the credit.
+4. For quarterly credits, make sure the charge posts inside the correct quarter.
+5. Keep the folio, especially if checkout happens near the end of a benefit window.
+
+## Useful Patterns
+
+- A real paid stay is the cleanest use case.
+- If you have a small quarterly credit, use it for a short stay, dining, parking, or other property-billed charges where terms allow.
+- For resort credits, verify the hotel is in Hilton's eligible resort list before booking.
+
+## Watch Outs
+
+Refund behavior has risk, so favor completed stays and legitimate property-billed charges.
+
+## Avoid
+
+- Assuming every Hilton hotel is an eligible resort
+- Letting a quarterly charge post after quarter-end
+- Relying on refundable deposits as the main plan
+- Splitting charges without confirming the hotel can bill the card cleanly`,
+      tips: [
+        'Check whether the benefit says resort or Hilton property',
+        'For quarterly credits, posting date matters',
+        'Book direct with Hilton when possible',
+        'Use real property-billed charges and keep the folio'
+      ]
+    },
+    {
+      title: 'How to Use Delta Stays Credits',
+      slug: 'delta-stays-credit',
+      description: 'Use Delta Stays credits through the Delta hotel booking path',
+      category: 'Travel',
+      content: `## Where to Book
+
+Use the Delta Stays booking path, not a generic hotel site and not the hotel's direct booking page. The charge and confirmation should clearly connect to Delta Stays.
+
+## Booking Steps
+
+1. Start from the Delta Stays benefit link or Delta's hotel booking page.
+2. Choose a qualifying prepaid hotel rate when required.
+3. Pay with the Delta Amex card that has the benefit.
+4. Save the Delta Stays confirmation and the final hotel folio.
+5. Check the statement after the charge posts.
+
+## Practical Use
+
+- Treat this as a hotel booking credit, not a general Delta credit.
+- Use it when you already need a paid hotel night.
+- Leave time before year-end in case the first booking does not trigger as expected.
+
+## Watch Outs
+
+Delta Stays is separate from FHR/THC, travel portal credits, and Delta flight credits. Modification and refund behavior can be messy, so avoid building the plan around cancellations.
+
+## Avoid
+
+- Booking direct with the hotel and expecting Delta Stays credit
+- Confusing Delta Stays with Delta flight credits
+- Cancelling after credit posts and assuming no adjustment
+- Waiting until December for a first attempt`,
+      tips: [
+        'Start from Delta Stays, not a normal hotel site',
+        'Pay with the eligible Delta Amex card',
+        'This is separate from Delta flight or airline-fee credits',
+        'Refund and modification behavior is not a reliable strategy'
+      ]
+    },
+    {
+      title: 'How to Use Citi Travel Hotel Benefits',
+      slug: 'citi-travel-hotel-benefit',
+      description: 'Use Citi annual hotel benefits that require Citi Travel and a qualifying stay',
+      category: 'Travel',
+      content: `## Core Requirement
+
+For benefits like the Citi Strata Elite annual hotel benefit, use Citi Travel and satisfy the stay-length requirement shown in the benefit text, such as 2 or more nights.
+
+## Booking Steps
+
+1. Book through Citi Travel while signed into the account with the eligible card.
+2. Confirm the minimum-night requirement before checkout.
+3. Pay with the eligible Citi card.
+4. Keep the Citi Travel confirmation and final folio.
+5. Track whether the credit is applied at checkout or posts later as a statement credit.
+
+## Practical Use
+
+- This is best for a planned paid hotel stay where Citi Travel pricing is competitive.
+- Compare the portal rate with the hotel direct rate before deciding.
+- If the benefit applies as a discount at booking, a refund may simply reverse the discounted transaction rather than create usable credit.
+
+## Watch Outs
+
+Citi travel-portal hotel behavior has less public data than Amex and Chase hotel credits. Keep the workflow conservative until you have a booking you actually plan to complete.
+
+## Avoid
+
+- Booking fewer nights than the requirement
+- Assuming regular hotel direct bookings qualify
+- Assuming refund behavior will mirror Chase or Amex credits
+- Forgetting to compare portal pricing`,
+      tips: [
+        'Use Citi Travel, not a hotel direct booking',
+        'Confirm the minimum-night rule before paying',
+        'Compare portal and direct rates',
+        'Current public data is thinner than for Amex and Chase'
+      ]
+    },
+    {
+      title: 'How to Use United Hotel and Travel Credits',
+      slug: 'united-hotel-travel-credits',
+      description: 'Use United purchase, United Hotels, and Renowned Hotels credits without mixing up channels',
+      category: 'Travel',
+      content: `## Identify the United Credit
+
+United-related credits can point to different channels:
+
+- United purchase credits usually require eligible United charges.
+- United Hotels credits require the United Hotels path.
+- Renowned Hotels credits require the specific hotel collection or portal tied to the card.
+
+## Booking Steps
+
+1. Open the benefit details and identify the required channel.
+2. Use United, United Hotels, or the named hotel collection exactly as stated.
+3. Pay with the eligible United card.
+4. Keep the booking confirmation and receipt.
+5. Track the credit after the charge posts.
+
+## Practical Use
+
+- Use United purchase credits for real United travel charges when possible.
+- Use hotel credits only through the named hotel channel.
+- Do not assume a United flight credit and United Hotels credit trigger the same way.
+
+## Watch Outs
+
+UA hotel and JSX-style credits are distinct from ordinary airline credits, and some approaches are fragile. Keep the channel explicit and avoid refund-dependent plans.
+
+## Avoid
+
+- Booking a random hotel and expecting a United Hotels credit
+- Confusing United purchase credits with airline incidental credits
+- Assuming OTA-controlled refunds behave like direct airline credits
+- Using a different United card than the one with the benefit`,
+      tips: [
+        'Match the credit to the exact United or hotel channel',
+        'United purchase, United Hotels, and Renowned Hotels are different flows',
+        'Use the card that carries the benefit',
+        'Refund-dependent tactics are fragile'
+      ]
+    },
+    {
+      title: 'How to Use Travel Portal Credits',
+      slug: 'travel-portal-credits',
+      description: 'Use Capital One, Chase, HSBC, and similar travel portal credits with the right booking channel',
+      category: 'Travel',
+      content: `## What Counts
+
+This guide applies to broad credits that require a bank travel portal, such as Capital One Travel, Chase Travel, or HSBC Travel bookings.
+
+## Booking Steps
+
+1. Start inside the issuer's travel portal.
+2. Choose a booking you actually expect to use: hotel, flight, car, or package depending on the terms.
+3. Pay with the eligible card.
+4. Save the portal confirmation and the provider confirmation.
+5. Track the credit by posting date and benefit year.
+
+## Airline Credit Conversion Notes
+
+Some portal credits can be used for flights that later become airline-controlled credit, but this is airline-specific and can leave you with expiring funds. If you consider that path, verify current data points, expiration rules, and who controls the credit before booking.
+
+## Safer Use
+
+- Book travel you already need through the required portal.
+- Avoid basic-economy or restrictive fares unless you understand the rules.
+- Leave time to fix a failed trigger before the credit expires.
+
+## Avoid
+
+- Booking outside the required portal
+- Assuming every airline handles portal cancellations the same way
+- Choosing a fare solely for refund mechanics
+- Forgetting that airline credits can expire`,
+      tips: [
+        'Start inside the required issuer travel portal',
+        'Portal flight-credit conversion is airline-specific and risky',
+        'Book travel you can actually use when possible',
+        'Track both portal confirmation and provider confirmation'
       ]
     },
     {
@@ -1756,7 +2024,7 @@ Based on community reports, these airlines typically reimburse gift card purchas
 💡 **Buy in small amounts** - $50-100 per transaction works best
 💡 **Space out purchases** - Don't buy all $250 at once
 💡 **Keep records** - Save confirmation emails and receipts
-💡 **Check recent reports** - Airline policies change; verify on credit card forums
+💡 **Check recent data points** - Airline policies change; verify current behavior before purchasing
 💡 **Select airline early** - Choose in January to maximize time
 
 ## Important Warnings
@@ -2121,6 +2389,556 @@ The **American Express Gold Card** offers a **$7 monthly Dunkin credit** that ca
         'Link DD Perks rewards to earn points while using credit',
         'Monthly credit doesn\'t roll over - use it or lose it each month'
       ]
+    },
+    {
+      title: 'How to Use DoorDash, Instacart, and Grocery Delivery Credits',
+      slug: 'delivery-grocery-credits',
+      description: 'Use food delivery and grocery credits without missing app, membership, or order-window rules',
+      category: 'Dining',
+      content: `## Start With the App
+
+Delivery and grocery credits usually require the named app or service. Add the eligible card directly in the app before ordering.
+
+## DoorDash
+
+1. Add the eligible card to DoorDash.
+2. Activate DashPass if the card includes it.
+3. Place an eligible restaurant, grocery, or convenience order.
+4. Use pickup when fees would erase the value.
+5. Confirm the monthly or quarterly credit applied or posted.
+
+## Instacart
+
+1. Add the eligible card to Instacart.
+2. Activate Instacart+ if your card includes it.
+3. Place an eligible order before the monthly credit expires.
+4. Watch for minimum order, delivery fee, and second-order rules.
+5. Save the receipt until the credit posts.
+
+## Practical Use
+
+- Use credits for staples you would buy anyway.
+- Combine small credits with pickup orders when available.
+- Track each card separately if you have multiple Chase or cobranded credits.
+- Check whether the credit applies at checkout or later as a statement credit.
+
+## Avoid
+
+- Letting a tiny monthly credit expire because delivery fees are too high
+- Assuming every grocery or convenience order qualifies
+- Forgetting to activate the included membership
+- Using Apple Pay or a wallet that hides the eligible card from the app`,
+      tips: [
+        'Add the eligible card directly in the delivery app',
+        'Pickup orders can preserve value when delivery fees are high',
+        'Check membership activation before ordering',
+        'Monthly credits usually do not roll over'
+      ]
+    },
+    {
+      title: 'How to Use Chase Fine Dining Credits',
+      slug: 'chase-fine-dining-credit',
+      description: 'Use Chase fine dining credits at eligible restaurants with clean payment and period tracking',
+      category: 'Dining',
+      content: `## Confirm Eligibility
+
+Fine dining credits are not generic restaurant credits. Check the card benefit page for the eligible restaurant list, reservation channel, and semi-annual window.
+
+## How to Use
+
+1. Pick an eligible restaurant for the current benefit period.
+2. Reserve through the required channel if the terms specify one.
+3. Pay the restaurant charge with the card carrying the credit.
+4. Keep the receipt and reservation confirmation.
+5. Track the statement credit before the period ends.
+
+## Practical Use
+
+- Use the credit for a planned meal instead of trying to force a deposit.
+- If the restaurant takes a prepaid deposit, confirm whether it is processed by the restaurant or a reservation platform.
+- Keep each semi-annual window separate.
+
+## Avoid
+
+- Assuming any upscale restaurant qualifies
+- Paying through an unsupported reservation or gift-card platform
+- Relying on a cancelled reservation to preserve value
+- Splitting payment in a way that makes the charge hard to track`,
+      tips: [
+        'Verify eligible restaurants before booking',
+        'Use the card carrying the benefit at the restaurant',
+        'Track each semi-annual window separately',
+        'Keep reservation and payment receipts'
+      ]
+    },
+    {
+      title: 'How to Use Saks Credits',
+      slug: 'saks-credit',
+      description: 'Use Saks credits cleanly across semi-annual windows',
+      category: 'Shopping',
+      content: `## Before You Buy
+
+1. Enroll the Saks benefit in your card account if required.
+2. Confirm the current window, usually Jan-Jun or Jul-Dec.
+3. Shop directly with Saks Fifth Avenue or Saks.com.
+4. Pay with the eligible card.
+5. Save the receipt until the credit posts.
+
+## Practical Use
+
+- Use in-store checkout when you want the cleanest merchant coding.
+- Online purchases can work, but shipping, returns, and delayed posting can complicate period-end usage.
+- Buy early in the window so a replacement order is possible if something cancels.
+
+## Avoid
+
+- Saks OFF 5TH unless your terms explicitly include it
+- Marketplace or third-party gift-card sellers
+- Returns that reverse the statement credit
+- Orders placed so late that the charge posts after the window closes`,
+      tips: [
+        'Enroll first if the card requires it',
+        'Use Saks Fifth Avenue or Saks.com directly',
+        'Buy early in the semi-annual window',
+        'Avoid returns until the credit is final'
+      ]
+    },
+    {
+      title: 'How to Use Lululemon Credits',
+      slug: 'lululemon-credit',
+      description: 'Use quarterly Lululemon credits with direct checkout and period-aware tracking',
+      category: 'Shopping',
+      content: `## How to Use
+
+1. Check the quarterly credit amount and dates.
+2. Shop directly with Lululemon online or in store.
+3. Use the eligible card at checkout.
+4. Keep the receipt until the credit posts.
+5. Mark the benefit complete only after the charge is final.
+
+## Practical Use
+
+- In-store purchases are usually the cleanest path.
+- If buying gift cards, verify current terms and merchant coding first.
+- Use the credit early enough to handle returns, out-of-stock cancellations, or delayed posting.
+
+## Avoid
+
+- Marketplace checkout
+- Relying on gift-card behavior without checking current terms
+- Letting the charge post after quarter-end
+- Returning items before the credit is settled`,
+      tips: [
+        'Use direct Lululemon checkout',
+        'Quarter-end posting date matters',
+        'In-store purchases are often cleaner than edge-case online flows',
+        'Keep receipts until the credit posts'
+      ]
+    },
+    {
+      title: 'How to Use Citi Splurge Credits',
+      slug: 'citi-splurge-credit',
+      description: 'Use Citi Splurge credits by choosing an eligible brand and keeping the purchase simple',
+      category: 'Shopping',
+      content: `## Choose the Merchant First
+
+Citi Splurge credits depend on the selected eligible brands for your card. Check the current merchant list before making a purchase.
+
+## How to Use
+
+1. Open the Citi benefit page and confirm eligible brands.
+2. Enroll or choose merchants if Citi requires selection.
+3. Buy directly from the eligible merchant.
+4. Pay with the Citi card carrying the credit.
+5. Track the credit and keep receipts.
+
+## Practical Use
+
+- Use the credit for a real purchase at an eligible brand.
+- Avoid assuming gift cards, third-party checkout, or marketplace purchases qualify.
+- Leave time before year-end for the credit to post.
+
+## Avoid
+
+- Buying from a related but ineligible brand
+- Using PayPal or marketplace checkout if terms require direct merchant billing
+- Returning the purchase before the credit is final
+- Waiting until the final days of the benefit year`,
+      tips: [
+        'Confirm the current eligible Splurge brands',
+        'Enroll or select merchants if required',
+        'Prefer direct merchant checkout',
+        'Use before year-end posting risk becomes an issue'
+      ]
+    },
+    {
+      title: 'How to Use StubHub Credits',
+      slug: 'stubhub-credit',
+      description: 'Use event-ticket credits through StubHub or the named ticket platform',
+      category: 'Entertainment',
+      content: `## How to Use
+
+1. Confirm the eligible ticket platform and benefit window.
+2. Buy tickets directly through StubHub or the named platform.
+3. Pay with the eligible card.
+4. Save the order confirmation.
+5. Track the statement credit after the charge posts.
+
+## Practical Use
+
+- Use the credit for an event you actually plan to attend or transfer.
+- Keep the platform account and cardholder account easy to reconcile.
+- Buy early enough to fix a failed trigger before the period closes.
+
+## Avoid
+
+- Counting on event cancellation behavior
+- Buying through a different ticket marketplace
+- Using wallet checkout that does not pass the eligible card cleanly
+- Resale activity that violates platform or issuer terms`,
+      tips: [
+        'Buy directly through the named ticket platform',
+        'Use the eligible card at checkout',
+        'Keep the event confirmation',
+        'Do not depend on cancelled-event behavior'
+      ]
+    },
+    {
+      title: 'How to Use Uber One Credits',
+      slug: 'uber-one-credit',
+      description: 'Track Uber One membership reimbursements and renewal timing',
+      category: 'Membership',
+      content: `## Setup
+
+1. Add the eligible card to Uber.
+2. Subscribe to the eligible Uber One plan.
+3. Confirm monthly or annual billing cadence.
+4. Keep the eligible card as the payment method.
+5. Track renewal and cancellation dates.
+
+## Practical Use
+
+- Use Uber One if you already use Uber rides or Uber Eats enough to benefit.
+- If the card reimburses annual billing, set a reminder before renewal.
+- Watch whether promos, partial refunds, or plan changes alter the final reimbursed amount.
+
+## Avoid
+
+- Paying through app-store billing if terms require direct Uber billing
+- Switching payment cards before the membership charge posts
+- Forgetting an annual renewal date
+- Assuming a refunded membership will keep the statement credit`,
+      tips: [
+        'Bill Uber One directly to the eligible card',
+        'Record annual renewal dates',
+        'Avoid app-store billing unless terms allow it',
+        'Plan changes and refunds can affect reimbursement'
+      ]
+    },
+    {
+      title: 'How to Use CLEAR Credits',
+      slug: 'clear-credit',
+      description: 'Use CLEAR Plus credits for membership charges and renewal tracking',
+      category: 'Membership',
+      content: `## Setup
+
+1. Sign up or renew directly with CLEAR.
+2. Use the eligible card for the membership charge.
+3. Check whether family add-ons or discounted rates change the reimbursed amount.
+4. Keep the confirmation email.
+5. Track the renewal date in Perks Reminder.
+
+## Practical Use
+
+- Use a promo code only if it still leaves a clean eligible CLEAR charge.
+- If multiple cards have CLEAR credits, keep each membership or renewal charge easy to match.
+- Check the statement after renewal because annual credits can post later than monthly app credits.
+
+## Avoid
+
+- Paying through an unrelated third-party bundle
+- Assuming every family add-on is fully reimbursed
+- Forgetting renewal timing
+- Cancelling immediately after reimbursement and assuming no adjustment`,
+      tips: [
+        'Pay CLEAR directly with the eligible card',
+        'Record the renewal date',
+        'Check family add-on eligibility',
+        'Keep the membership confirmation'
+      ]
+    },
+    {
+      title: 'How to Use Oura Ring Credits',
+      slug: 'oura-credit',
+      description: 'Use Oura hardware credits with straightforward checkout and receipt tracking',
+      category: 'Shopping',
+      content: `## How to Use
+
+1. Confirm the eligible Oura product and credit amount.
+2. Buy directly from Oura unless your card terms say another channel qualifies.
+3. Pay with the card carrying the benefit.
+4. Keep the order confirmation and shipping confirmation.
+5. Track the statement credit after the charge posts.
+
+## Practical Use
+
+- Keep checkout simple: one eligible product, one eligible card.
+- If the order total exceeds the credit, expect only the capped amount back.
+- Avoid changing payment after order review unless support confirms the charge will remain eligible.
+
+## Avoid
+
+- Marketplace checkout
+- Split payments that make the eligible charge unclear
+- Returns before the credit is final
+- Buying accessories only if the terms require a ring purchase`,
+      tips: [
+        'Buy directly from Oura when possible',
+        'Use a single eligible card at checkout',
+        'Keep order and shipping confirmations',
+        'Avoid payment changes after checkout'
+      ]
+    },
+    {
+      title: 'How to Use Blacklane Credits',
+      slug: 'blacklane-credit',
+      description: 'Use Blacklane transportation credits with direct booking and date-window tracking',
+      category: 'Transportation',
+      content: `## How to Use
+
+1. Book directly through Blacklane.
+2. Add the eligible card as the payment method.
+3. Check the semi-annual or annual window before scheduling.
+4. Complete the ride and keep the receipt.
+5. Track the statement credit after the charge posts.
+
+## Practical Use
+
+- Use the credit for airport transfers or planned car service.
+- Confirm local availability before relying on it for a trip.
+- If the ride is near the end of a window, make sure the charge posts in time.
+
+## Avoid
+
+- Third-party travel agency bookings
+- Cancelling and assuming the credit remains
+- Using a different saved payment card
+- Booking where Blacklane does not have reliable local coverage`,
+      tips: [
+        'Book directly with Blacklane',
+        'Use the eligible card as payment',
+        'Confirm service availability before travel',
+        'Watch semi-annual posting windows'
+      ]
+    },
+    {
+      title: 'How to Use Southwest Travel Credits',
+      slug: 'southwest-travel-credit',
+      description: 'Use Southwest annual travel credits for real Southwest charges and clean tracking',
+      category: 'Travel',
+      content: `## How to Use
+
+1. Book or purchase directly with Southwest.
+2. Use the card carrying the annual Southwest travel credit.
+3. Keep the confirmation number and receipt.
+4. Track the credit after the charge posts.
+5. Use the credit before the benefit year closes.
+
+## Practical Use
+
+- Apply it toward airfare, taxes, fees, or eligible Southwest charges according to the card terms.
+- If a booking creates Southwest travel funds, track their expiration separately.
+- Keep the original confirmation because Southwest credits and travel funds can be easy to mix up.
+
+## Avoid
+
+- Assuming travel funds never expire
+- Booking through an OTA
+- Using a different Southwest card than the one with the credit
+- Waiting until the last day of the benefit year`,
+      tips: [
+        'Book directly with Southwest',
+        'Track any resulting travel-fund expiration separately',
+        'Keep confirmation numbers',
+        'Use before the annual window closes'
+      ]
+    },
+    {
+      title: 'How to Use Shopping Credits',
+      slug: 'shopping-credits',
+      description: 'Use merchant credits such as Saks, Lululemon, and select splurge brands without missing enrollment or period rules',
+      category: 'Shopping',
+      content: `## Before You Buy
+
+1. **Confirm the eligible merchant list** in your card account before each period
+2. **Enroll if required** so the charge is tracked correctly
+3. **Use the exact card** that carries the credit
+4. **Leave posting time** before the semi-annual or quarterly window ends
+
+## Practical Patterns
+
+- Shop directly with the merchant rather than marketplaces or resellers
+- For Saks-style credits, in-store purchases are often more predictable than edge-case online gift card flows
+- For Lululemon-style credits, online gift card behavior can change quickly, so verify current terms before relying on it
+- Keep receipts until the credit posts
+
+## Common Failure Cases
+
+- Purchase posts after the benefit window closes
+- Gift card or third-party checkout stops coding as expected
+- Returns or cancellations can reverse credits
+- Multiple cards or split payments can make tracking harder`,
+      tips: [
+        'Check enrollment and eligible merchants before each benefit period',
+        'Prefer direct merchant checkout',
+        'Use early in the period so late posting does not waste the credit',
+        'Save receipts until the statement credit posts'
+      ]
+    },
+    {
+      title: 'How to Use Business Service Credits',
+      slug: 'business-service-credits',
+      description: 'Redeem Dell, Adobe, wireless, Indeed, shipping, office supply, and similar business credits cleanly',
+      category: 'Business Services',
+      content: `## Basic Flow
+
+1. **Enroll the benefit** if your issuer requires activation
+2. **Buy directly from the eligible merchant or category**
+3. **Avoid changing the order after purchase** unless the merchant clearly supports it
+4. **Track statement posting** and reconcile partial credits
+
+## Payment Flow Notes
+
+Split-payment quirks, order review, and payment update flows can make business credits harder to reconcile. The safer takeaway is simple: use normal checkout, keep the order easy to audit, and avoid relying on payment failures or unusual split-payment behavior.
+
+## What To Watch
+
+- Business credits may be annual, semi-annual, quarterly, or monthly
+- Some credits require minimum spend or only reimburse after a threshold
+- Wireless credits usually require the monthly bill to charge directly to the card
+- Returns, price matches, and edited orders can delay or reverse credits`,
+      tips: [
+        'Enroll first, then buy directly from the merchant',
+        'Keep checkout simple for Dell and similar merchant credits',
+        'Use wireless credits for recurring bills charged directly to the card',
+        'Reconcile partial credits against the benefit amount'
+      ]
+    },
+    {
+      title: 'How to Use Entertainment Credits',
+      slug: 'entertainment-credits',
+      description: 'Set up streaming, digital entertainment, ticket, and event credits so they post reliably',
+      category: 'Entertainment',
+      content: `## Setup
+
+1. **Check eligible services** in your card benefit terms
+2. **Pay the service directly** with the eligible card
+3. **Avoid app-store billing** unless the terms say it qualifies
+4. **Monitor monthly caps** because entertainment credits often reset each month
+
+## Event And Ticket Credits
+
+For StubHub or other event credits, pay directly through the named platform and keep the confirmation. Avoid counting on cancelled-event behavior; it is variable and not a reliable product workflow.
+
+## Monthly Credit Hygiene
+
+- Put recurring subscriptions on the correct card
+- Keep one small subscription per monthly credit when possible
+- Check whether taxes or add-ons count toward the cap
+- Revisit eligible services when issuers update benefit terms`,
+      tips: [
+        'Use direct billing with the eligible service',
+        'Avoid app-store billing unless card terms explicitly allow it',
+        'Check monthly caps before adding services',
+        'Keep event-ticket confirmations until credit posts'
+      ]
+    },
+    {
+      title: 'How to Use Membership Credits',
+      slug: 'membership-credits',
+      description: 'Track memberships like CLEAR, Walmart+, Uber One, lounge passes, and similar account-based benefits',
+      category: 'Membership',
+      content: `## Setup
+
+1. **Create or sign in to the membership account**
+2. **Use the eligible card as the payment method**
+3. **Match the membership name and billing cadence** to issuer requirements
+4. **Store renewal dates** so you do not double-pay or miss cancellation windows
+
+## Practical Notes
+
+Promos, refunds, and account state can affect outcomes. For dependable tracking, treat membership credits as reimbursements for real membership charges and record renewal dates in Perks Reminder.
+
+## Watch Outs
+
+- Annual memberships may renew before you expect
+- Some credits only cover a specific plan tier
+- Family plans or add-ons may not be fully reimbursed
+- Promotional gift cards or refunds can change net value`,
+      tips: [
+        'Use the eligible card as the saved payment method',
+        'Record renewal dates and cancellation windows',
+        'Confirm plan tier eligibility before upgrading',
+        'Check whether family plans or add-ons are reimbursed'
+      ]
+    },
+    {
+      title: 'How to Use Security Screening Credits',
+      slug: 'security-screening-credits',
+      description: 'Redeem Global Entry, TSA PreCheck, NEXUS, or similar application-fee credits',
+      category: 'Travel',
+      content: `## Steps
+
+1. **Apply through the official government or authorized program site**
+2. **Pay the application fee with the eligible card**
+3. **Keep the receipt and application confirmation**
+4. **Wait for the statement credit**, usually within one or two billing cycles
+
+## Timing
+
+These credits usually reset every four to five years rather than annually. If you already have Global Entry or TSA PreCheck, use the credit for an authorized user, partner, family member, or renewal when eligible.
+
+## Common Misses
+
+- Paying with the wrong card
+- Assuming every traveler in a household gets a separate credit
+- Forgetting that renewals can take time
+- Using a third-party application helper instead of the official fee path`,
+      tips: [
+        'Pay the official application fee with the eligible card',
+        'Credits reset every four to five years, not annually',
+        'You can often use the credit for someone else',
+        'Avoid third-party application helper fees'
+      ]
+    },
+    {
+      title: 'Benefit Usage Checklist',
+      slug: 'benefit-checklist',
+      description: 'A generic checklist for certificates, passes, bonus points, companion fares, and non-cash perks',
+      category: 'General',
+      content: `## Checklist
+
+1. **Confirm when the benefit becomes available**
+2. **Record the expiration date** in Perks Reminder
+3. **Read redemption restrictions** before planning around the value
+4. **Use the benefit early enough** to recover from booking or posting issues
+
+## Examples
+
+- Free night certificates often have brand, property, or point-cap restrictions
+- Companion fares usually require taxes and fees and may need a specific booking path
+- Lounge or club passes can expire even if your card account remains open
+- Anniversary points and bonus miles may post weeks after the account anniversary
+
+## Practical Tracking
+
+For benefits that do not reimburse a purchase, mark them complete when you redeem or confirm they posted. Add a note if the certificate number, booking reference, or pass expiration date matters.`,
+      tips: [
+        'Record expiration dates as soon as certificates or passes issue',
+        'Check property, fare, and booking-channel restrictions',
+        'Use early enough to handle booking changes',
+        'Add notes for certificate numbers or booking references'
+      ]
     }
   ];
 
@@ -2133,6 +2951,31 @@ The **American Express Gold Card** offers a **$7 monthly Dunkin credit** that ca
   }
 
   console.log(`✅ Seeded ${usageWays.length} benefit usage ways.`);
+
+  console.log('Linking predefined benefits to usage ways...');
+  const usageWayRecords = await prisma.benefitUsageWay.findMany({
+    select: { id: true, slug: true },
+  });
+  const usageWayIdBySlug = new Map(usageWayRecords.map((way) => [way.slug, way.id]));
+  const predefinedBenefits = await prisma.predefinedBenefit.findMany({
+    select: { id: true, category: true, description: true },
+  });
+
+  let linkedUsageWays = 0;
+  for (const benefit of predefinedBenefits) {
+    const slug = inferBenefitUsageWaySlug(benefit);
+    const usageWayId = usageWayIdBySlug.get(slug);
+    if (!usageWayId) {
+      throw new Error(`Missing BenefitUsageWay seed for slug "${slug}"`);
+    }
+
+    await prisma.predefinedBenefit.update({
+      where: { id: benefit.id },
+      data: { usageWayId },
+    });
+    linkedUsageWays += 1;
+  }
+  console.log(`✅ Linked ${linkedUsageWays} predefined benefits to usage ways.`);
 
   // --- Seed Loyalty Programs (with and without expiration) ---
   console.log('Seeding loyalty programs...');
@@ -2419,4 +3262,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-  }); 
+  });

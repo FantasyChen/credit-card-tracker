@@ -5,6 +5,14 @@ import path from "path";
 import yargs from "yargs/yargs";
 import { hideBin } from "yargs/helpers";
 import dotenv from "dotenv";
+import {
+  filenameForCardImage,
+  findDuplicateImageHashes,
+  normalizeExtension,
+  slugifyCardName,
+  SUPPORTED_IMAGE_EXTENSIONS,
+  validateImageFile,
+} from "./card-image-utils.js";
 
 // Determine the directory name in an ES module context
 import { fileURLToPath } from 'url';
@@ -15,6 +23,7 @@ dotenv.config(); // Load .env file variables
 
 const API_KEY = process.env.SERPAPI_API_KEY;
 const OUTPUT_DIR = path.resolve(__dirname, "../public/images/cards");
+const MANIFEST_PATH = path.join(OUTPUT_DIR, "manifest.json");
 const USE_YOUR_CREDITS_BASE = "https://useyourcredits.com/cards/";
 
 // --- Card name to UseYourCredits.com slug mapping ---
@@ -33,16 +42,16 @@ const USEYOURCREDITS_SLUGS = {
   "Hilton Honors American Express Surpass Card": "american-express-hilton-honors-surpass-card",
   "Marriott Bonvoy Brilliant American Express Card": "american-express-marriott-bonvoy-brilliant-card",
   "Marriott Bonvoy Business American Express Card": "american-express-marriott-bonvoy-business-card",
-  
+
   // Bank of America / Atmos
   "Alaska Airlines Visa Signature credit card": "bank-of-america-spirit-airlines-free-spirit-card", // No direct match, fallback
   "Atmos Rewards Ascent Visa Signature Card": "bank-of-america-atmos-rewards-ascent-card",
   "Atmos Rewards Summit Visa Infinite Card": "bank-of-america-atmos-rewards-summit-visa-infinite-card",
   "Atmos Rewards Visa Business Card": "bank-of-america-atmos-rewards-visa-signature-business-card",
-  
+
   // Capital One
   "Capital One Venture X": "capital-one-venture-x-card",
-  
+
   // Chase
   "Chase Freedom Flex": "chase-freedom-flex-card",
   "Chase Ink Business Preferred": "chase-ink-business-preferred-card",
@@ -58,29 +67,15 @@ const USEYOURCREDITS_SLUGS = {
   "IHG One Rewards Premier Credit Card": "chase-ihg-one-rewards-premier-card",
   "IHG One Rewards Premier Business Credit Card": "chase-ihg-business-card",
   "The Ritz-Carlton Credit Card": "chase-ritz-carlton-visa-card",
-  
+
   // Citi
   "Citi Strata Elite": "citi-strata-elite-card",
-  
+
   // Discover
   "Discover it Cash Back": "discover-it-cash-back-credit-card",
 };
 
 // --- Helper Functions ---
-
-// Simple slugify function to create safe filenames
-function slugify(text) {
-  return text
-    .toString()
-    .toLowerCase()
-    .normalize('NFD') // split an accented letter in the base letter and the acent
-    .replace(/[\u0300-\u036f]/g, '') // remove all previously split accents
-    .replace(/\s+/g, "-") // Replace spaces with -
-    .replace(/[^\w\-]+/g, "") // Remove all non-word chars
-    .replace(/\-\-+/g, "-") // Replace multiple - with single -
-    .replace(/^-+/, "") // Trim - from start of text
-    .replace(/-+$/, ""); // Trim - from end of text
-}
 
 // Ensure directory exists
 async function ensureDirectoryExists(dirPath) {
@@ -101,56 +96,56 @@ function isValidImageUrl(url, cardName) {
     const urlObj = new URL(url);
     const pathname = urlObj.pathname.toLowerCase();
     const fullUrl = urlObj.href.toLowerCase();
-    
+
     // Check if it ends with common image extensions
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
     const hasImageExtension = imageExtensions.some(ext => pathname.endsWith(ext));
-    
+
     // Exclude common non-image patterns
     const invalidPatterns = ['/404', '/error', 'placeholder', 'fallback', 'logo', 'icon'];
-    const hasInvalidPattern = invalidPatterns.some(pattern => 
+    const hasInvalidPattern = invalidPatterns.some(pattern =>
       fullUrl.includes(pattern.toLowerCase())
     );
-    
+
     // Avoid URLs that typically have multiple cards stacked or comparison images
     const multiCardPatterns = [
-      'comparison', 'compare', 'vs', 'best-', 'top-', 'lineup', 
+      'comparison', 'compare', 'vs', 'best-', 'top-', 'lineup',
       'collection', 'stack', 'family', 'portfolio', 'all-cards',
       'uscreditcardguide', 'nerdwallet', 'creditcards.com', 'wallethub',
       'bankrate', 'forbes', 'cnbc', 'usnews', 'upgrade', 'review'
     ];
-    const hasMultiCardPattern = multiCardPatterns.some(pattern => 
+    const hasMultiCardPattern = multiCardPatterns.some(pattern =>
       fullUrl.includes(pattern.toLowerCase())
     );
-    
+
     // Extract key words from card name for validation
-    const cardWords = cardName.toLowerCase().split(' ').filter(word => 
+    const cardWords = cardName.toLowerCase().split(' ').filter(word =>
       word.length > 2 && !['card', 'credit', 'visa', 'mastercard', 'american', 'express'].includes(word)
     );
-    
+
     // Check if URL contains relevant card-specific terms
     const hasRelevantTerms = cardWords.some(word => fullUrl.includes(word));
-    
+
     // Prefer certain domains known to have official card images
     const preferredDomains = [
-      'americanexpress.com', 'chase.com', 'capitalone.com', 'citi.com', 
+      'americanexpress.com', 'chase.com', 'capitalone.com', 'citi.com',
       'discover.com', 'bankofamerica.com', 'hilton.com', 'marriott.com',
       'delta.com', 'united.com', 'southwest.com', 'alaskaair.com',
       'ihg.com', 'hyatt.com', 'atmosrewards.com', 'hsbc.com'
     ];
     const isPreferredDomain = preferredDomains.some(domain => urlObj.hostname.includes(domain));
-    
+
     // Prefer URLs that look like official product/card images
     const productImagePatterns = ['product', 'card-art', 'card_art', 'cardart', 'card-image', 'card_image'];
     const isProductImage = productImagePatterns.some(pattern => fullUrl.includes(pattern));
-    
+
     // Avoid generic or misleading URLs
     const avoidPatterns = ['freedom-unlimited', 'freedom_unlimited'];
     if (cardName.toLowerCase().includes('freedom flex')) {
       const hasAvoidPattern = avoidPatterns.some(pattern => fullUrl.includes(pattern));
       if (hasAvoidPattern) return { isValid: false, isPreferred: false, extension: '.jpg' };
     }
-    
+
     return {
       isValid: hasImageExtension && !hasInvalidPattern && !hasMultiCardPattern,
       isPreferred: isPreferredDomain,
@@ -166,33 +161,150 @@ function isValidImageUrl(url, cardName) {
 // Validate downloaded content
 async function isValidImageContent(filepath) {
   try {
-    const stats = await fs.promises.stat(filepath);
-    
-    // Check file size - too small likely means error page
-    if (stats.size < 1000) {
-      return false;
+    const result = await validateImageFile(filepath);
+    if (!result.ok) {
+      console.warn(`Image validation failed for ${filepath}: ${result.errors.join("; ")}`);
     }
-    
-    // Read first few bytes to check for image headers
-    const buffer = Buffer.alloc(20);
-    const fileHandle = await fs.promises.open(filepath, 'r');
-    await fileHandle.read(buffer, 0, 20, 0);
-    await fileHandle.close();
-    
-    // Check for image magic numbers
-    const isPNG = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
-    const isJPEG = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
-    const isGIF = buffer.toString('ascii', 0, 3) === 'GIF';
-    const isWebP = buffer.toString('ascii', 8, 12) === 'WEBP';
-    
-    // Check for HTML content (common in error pages)
-    const content = buffer.toString('ascii').toLowerCase();
-    const isHTML = content.includes('<html') || content.includes('<!doctype');
-    
-    return (isPNG || isJPEG || isGIF || isWebP) && !isHTML;
+    for (const warning of result.warnings) {
+      console.warn(`Image validation warning for ${filepath}: ${warning}`);
+    }
+    return result.ok;
   } catch (error) {
     console.warn(`Could not validate image content: ${error.message}`);
     return false;
+  }
+}
+
+async function writeManifestEntry(entry) {
+  await ensureDirectoryExists(OUTPUT_DIR);
+  let manifest = { updatedAt: null, images: [] };
+  try {
+    manifest = JSON.parse(await fs.promises.readFile(MANIFEST_PATH, "utf8"));
+    if (!Array.isArray(manifest.images)) manifest.images = [];
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      console.warn(`Could not read existing manifest: ${error.message}`);
+    }
+  }
+
+  const nextImages = manifest.images.filter((image) => image.filename !== entry.filename);
+  nextImages.push(entry);
+  nextImages.sort((a, b) => a.cardName.localeCompare(b.cardName));
+
+  await fs.promises.writeFile(
+    MANIFEST_PATH,
+    JSON.stringify({ updatedAt: new Date().toISOString(), images: nextImages }, null, 2)
+  );
+}
+
+async function writeManifestEntries(entries) {
+  await ensureDirectoryExists(OUTPUT_DIR);
+  const sortedEntries = [...entries].sort((a, b) => a.filename.localeCompare(b.filename));
+  await fs.promises.writeFile(
+    MANIFEST_PATH,
+    JSON.stringify({ updatedAt: new Date().toISOString(), images: sortedEntries }, null, 2)
+  );
+}
+
+async function finalizeDownloadedImage({ filepath, cardName, source, sourceUrl, force, updateManifest }) {
+  const validation = await validateImageFile(filepath);
+  if (!validation.ok) {
+    await fs.promises.unlink(filepath).catch(() => {});
+    throw new Error(`Downloaded image failed validation: ${validation.errors.join("; ")}`);
+  }
+
+  const duplicates = await findDuplicateImageHashes(OUTPUT_DIR, validation.sha256, filepath);
+  if (duplicates.length > 0) {
+    console.warn("Duplicate image content detected:");
+    duplicates.forEach((duplicate) => console.warn(`  - ${path.relative(process.cwd(), duplicate)}`));
+  }
+
+  const filename = path.basename(filepath);
+  const entry = {
+    cardName,
+    filename,
+    path: `/images/cards/${filename}`,
+    source,
+    sourceUrl,
+    width: validation.metadata.width,
+    height: validation.metadata.height,
+    type: validation.metadata.type,
+    sizeBytes: validation.sizeBytes,
+    sha256: validation.sha256,
+    duplicates: duplicates.map((duplicate) => path.relative(OUTPUT_DIR, duplicate)),
+    overwritten: force,
+    ingestedAt: new Date().toISOString(),
+  };
+
+  if (updateManifest) {
+    await writeManifestEntry(entry);
+  }
+
+  console.log(`Validated ${filename}: ${entry.width ?? "?"}x${entry.height ?? "?"}, ${entry.type}, ${entry.sizeBytes} bytes`);
+  if (updateManifest) {
+    console.log(`Updated manifest: ${path.relative(process.cwd(), MANIFEST_PATH)}`);
+  }
+  return entry;
+}
+
+async function assertCanWrite(filepath, force) {
+  try {
+    await fs.promises.access(filepath);
+    if (!force) {
+      throw new Error(`Refusing to overwrite ${path.relative(process.cwd(), filepath)}. Pass --force to replace it.`);
+    }
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+}
+
+async function validateExistingImages(target, writeManifest = false) {
+  await ensureDirectoryExists(OUTPUT_DIR);
+  const files = target === "all"
+    ? (await fs.promises.readdir(OUTPUT_DIR))
+        .filter((file) => SUPPORTED_IMAGE_EXTENSIONS.includes(path.extname(file).toLowerCase()))
+        .map((file) => path.join(OUTPUT_DIR, file))
+    : [path.isAbsolute(target) ? target : path.join(OUTPUT_DIR, target)];
+
+  let failures = 0;
+  const manifestEntries = [];
+  for (const filepath of files) {
+    const result = await validateImageFile(filepath);
+    const relative = path.relative(process.cwd(), filepath);
+    if (result.ok) {
+      console.log(`OK ${relative} ${result.metadata.width ?? "?"}x${result.metadata.height ?? "?"} ${result.sizeBytes} bytes`);
+    } else {
+      failures += 1;
+      console.error(`FAIL ${relative}: ${result.errors.join("; ")}`);
+    }
+    for (const warning of result.warnings) {
+      console.warn(`WARN ${relative}: ${warning}`);
+    }
+
+    manifestEntries.push({
+      cardName: path.basename(filepath, path.extname(filepath)),
+      filename: path.basename(filepath),
+      path: `/images/cards/${path.basename(filepath)}`,
+      source: "existing-repo-asset",
+      sourceUrl: null,
+      width: result.metadata.width,
+      height: result.metadata.height,
+      type: result.metadata.type,
+      sizeBytes: result.sizeBytes,
+      sha256: result.sha256,
+      duplicates: [],
+      validatedAt: new Date().toISOString(),
+    });
+  }
+
+  if (failures > 0) {
+    throw new Error(`${failures} image${failures === 1 ? "" : "s"} failed validation`);
+  }
+
+  if (writeManifest) {
+    await writeManifestEntries(manifestEntries);
+    console.log(`Updated manifest: ${path.relative(process.cwd(), MANIFEST_PATH)}`);
   }
 }
 
@@ -247,20 +359,13 @@ async function downloadImage(url, filepath) {
 // --- Main Script Logic ---
 
 async function main() {
-  if (!API_KEY) {
-    console.error(
-      "Error: SERPAPI_API_KEY not found. Make sure it's set in your .env file."
-    );
-    process.exit(1);
-  }
-
   // Parse command line arguments
   const argv = yargs(hideBin(process.argv))
     .option("name", {
       alias: "n",
       description: "The name of the credit card",
       type: "string",
-      demandOption: true, // Make the name argument required
+      demandOption: false,
     })
     .option("max-attempts", {
       alias: "m",
@@ -281,24 +386,72 @@ async function main() {
     })
     .option("source", {
       alias: "s",
-      description: "Image source: 'google' (default) or 'useyourcredits'",
+      description: "Image source: 'auto' (default), 'google', or 'useyourcredits'",
       type: "string",
-      default: "google",
+      default: "auto",
+      choices: ["auto", "google", "useyourcredits"],
+    })
+    .option("dry-run", {
+      description: "Show the target filename and source candidates without writing files",
+      type: "boolean",
+      default: false,
+    })
+    .option("force", {
+      alias: "f",
+      description: "Overwrite an existing image file",
+      type: "boolean",
+      default: false,
+    })
+    .option("validate", {
+      description: "Validate an existing image filename/path, or use 'all' for every card image",
+      type: "string",
+    })
+    .option("manifest", {
+      description: "Update public/images/cards/manifest.json after a successful ingestion",
+      type: "boolean",
+      default: true,
+    })
+    .option("write-manifest", {
+      description: "When validating existing images, write a manifest for the validated files",
+      type: "boolean",
+      default: false,
     })
     .help()
     .alias("help", "h")
     .parseSync();
+
+  if (argv.validate) {
+    try {
+      await validateExistingImages(argv.validate, argv["write-manifest"]);
+      process.exit(0);
+    } catch (error) {
+      console.error(`Validation failed: ${error.message}`);
+      process.exit(1);
+    }
+  }
+
+  if (!argv.name) {
+    console.error("Error: --name is required unless --validate is used.");
+    process.exit(1);
+  }
 
   const cardName = argv.name;
   const maxAttempts = argv["max-attempts"];
   const listMode = argv.list;
   const directUrl = argv.url;
   const source = argv.source;
+  const dryRun = argv["dry-run"];
+  const force = argv.force;
+  const updateManifest = argv.manifest;
+
+  const normalizedBaseName = slugifyCardName(cardName);
+  console.log(`Card: ${cardName}`);
+  console.log(`Normalized filename base: ${normalizedBaseName}`);
 
   // If using useyourcredits.com as source
-  if (source === "useyourcredits") {
+  if (source === "useyourcredits" || source === "auto") {
     const slug = USEYOURCREDITS_SLUGS[cardName];
-    if (!slug) {
+    if (!slug && source === "useyourcredits") {
       console.error(`❌ No mapping found for "${cardName}" on useyourcredits.com`);
       console.log("\nAvailable mappings:");
       Object.keys(USEYOURCREDITS_SLUGS).forEach(name => console.log(`  - ${name}`));
@@ -306,20 +459,32 @@ async function main() {
       console.log("   Or use --source google to search Google Images instead.");
       process.exit(1);
     }
-    
-    const imageUrl = `${USE_YOUR_CREDITS_BASE}${slug}.png`;
-    console.log(`📥 Downloading from useyourcredits.com: ${imageUrl}`);
-    
-    try {
-      const filename = `${slugify(cardName)}.png`;
+
+    if (slug) {
+      const imageUrl = `${USE_YOUR_CREDITS_BASE}${slug}.png`;
+      const filename = filenameForCardImage(cardName, ".png");
       const filepath = path.join(OUTPUT_DIR, filename);
-      await downloadImage(imageUrl, filepath);
-      console.log(`✅ Successfully downloaded image for "${cardName}" to ${filepath}`);
-      process.exit(0);
-    } catch (error) {
-      console.error(`❌ Failed to download: ${error.message}`);
-      console.log("💡 The card might not exist on useyourcredits.com. Try --source google instead.");
-      process.exit(1);
+      console.log(`UseYourCredits candidate: ${imageUrl}`);
+      console.log(`Target: ${path.relative(process.cwd(), filepath)}`);
+
+      if (dryRun || listMode) {
+        if (source === "useyourcredits" || !API_KEY) process.exit(0);
+      } else {
+        try {
+          await assertCanWrite(filepath, force);
+          await downloadImage(imageUrl, filepath);
+          await finalizeDownloadedImage({ filepath, cardName, source: "useyourcredits", sourceUrl: imageUrl, force, updateManifest });
+          console.log(`✅ Successfully downloaded image for "${cardName}" to ${filepath}`);
+          process.exit(0);
+        } catch (error) {
+          console.error(`❌ UseYourCredits failed: ${error.message}`);
+          if (source === "useyourcredits") {
+            console.log("💡 The card might not exist on useyourcredits.com. Try --source google instead.");
+            process.exit(1);
+          }
+          console.log("Falling back to Google Images search...");
+        }
+      }
     }
   }
 
@@ -329,13 +494,18 @@ async function main() {
     try {
       const urlObj = new URL(directUrl);
       const pathname = urlObj.pathname.toLowerCase();
-      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-      const extension = imageExtensions.find(ext => pathname.endsWith(ext)) || '.png';
-      
-      const filename = `${slugify(cardName)}${extension}`;
+      const extension = normalizeExtension(SUPPORTED_IMAGE_EXTENSIONS.find(ext => pathname.endsWith(ext)) || '.png');
+      const filename = filenameForCardImage(cardName, extension);
       const filepath = path.join(OUTPUT_DIR, filename);
-      
+
+      console.log(`Target: ${path.relative(process.cwd(), filepath)}`);
+      if (dryRun) {
+        process.exit(0);
+      }
+
+      await assertCanWrite(filepath, force);
       await downloadImage(directUrl, filepath);
+      await finalizeDownloadedImage({ filepath, cardName, source: "direct-url", sourceUrl: directUrl, force, updateManifest });
       console.log(`✅ Successfully downloaded image for "${cardName}" to ${filepath}`);
       process.exit(0);
     } catch (error) {
@@ -343,7 +513,12 @@ async function main() {
       process.exit(1);
     }
   }
-  
+
+  if (!API_KEY) {
+    console.error("Error: SERPAPI_API_KEY not found. Use --source useyourcredits, --url, or set SERPAPI_API_KEY.");
+    process.exit(1);
+  }
+
   // Use a more specific search query to find official card art images
   // Adding "card art" or "official" helps find single card product images
   const searchQuery = `"${cardName}" card art official`;
@@ -379,7 +554,7 @@ async function main() {
         const scoreB = calculateImageScore(b.validation);
         return scoreB - scoreA; // Higher score first
       });
-    
+
     function calculateImageScore(validation) {
       let score = 0;
       // Highest priority: official issuer domains
@@ -397,7 +572,7 @@ async function main() {
     }
 
     console.log(`${sortedResults.length} valid image URLs found`);
-    
+
     // If list mode is enabled, show URLs and exit
     if (listMode) {
       console.log("\n📋 Available image URLs (sorted by quality score):\n");
@@ -411,7 +586,7 @@ async function main() {
           v.isProductImage ? '🎨 ProductImg' : '',
           v.hasRelevantTerms ? '🎯 Relevant' : ''
         ].filter(Boolean).join(' ');
-        
+
         console.log(`${i + 1}. [Score: ${score}] ${indicators}`);
         console.log(`   ${result.original}`);
         if (result.source) console.log(`   Source: ${result.source}`);
@@ -421,7 +596,15 @@ async function main() {
       console.log(`   node scripts/download-card-image.js --name "${cardName}" --url "<URL>"`);
       process.exit(0);
     }
-    
+
+    if (dryRun) {
+      const best = sortedResults[0];
+      const filename = filenameForCardImage(cardName, best.validation.extension);
+      console.log(`Dry run target: ${path.relative(process.cwd(), path.join(OUTPUT_DIR, filename))}`);
+      console.log(`Best candidate: ${best.original}`);
+      process.exit(0);
+    }
+
     console.log(`Trying up to ${maxAttempts} images...`);
 
     // 2. Try downloading images until we succeed
@@ -432,7 +615,7 @@ async function main() {
       const result = sortedResults[i];
       const imageUrl = result.original;
       const validation = result.validation;
-      
+
       console.log(`\n📁 Attempt ${i + 1}/${attempts}: ${imageUrl}`);
       if (validation.isPreferred) {
         console.log("✅ Preferred domain detected");
@@ -443,11 +626,13 @@ async function main() {
 
       try {
         // Generate filename with proper extension
-        const filename = `${slugify(cardName)}${validation.extension}`;
+        const filename = filenameForCardImage(cardName, validation.extension);
         const filepath = path.join(OUTPUT_DIR, filename);
 
         console.log(`📥 Downloading to: ${filepath}...`);
+        await assertCanWrite(filepath, force);
         await downloadImage(imageUrl, filepath);
+        await finalizeDownloadedImage({ filepath, cardName, source: "google-images", sourceUrl: imageUrl, force, updateManifest });
 
         console.log(`✅ Successfully downloaded image for "${cardName}" to ${filepath}`);
         successfulDownload = true;
@@ -477,4 +662,4 @@ async function main() {
   }
 }
 
-main(); 
+main();

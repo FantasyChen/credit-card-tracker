@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'; // Assuming you have a Button c
 import { Input } from '@/components/ui/input';   // Assuming you have an Input component
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import PageHeader from '@/components/ui/PageHeader';
 
 export default function DataManagementPage() {
   const { status } = useSession();
@@ -24,12 +25,12 @@ export default function DataManagementPage() {
 
   // Handle loading state for session
   if (status === 'loading') {
-    return <p className="text-center mt-10">Loading session...</p>;
+    return <p className="mt-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading session...</p>;
   }
 
   // Show loading while redirecting
   if (status === 'unauthenticated') {
-    return <p className="text-center mt-10">Redirecting to sign in...</p>;
+    return <p className="mt-10 text-center text-sm text-gray-500 dark:text-gray-400">Redirecting to sign in...</p>;
   }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,10 +87,13 @@ export default function DataManagementPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100">Data Management</h1>
+    <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+      <PageHeader
+        title="Data Management"
+        description="Export a backup or restore cards from a previous Perks Reminder file."
+      />
 
-      <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6 mb-8">
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Your Data, Your Control</h2>
         <p className="text-gray-600 dark:text-gray-300 mb-4">
           We believe you should always own and control your data. You can export your added credit card list at any time.
@@ -98,7 +102,7 @@ export default function DataManagementPage() {
       </div>
 
       {/* Export Section */}
-      <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6 mb-8">
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Export Your Data</h2>
         <p className="text-gray-600 dark:text-gray-300 mb-4">
           Download a JSON file containing your list of added credit cards and their opening dates.
@@ -109,7 +113,7 @@ export default function DataManagementPage() {
       </div>
 
       {/* Import Section */}
-      <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
+      <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Import Data</h2>
         <p className="text-gray-600 dark:text-gray-300 mb-4">
           Upload a previously exported JSON file (`perks_reminder_data_*.json` or `couponcycle_data_*.json`) to add cards to your account.
@@ -150,4 +154,4 @@ export default function DataManagementPage() {
       </div>
     </div>
   );
-} 
+}

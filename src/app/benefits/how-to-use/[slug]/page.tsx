@@ -1,10 +1,10 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { BenefitFrequency } from '@/generated/prisma';
 import ShareButton from '@/components/ShareButton';
+import CardImageWell from '@/components/ui/CardImageWell';
 import React from 'react';
 
 // Helper function to get next reset date based on frequency
@@ -51,12 +51,13 @@ function getFrequencyLabel(frequency: BenefitFrequency): string {
 }
 
 interface PageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
   const usageWay = await prisma.benefitUsageWay.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
   });
 
   if (!usageWay) {
@@ -75,7 +76,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       usageWay.category || 'rewards',
     ],
     alternates: {
-      canonical: `/benefits/how-to-use/${params.slug}`,
+      canonical: `/benefits/how-to-use/${slug}`,
     },
   };
 }
@@ -96,10 +97,11 @@ export async function generateStaticParams() {
 }
 
 export default async function UsageWayDetailPage({ params }: PageProps) {
+  const { slug } = await params;
   let usageWay;
   try {
     usageWay = await prisma.benefitUsageWay.findUnique({
-      where: { slug: params.slug },
+      where: { slug },
       include: {
         predefinedBenefits: {
           include: {
@@ -208,7 +210,7 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
       {/* Breadcrumb */}
       <nav className="mb-8 flex items-center text-sm text-gray-600 dark:text-gray-400">
         <Link href="/benefits" className="hover:text-indigo-600 dark:hover:text-indigo-400">
@@ -251,7 +253,7 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
 
       {/* Pro Tips Box */}
       {usageWay.tips && usageWay.tips.length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-6 mb-8">
+        <div className="mb-8 rounded-lg border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/20">
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,7 +262,7 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
             </div>
             <div className="ml-4 flex-1">
               <h3 className="text-lg font-semibold text-amber-900 dark:text-amber-200 mb-3">
-                💡 Pro Tips
+                Pro Tips
               </h3>
               <ul className="space-y-2">
                 {usageWay.tips.map((tip, index) => (
@@ -279,14 +281,14 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
 
       {/* Main Content */}
       <article className="prose prose-lg max-w-none mb-12">
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
+        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-8">
           {renderContent(usageWay.content)}
         </div>
       </article>
 
       {/* Related Cards with Images */}
       {relatedCards.length > 0 && (
-        <div className="mt-12 bg-gray-50 dark:bg-gray-900 rounded-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+        <div className="mt-12 rounded-lg border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-900 sm:p-8">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
             Cards Offering This Benefit
           </h2>
@@ -295,21 +297,17 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
               <Link
                 key={card.id}
                 href={`/cards/browse/${encodeURIComponent(card.name)}`}
-                className="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+                className="group rounded-lg border border-gray-200 bg-white p-4 transition-all hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600"
               >
                 <div className="flex items-start gap-4">
                   {/* Card Image */}
-                  {card.imageUrl && (
-                    <div className="flex-shrink-0 w-16 h-10 relative rounded overflow-hidden bg-gray-100 dark:bg-gray-700">
-                      <Image
-                        src={card.imageUrl}
-                        alt={card.name}
-                        fill
-                        className="object-contain"
-                        sizes="64px"
-                      />
-                    </div>
-                  )}
+                  <CardImageWell
+                    imageUrl={card.imageUrl}
+                    alt={card.name}
+                    issuer={card.issuer}
+                    className="h-12 w-20 flex-shrink-0 rounded-md p-1"
+                    sizes="80px"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-gray-500 dark:text-gray-400 mb-0.5">
                       {card.issuer}
@@ -330,7 +328,7 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
 
       {/* Related Benefits with Reset Dates */}
       {usageWay.predefinedBenefits.length > 0 && (
-        <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+        <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-8">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
             Benefits in This Guide
           </h2>

@@ -1,7 +1,8 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
 import { prisma } from '@/lib/prisma';
+import CardImageWell from '@/components/ui/CardImageWell';
+import PageHeader from '@/components/ui/PageHeader';
 
 export const metadata: Metadata = {
   title: 'Browse Credit Cards | Perks Reminder',
@@ -62,19 +63,12 @@ export default async function BrowseCardsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-12">
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-          Browse Credit Cards
-        </h1>
-        <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl">
-          Explore our complete catalog of {predefinedCards.length}+ credit cards with trackable benefits. 
-          Sign in to add cards to your collection and start tracking your benefits.
-        </p>
-        
-        {/* Quick Stats */}
-        <div className="mt-6 flex flex-wrap gap-6">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <PageHeader
+        title="Browse Credit Cards"
+        description={`Explore ${predefinedCards.length}+ supported cards with trackable benefits. Sign in to add cards to your collection and start tracking cycles.`}
+      >
+        <div className="grid w-full grid-cols-3 gap-3 sm:w-auto sm:min-w-[22rem]">
           <div className="flex items-center gap-2">
             <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{predefinedCards.length}</span>
             <span className="text-gray-600 dark:text-gray-400">Cards</span>
@@ -90,7 +84,7 @@ export default async function BrowseCardsPage() {
             <span className="text-gray-600 dark:text-gray-400">Benefits</span>
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Cards by Issuer */}
       <div className="space-y-12">
@@ -114,27 +108,14 @@ export default async function BrowseCardsPage() {
                     href={`/cards/browse/${encodeURIComponent(card.name)}`}
                     className="group block"
                   >
-                    <div className="h-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600">
-                      {/* Card Image - fixed aspect ratio container */}
-                      <div className="relative bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center p-4" style={{ aspectRatio: '16/10' }}>
-                        {card.imageUrl ? (
-                          <div className="relative w-full h-full max-w-[200px]" style={{ aspectRatio: '1.586/1' }}>
-                            <Image
-                              src={card.imageUrl}
-                              alt={card.name}
-                              fill
-                              className="object-contain drop-shadow-md"
-                              sizes="200px"
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center">
-                            <svg className="h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
+                    <div className="h-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600">
+                      <CardImageWell
+                        imageUrl={card.imageUrl}
+                        alt={card.name}
+                        issuer={card.issuer}
+                        className="rounded-none border-x-0 border-t-0"
+                        sizes="220px"
+                      />
                       
                       {/* Card Info */}
                       <div className="p-5">
@@ -179,7 +160,7 @@ export default async function BrowseCardsPage() {
       </div>
 
       {/* CTA Section */}
-      <div className="mt-16 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-2xl p-8 border border-indigo-200 dark:border-indigo-700">
+      <div className="mt-16 rounded-lg border border-indigo-200 bg-indigo-50 p-8 dark:border-indigo-800 dark:bg-indigo-950/20">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
             Start Tracking Your Benefits

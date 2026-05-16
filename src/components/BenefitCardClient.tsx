@@ -4,9 +4,9 @@ import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatDate } from '@/lib/dateUtils';
-import { 
-  toggleBenefitStatusAction, 
-  markBenefitAsNotUsableAction, 
+import {
+  toggleBenefitStatusAction,
+  markBenefitAsNotUsableAction,
   deleteCustomBenefitAction,
   addPartialCompletionAction,
   markFullCompletionAction,
@@ -44,7 +44,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const newIsCompleted = !status.isCompleted;
-    
+
     startTransition(async () => {
       try {
         await toggleBenefitStatusAction(formData);
@@ -60,7 +60,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
   const handleFullCompletion = async () => {
     const formData = new FormData();
     formData.append('benefitStatusId', status.id);
-    
+
     startTransition(async () => {
       try {
         await markFullCompletionAction(formData);
@@ -79,7 +79,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
     const formData = new FormData();
     formData.append('benefitStatusId', status.id);
     formData.append('amount', amount.toString());
-    
+
     startTransition(async () => {
       try {
         const result = await addPartialCompletionAction(formData);
@@ -102,7 +102,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const newIsNotUsable = !status.isNotUsable;
-    
+
     startTransition(async () => {
       try {
         await markBenefitAsNotUsableAction(formData);
@@ -134,7 +134,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
 
   const handleDeleteCustomBenefit = async () => {
     if (!status.isCustomBenefit) return;
-    
+
     setIsDeleting(true);
     try {
       const formData = new FormData();
@@ -153,23 +153,24 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
   const isCustomBenefit = status.isCustomBenefit;
   const isNotUsable = status.isNotUsable;
   const hasPartialProgress = usedAmount > 0 && !isCompleted;
+  const statusLabel = isScheduled ? 'Scheduled' : isCompleted ? 'Claimed' : isNotUsable ? 'Not usable' : hasPartialProgress ? 'Partially used' : 'Open';
 
   return (
-    <div className={`group relative overflow-hidden rounded-xl border transition-all duration-300 hover:shadow-lg ${
+    <div className={`group relative overflow-hidden rounded-lg border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
       isScheduled
-        ? 'bg-gradient-to-r from-purple-50 to-violet-50 border-purple-200 dark:from-purple-900/20 dark:to-violet-900/20 dark:border-purple-700'
-        : isCompleted 
-          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-700' 
+        ? 'bg-white border-violet-200 dark:bg-gray-800 dark:border-violet-700'
+        : isCompleted
+          ? 'bg-white border-emerald-200 dark:bg-gray-800 dark:border-emerald-700'
           : isNotUsable
-            ? 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200 dark:from-gray-900/20 dark:to-slate-900/20 dark:border-gray-700'
+            ? 'bg-gray-50 border-gray-200 dark:bg-gray-800/80 dark:border-gray-700'
             : 'bg-white border-gray-200 hover:border-indigo-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:border-indigo-600'
     }`}>
       {/* Status indicator */}
       <div className={`absolute top-0 left-0 w-1 h-full ${
         isScheduled ? 'bg-purple-500' : isCompleted ? 'bg-green-500' : isNotUsable ? 'bg-gray-500' : 'bg-indigo-500'
       }`} />
-      
-      <div className="p-3 sm:p-6">
+
+      <div className="p-4 sm:p-5">
         {/* Mobile-first layout: Stack content vertically on small screens */}
         <div className="space-y-4">
           {/* Top section: Icon, title, and amount */}
@@ -177,8 +178,8 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
             <div className={`flex-shrink-0 p-2 rounded-lg ${
               isScheduled
                 ? 'bg-purple-100 dark:bg-purple-800/30'
-                : isCompleted 
-                  ? 'bg-green-100 dark:bg-green-800/30' 
+                : isCompleted
+                  ? 'bg-green-100 dark:bg-green-800/30'
                   : isNotUsable
                     ? 'bg-gray-100 dark:bg-gray-800/30'
                     : 'bg-indigo-100 dark:bg-indigo-800/30'
@@ -201,8 +202,26 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 </svg>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight">
+            <div className="min-w-0 flex-1">
+              <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  isScheduled
+                    ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-900/30 dark:text-violet-200 dark:ring-violet-800'
+                    : isCompleted
+                      ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-800'
+                      : isNotUsable
+                        ? 'bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600'
+                        : hasPartialProgress
+                          ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-800'
+                          : 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-200 dark:ring-indigo-800'
+                }`}>
+                  {statusLabel}
+                </span>
+                <span className="text-xs font-medium uppercase tracking-normal text-gray-500 dark:text-gray-400">
+                  {status.benefit.category}
+                </span>
+              </div>
+              <h3 className="text-base font-semibold text-gray-950 dark:text-gray-100 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors leading-snug">
                 {status.benefit.description}
                 {status.benefit.occurrencesInCycle && status.benefit.occurrencesInCycle > 1 && (
                   <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
@@ -212,9 +231,9 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               </h3>
               {benefitAmount > 0 && (
                 <div className="mt-1">
-                  <p className={`text-lg sm:text-xl font-bold ${
-                    isCompleted 
-                      ? 'text-green-600 dark:text-green-400' 
+                  <p className={`text-lg sm:text-xl font-semibold tabular-nums ${
+                    isCompleted
+                      ? 'text-green-600 dark:text-green-400'
                       : isNotUsable
                         ? 'text-gray-600 dark:text-gray-400'
                         : hasPartialProgress
@@ -232,8 +251,8 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                   {/* Progress bar for partial completion */}
                   {hasPartialProgress && (
                     <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div 
-                        className="bg-amber-500 h-2 rounded-full transition-all duration-300" 
+                      <div
+                        className="bg-amber-500 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${completionPercent}%` }}
                       />
                     </div>
@@ -242,7 +261,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               )}
             </div>
           </div>
-          
+
           {/* Card info - more compact on mobile */}
           <div className="space-y-1.5 sm:pl-11">
             {status.benefit.creditCard ? (
@@ -289,7 +308,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               )}
             </div>
           </div>
-          
+
           {/* Usage Guide Link */}
           {status.usageWaySlug && (
             <div className="sm:pl-11">
@@ -357,7 +376,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               </div>
             )}
           </div>
-          
+
           {/* Action buttons - full width on mobile, fixed width on larger screens */}
           <div className="sm:pl-11">
             <div className="flex flex-col sm:flex-row gap-2">
@@ -437,7 +456,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                   )}
                 </>
               )}
-              
+
               {/* Not Usable button - only show for upcoming benefits, not scheduled */}
               {!isCompleted && !isScheduled && (
                 <form onSubmit={handleNotUsableSubmit}>
@@ -482,7 +501,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                   </button>
                 </form>
               )}
-              
+
               {/* Delete button - only show for custom benefits */}
               {isCustomBenefit && (
                 <button
@@ -503,7 +522,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
           </div>
         </div>
       </div>
-      
+
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -563,7 +582,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               </div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Partial Amount</h3>
             </div>
-            
+
             <div className="mb-4">
               <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
                 {status.benefit.description}
@@ -574,8 +593,8 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               </div>
               {/* Progress bar */}
               <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div 
-                  className="bg-amber-500 h-2 rounded-full transition-all duration-300" 
+                <div
+                  className="bg-amber-500 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${completionPercent}%` }}
                 />
               </div>

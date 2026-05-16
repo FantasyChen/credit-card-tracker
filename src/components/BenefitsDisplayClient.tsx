@@ -452,19 +452,19 @@ export default function BenefitsDisplayClient({
   };
 
   return (
-    <div className="container mx-auto px-2 py-4 sm:p-4">
-      <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mb-6 flex flex-col gap-4 border-b border-gray-200 pb-5 dark:border-gray-800 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold dark:text-white">Benefits Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-950 dark:text-white sm:text-3xl">Benefits Dashboard</h1>
+          <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
             Prioritize what expires soon, record claimed value, and keep annual fees honest.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
           {/* Add Custom Benefit Button */}
           <Link
             href="/benefits/custom"
-            className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
           >
             <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -473,7 +473,7 @@ export default function BenefitsDisplayClient({
           </Link>
           <button
             onClick={setCategoryView}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`inline-flex min-h-10 items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               viewMode === 'category' 
                 ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
                 : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200'
@@ -486,7 +486,7 @@ export default function BenefitsDisplayClient({
           </button>
           <button
             onClick={setCardView}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`inline-flex min-h-10 items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               viewMode === 'card' 
                 ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
                 : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200'
@@ -501,9 +501,9 @@ export default function BenefitsDisplayClient({
       </div>
 
       {/* Summary Widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {/* Upcoming Benefits Widget */}
-        <div className="overflow-hidden rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div className="p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -517,7 +517,7 @@ export default function BenefitsDisplayClient({
                 <dl>
                   <dt className="text-sm font-medium text-blue-600 dark:text-blue-300">Upcoming Benefits</dt>
                   <dd>
-                    <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">${localTotalUnusedValue.toFixed(2)}</div>
+                    <div className="text-xl font-semibold tabular-nums text-gray-950 dark:text-white sm:text-2xl">${localTotalUnusedValue.toFixed(2)}</div>
                   </dd>
                 </dl>
               </div>
@@ -526,7 +526,7 @@ export default function BenefitsDisplayClient({
         </div>
 
         {/* Claimed Benefits Widget */}
-        <div className="overflow-hidden rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div className="p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -540,7 +540,7 @@ export default function BenefitsDisplayClient({
                 <dl>
                   <dt className="text-sm font-medium text-green-600 dark:text-green-300">Claimed Benefits</dt>
                   <dd>
-                    <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">${localTotalUsedValue.toFixed(2)}</div>
+                    <div className="text-xl font-semibold tabular-nums text-gray-950 dark:text-white sm:text-2xl">${localTotalUsedValue.toFixed(2)}</div>
                   </dd>
                 </dl>
               </div>
@@ -549,7 +549,7 @@ export default function BenefitsDisplayClient({
         </div>
 
         {/* Not Usable Benefits Widget */}
-        <div className="overflow-hidden rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div className="p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -563,7 +563,7 @@ export default function BenefitsDisplayClient({
                 <dl>
                   <dt className="text-sm font-medium text-gray-600 dark:text-gray-300">Not Usable</dt>
                   <dd>
-                    <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">${localTotalNotUsableValue.toFixed(2)}</div>
+                    <div className="text-xl font-semibold tabular-nums text-gray-950 dark:text-gray-100 sm:text-2xl">${localTotalNotUsableValue.toFixed(2)}</div>
                   </dd>
                 </dl>
               </div>
@@ -572,7 +572,7 @@ export default function BenefitsDisplayClient({
         </div>
 
         {/* Annual Fee ROI Widget */}
-        <div className={`overflow-hidden rounded-lg shadow-sm border ${
+        <div className={`overflow-hidden rounded-lg border shadow-sm ${
           localTotalUsedValue >= totalAnnualFees 
             ? 'bg-white dark:bg-gray-800 border-emerald-200 dark:border-emerald-700'
             : 'bg-white dark:bg-gray-800 border-orange-200 dark:border-orange-700'
@@ -619,7 +619,7 @@ export default function BenefitsDisplayClient({
                           ? 'text-emerald-600 dark:text-emerald-300' 
                           : 'text-orange-600 dark:text-orange-300'
                       }`}>
-                        ${localTotalUsedValue.toFixed(2)} earned vs ${totalAnnualFees.toFixed(2)} fees
+                        ${localTotalUsedValue.toFixed(2)} claimed vs ${totalAnnualFees.toFixed(2)} fees
                       </div>
                     </div>
                   </dd>
@@ -632,7 +632,7 @@ export default function BenefitsDisplayClient({
 
       {/* Card-level ROI breakdown (collapsible) */}
       {cardLevelRoiLive.length > 0 && (
-        <div className="mb-8 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow">
+        <div className="mb-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <button
             type="button"
             onClick={() => setShowRoiBreakdown(prev => !prev)}
@@ -678,7 +678,7 @@ export default function BenefitsDisplayClient({
       )}
 
       {/* Tabs */}
-      <div className="mb-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+      <div className="mb-4 overflow-x-auto border-b border-gray-200 dark:border-gray-700">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 min-w-max" aria-label="Tabs">
           <button
             onClick={() => setActiveTab('upcoming')}
@@ -730,8 +730,8 @@ export default function BenefitsDisplayClient({
       </div>
 
       {/* Search & Filters */}
-      <div className="mb-4 space-y-3">
-        <div className="flex flex-col sm:flex-row gap-3">
+      <div className="mb-5 space-y-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-col gap-3 lg:flex-row">
           <div className="relative flex-1">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
@@ -742,14 +742,14 @@ export default function BenefitsDisplayClient({
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <label htmlFor="sort-benefits" className="sr-only">Sort benefits</label>
             <select
               id="sort-benefits"
               aria-label="Sort benefits"
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-800 dark:text-white"
+              className="min-h-10 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               <option value="expires">Expires soon</option>
               <option value="value">Highest value</option>
@@ -761,7 +761,7 @@ export default function BenefitsDisplayClient({
               aria-label="Filter by frequency"
               value={filterFrequency}
               onChange={(e) => setFilterFrequency(e.target.value as BenefitDashboardFrequency)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-800 dark:text-white"
+              className="min-h-10 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               <option value="ALL">All cycles</option>
               <option value="WEEKLY">Weekly</option>
@@ -773,7 +773,7 @@ export default function BenefitsDisplayClient({
             <button
               type="button"
               onClick={() => setFreeNightOnly((value) => !value)}
-              className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+              className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                 freeNightOnly
                   ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300'
                   : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -785,7 +785,7 @@ export default function BenefitsDisplayClient({
             <button
               type="button"
               onClick={() => setShowFilters(!showFilters)}
-              className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+              className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
                 showFilters || hasActiveFilters
                   ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300'
                   : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -803,7 +803,7 @@ export default function BenefitsDisplayClient({
               <button
                 type="button"
                 onClick={clearFilters}
-                className="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="inline-flex min-h-10 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                 title="Clear filters"
               >
                 <XMarkIcon className="h-5 w-5" />
@@ -812,7 +812,7 @@ export default function BenefitsDisplayClient({
           </div>
         </div>
         {showFilters && (
-          <div className="flex flex-wrap gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/30 sm:grid-cols-2">
             <div>
               <label htmlFor="filter-category" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                 Category
