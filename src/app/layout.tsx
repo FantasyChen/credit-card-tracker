@@ -12,6 +12,8 @@ import { authOptions } from "@/lib/auth";
 import { ErrorBoundary } from "@/lib/monitoring/errorBoundary";
 import { PRIMARY_SITE_URL, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import DomainMigrationBanner from "@/components/DomainMigrationBanner";
+import IosInstallPrompt from "@/components/IosInstallPrompt";
+import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 // import { ThemeProviders } from "@/components/ThemeProviders"; // Removed
 // import { ensureCurrentBenefitStatuses } from "@/lib/actions/benefitActions"; // Keep import commented out or remove
 
@@ -87,7 +89,7 @@ export const metadata: Metadata = {
       sizes: "any",
     },
     apple: {
-      url: "/favicon.png",
+      url: "/icons/apple-touch-icon.png",
       sizes: "180x180",
     },
   },
@@ -104,6 +106,7 @@ export const viewport = {
   initialScale: 1,
   userScalable: true,
   themeColor: "#3b82f6",
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({
@@ -126,7 +129,7 @@ export default async function RootLayout({
         <meta name="application-name" content={SITE_NAME} />
         <meta name="msapplication-TileColor" content="#3b82f6" />
         <meta name="msapplication-tap-highlight" content="no" />
-        <link rel="apple-touch-icon" href="/favicon.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
         <link rel="shortcut icon" href="/favicon.png" />
         
         {/* Google Analytics */}
@@ -163,8 +166,9 @@ export default async function RootLayout({
         {/* <ThemeProviders> */}
         <Providers session={session}>{/* Use original Providers */}
           <ErrorBoundary>
+            <ServiceWorkerRegistrar />
             <SkipLink />
-            <div className="flex min-h-full flex-col bg-gray-50 dark:bg-gray-950">
+            <div className="app-shell flex min-h-full flex-col bg-gray-50 dark:bg-gray-950">
               <Navbar />
               <DomainMigrationBanner />
               <main 
@@ -179,6 +183,7 @@ export default async function RootLayout({
               <Footer />
               <Analytics />
             </div>
+            <IosInstallPrompt />
           </ErrorBoundary>
         </Providers>
         {/* </ThemeProviders> */}

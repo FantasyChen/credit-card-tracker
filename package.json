@@ -33,10 +33,13 @@
     "db:dev:seed": "node scripts/with-dev-db.js npx prisma db seed",
     "db:dev:reset": "node scripts/with-dev-db.js npx prisma migrate reset",
     "db:prod:status": "npx prisma migrate status",
-    "migrate:diff": "npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma"
+    "migrate:diff": "npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma",
+    "ios:sync": "cap sync ios",
+    "ios:open": "cap open ios"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",
+    "@capacitor/core": "^8.3.4",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -67,6 +70,8 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/ios": "^8.3.4",
     "@eslint/eslintrc": "^3",
     "@next/swc-wasm-nodejs": "^15.5.7",
     "@prisma/nextjs-monorepo-workaround-plugin": "^6.7.0",

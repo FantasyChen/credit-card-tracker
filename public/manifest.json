@@ -1,34 +1,58 @@
 {
+  "id": "/",
   "name": "Perks Reminder - Credit Card Benefits Tracker",
   "short_name": "Perks Reminder",
   "description": "Never miss a credit card benefit again. Track every perk and maximize your annual fees.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
-  "scope": "/",
   "icons": [
     {
-      "src": "/favicon.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/favicon.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "categories": ["finance", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Benefits",
+      "short_name": "Benefits",
+      "description": "Open your benefits dashboard",
+      "url": "/benefits",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Cards",
+      "short_name": "Cards",
+      "description": "Open your card list",
+      "url": "/cards",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "screenshots": [
     {
       "src": "/hero-image.jpg",
-      "sizes": "1280x720",
+      "sizes": "1536x1024",
       "type": "image/jpeg",
       "form_factor": "wide"
     }
   ]
-} 
+}

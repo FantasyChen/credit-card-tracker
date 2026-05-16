@@ -11,14 +11,12 @@ const IMAGE_CACHE = 'perks-reminder-images-v1';
 // Resources to cache immediately
 const STATIC_ASSETS = [
   '/',
-  '/benefits',
-  '/cards',
-  '/loyalty',
   '/offline', // Offline fallback page
   '/favicon.png',
+  '/icons/apple-touch-icon.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
   '/manifest.json',
-  '/_next/static/css/',
-  '/_next/static/js/',
 ];
 
 // Network-first routes (always try network first)
@@ -30,6 +28,7 @@ const NETWORK_FIRST_ROUTES = [
 // Cache-first routes (use cache if available)
 const CACHE_FIRST_ROUTES = [
   '/images/',
+  '/icons/',
   '/_next/static/',
   '/favicon',
 ];
@@ -41,7 +40,13 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     Promise.all([
       caches.open(STATIC_CACHE).then((cache) => {
-        return cache.addAll(STATIC_ASSETS);
+        return Promise.all(
+          STATIC_ASSETS.map((asset) =>
+            cache.add(asset).catch((error) => {
+              console.warn('Unable to precache asset:', asset, error);
+            })
+          )
+        );
       }),
       self.skipWaiting() // Activate immediately
     ])
@@ -281,7 +286,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: data.body,
     icon: '/favicon.png',
-    badge: '/favicon.png',
+    badge: '/icons/icon-192.png',
     actions: [
       {
         action: 'view',
