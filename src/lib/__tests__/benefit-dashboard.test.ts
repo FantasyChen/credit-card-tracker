@@ -110,7 +110,6 @@ describe('buildBenefitDashboardProjection', () => {
       completedAt: null,
       isNotUsable: false,
       usedAmount: 0,
-      notes: null,
       orderIndex: null,
       occurrenceIndex: 0,
       createdAt: date('2026-05-01'),

@@ -7,7 +7,7 @@ Make the benefits dashboard easier for power users to scan by adding high-signal
 - Add client-side filters for benefit frequency and free-night/certificate-like benefits.
 - Add reusable helper functions for filtering and group summary calculations.
 - Surface group totals for remaining value, claimed value, partial progress count, and soonest due date.
-- Keep existing tabs, search, category/card filters, sorting, partial completion, notes, and ROI behavior intact.
+- Keep existing tabs, search, category/card filters, sorting, partial completion, and ROI behavior intact.
 
 ## Non-Goals
 - No bank or loyalty account linking.

@@ -2932,12 +2932,12 @@ These credits usually reset every four to five years rather than annually. If yo
 
 ## Practical Tracking
 
-For benefits that do not reimburse a purchase, mark them complete when you redeem or confirm they posted. Add a note if the certificate number, booking reference, or pass expiration date matters.`,
+For benefits that do not reimburse a purchase, mark them complete when you redeem or confirm they posted. Keep certificate numbers, booking references, and pass expiration dates in the issuer or loyalty account where the benefit is managed.`,
       tips: [
         'Record expiration dates as soon as certificates or passes issue',
         'Check property, fare, and booking-channel restrictions',
         'Use early enough to handle booking changes',
-        'Add notes for certificate numbers or booking references'
+        'Keep certificate numbers and booking references in the source account'
       ]
     }
   ];

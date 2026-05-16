@@ -382,42 +382,6 @@ export async function markBenefitAsNotUsableAction(formData: FormData) {
   }
 }
 
-export async function updateBenefitNotesAction(formData: FormData) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    throw new Error('User not authenticated.');
-  }
-
-  const benefitStatusId = formData.get('benefitStatusId') as string;
-  const notes = (formData.get('notes') as string)?.trim() || null;
-
-  if (!benefitStatusId) {
-    throw new Error('Benefit Status ID is missing.');
-  }
-
-  try {
-    const updatedStatus = await prisma.benefitStatus.updateMany({
-      where: {
-        id: benefitStatusId,
-        userId: session.user.id,
-      },
-      data: { notes },
-    });
-
-    if (updatedStatus.count === 0) {
-      throw new Error('Benefit status not found or permission denied.');
-    }
-
-    revalidatePath('/benefits');
-    revalidatePath('/');
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error updating benefit notes:', error);
-    throw new Error('Failed to update benefit notes.');
-  }
-}
-
 export async function updateBenefitOrderAction(benefitStatusIds: string[]) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {

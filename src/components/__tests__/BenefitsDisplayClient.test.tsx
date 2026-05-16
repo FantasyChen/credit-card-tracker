@@ -52,7 +52,6 @@ function benefitStatus(
     completedAt: null,
     isNotUsable: false,
     usedAmount: 0,
-    notes: null,
     createdAt: new Date('2026-04-01T00:00:00.000Z'),
     updatedAt: new Date('2026-04-01T00:00:00.000Z'),
     orderIndex: null,
