@@ -1,5 +1,6 @@
 import React from 'react';
 import { Metadata } from 'next';
+import { SUPPORT_EMAIL } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: "Contact Us",
@@ -18,10 +19,10 @@ export default function ContactPage() {
           Have questions, feedback, or a feature request? We&apos;d love to hear from you!
         </p>
         <p className="text-lg text-gray-700 mb-4 dark:text-gray-300">
-          If you have a specific credit card you&apos;d like to see added to our predefined list, please let us know the card name and issuer.
+          If you have a card, benefit, or guide correction, send the card name, the exact benefit text, and the issuer or community source that supports the change.
         </p>
         <p className="text-lg text-gray-700 mb-6 dark:text-gray-300">
-          You can reach out to us via email: <a href="mailto:coupon.cycle@gmail.com" className="text-blue-600 hover:text-blue-800 underline dark:text-blue-400 dark:hover:text-blue-300">coupon.cycle@gmail.com</a>.
+          You can reach out to us via email: <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-600 hover:text-blue-800 underline dark:text-blue-400 dark:hover:text-blue-300">{SUPPORT_EMAIL}</a>.
         </p>
         
         {/* Support Section */}

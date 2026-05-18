@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { BenefitFrequency } from '@/generated/prisma';
 import ShareButton from '@/components/ShareButton';
 import CardImageWell from '@/components/ui/CardImageWell';
+import SuggestCorrectionLink from '@/components/SuggestCorrectionLink';
 import React from 'react';
 
 // Helper function to get next reset date based on frequency
@@ -249,6 +250,29 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
             {usageWay.description}
           </p>
         )}
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+          <span>
+            Updated {usageWay.updatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </span>
+          <span className="hidden sm:inline">•</span>
+          <span>Source: issuer terms plus community data points</span>
+          <SuggestCorrectionLink
+            subject={`Correction: ${usageWay.title}`}
+            context={`Guide: ${usageWay.title}\nSlug: ${usageWay.slug}\nCategory: ${usageWay.category ?? 'General'}`}
+            label="Suggest guide fix"
+          />
+        </div>
+      </div>
+
+      <div className="mb-8 rounded-lg border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-800 dark:bg-indigo-950/20">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Quick read checklist</h2>
+        <div className="mt-3 grid gap-2 text-sm text-gray-700 dark:text-gray-300 sm:grid-cols-5">
+          {['What qualifies', 'How to trigger', 'Posting timing', 'DP caveats', 'What to avoid'].map((item) => (
+            <div key={item} className="rounded-lg bg-white/70 px-3 py-2 ring-1 ring-indigo-100 dark:bg-gray-900/40 dark:ring-indigo-900">
+              {item}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Pro Tips Box */}
@@ -354,6 +378,14 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
                   </div>
                   <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                     {benefit.predefinedCard.name}
+                  </div>
+                  <div className="mt-2">
+                    <SuggestCorrectionLink
+                      subject={`Correction: ${benefit.predefinedCard.name} - ${benefit.description}`}
+                      context={`Guide: ${usageWay.title}\nCard: ${benefit.predefinedCard.name}\nBenefit: ${benefit.description}`}
+                      label="Suggest benefit fix"
+                      className="text-xs"
+                    />
                   </div>
                 </div>
                 <div className="flex items-center gap-4">

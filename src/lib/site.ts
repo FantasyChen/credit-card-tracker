@@ -3,6 +3,7 @@ export const SITE_DESCRIPTION =
   'Track credit card benefits, maximize rewards, and never miss expiring perks again.';
 export const PRIMARY_SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || 'https://www.perks-reminder.com';
+export const SUPPORT_EMAIL = 'coupon.cycle@gmail.com';
 
 export function getRootDomain(hostname: string): string | null {
   if (!hostname || hostname.includes('localhost')) return null;

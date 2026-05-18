@@ -10,6 +10,16 @@ import { revalidatePath } from 'next/cache';
 import { createCardForUser } from '@/lib/actions/cardUtils';
 import { validateCardDigits } from '@/lib/cardDisplayUtils';
 import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+const bulkCardItemSchema = z.object({
+  predefinedCardId: z.string().cuid(),
+  nickname: z.string().max(50).optional().default(''),
+  owner: z.string().max(50).optional().default(''),
+  lastFourDigits: z.string().max(5).optional().default(''),
+});
+
+const bulkCardsSchema = z.array(bulkCardItemSchema).min(1).max(50);
 
 export async function addCardAction(formData: FormData) {
   const session = await getServerSession(authOptions);
@@ -86,4 +96,83 @@ export async function addCardAction(formData: FormData) {
 
 
   redirect('/benefits');
-} 
+}
+
+export async function bulkAddCardsAction(formData: FormData) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    redirect('/api/auth/signin?callbackUrl=/cards/new');
+  }
+
+  const payload = formData.get('bulkCards');
+  if (typeof payload !== 'string') {
+    throw new Error('Bulk card payload is missing.');
+  }
+
+  let parsedPayload: unknown;
+  try {
+    parsedPayload = JSON.parse(payload);
+  } catch {
+    throw new Error('Bulk card payload is invalid JSON.');
+  }
+
+  const parseResult = bulkCardsSchema.safeParse(parsedPayload);
+  if (!parseResult.success) {
+    throw new Error('Please review the bulk card list before adding cards.');
+  }
+
+  const items = parseResult.data;
+  const predefinedCards = await prisma.predefinedCard.findMany({
+    where: {
+      id: {
+        in: Array.from(new Set(items.map((item) => item.predefinedCardId))),
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      issuer: true,
+    },
+  });
+  const cardById = new Map(predefinedCards.map((card) => [card.id, card]));
+
+  const currentYear = new Date().getUTCFullYear();
+  const openedDate = new Date(Date.UTC(currentYear, 0, 1));
+
+  for (const item of items) {
+    const card = cardById.get(item.predefinedCardId);
+    if (!card) {
+      throw new Error('One of the selected card templates no longer exists.');
+    }
+
+    const lastDigits = item.lastFourDigits.trim();
+    if (lastDigits) {
+      const validation = validateCardDigits(lastDigits, card.issuer);
+      if (!validation.valid) {
+        throw new Error(`${card.name}: ${validation.error || 'Invalid card digits.'}`);
+      }
+    }
+
+    const owner = item.owner.trim();
+    const nickname = item.nickname.trim();
+    const persistedNickname = [owner, nickname].filter(Boolean).join(' - ') || null;
+    const result = await createCardForUser(
+      session.user.id,
+      item.predefinedCardId,
+      openedDate,
+      lastDigits || null,
+      persistedNickname
+    );
+
+    if (!result.success) {
+      throw new Error(`${card.name}: ${result.message || 'Failed to add card.'}`);
+    }
+  }
+
+  revalidatePath('/');
+  revalidatePath('/cards');
+  revalidatePath('/benefits');
+
+  redirect('/benefits');
+}

@@ -41,7 +41,7 @@ export default function BenefitsDisplayClient({
   const [activeTab, setActiveTab] = useState('upcoming');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
-  const [filterCard, setFilterCard] = useState('');
+  const [filterCardId, setFilterCardId] = useState('');
   const [filterFrequency, setFilterFrequency] = useState<BenefitDashboardFrequency>('ALL');
   const [freeNightOnly, setFreeNightOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -61,14 +61,19 @@ export default function BenefitsDisplayClient({
   const cardLevelRoiLive = useMemo(() => {
     if (cardLevelRoi.length === 0) return [];
     const claimedByCard = new Map<string, number>();
+    let customClaimed = 0;
     for (const status of [...localUpcomingBenefits, ...localCompletedBenefits]) {
-      const key = status.benefit.creditCard?.name ?? CUSTOM_BENEFITS_CARD_NAME;
       const used = resolveBenefitClaimedValue(status);
-      claimedByCard.set(key, (claimedByCard.get(key) ?? 0) + used);
+      const cardId = status.benefit.creditCard?.id;
+      if (!cardId) {
+        customClaimed += used;
+        continue;
+      }
+      claimedByCard.set(cardId, (claimedByCard.get(cardId) ?? 0) + used);
     }
     return cardLevelRoi
       .map((row) => {
-        const claimedValue = claimedByCard.get(row.cardName) ?? 0;
+        const claimedValue = row.cardId ? (claimedByCard.get(row.cardId) ?? 0) : customClaimed;
         const netRoi = claimedValue - row.annualFee;
         return { ...row, claimedValue, netRoi };
       })
@@ -216,10 +221,12 @@ export default function BenefitsDisplayClient({
         !searchQuery.trim() ||
         status.benefit.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (status.benefit.creditCard?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+        (status.benefit.creditCard?.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+        (status.benefit.creditCard?.lastFourDigits?.includes(searchQuery.trim()) ?? false) ||
         status.benefit.category.toLowerCase().includes(searchQuery.toLowerCase());
       const categoryMatch = !filterCategory || status.benefit.category === filterCategory;
-      const cardName = status.benefit.creditCard?.name ?? CUSTOM_BENEFITS_CARD_NAME;
-      const cardMatch = !filterCard || cardName === filterCard;
+      const cardKey = status.benefit.creditCard?.id ?? CUSTOM_BENEFITS_CARD_NAME;
+      const cardMatch = !filterCardId || cardKey === filterCardId;
       return descMatch && categoryMatch && cardMatch;
     });
   };
@@ -263,21 +270,31 @@ export default function BenefitsDisplayClient({
     () => Array.from(new Set(allBenefitsForTab.map((b) => b.benefit.category))).sort(),
     [allBenefitsForTab]
   );
-  const uniqueCards = useMemo(
-    () =>
-      Array.from(new Set(allBenefitsForTab.map((b) => b.benefit.creditCard?.name ?? CUSTOM_BENEFITS_CARD_NAME))).sort((a, b) => {
-        if (a === CUSTOM_BENEFITS_CARD_NAME) return -1;
-        if (b === CUSTOM_BENEFITS_CARD_NAME) return 1;
-        return a.localeCompare(b);
-      }),
-    [allBenefitsForTab]
-  );
+  const uniqueCards = useMemo(() => {
+    const cards = new Map<string, string>();
+    for (const benefit of allBenefitsForTab) {
+      const card = benefit.benefit.creditCard;
+      if (!card) {
+        cards.set(CUSTOM_BENEFITS_CARD_NAME, CUSTOM_BENEFITS_CARD_NAME);
+        continue;
+      }
+      cards.set(card.id, card.displayName);
+    }
 
-  const hasActiveFilters = searchQuery.trim() || filterCategory || filterCard || filterFrequency !== 'ALL' || freeNightOnly;
+    return Array.from(cards.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => {
+        if (a.id === CUSTOM_BENEFITS_CARD_NAME) return -1;
+        if (b.id === CUSTOM_BENEFITS_CARD_NAME) return 1;
+        return a.label.localeCompare(b.label);
+      });
+  }, [allBenefitsForTab]);
+
+  const hasActiveFilters = searchQuery.trim() || filterCategory || filterCardId || filterFrequency !== 'ALL' || freeNightOnly;
   const clearFilters = () => {
     setSearchQuery('');
     setFilterCategory('');
-    setFilterCard('');
+    setFilterCardId('');
     setFilterFrequency('ALL');
     setFreeNightOnly(false);
   };
@@ -312,11 +329,11 @@ export default function BenefitsDisplayClient({
   const groupBenefitsByCard = (benefits: DisplayBenefitStatus[]) => {
     const grouped = benefits.reduce((acc, benefit) => {
       // Use "Custom Benefits" as the group name for standalone benefits
-      const cardName = benefit.benefit.creditCard?.name || CUSTOM_BENEFITS_CARD_NAME;
-      if (!acc[cardName]) {
-        acc[cardName] = [];
+      const cardGroupName = benefit.benefit.creditCard?.displayName || CUSTOM_BENEFITS_CARD_NAME;
+      if (!acc[cardGroupName]) {
+        acc[cardGroupName] = [];
       }
-      acc[cardName].push(benefit);
+      acc[cardGroupName].push(benefit);
       return acc;
     }, {} as Record<string, DisplayBenefitStatus[]>);
 
@@ -462,6 +479,15 @@ export default function BenefitsDisplayClient({
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
           {/* Add Custom Benefit Button */}
+          <Link
+            href="/benefits/how-to-use"
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-900/30"
+          >
+            <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            How-to Guides
+          </Link>
           <Link
             href="/benefits/custom"
             className="inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
@@ -837,14 +863,14 @@ export default function BenefitsDisplayClient({
               </label>
               <select
                 id="filter-card"
-                value={filterCard}
-                onChange={(e) => setFilterCard(e.target.value)}
+                value={filterCardId}
+                onChange={(e) => setFilterCardId(e.target.value)}
                 className="block w-full sm:w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-800 dark:text-white"
               >
                 <option value="">All cards</option>
                 {uniqueCards.map((card) => (
-                  <option key={card} value={card}>
-                    {card}
+                  <option key={card.id} value={card.id}>
+                    {card.label}
                   </option>
                 ))}
               </select>

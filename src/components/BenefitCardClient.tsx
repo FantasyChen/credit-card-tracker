@@ -12,6 +12,7 @@ import {
 } from '@/app/benefits/actions';
 import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard';
 import { calculateCompletionPercentage } from '@/lib/partial-completion';
+import SuggestCorrectionLink from '@/components/SuggestCorrectionLink';
 
 interface BenefitCardClientProps {
   status: DisplayBenefitStatus;
@@ -131,6 +132,13 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
   const isNotUsable = status.isNotUsable;
   const hasPartialProgress = usedAmount > 0 && !isCompleted;
   const statusLabel = isScheduled ? 'Scheduled' : isCompleted ? 'Claimed' : isNotUsable ? 'Not usable' : hasPartialProgress ? 'Partially used' : 'Open';
+  const card = status.benefit.creditCard;
+  const cardIdentityDetails = card
+    ? [
+        card.nickname?.trim() ? card.name : null,
+        card.lastFourDigits ? `Last ${card.lastFourDigits.length}: ${'•'.repeat(card.lastFourDigits.length)}${card.lastFourDigits}` : null,
+      ].filter(Boolean)
+    : [];
 
   return (
     <div className={`group relative overflow-hidden rounded-lg border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
@@ -241,25 +249,33 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
 
           {/* Card info - more compact on mobile */}
           <div className="space-y-1.5 sm:pl-11">
-            {status.benefit.creditCard ? (
+            {card ? (
               // Regular credit card benefit
               <>
                 <div className="flex items-start text-sm text-gray-600 dark:text-gray-300">
                   <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                   </svg>
-                  <span className="min-w-0 font-medium leading-snug break-words" title={status.benefit.creditCard.displayName}>
-                    {status.benefit.creditCard.displayName}
+                  <span className="min-w-0 font-medium leading-snug break-words" title={card.displayName}>
+                    {card.displayName}
                   </span>
                   <span className="mx-2 hidden sm:inline">•</span>
-                  <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">{status.benefit.creditCard.issuer}</span>
+                  <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">{card.issuer}</span>
                 </div>
+                {cardIdentityDetails.length > 0 && (
+                  <div className="flex items-start text-xs text-gray-500 dark:text-gray-400">
+                    <svg className="h-4 w-4 mr-2 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586l6.257-6.257A6 6 0 1121 9z" />
+                    </svg>
+                    <span>{cardIdentityDetails.join(' • ')}</span>
+                  </div>
+                )}
                 {/* Show issuer on mobile in a separate line for better readability */}
                 <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 sm:hidden">
                   <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h4a1 1 0 011 1v5m-6 0V9a1 1 0 011-1h4a1 1 0 011 1v11" />
                   </svg>
-                  <span>{status.benefit.creditCard.issuer}</span>
+                  <span>{card.issuer}</span>
                 </div>
               </>
             ) : (
@@ -286,23 +302,34 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
             </div>
           </div>
 
-          {/* Usage Guide Link */}
-          {status.usageWaySlug && (
-            <div className="sm:pl-11">
+          <div className="space-y-2 sm:pl-11">
+            {status.usageWaySlug && (
               <Link
                 href={`/benefits/how-to-use/${status.usageWaySlug}`}
-                className="inline-flex items-center text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors"
+                className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:border-amber-300 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-900/30"
               >
-                <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                How to use this benefit
-                <svg className="h-3 w-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  <span className="truncate">Use guide: qualifies, timing, caveats</span>
+                </span>
+                <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
-            </div>
-          )}
+            )}
+            <SuggestCorrectionLink
+              subject={`Correction: ${status.benefit.description}`}
+              context={[
+                `Benefit: ${status.benefit.description}`,
+                `Category: ${status.benefit.category}`,
+                card ? `Card: ${card.displayName} (${card.name}, ${card.issuer})` : 'Card: Custom benefit',
+              ].join('\n')}
+              label="Suggest benefit fix"
+              className="text-xs"
+            />
+          </div>
 
           {/* Action buttons - full width on mobile, fixed width on larger screens */}
           <div className="sm:pl-11">

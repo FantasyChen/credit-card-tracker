@@ -40,6 +40,18 @@ announcement-state/ Local ignored state for one-time announcement batches
 - Build: `npx next build`
 - DB check: `npm run db:check`
 
+## Public Narrative
+- The published Nitan / US Card Forum 2.0 announcement positions Perks Reminder around a major UI refresh, especially mobile responsiveness and logged-in usability.
+- Benefit Usage Guides are now part of the public 2.0 story: they summarize forum/community playbooks, common DP-style advice, and practical steps for using recurring credits before expiration.
+- A native iOS app is publicly framed as a possible future roadmap item after validating interest in the 2.0 web/PWA experience.
+- Real logged-in 2.0 screenshots for forum/social use live in `screenshots/perks-reminder-2.0-prod/` and use the dedicated production demo account `demo+screenshots@perks-reminder.com`.
+
+## Product Strategy
+- The front-loaded product priorities from Nitan competitor research are: worktree hygiene, duplicate-card tracking audit/fix, deeper Benefit Usage Guides, visible community data correction, native iOS companion planning, then bulk card onboarding.
+- Punt free-night/certificate dashboard, monthly digest/calendar reminders, and best-card-by-category until the front-loaded priorities are handled.
+- Keep Perks Reminder's wedge centered on open-source cross-platform tracking plus practical usage guidance; avoid trying to out-native Reward Radar/CardFans or out-email PerkPerks in one step.
+- If iOS work starts, make widgets, push notifications, and quick completion the native value rather than rebuilding the whole web app first.
+
 ## Learned Patterns
 - Resend free transactional quota is recipient-based and 100/day; one email to 481 users consumes 481 quota units, and sent/received emails can both count.
 - The local Resend API key is send-only; it cannot list sent emails, so batch scripts need local audit state or deterministic resume points.
@@ -51,3 +63,7 @@ announcement-state/ Local ignored state for one-time announcement batches
 - **Benefit Cycle Materialization:** `src/lib/benefit-cycle-materialization.ts` owns turning a Benefit plus card/start-date context into normalized BenefitStatus rows. Use it from cron, card creation, migrations, and custom benefit creation when status rows are needed.
 - **Benefit Status Transitions:** `src/lib/benefit-status-transitions.ts` owns completion, partial completion, reset, direct amount edit, and not-usable state transitions. Server actions should call it before persisting BenefitStatus changes.
 - **Notification Digest Pipeline:** `src/lib/notification-digest.ts` owns notification candidate selection, per-user reminder windows, digest assembly, quota checks, batching, and delivery; the cron route should stay limited to auth/date parsing and response handling.
+- **Duplicate Card Identity:** Dashboard filters, grouping, and ROI should use the physical `CreditCard.id` plus display names, not only the product name. Product-name grouping collapses multiple Aspire/Platinum copies and hides which credit belongs to which card.
+- **Community Corrections:** Card, benefit, and guide surfaces should expose contextual correction links and provenance/last-updated signals. Maintainer workflow lives in `docs/community-data-quality-loop.md`; template changes still need seed plus existing-user migration/status creation.
+- **Bulk Onboarding:** The first power-user bulk add flow lives on `/cards/new` and parses shorthand such as `plat x2, gold, csr, aspire x3`. Owner is currently folded into the saved nickname/display label rather than a separate household-owner schema field.
+- **iOS Companion Direction:** `docs/ios-support.md` is the source for native iOS planning. Keep iOS focused on widgets, push notifications, quick mark-complete, and glanceable expiring benefits.

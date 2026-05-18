@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { BenefitUsageWay } from '@/generated/prisma';
 import PageHeader from '@/components/ui/PageHeader';
+import SuggestCorrectionLink from '@/components/SuggestCorrectionLink';
 
 export const metadata: Metadata = {
   title: 'How to Use Credit Card Benefits - Complete Guide',
@@ -93,12 +94,28 @@ export default async function HowToUseIndexPage() {
                         </div>
                       </div>
                     )}
+
+                    <div className="mb-4 flex flex-wrap gap-1.5">
+                      {['qualifies', 'trigger', 'timing', 'caveats', 'avoid'].map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
                     
-                    <div className="flex items-center text-indigo-600 dark:text-indigo-400 font-medium text-sm group-hover:translate-x-1 transition-transform">
-                      Read guide
-                      <svg className="h-4 w-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center text-indigo-600 dark:text-indigo-400 font-medium text-sm group-hover:translate-x-1 transition-transform">
+                        Read guide
+                        <svg className="h-4 w-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Updated {way.updatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
                     </div>
                   </div>
                 </Link>
@@ -106,6 +123,21 @@ export default async function HowToUseIndexPage() {
             </div>
           </section>
         ))}
+      </div>
+
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Community-maintained playbooks</h2>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+              Guides are written from issuer terms, public data points, and repeatable community patterns. If something changed, send the card, benefit, and source.
+            </p>
+          </div>
+          <SuggestCorrectionLink
+            subject="Correction: benefit usage guide library"
+            context="Page: /benefits/how-to-use"
+          />
+        </div>
       </div>
 
       {/* CTA Section */}

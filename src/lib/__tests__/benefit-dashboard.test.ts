@@ -97,7 +97,7 @@ describe('buildBenefitDashboardProjection', () => {
     id: string,
     overrides: Partial<RawDisplayBenefitStatus> = {}
   ): RawDisplayBenefitStatus {
-    const benefitOverrides = overrides.benefit ?? {};
+    const benefitOverrides = (overrides.benefit ?? {}) as Partial<RawDisplayBenefitStatus['benefit']>;
     const hasCreditCardOverride = Object.prototype.hasOwnProperty.call(benefitOverrides, 'creditCard');
 
     return {
@@ -180,6 +180,51 @@ describe('buildBenefitDashboardProjection', () => {
     expect(projection.upcomingBenefits[0].benefit.creditCard?.displayName).toBe('Test Card');
     expect(projection.upcomingBenefits[0].usageWaySlug).toBe('monthly-travel-credit');
     expect(projection.cardLevelRoi.map((row) => row.cardName)).toContain(CUSTOM_BENEFITS_CARD_NAME);
+  });
+
+  it('keeps duplicate-card ROI separate by physical card identity', () => {
+    const secondCard = {
+      ...card,
+      id: 'card-2',
+      lastFourDigits: '5678',
+    };
+
+    const projection = buildBenefitDashboardProjection({
+      statuses: [
+        rawStatus('card-1-completed', {
+          isCompleted: true,
+          usedAmount: 100,
+          benefit: { creditCard: card, creditCardId: 'card-1', maxAmount: 100 } as never,
+        }),
+        rawStatus('card-2-completed', {
+          isCompleted: true,
+          usedAmount: 25,
+          benefit: { creditCard: secondCard, creditCardId: 'card-2', maxAmount: 100 } as never,
+        }),
+      ],
+      userCards: [card, secondCard],
+      usageWays: [],
+      predefinedCardFees: [{ name: 'Test Card', annualFee: 95 }],
+      now: date('2026-05-15'),
+    });
+
+    expect(projection.totalAnnualFees).toBe(190);
+    expect(projection.cardLevelRoi).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          cardId: 'card-1',
+          cardDisplayName: 'Test Card (••••1234)',
+          claimedValue: 100,
+          annualFee: 95,
+        }),
+        expect.objectContaining({
+          cardId: 'card-2',
+          cardDisplayName: 'Test Card (••••5678)',
+          claimedValue: 25,
+          annualFee: 95,
+        }),
+      ])
+    );
   });
 });
 

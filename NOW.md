@@ -1,30 +1,16 @@
 # Now
 
 ## Current Focus
-Triage the active worktree and choose the next focused slice before making more code changes.
+Post-2.0 roadmap implementation is complete through P5, with focused tests and browser screenshots captured.
 
 ## Active Blockers
-- The worktree has broad uncommitted changes across UI polish, card image ingestion, seed/catalog data, config, and migrations.
-- `PLAN.md` previously tracked an older domain-migration announcement batch while `NOW.md` pointed at the next competitor-roadmap slice; that split made the active lane unclear.
+- Full `tsc --noEmit` still fails on preexisting Jest mock typing issues in older `api/user-cards` and `benefit-migration` tests.
+- Native Node 24 cannot load local signed native modules (`@next/swc-darwin-arm64`, `lightningcss-darwin-arm64`); use the bundled runtime Node plus `NEXT_TEST_WASM_DIR=node_modules/@next/swc-wasm-nodejs` for local browser/test verification.
+- Existing untracked `screenshots/` assets remain parked from the forum screenshot task.
 
 ## Immediate Next Step
-Review the current worktree buckets, decide whether to validate/finish the existing changes first or park them, then choose one next slice.
-
-Recommended order:
-1. Validate and finish the existing uncommitted work.
-2. Then choose between the free-night/certificate dashboard slice and the remaining domain-migration announcement batch.
+Review the implementation diff, then decide whether to commit as one roadmap slice or split into duplicate-card, guides/data-quality, docs, and bulk-onboarding commits.
 
 ## Session State
-- Last modified: 2026-05-16
-- Context cleanup only; no application code was changed in this pass.
-- Existing dirty worktree was preserved as-is.
-
-## Worktree Buckets
-- Dashboard/tracker focus: `src/components/BenefitsDisplayClient.tsx`, dashboard tests, and related helper files from the completed tracker focus pack.
-- UI consistency pass: auth, cards, loyalty, settings, home page, navbar, empty states, and new shared UI components.
-- Card image ingestion/catalog: `scripts/download-card-image.js`, new image utility/tests, card image manifest, image format swaps, and seed changes.
-- Config/migration hygiene: Jest/Next config, dev DB script, and two migration SQL edits.
-
-## Parking Lot
-- Domain migration announcement: previous plan says 195 sent and 286 remaining. Resume only with a dry run, capped sends, and `announcement-state/` as the source of truth.
-- Competitor roadmap: next proposed product slice is a free-night/certificate dashboard, pending approval/design.
+- Last modified: 2026-05-17
+- Product changes in progress: duplicate-card ROI/filtering, guide discoverability, correction links/provenance, iOS companion plan, and bulk card onboarding.

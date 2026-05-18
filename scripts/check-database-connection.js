@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import dotenv from 'dotenv';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 dotenv.config();
 
@@ -19,10 +19,15 @@ function mask(url) {
   return url ? url.replace(/\/\/[^@]+@/, '//****@') : '(not set)';
 }
 
-function checkMigrationStatus(url, label) {
+function directUrlFor(url, explicitDirectUrl) {
+  if (explicitDirectUrl) return explicitDirectUrl;
+  return url?.replace('-pooler.', '.');
+}
+
+function checkMigrationStatus(url, label, directUrl) {
   try {
-    const output = execSync(`npx prisma migrate status`, {
-      env: { ...process.env, DATABASE_URL: url },
+    const output = execFileSync('npx', ['prisma', 'migrate', 'status'], {
+      env: { ...process.env, DATABASE_URL: url, DIRECT_URL: directUrl },
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -54,13 +59,15 @@ function checkMigrationStatus(url, label) {
 console.log(`${colors.bold}${colors.blue}🔍 Database Connection Check${colors.reset}\n`);
 
 const prodUrl = process.env.DATABASE_URL;
+const prodDirectUrl = directUrlFor(prodUrl, process.env.DIRECT_URL);
 const devUrl = process.env.DATABASE_URL_DEV;
+const devDirectUrl = directUrlFor(devUrl);
 
 // --- Production ---
 console.log(`${colors.bold}📦 Production Database${colors.reset}`);
 if (prodUrl) {
   console.log(`  URL: ${mask(prodUrl)}`);
-  checkMigrationStatus(prodUrl, 'Production');
+  checkMigrationStatus(prodUrl, 'Production', prodDirectUrl);
 } else {
   console.log(`  ${colors.red}❌ DATABASE_URL not set${colors.reset}`);
 }
@@ -71,7 +78,7 @@ console.log('');
 console.log(`${colors.bold}🧪 Development Database${colors.reset}`);
 if (devUrl) {
   console.log(`  URL: ${mask(devUrl)}`);
-  const devOk = checkMigrationStatus(devUrl, 'Development');
+  const devOk = checkMigrationStatus(devUrl, 'Development', devDirectUrl);
   if (!devOk) {
     console.log(`  ${colors.dim}💡 Run: npm run db:dev:migrate${colors.reset}`);
   }

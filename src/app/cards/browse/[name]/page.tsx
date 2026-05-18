@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { BenefitFrequency } from '@/generated/prisma';
 import CardImageWell from '@/components/ui/CardImageWell';
+import SuggestCorrectionLink from '@/components/SuggestCorrectionLink';
 
 interface PageProps {
   params: Promise<{ name: string }>;
@@ -222,6 +223,19 @@ export default async function CardDetailPage({ params }: PageProps) {
                 </svg>
                 Add to My Cards
               </Link>
+              <SuggestCorrectionLink
+                subject={`Correction: ${card.name}`}
+                context={`Card: ${card.name}\nIssuer: ${card.issuer}\nCatalog page: /cards/browse/${encodeURIComponent(card.name)}`}
+                label="Suggest card fix"
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              />
+            </div>
+
+            <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
+              <div className="font-medium text-gray-900 dark:text-white">Catalog provenance</div>
+              <div className="mt-1">
+                Last updated {card.updatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Benefits are community-maintained from issuer terms and public data points.
+              </div>
             </div>
           </div>
         </div>
@@ -269,6 +283,14 @@ export default async function CardDetailPage({ params }: PageProps) {
                             Annual value: ${calculateAnnualValue(benefit.maxAmount, benefit.frequency).toLocaleString()}
                           </p>
                         )}
+                        <div className="mt-2">
+                          <SuggestCorrectionLink
+                            subject={`Correction: ${card.name} - ${benefit.description}`}
+                            context={`Card: ${card.name}\nIssuer: ${card.issuer}\nBenefit: ${benefit.description}`}
+                            label="Suggest benefit fix"
+                            className="text-xs"
+                          />
+                        </div>
                       </div>
                       
                       {benefit.usageWay && (

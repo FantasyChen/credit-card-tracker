@@ -37,3 +37,25 @@ npm run ios:open
 ```
 
 Phase 2 validates that the iOS project can be generated and synchronized. Before App Store submission, validate OAuth provider behavior in the native WebView and decide whether to move from the hosted shell to a bundled static/mobile-specific flow.
+
+## Phase 3: Focused Native Companion
+
+Do not rebuild the whole product in Swift first. The web/PWA remains the canonical app, data model, guide library, and card onboarding surface. Native iOS should add value where the web app cannot:
+
+1. **Glanceable widgets**: home/lock screen widgets for expiring benefits, unused monthly value, and next reset.
+2. **Push notifications**: benefit-expiration and new-cycle alerts that mirror email preferences without requiring users to live in email.
+3. **Quick mark-complete**: tap a widget or notification action, authenticate if needed, and mark a specific `BenefitStatus` as complete.
+4. **Fast benefit detail**: open directly into the relevant web guide or benefit row so "what qualifies?" is one tap away.
+
+Smallest first milestone:
+
+- Ship a TestFlight-only Capacitor companion that signs in, opens the hosted `/benefits` view, registers an APNs device token, and shows one native widget fed by a small authenticated API endpoint returning the next 5 open benefits.
+- Keep mutation scope to one server action/API path: mark a `BenefitStatus` complete by ID after confirming the status belongs to the signed-in user.
+
+Technical risks:
+
+- OAuth/session behavior inside the Capacitor WebView may require provider redirect URI updates and cookie-domain checks.
+- APNs token storage needs a new table keyed by user/device, plus unsubscribe/revocation handling.
+- Widget data should avoid storing sensitive card details locally; prefer display name, amount, due date, and a signed deep link.
+- Quick actions must use existing transition logic from `src/lib/benefit-status-transitions.ts` so native and web completion behavior cannot drift.
+- App Store review may object if the shell feels too thin, so the first native submission should include a real widget and notification workflow rather than only a web wrapper.

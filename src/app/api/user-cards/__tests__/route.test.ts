@@ -30,6 +30,8 @@ jest.mock('@/lib/prisma', () => ({
 
 const mockGetServerSession = jest.mocked(getServerSession);
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const creditCardMock = mockPrisma.creditCard as unknown as { findMany: jest.Mock };
+const predefinedCardMock = mockPrisma.predefinedCard as unknown as { findMany: jest.Mock };
 
 describe('GET /api/user-cards', () => {
   beforeEach(() => {
@@ -44,12 +46,12 @@ describe('GET /api/user-cards', () => {
 
     expect(response.status).toBe(401);
     expect(data).toEqual({ error: 'Unauthorized' });
-    expect(mockPrisma.creditCard.findMany).not.toHaveBeenCalled();
+    expect(creditCardMock.findMany).not.toHaveBeenCalled();
   });
 
   it('returns 200 and user cards when authenticated', async () => {
     mockGetServerSession.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrisma.creditCard.findMany.mockResolvedValue([
+    creditCardMock.findMany.mockResolvedValue([
       {
         id: 'card-1',
         name: 'Test Card',
@@ -60,7 +62,7 @@ describe('GET /api/user-cards', () => {
         updatedAt: new Date(),
       },
     ]);
-    mockPrisma.predefinedCard.findMany.mockResolvedValue([
+    predefinedCardMock.findMany.mockResolvedValue([
       { name: 'Test Card', issuer: 'Test', imageUrl: 'https://example.com/img.png' },
     ]);
 
@@ -76,7 +78,7 @@ describe('GET /api/user-cards', () => {
       userId: 'user-1',
       imageUrl: 'https://example.com/img.png',
     });
-    expect(mockPrisma.creditCard.findMany).toHaveBeenCalledWith(
+    expect(creditCardMock.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: 'user-1' },
         include: { benefits: true },
@@ -86,8 +88,8 @@ describe('GET /api/user-cards', () => {
 
   it('returns 200 and empty array when user has no cards', async () => {
     mockGetServerSession.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrisma.creditCard.findMany.mockResolvedValue([]);
-    mockPrisma.predefinedCard.findMany.mockResolvedValue([]);
+    creditCardMock.findMany.mockResolvedValue([]);
+    predefinedCardMock.findMany.mockResolvedValue([]);
 
     const response = await GET();
     const data = await response.json();
@@ -98,7 +100,7 @@ describe('GET /api/user-cards', () => {
 
   it('returns 500 when database throws', async () => {
     mockGetServerSession.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrisma.creditCard.findMany.mockRejectedValue(new Error('DB error'));
+    creditCardMock.findMany.mockRejectedValue(new Error('DB error'));
 
     const response = await GET();
     const data = await response.json();

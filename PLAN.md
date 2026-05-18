@@ -1,56 +1,90 @@
-# Workspace Triage and Next Steps
+# Post-2.0 Product Priorities
 
 ## Goal
-Make the current repository state easy to reason about so the next implementation slice can be chosen deliberately.
+Use the Nitan competitor research to choose the next product slices that strengthen Perks Reminder's clearest wedge: open-source, cross-platform benefit tracking that explains how to actually use expiring value.
 
-## Current State
-- The tracker focus pack is documented as complete.
-- The worktree is dirty with broad uncommitted changes that should be preserved, not reverted.
-- The previous domain migration announcement plan is parked, not the active coding lane.
+## Progress
+- [x] Identify closest Nitan-built alternatives: Reward Radar, CardFans, Perkmon/Perkly, PerkPerks, AMEX Benefit Dashboard, Card Verdict, Notion CC Tracker, and Loyalty Hub.
+- [x] Compare their posts/comments against Perks Reminder's current positioning.
+- [x] Rank next improvements by strategic impact, user pain, and fit with the 2.0 public narrative.
+- [x] Before coding, review the current dirty worktree and decide what to preserve, stage, or park.
+- [x] Implement the first selected slices through P5.
+- [x] Run focused validation and capture browser screenshots.
+- [ ] Resolve preexisting whole-project TypeScript test mock errors separately if a clean `tsc --noEmit` gate is needed.
 
-## Active Cleanup Tasks
-- [x] Read `NOW.md`, `CONTEXT.md`, and active `PLAN.md`.
-- [x] Inspect the dirty worktree at a high level.
-- [x] Reconcile `NOW.md` and `PLAN.md` around a single active focus.
-- [ ] Review the dirty worktree by bucket and decide what should be finished, tested, staged, parked, or split.
-- [ ] Run focused validation for the bucket selected as the next active work.
+## Near-Term Priority Roadmap
 
-## Worktree Buckets To Review
-- **UI consistency pass:** multiple App Router pages plus shared components now use tighter page headers, card surfaces, and button sizing.
-- **Card image ingestion/catalog:** image download script has validation/manifest support; card assets changed from PNG to JPG/AVIF for two Chase cards; new manifest and image utility files exist.
-- **Seed/catalog expansion:** `prisma/seed.ts` has large catalog/guide changes and should be reviewed separately from UI work.
-- **Config/migration hygiene:** `jest.config.mjs`, `next.config.ts`, `scripts/with-dev-db.js`, and two migration SQL files changed.
-- **Tracker focus pack residue:** dashboard/test wording changed from "earned" to "claimed"; ensure this belongs with the completed tracker focus pack or fold it into UI polish.
+### P0: Worktree Hygiene Before Product Work
+Finish or park the existing broad uncommitted work before starting another feature. The current tree has screenshot assets plus prior UI/catalog/config changes, so starting a new product slice without sorting it will make review and rollback painful.
 
-## Recommended Next Actions
-1. Review and validate the existing uncommitted changes before starting new product work.
-2. Split the dirty work into coherent commits or at least coherent review buckets.
-3. After the tree is understandable, choose one active next slice:
-   - free-night/certificate dashboard slice, or
-   - remaining domain-migration announcement batch.
+Success signal: `git status --short` is understandable by bucket, and the next implementation touches only the selected product slice.
 
-## Parked: Domain Migration Announcement
+Status: complete. Preexisting changes were limited to context docs plus parked forum screenshot assets in `screenshots/perks-reminder-2.0-prod/`. Product edits started from a clean application-code baseline.
 
-### Goal
-All existing users receive one clear announcement that CouponCycle is now Perks Reminder, with no duplicate sends and a recoverable batch process.
+### P1: Audit Duplicate Card Identity and Per-Card Tracking
+Double-check whether duplicate-card tracking is already fully handled. Verify card nickname, last four/five, owner/source labels, benefit cards, filters, bulk actions, ROI views, screenshots, and mobile layouts. If gaps remain, fix those before adding new product surface area.
 
-### Previous Progress
-- [x] Create migration announcement email content.
-- [x] Send one live smoke test to `fantasychen2016@gmail.com`.
-- [x] Start production send through Resend from `notifications@perks-reminder.com`.
-- [x] Stop sending after Resend returned `daily_quota_exceeded`.
-- [x] Save sent and remaining recipient lists in `announcement-state/`.
-- [ ] Send remaining users in daily capped batches after quota resets.
-- [ ] Re-audit remaining list after each batch.
+Why now: The user suspects this may already be done, but competitor comments show duplicate-card ambiguity is one of the fastest ways to lose power users. Perkmon tried benefit merging and later moved back toward clearer per-card tracking.
 
-### Previous Findings
-- Intended recipient count was 481 after excluding `@example.com` test accounts.
-- First quota failure was `mlee092161@gmail.com`.
-- Local state recorded 195 sent and 286 remaining.
-- Resend free plan quota is recipient-based, so daily quota can be consumed quickly by production announcements.
+Success signal: a user with four Aspire cards can immediately tell which quarterly flight credits are unused, on both desktop and mobile.
 
-### Resume Rules
-- Use `announcement-state/migration-announcement-remaining.txt` as the next-batch source.
-- Use `--limit` for future batches so normal transactional reminders still have quota headroom.
-- Stop immediately on `daily_quota_exceeded`.
-- Dry run and report recipient count before any live send.
+Status: implemented. Dashboard grouping, card filters, search, and ROI now use per-card IDs/display names instead of collapsing duplicate products by raw card name. Benefit cards show nickname/display name, underlying product, issuer, and last-four/five where available.
+
+### P2: Make Benefit Usage Guides the Core Wedge
+Deepen the guide system so every important benefit answers: what qualifies, how to trigger it, timing/posting expectations, common DP caveats, and what to avoid. Surface guide links more prominently inside dashboard and reminders.
+
+Why now: Most competitors track checkboxes; few explain how to use benefits. CardFans' later Nitan tips feature validates that community playbooks are valuable.
+
+Success signal: a user can go from "I have this credit" to "I know exactly how to use it" without leaving Perks Reminder.
+
+Status: implemented. Dashboard cards now surface stronger guide links, the guide index advertises practical guide coverage, and guide detail pages show the checklist users should expect: what qualifies, trigger, timing, caveats, and what to avoid.
+
+### P3: Community Data Quality Loop
+Make data quality visible and easier to improve: suggest corrections on every card/benefit/guide, show last-updated dates, and keep admin review/migration flows reliable for existing users.
+
+Why now: Every competitor thread contains card/benefit/rate corrections. Users trust tools that visibly handle errors and update existing accounts, not just new templates.
+
+Success signal: corrections become an obvious workflow, and existing users receive updated benefits/statuses without manual support.
+
+Status: implemented. Card, benefit, and guide surfaces now include correction links with contextual email templates. Catalog and guide pages show last-updated/provenance signals. The maintainer workflow is documented in `docs/community-data-quality-loop.md`.
+
+### P4: Native iOS as a Focused Companion, Not a Full Rewrite
+If building iOS, prioritize native-only value: widgets, push notifications, quick mark-complete, and glanceable expiring benefits. Keep the web/PWA as the canonical product and data model.
+
+Why now: Reward Radar's strongest emotional hook is widgets; CardFans/Loyalty Hub show native push and local device affordances matter. A native shell that merely mirrors the web UI is less differentiated.
+
+Success signal: the iOS app makes the existing web product more useful on the lock/home screen.
+
+Status: planned. `docs/ios-support.md` now records the focused companion plan: widgets, push, quick mark-complete, smallest TestFlight milestone, and technical risks.
+
+### P5: Bulk Card Onboarding for Power Users
+Build a fast add-cards flow for Nitan-style users with many cards. Accept abbreviations and counts, for example `plat x2, gold, csr, aspire x3`, then let users set owner/nickname/last-four before confirming.
+
+Why after P1-P4: Perkmon and PerkPerks both received strong feedback that adding many cards one-by-one is a conversion blocker, but the current strategy is to first lock down the existing core wedge and data trust story.
+
+Success signal: a user with 20 cards can create a realistic wallet in under two minutes without visiting 20 separate add-card forms.
+
+Status: first shippable version implemented. `/cards/new` accepts shorthand such as `plat x2, gold, csr, aspire x3`, expands counts, lets users review matches, and captures owner/nickname/last digits before one bulk submit.
+
+## Punted Ideas
+
+- **Free Night / Certificate Dashboard:** Still valuable, but punted for now despite strong competitor signal. Revisit after guides/data quality/iOS direction are clearer.
+- **Monthly Digest and Calendar Reminder Mode:** Useful and validated by PerkPerks, but lower priority than guide quality, correction workflows, and native companion planning.
+- **Best Card by Category:** Valuable but crowded; Reward Radar and PerkPerks compete directly here. Revisit only after the core benefit-tracking wedge is stronger.
+
+## Findings
+- Nitan users repeatedly reward tools that are fast, mobile-native feeling, and low-friction at setup.
+- The crowded market does not eliminate opportunity; users explicitly say each tool solves a different slice.
+- The most common complaint categories are missing cards, inaccurate benefit/rate data, duplicate-card ambiguity, poor bulk onboarding, and unclear reset/completion behavior.
+- Users with many cards need owner/nickname/last-four and sometimes P1/P2-style grouping.
+- Valuation is subjective and contentious. Keep claimed ROI separate from subjective "true value" unless the assumptions are editable.
+- Email-only and calendar-based reminders appeal to users who do not want another app or constant push notifications.
+
+## Decisions
+- Treat "tracking plus how to use" as the primary differentiation, not bank-link automation or broad card recommendation.
+- Front-load product work in this order: worktree hygiene, duplicate-card tracking audit/fix, Benefit Usage Guides, community data quality, native iOS companion planning, then bulk card onboarding.
+- Punt free-night/certificate dashboard, monthly digest/calendar reminders, and best-card-by-category until the front-loaded priorities are handled.
+- Keep native iOS framed as a companion for widgets/push/quick actions rather than a replacement for the cross-platform web app.
+
+## Parked
+- Domain migration announcement remains paused. If resumed, use `announcement-state/migration-announcement-remaining.txt`, dry run first, send capped batches, and stop on `daily_quota_exceeded`.

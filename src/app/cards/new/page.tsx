@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useTransition } from 'react'; // Import useTransition
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
-import { addCardAction } from './actions'; // Import the action from the new file
+import { addCardAction, bulkAddCardsAction } from './actions'; // Import the actions from the new file
 import { searchCards, type CardWithBenefits } from '@/lib/cardSearchUtils';
 import { isAmexCard } from '@/lib/cardDisplayUtils';
+import { parseBulkCardInput } from '@/lib/bulk-card-parser';
 import { Tooltip } from '@/components/ui/Tooltip';
 import CardImageWell from '@/components/ui/CardImageWell';
 import PageHeader from '@/components/ui/PageHeader';
@@ -19,6 +20,17 @@ const months = [
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 10 }, (_, i) => currentYear - i); // Last 10 years
+
+interface BulkReviewRow {
+  rowId: string;
+  input: string;
+  cardId: string;
+  owner: string;
+  nickname: string;
+  lastFourDigits: string;
+  candidates: CardWithBenefits[];
+  error?: string;
+}
 
 // --- Sub-component for the card form with its own transition state ---
 function PredefinedCardForm({ card, matchedFields }: { card: CardWithBenefits; matchedFields?: string[] }) {
@@ -221,6 +233,8 @@ export default function AddNewCardPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true); // Loading state for fetching predefined cards
   const [groupByIssuer, setGroupByIssuer] = useState(true); // Toggle for grouping by issuer
+  const [bulkInput, setBulkInput] = useState('plat x2, gold, csr, aspire x3');
+  const [bulkRows, setBulkRows] = useState<BulkReviewRow[]>([]);
 
 
   // Fetch data using useEffect
@@ -247,6 +261,40 @@ export default function AddNewCardPage() {
   // Enhanced search logic
   const searchResults = searchCards(predefinedCards, searchTerm);
   const filteredCards = searchResults.map(result => result.card);
+  const cardById = React.useMemo(
+    () => new Map(predefinedCards.map((card) => [card.id, card])),
+    [predefinedCards]
+  );
+  const bulkPayload = React.useMemo(() => {
+    return JSON.stringify(
+      bulkRows
+        .filter((row) => row.cardId)
+        .map((row) => ({
+          predefinedCardId: row.cardId,
+          owner: row.owner,
+          nickname: row.nickname,
+          lastFourDigits: row.lastFourDigits,
+        }))
+    );
+  }, [bulkRows]);
+
+  const parseBulkInput = () => {
+    const parsed = parseBulkCardInput(bulkInput, predefinedCards);
+    setBulkRows(parsed.map((item, index) => ({
+      rowId: `${index}-${item.input}-${item.copyIndex}`,
+      input: item.input,
+      cardId: item.matchedCard?.id ?? '',
+      owner: '',
+      nickname: item.totalCopies > 1 ? `${item.input} ${item.copyIndex}` : '',
+      lastFourDigits: '',
+      candidates: item.candidates as CardWithBenefits[],
+      error: item.error,
+    })));
+  };
+
+  const updateBulkRow = (rowId: string, updates: Partial<BulkReviewRow>) => {
+    setBulkRows((rows) => rows.map((row) => row.rowId === rowId ? { ...row, ...updates } : row));
+  };
 
   // Group cards by issuer if groupByIssuer is true
   const groupedCards = React.useMemo(() => {
@@ -278,6 +326,136 @@ export default function AddNewCardPage() {
         title="Select a Card to Add"
         description="Search the predefined catalog, add optional identifiers, and Perks Reminder will create the trackable benefits."
       />
+
+      <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4 shadow-sm dark:border-indigo-800 dark:bg-indigo-950/20">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-950 dark:text-white">Bulk add cards</h2>
+            <p className="mt-1 max-w-3xl text-sm text-gray-600 dark:text-gray-300">
+              Paste shorthand like <span className="font-mono">plat x2, gold, csr, aspire x3</span>, review the matches, then add owner labels, nicknames, and last digits before confirming.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={parseBulkInput}
+            disabled={isLoading || bulkInput.trim().length === 0}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Parse wallet
+          </button>
+        </div>
+        <textarea
+          value={bulkInput}
+          onChange={(event) => setBulkInput(event.target.value)}
+          rows={3}
+          className="mt-4 w-full rounded-lg border border-indigo-200 bg-white p-3 text-sm text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 dark:border-indigo-800 dark:bg-gray-900 dark:text-white"
+          placeholder="plat x2, gold, csr, aspire x3"
+        />
+
+        {bulkRows.length > 0 && (
+          <form action={bulkAddCardsAction} className="mt-4 space-y-3" autoComplete="off">
+            <input type="hidden" name="bulkCards" value={bulkPayload} />
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+              <div className="grid grid-cols-12 gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold uppercase tracking-normal text-gray-500 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-400">
+                <div className="col-span-12 sm:col-span-4">Matched card</div>
+                <div className="col-span-4 sm:col-span-2">Owner</div>
+                <div className="col-span-4 sm:col-span-3">Nickname</div>
+                <div className="col-span-4 sm:col-span-2">Last digits</div>
+                <div className="hidden sm:block sm:col-span-1">Status</div>
+              </div>
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                {bulkRows.map((row) => {
+                  const selectedCard = cardById.get(row.cardId);
+                  const candidateOptions = row.candidates.length > 0 ? row.candidates : predefinedCards;
+                  const maxLength = selectedCard && isAmexCard(selectedCard.issuer) ? 5 : 4;
+                  const pattern = selectedCard && isAmexCard(selectedCard.issuer) ? '[0-9]{4,5}' : '[0-9]{4}';
+
+                  return (
+                    <div key={row.rowId} className="grid grid-cols-12 gap-2 px-3 py-3">
+                      <div className="col-span-12 sm:col-span-4">
+                        <label className="sr-only" htmlFor={`bulk-card-${row.rowId}`}>Matched card for {row.input}</label>
+                        <select
+                          id={`bulk-card-${row.rowId}`}
+                          value={row.cardId}
+                          onChange={(event) => updateBulkRow(row.rowId, { cardId: event.target.value, error: undefined })}
+                          className="w-full rounded-md border border-gray-300 px-2 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                          required
+                        >
+                          <option value="">Choose match for &ldquo;{row.input}&rdquo;</option>
+                          {candidateOptions.map((card) => (
+                            <option key={card.id} value={card.id}>{card.name}</option>
+                          ))}
+                        </select>
+                        {selectedCard && (
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{selectedCard.issuer}</p>
+                        )}
+                      </div>
+                      <div className="col-span-4 sm:col-span-2">
+                        <label className="sr-only" htmlFor={`bulk-owner-${row.rowId}`}>Owner</label>
+                        <input
+                          id={`bulk-owner-${row.rowId}`}
+                          value={row.owner}
+                          onChange={(event) => updateBulkRow(row.rowId, { owner: event.target.value })}
+                          maxLength={50}
+                          placeholder="P1"
+                          autoComplete="off"
+                          className="w-full rounded-md border border-gray-300 px-2 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                        />
+                      </div>
+                      <div className="col-span-4 sm:col-span-3">
+                        <label className="sr-only" htmlFor={`bulk-nickname-${row.rowId}`}>Nickname</label>
+                        <input
+                          id={`bulk-nickname-${row.rowId}`}
+                          value={row.nickname}
+                          onChange={(event) => updateBulkRow(row.rowId, { nickname: event.target.value })}
+                          maxLength={50}
+                          placeholder="Travel, sock drawer..."
+                          autoComplete="off"
+                          className="w-full rounded-md border border-gray-300 px-2 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                        />
+                      </div>
+                      <div className="col-span-4 sm:col-span-2">
+                        <label className="sr-only" htmlFor={`bulk-digits-${row.rowId}`}>Last digits</label>
+                        <input
+                          id={`bulk-digits-${row.rowId}`}
+                          value={row.lastFourDigits}
+                          onChange={(event) => updateBulkRow(row.rowId, {
+                            lastFourDigits: event.target.value.replace(/[^0-9]/g, '').slice(0, maxLength),
+                          })}
+                          maxLength={maxLength}
+                          pattern={pattern}
+                          placeholder={maxLength === 5 ? '12345' : '1234'}
+                          autoComplete="off"
+                          className="w-full rounded-md border border-gray-300 px-2 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                        />
+                      </div>
+                      <div className="col-span-12 sm:col-span-1 sm:flex sm:items-center">
+                        {row.error ? (
+                          <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Review</span>
+                        ) : (
+                          <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Ready</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {bulkRows.filter((row) => row.cardId).length} card{bulkRows.filter((row) => row.cardId).length === 1 ? '' : 's'} ready. Owner is saved into the card label so duplicate cards stay identifiable.
+              </p>
+              <button
+                type="submit"
+                disabled={bulkRows.length === 0 || bulkRows.some((row) => !row.cardId)}
+                className="inline-flex min-h-10 items-center justify-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Add reviewed cards
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
 
       {/* Search and Toggle Controls */}
       <div className="mb-6 space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">

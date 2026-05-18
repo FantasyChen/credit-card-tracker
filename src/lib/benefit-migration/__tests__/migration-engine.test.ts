@@ -34,7 +34,27 @@ jest.mock('@/lib/prisma', () => ({
   },
 }));
 
-const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const mockPrisma = prisma as unknown as {
+  $transaction: jest.Mock;
+  predefinedCard: {
+    findUnique: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+  };
+  creditCard: {
+    findMany: jest.Mock;
+    update: jest.Mock;
+    count: jest.Mock;
+  };
+  benefit: {
+    create: jest.Mock;
+    deleteMany: jest.Mock;
+  };
+  benefitStatus: {
+    create: jest.Mock;
+    deleteMany: jest.Mock;
+  };
+};
 
 describe('BenefitMigrationEngine', () => {
   beforeEach(() => {
@@ -62,7 +82,7 @@ describe('BenefitMigrationEngine', () => {
         .finishCard()
         .build();
 
-      mockPrisma.creditCard.count.mockImplementation((args) => {
+      mockPrisma.creditCard.count.mockImplementation((args: any) => {
         if (args?.where?.name === 'Test Card') {
           return Promise.resolve(5);
         }
@@ -106,7 +126,7 @@ describe('BenefitMigrationEngine', () => {
         }]
       };
 
-      mockPrisma.creditCard.count.mockImplementation((args) => {
+      mockPrisma.creditCard.count.mockImplementation((args: any) => {
         if (args?.where?.name === 'Test Card') {
           return Promise.resolve(1);
         }
@@ -144,7 +164,7 @@ describe('BenefitMigrationEngine', () => {
         .build();
 
       // Mock existing cards
-      mockPrisma.creditCard.count.mockImplementation((args) => {
+      mockPrisma.creditCard.count.mockImplementation((args: any) => {
         if (args?.where?.name === 'Test Card') {
           return Promise.resolve(2);
         }
@@ -204,7 +224,7 @@ describe('BenefitMigrationEngine', () => {
         .build();
 
       // Mock cards with one that will fail
-      mockPrisma.creditCard.count.mockImplementation((args) => {
+      mockPrisma.creditCard.count.mockImplementation((args: any) => {
         if (args?.where?.name === 'Test Card') {
           return Promise.resolve(3);
         }
@@ -236,7 +256,7 @@ describe('BenefitMigrationEngine', () => {
 
       // Mock transaction to succeed for first two, fail for third
       let transactionCallCount = 0;
-      mockPrisma.$transaction.mockImplementation(async (callback) => {
+      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
         transactionCallCount++;
         if (transactionCallCount === 3) {
           throw new Error('Simulated database error');
@@ -280,7 +300,7 @@ describe('BenefitMigrationEngine', () => {
         .finishCard()
         .build();
 
-      mockPrisma.creditCard.count.mockImplementation((args) => {
+      mockPrisma.creditCard.count.mockImplementation((args: any) => {
         if (args?.where?.name === 'Test Card') {
           return Promise.resolve(1);
         }
@@ -315,7 +335,7 @@ describe('BenefitMigrationEngine', () => {
         }
       ]);
 
-      mockPrisma.$transaction.mockImplementation(async (callback) => {
+      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
         const tx = {
           benefitStatus: { 
             deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -387,7 +407,7 @@ describe('BenefitMigrationEngine', () => {
       });
       mockPrisma.predefinedCard.update.mockResolvedValue({});
 
-      mockPrisma.creditCard.count.mockImplementation((args) => {
+      mockPrisma.creditCard.count.mockImplementation((args: any) => {
         if (args?.where?.name === 'Test Card') return Promise.resolve(2);
         return Promise.resolve(0);
       });
@@ -433,7 +453,7 @@ describe('BenefitMigrationEngine', () => {
         },
       ]);
 
-      mockPrisma.$transaction.mockImplementation(async (callback) => {
+      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
         const tx = {
           benefitStatus: { deleteMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'ns1' }) },
           benefit: { deleteMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'nb1' }) },

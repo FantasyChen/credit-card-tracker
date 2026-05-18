@@ -41,6 +41,7 @@ function benefitStatus(
   id: string,
   description: string,
   frequency: 'MONTHLY' | 'QUARTERLY' | 'YEARLY',
+  cardOverride: Partial<NonNullable<DisplayBenefitStatus['benefit']['creditCard']>> = {},
 ): DisplayBenefitStatus {
   return {
     id,
@@ -86,6 +87,7 @@ function benefitStatus(
         lastFourDigits: null,
         nickname: null,
         displayName: 'Test Travel Card',
+        ...cardOverride,
       },
     },
     usageWaySlug: null,
@@ -168,5 +170,37 @@ describe('BenefitsDisplayClient', () => {
     expect(screen.getByText('Annual Free Night Award')).toBeInTheDocument();
     expect(screen.queryByText('Monthly dining credit')).not.toBeInTheDocument();
     expect(screen.queryByText('Quarterly Hilton credit')).not.toBeInTheDocument();
+  });
+
+  it('filters duplicate cards by per-card display identity', () => {
+    render(
+      <BenefitsDisplayClient
+        {...defaultProps}
+        upcomingBenefits={[
+          benefitStatus('aspire-1', 'Q2 airline credit - card one', 'QUARTERLY', {
+            id: 'card-aspire-1',
+            name: 'Hilton Honors American Express Aspire Card',
+            displayName: 'Aspire P1',
+            nickname: 'Aspire P1',
+            lastFourDigits: '12345',
+          }),
+          benefitStatus('aspire-2', 'Q2 airline credit - card two', 'QUARTERLY', {
+            id: 'card-aspire-2',
+            name: 'Hilton Honors American Express Aspire Card',
+            displayName: 'Aspire P2',
+            nickname: 'Aspire P2',
+            lastFourDigits: '67890',
+          }),
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Filters/i }));
+    fireEvent.change(screen.getByLabelText('Card'), {
+      target: { value: 'card-aspire-2' },
+    });
+
+    expect(screen.getByText('Q2 airline credit - card two')).toBeInTheDocument();
+    expect(screen.queryByText('Q2 airline credit - card one')).not.toBeInTheDocument();
   });
 });

@@ -43,6 +43,7 @@ export interface PredefinedCardFee {
 }
 
 export interface CardLevelRoi {
+  cardId: string | null;
   cardDisplayName: string;
   cardName: string;
   annualFee: number;
@@ -290,45 +291,41 @@ export function calculateCardLevelRoi(
   predefinedCardFees: PredefinedCardFee[]
 ): { totalAnnualFees: number; cardLevelRoi: CardLevelRoi[] } {
   const cardDisplayNameMap = createCardDisplayNameMap(userCards);
-  const cardCounts = userCards.reduce((acc, card) => {
-    acc[card.name] = (acc[card.name] ?? 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
   const annualFeeByCardName = new Map(predefinedCardFees.map((card) => [card.name, card.annualFee]));
-  const totalAnnualFees = Object.entries(cardCounts).reduce((total, [cardName, quantity]) => {
-    return total + ((annualFeeByCardName.get(cardName) ?? 0) * quantity);
+  const totalAnnualFees = userCards.reduce((total, card) => {
+    return total + (annualFeeByCardName.get(card.name) ?? 0);
   }, 0);
 
-  const claimedByCardKey = new Map<string, number>();
+  const claimedByCardId = new Map<string, number>();
+  let customClaimed = 0;
   for (const status of statuses) {
     const used = resolveBenefitClaimedValue(status);
-    const key = status.benefit.creditCard?.name ?? CUSTOM_BENEFITS_CARD_NAME;
-    claimedByCardKey.set(key, (claimedByCardKey.get(key) ?? 0) + used);
+    const cardId = status.benefit.creditCard?.id;
+    if (!cardId) {
+      customClaimed += used;
+      continue;
+    }
+    claimedByCardId.set(cardId, (claimedByCardId.get(cardId) ?? 0) + used);
   }
 
-  const cardLevelRoi: CardLevelRoi[] = Object.entries(cardCounts).map(([cardName, quantity]) => {
-    const annualFee = (annualFeeByCardName.get(cardName) ?? 0) * quantity;
-    const claimedValue = claimedByCardKey.get(cardName) ?? 0;
-    const firstCard = userCards.find((card) => card.name === cardName);
-    const cardDisplayName = quantity > 1
-      ? `${cardName} (${quantity} cards)`
-      : firstCard
-        ? (cardDisplayNameMap.get(firstCard.id) ?? cardName)
-        : cardName;
+  const cardLevelRoi: CardLevelRoi[] = userCards.map((card) => {
+    const annualFee = annualFeeByCardName.get(card.name) ?? 0;
+    const claimedValue = claimedByCardId.get(card.id) ?? 0;
+    const cardDisplayName = cardDisplayNameMap.get(card.id) ?? card.name;
 
     return {
+      cardId: card.id,
       cardDisplayName,
-      cardName,
+      cardName: card.name,
       annualFee,
       claimedValue,
       netRoi: claimedValue - annualFee,
     };
   });
 
-  const customClaimed = claimedByCardKey.get(CUSTOM_BENEFITS_CARD_NAME) ?? 0;
   if (customClaimed > 0) {
     cardLevelRoi.push({
+      cardId: null,
       cardDisplayName: CUSTOM_BENEFITS_CARD_NAME,
       cardName: CUSTOM_BENEFITS_CARD_NAME,
       annualFee: 0,
