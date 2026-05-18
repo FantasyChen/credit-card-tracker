@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Info } from 'lucide-react';
+import { X, Info, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -26,6 +26,24 @@ interface AddLoyaltyAccountModalProps {
   isPending: boolean;
 }
 
+type CertificateFormRow = {
+  id: string;
+  label: string;
+  quantity: string;
+  expirationDate: string;
+  notes: string;
+};
+
+function createCertificateRow(): CertificateFormRow {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    label: '',
+    quantity: '1',
+    expirationDate: '',
+    notes: '',
+  };
+}
+
 export function AddLoyaltyAccountModal({ 
   availablePrograms, 
   onSubmit, 
@@ -34,6 +52,7 @@ export function AddLoyaltyAccountModal({
 }: AddLoyaltyAccountModalProps) {
   const [selectedProgram, setSelectedProgram] = useState<LoyaltyProgram | null>(null);
   const [showActivities, setShowActivities] = useState(false);
+  const [certificateRows, setCertificateRows] = useState<CertificateFormRow[]>([]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -56,6 +75,18 @@ export function AddLoyaltyAccountModal({
     today.setMonth(today.getMonth() - 1); // Default to 1 month ago
     return today.toISOString().split('T')[0];
   };
+
+  const updateCertificateRow = (id: string, field: keyof Omit<CertificateFormRow, 'id'>, value: string) => {
+    setCertificateRows((rows) => rows.map((row) => row.id === id ? { ...row, [field]: value } : row));
+  };
+
+  const serializedCertificates = JSON.stringify(
+    selectedProgram?.type === 'HOTEL'
+      ? certificateRows
+          .filter((row) => row.expirationDate)
+          .map(({ label, quantity, expirationDate, notes }) => ({ label, quantity, expirationDate, notes }))
+      : []
+  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -80,6 +111,9 @@ export function AddLoyaltyAccountModal({
               onChange={(e) => {
                 const program = availablePrograms.find(p => p.id === e.target.value);
                 setSelectedProgram(program || null);
+                if (program?.type !== 'HOTEL') {
+                  setCertificateRows([]);
+                }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
@@ -171,6 +205,25 @@ export function AddLoyaltyAccountModal({
             </p>
           </div>
 
+          {/* Points/Miles Balance */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {selectedProgram?.type === 'AIRLINE' ? 'Miles Remaining' : 'Points Remaining'} (optional)
+            </label>
+            <Input
+              type="number"
+              name="pointsBalance"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              placeholder={selectedProgram?.type === 'AIRLINE' ? 'Enter miles balance' : 'Enter points balance'}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Track the current balance you see in the loyalty program.
+            </p>
+          </div>
+
           {/* Last Activity Date / Oldest Earning Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -195,6 +248,92 @@ export function AddLoyaltyAccountModal({
                   : 'When did you last earn or redeem points/miles? This determines your expiration date.'}
             </p>
           </div>
+
+          {/* Free Night Certificates */}
+          {selectedProgram?.type === 'HOTEL' && (
+            <div className="space-y-3 rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+              <input type="hidden" name="certificates" value={serializedCertificates} />
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-white">Free Night Certificates</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Add each certificate or group with its expiration date.</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCertificateRows((rows) => [...rows, createCertificateRow()])}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add
+                </Button>
+              </div>
+
+              {certificateRows.length === 0 ? (
+                <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-500 dark:bg-gray-700 dark:text-gray-300">
+                  No free night certificates recorded.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {certificateRows.map((row) => (
+                    <div key={row.id} className="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_90px_150px_36px]">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Label</label>
+                          <Input
+                            type="text"
+                            value={row.label}
+                            onChange={(e) => updateCertificateRow(row.id, 'label', e.target.value)}
+                            placeholder="Anniversary free night"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Qty</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            step="1"
+                            inputMode="numeric"
+                            value={row.quantity}
+                            onChange={(e) => updateCertificateRow(row.id, 'quantity', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Expires</label>
+                          <Input
+                            type="date"
+                            value={row.expirationDate}
+                            onChange={(e) => updateCertificateRow(row.id, 'expirationDate', e.target.value)}
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setCertificateRows((rows) => rows.filter((item) => item.id !== row.id))}
+                            className="h-9 w-9 p-0 text-red-600 hover:text-red-700"
+                            aria-label="Remove certificate"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Notes</label>
+                        <Input
+                          type="text"
+                          value={row.notes}
+                          onChange={(e) => updateCertificateRow(row.id, 'notes', e.target.value)}
+                          placeholder="Optional certificate details"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           <div>
@@ -222,4 +361,4 @@ export function AddLoyaltyAccountModal({
       </div>
     </div>
   );
-} 
+}

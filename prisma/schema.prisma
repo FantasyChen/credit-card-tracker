@@ -35,6 +35,7 @@ model User {
   benefitStatuses         BenefitStatus[]
   creditCards             CreditCard[]
   loyaltyAccounts         LoyaltyAccount[]
+  loyaltyCertificates     LoyaltyCertificate[]
   sessions                Session[]
   standaloneBenefits      Benefit[]        // Custom benefits not tied to a card
 }
@@ -196,16 +197,36 @@ model LoyaltyAccount {
   userId           String
   loyaltyProgramId String
   accountNumber    String?
+  pointsBalance    Int?
   lastActivityDate DateTime
   expirationDate   DateTime?
   isActive         Boolean        @default(true)
   notes            String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  certificates     LoyaltyCertificate[]
   loyaltyProgram   LoyaltyProgram @relation(fields: [loyaltyProgramId], references: [id], onDelete: Cascade)
   user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, loyaltyProgramId])
+}
+
+model LoyaltyCertificate {
+  id               String         @id @default(cuid())
+  userId           String
+  loyaltyAccountId String
+  label            String?
+  quantity         Int            @default(1)
+  expirationDate   DateTime
+  notes            String?
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  loyaltyAccount   LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expirationDate])
+  @@index([loyaltyAccountId, expirationDate])
 }
 
 

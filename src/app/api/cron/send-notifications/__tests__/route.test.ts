@@ -10,6 +10,7 @@ jest.mock('@/lib/prisma', () => ({
     user: { findMany: jest.fn() },
     benefitStatus: { findMany: jest.fn() },
     loyaltyAccount: { findMany: jest.fn() },
+    loyaltyCertificate: { findMany: jest.fn() },
   },
 }));
 
@@ -48,6 +49,7 @@ describe('/api/cron/send-notifications', () => {
     (prisma.user.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.benefitStatus.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.loyaltyAccount.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.loyaltyCertificate.findMany as jest.Mock).mockResolvedValue([]);
     (sendEmail as jest.Mock).mockResolvedValue(true); // Default successful email send
     (NextResponse.json as jest.Mock).mockClear();
   });
@@ -169,6 +171,28 @@ describe('/api/cron/send-notifications', () => {
                 company: programName.split(' ')[0],
                 expirationMonths: 18,
                 hasExpiration: true
+            }
+        };
+    };
+
+    const mockLoyaltyCertificate = (id: string, programName: string, expirationDate: Date, userId = 'user1') => {
+        return {
+            id: `certificate-${id}`,
+            userId,
+            loyaltyAccountId: `loyalty-${id}`,
+            label: 'Anniversary free night',
+            quantity: 1,
+            expirationDate,
+            isActive: true,
+            loyaltyAccount: {
+                id: `loyalty-${id}`,
+                loyaltyProgram: {
+                    id: `program-${id}`,
+                    name: programName.toLowerCase().replace(/\s+/g, '_'),
+                    displayName: programName,
+                    type: 'HOTEL',
+                    company: programName.split(' ')[0],
+                }
             }
         };
     };
@@ -298,6 +322,70 @@ describe('/api/cron/send-notifications', () => {
         }));
         expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
             html: expect.stringContaining('Perks Reminder Update')
+        }));
+    });
+
+    it('should send digest email for expiring free night certificates', async () => {
+        const systemTime = utcDate(2023, 8, 15, 11, 0, 0);
+        const userNotifyDays = 30;
+        const certificateExpiryDate = utcDate(2023, 8, 15 + userNotifyDays, 12, 0, 0);
+
+        jest.useFakeTimers().setSystemTime(systemTime);
+        (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({ pointsExpirationDays: userNotifyDays })]);
+
+        (prisma.benefitStatus.findMany as jest.Mock)
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([]);
+
+        (prisma.loyaltyAccount.findMany as jest.Mock).mockResolvedValueOnce([]);
+        (prisma.loyaltyCertificate.findMany as jest.Mock).mockResolvedValueOnce([
+            mockLoyaltyCertificate('hyatt', 'World of Hyatt', certificateExpiryDate)
+        ]);
+
+        await GET(createMockReq());
+
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+        expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            to: 'user1@example.com',
+            subject: 'Free Night Certificates Expiring Soon!',
+            html: expect.stringContaining('Free Night Certificates Expiring Soon')
+        }));
+        expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            html: expect.stringContaining('World of Hyatt')
+        }));
+        expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            html: expect.stringContaining(`expiring on ${certificateExpiryDate.toLocaleDateString('en-US', {timeZone: 'UTC'})}`)
+        }));
+    });
+
+    it('should include points and certificates in one combined digest', async () => {
+        const systemTime = utcDate(2023, 8, 15, 11, 0, 0);
+        const userNotifyDays = 30;
+        const expiryDate = utcDate(2023, 8, 15 + userNotifyDays, 12, 0, 0);
+
+        jest.useFakeTimers().setSystemTime(systemTime);
+        (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({ pointsExpirationDays: userNotifyDays })]);
+
+        (prisma.benefitStatus.findMany as jest.Mock)
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([]);
+
+        (prisma.loyaltyAccount.findMany as jest.Mock).mockResolvedValueOnce([
+            mockLoyaltyAccount('aa', 'American Airlines', expiryDate)
+        ]);
+        (prisma.loyaltyCertificate.findMany as jest.Mock).mockResolvedValueOnce([
+            mockLoyaltyCertificate('hyatt', 'World of Hyatt', expiryDate)
+        ]);
+
+        await GET(createMockReq());
+
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+        expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            subject: 'Your Perks Reminder Daily Update',
+            html: expect.stringContaining('Loyalty Points Expiring Soon')
+        }));
+        expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            html: expect.stringContaining('Free Night Certificates Expiring Soon')
         }));
     });
 

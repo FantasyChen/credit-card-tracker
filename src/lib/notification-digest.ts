@@ -81,7 +81,7 @@ export async function runNotificationDigest({
     const maxWindow = new Date(today.getTime() + Math.max(maxExpirationDays, maxPointsDays) * 24 * 60 * 60 * 1000);
     maxWindow.setUTCHours(23, 59, 59, 999);
 
-    const [newStatuses, expiringStatuses, expiringLoyalty] = await Promise.all([
+    const [newStatuses, expiringStatuses, expiringLoyalty, expiringCertificates] = await Promise.all([
       newBenefitUserIds.length > 0
         ? prisma.benefitStatus.findMany({
             where: {
@@ -114,6 +114,22 @@ export async function runNotificationDigest({
             include: { loyaltyProgram: true },
           })
         : Promise.resolve([]),
+
+      loyaltyUserIds.length > 0 && maxPointsDays > 0
+        ? prisma.loyaltyCertificate.findMany({
+            where: {
+              userId: { in: loyaltyUserIds },
+              isActive: true,
+              expirationDate: { gte: today, lte: maxWindow },
+              loyaltyAccount: { isActive: true },
+            },
+            include: {
+              loyaltyAccount: {
+                include: { loyaltyProgram: true },
+              },
+            },
+          })
+        : Promise.resolve([]),
     ]);
 
     const emailEligibleNewStatuses = newStatuses.filter(isEmailEligibleBenefitStatus);
@@ -123,7 +139,7 @@ export async function runNotificationDigest({
     console.log(
       `📊 Fetched ${newStatuses.length} new (${emailEligibleNewStatuses.length} email-eligible), ` +
       `${expiringStatuses.length} expiring (${emailEligibleExpiringStatuses.length} email-eligible), ` +
-      `${expiringLoyalty.length} loyalty in ${fetchMs}ms`
+      `${expiringLoyalty.length} loyalty, ${expiringCertificates.length} certificates in ${fetchMs}ms`
     );
 
     const newByUser = groupByUserId(emailEligibleNewStatuses);
@@ -134,11 +150,13 @@ export async function runNotificationDigest({
       today
     );
     const loyaltyByUser = filterExpiringLoyaltyByUser(expiringLoyalty, userMap, today);
+    const certificatesByUser = filterExpiringCertificatesByUser(expiringCertificates, userMap, today);
     const emailTasks = buildDigestEmailTasks({
       usersToNotify,
       newByUser,
       expiringByUser,
       loyaltyByUser,
+      certificatesByUser,
       effectiveExpirationDaysByUser,
       baseUrl,
     });
@@ -264,11 +282,32 @@ function filterExpiringLoyaltyByUser<T extends { userId: string; expirationDate:
   return loyaltyByUser;
 }
 
+function filterExpiringCertificatesByUser<T extends { userId: string; expirationDate: Date }>(
+  certificates: T[],
+  userMap: Map<string, NotificationUser>,
+  today: Date
+): Map<string, T[]> {
+  const certificatesByUser = new Map<string, T[]>();
+  for (const certificate of certificates) {
+    const user = userMap.get(certificate.userId);
+    if (!user?.pointsExpirationDays) continue;
+
+    const { dayStart, dayEnd } = reminderWindow(today, user.pointsExpirationDays);
+    if (certificate.expirationDate >= dayStart && certificate.expirationDate <= dayEnd) {
+      const list = certificatesByUser.get(certificate.userId) ?? [];
+      list.push(certificate);
+      certificatesByUser.set(certificate.userId, list);
+    }
+  }
+  return certificatesByUser;
+}
+
 function buildDigestEmailTasks({
   usersToNotify,
   newByUser,
   expiringByUser,
   loyaltyByUser,
+  certificatesByUser,
   effectiveExpirationDaysByUser,
   baseUrl,
 }: {
@@ -276,6 +315,7 @@ function buildDigestEmailTasks({
   newByUser: Map<string, EmailBenefitStatus[]>;
   expiringByUser: Map<string, EmailBenefitStatus[]>;
   loyaltyByUser: Map<string, EmailLoyaltyAccount[]>;
+  certificatesByUser: Map<string, EmailLoyaltyCertificate[]>;
   effectiveExpirationDaysByUser: Map<string, number>;
   baseUrl: string;
 }): Array<{ to: string; userId: string; subject: string; html: string }> {
@@ -287,11 +327,13 @@ function buildDigestEmailTasks({
     const newBenefits = newByUser.get(user.id);
     const expiring = expiringByUser.get(user.id);
     const loyalty = loyaltyByUser.get(user.id);
+    const certificates = certificatesByUser.get(user.id);
 
     const hasNew = Boolean(newBenefits?.length);
     const hasExpiring = Boolean(expiring?.length);
     const hasLoyalty = Boolean(loyalty?.length);
-    if (!hasNew && !hasExpiring && !hasLoyalty) continue;
+    const hasCertificates = Boolean(certificates?.length);
+    if (!hasNew && !hasExpiring && !hasLoyalty && !hasCertificates) continue;
 
     const sections: string[] = [];
     const sectionLabels: string[] = [];
@@ -330,6 +372,22 @@ function buildDigestEmailTasks({
       sections.push(
         `<h2 style="color:#D97706;margin:24px 0 8px;">Loyalty Points Expiring Soon</h2>` +
         `<p>Consider earning or redeeming to prevent expiration:</p><ul>${items}</ul>` +
+        `<p><a href="${baseUrl}/loyalty" style="color:#4F46E5;">Manage Loyalty Accounts &rarr;</a></p>`
+      );
+    }
+
+    if (hasCertificates && certificates) {
+      sectionLabels.push('Expiring Certificates');
+      const items = certificates.map((certificate) => {
+        const expDate = fmtDate(certificate.expirationDate);
+        const programName = certificate.loyaltyAccount.loyaltyProgram.displayName;
+        const label = certificate.label || 'Free night certificate';
+        const quantity = certificate.quantity > 1 ? ` (${certificate.quantity} available)` : '';
+        return `<li><strong>${label}</strong>${quantity} for ${programName}, expiring on ${expDate} (in ${user.pointsExpirationDays} day(s)).</li>`;
+      }).join('');
+      sections.push(
+        `<h2 style="color:#D97706;margin:24px 0 8px;">Free Night Certificates Expiring Soon</h2>` +
+        `<p>Use these certificates before their expiration dates:</p><ul>${items}</ul>` +
         `<p><a href="${baseUrl}/loyalty" style="color:#4F46E5;">Manage Loyalty Accounts &rarr;</a></p>`
       );
     }
@@ -421,6 +479,7 @@ function digestSubjectForSection(label: string): string {
     case 'New Benefits': return 'New Benefit Cycles Have Started!';
     case 'Expiring Benefits': return 'Benefits Expiring Soon!';
     case 'Expiring Points': return 'Loyalty Points Expiring Soon!';
+    case 'Expiring Certificates': return 'Free Night Certificates Expiring Soon!';
     default: return `Your ${SITE_NAME} Daily Update`;
   }
 }
@@ -477,4 +536,16 @@ interface EmailLoyaltyAccount {
   };
   accountNumber?: string | null;
   expirationDate: Date | null;
+}
+
+interface EmailLoyaltyCertificate {
+  userId: string;
+  label: string | null;
+  quantity: number;
+  expirationDate: Date;
+  loyaltyAccount: {
+    loyaltyProgram: {
+      displayName: string;
+    };
+  };
 }

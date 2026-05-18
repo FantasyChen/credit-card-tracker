@@ -66,9 +66,31 @@ jest.mock('@/lib/prisma', () => ({
     benefitUsageWay: {
       findMany: jest.fn(),
     },
+    loyaltyProgram: {
+      findUnique: jest.fn(),
+    },
     loyaltyAccount: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     },
+    loyaltyCertificate: {
+      findMany: jest.fn(),
+      createMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    $transaction: jest.fn(async (callback: any) => callback({
+      loyaltyAccount: {
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      loyaltyCertificate: {
+        createMany: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+    })),
   },
 }));
 

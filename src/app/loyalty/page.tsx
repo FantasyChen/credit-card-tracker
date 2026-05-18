@@ -40,6 +40,10 @@ export default async function LoyaltyPage() {
   const userLoyaltyAccounts = await prisma.loyaltyAccount.findMany({
     where: { userId: session.user.id },
     include: {
+      certificates: {
+        where: { isActive: true },
+        orderBy: { expirationDate: 'asc' },
+      },
       loyaltyProgram: {
         select: {
           id: true,
