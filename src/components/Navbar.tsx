@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { useState, useMemo, useEffect } from 'react';
 import { Bars3Icon, XMarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import ThemeToggle from '@/components/ui/ThemeToggle';
@@ -48,7 +48,18 @@ function getSwitchUrl(isLoyaltyContext: boolean): string {
 function getSignOutCallbackUrl(isLoyaltyContext: boolean): string {
   if (!isLoyaltyContext || typeof window === 'undefined') return '/';
 
-  return `${window.location.protocol}//${window.location.host}/`;
+  const host = window.location.hostname;
+  if (host.includes('loyalty.')) {
+    return `${window.location.protocol}//${window.location.host}/`;
+  }
+
+  return '/loyalty-landing';
+}
+
+function getSignOutHref(isLoyaltyContext: boolean): string {
+  return `/api/auth/force-signout?callbackUrl=${encodeURIComponent(
+    getSignOutCallbackUrl(isLoyaltyContext)
+  )}`;
 }
 
 const Navbar = () => {
@@ -75,9 +86,7 @@ const Navbar = () => {
 
   const switchLabel = isLoyaltyContext ? 'Credit Card Benefits' : 'Loyalty Points';
   const switchHref = getSwitchUrl(isLoyaltyContext ?? false);
-  const handleSignOut = () => {
-    void signOut({ callbackUrl: getSignOutCallbackUrl(isLoyaltyContext ?? false) });
-  };
+  const signOutHref = getSignOutHref(isLoyaltyContext ?? false);
 
   return (
     <header role="banner">
@@ -139,12 +148,12 @@ const Navbar = () => {
                       {session.user.isBetaUser ? 'Beta Pro' : 'Pro'}
                     </span>
                   )}
-                  <button
-                    onClick={handleSignOut}
+                  <a
+                    href={signOutHref}
                     className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
                   >
                     Sign out
-                  </button>
+                  </a>
                 </>
               ) : (
                 <Link
@@ -216,12 +225,13 @@ const Navbar = () => {
                       </span>
                     </div>
                   )}
-                  <button
-                    onClick={() => { handleSignOut(); setIsMobileMenuOpen(false); }}
+                  <a
+                    href={signOutHref}
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
                   >
                     Sign out
-                  </button>
+                  </a>
                 </>
               ) : (
                 <Link

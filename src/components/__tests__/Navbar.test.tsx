@@ -3,13 +3,12 @@
  */
 
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import Navbar from '../Navbar';
-import { signOut, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 
 jest.mock('next-auth/react', () => ({
   useSession: jest.fn(),
-  signOut: jest.fn(),
 }));
 
 jest.mock('@/components/ui/ThemeToggle', () => ({
@@ -18,7 +17,6 @@ jest.mock('@/components/ui/ThemeToggle', () => ({
 }));
 
 const mockUseSession = jest.mocked(useSession);
-const mockSignOut = jest.mocked(signOut);
 
 describe('Navbar', () => {
   beforeEach(() => {
@@ -60,7 +58,7 @@ describe('Navbar', () => {
     expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
   });
 
-  it('signs out to a neutral page instead of returning to the current protected page', () => {
+  it('uses the force sign-out endpoint instead of returning to the current protected page', () => {
     mockUseSession.mockReturnValue({
       data: {
         user: {
@@ -77,8 +75,9 @@ describe('Navbar', () => {
 
     render(<Navbar />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-
-    expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: '/' });
+    expect(screen.getByRole('link', { name: 'Sign out' })).toHaveAttribute(
+      'href',
+      '/api/auth/force-signout?callbackUrl=%2F'
+    );
   });
 });
