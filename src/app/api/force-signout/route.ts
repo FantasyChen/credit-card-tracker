@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRootDomain } from '@/lib/site';
 
-const COOKIE_BASE_NAMES = [
+const SESSION_COOKIE_NAMES = [
   '__Secure-next-auth.session-token',
   'next-auth.session-token',
   'authjs.session-token',
+];
+
+const NON_SESSION_COOKIE_NAMES = [
   '__Secure-next-auth.callback-url',
   'next-auth.callback-url',
   'authjs.callback-url',
@@ -17,11 +20,15 @@ const COOKIE_BASE_NAMES = [
 function getCookieNames(): string[] {
   const names = new Set<string>();
 
-  for (const name of COOKIE_BASE_NAMES) {
+  for (const name of SESSION_COOKIE_NAMES) {
     names.add(name);
-    for (let index = 0; index < 10; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
       names.add(`${name}.${index}`);
     }
+  }
+
+  for (const name of NON_SESSION_COOKIE_NAMES) {
+    names.add(name);
   }
 
   return Array.from(names);
@@ -33,7 +40,7 @@ function getCookieDomains(host: string): Array<string | undefined> {
 
   if (!rootDomain) return [undefined];
 
-  return [undefined, `.${rootDomain}`, rootDomain];
+  return [undefined, `.${rootDomain}`];
 }
 
 function getSafeCallbackUrl(request: NextRequest): URL {
