@@ -5,7 +5,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
-import { getSharedCookieDomain } from './site';
+import { getCanonicalAuthUrl, getSharedCookieDomain } from './site';
 import { enrollBetaUser, getEffectiveTier, isBetaMode } from './subscription';
 
 declare module "next-auth" {
@@ -29,7 +29,16 @@ declare module "next-auth/jwt" {
   }
 }
 
-const sharedCookieDomain = getSharedCookieDomain(process.env.NEXTAUTH_URL);
+const canonicalNextAuthUrl = getCanonicalAuthUrl(process.env.NEXTAUTH_URL);
+
+// NextAuth reads NEXTAUTH_URL internally when constructing OAuth redirect_uri.
+// Keep production OAuth callbacks on the registered canonical www host even if
+// the deployment environment is set to the apex domain.
+if (canonicalNextAuthUrl) {
+  process.env.NEXTAUTH_URL = canonicalNextAuthUrl;
+}
+
+const sharedCookieDomain = getSharedCookieDomain(canonicalNextAuthUrl);
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),

@@ -5,24 +5,44 @@ const LOYALTY_SUBDOMAINS = ['loyalty'];
 const OLD_DOMAIN = 'coupon-cycle.site';
 const NEW_DOMAIN = 'perks-reminder.com';
 
+function splitHostAndPort(hostname: string): { host: string; port: string } {
+  const [host, port = ''] = hostname.split(':');
+  return { host, port };
+}
+
 function getSubdomain(hostname: string): string | null {
-  const parts = hostname.split('.');
+  const { host } = splitHostAndPort(hostname);
+  const parts = host.split('.');
   // localhost:3000 → no subdomain
-  if (parts.length <= 2 && !hostname.includes('localhost')) return null;
+  if (parts.length <= 2 && !host.includes('localhost')) return null;
   // loyalty.perks-reminder.com → "loyalty"
   if (parts.length >= 3) return parts[0];
   // loyalty.localhost → "loyalty" (dev)
-  if (hostname.includes('localhost') && parts.length >= 2 && parts[0] !== 'localhost') {
+  if (host.includes('localhost') && parts.length >= 2 && parts[0] !== 'localhost') {
     return parts[0];
   }
   return null;
+}
+
+function getMainAuthHost(hostname: string, subdomain: string): { host: string; port: string } {
+  const { host, port } = splitHostAndPort(hostname);
+  const rootHost = host.replace(new RegExp(`^${subdomain}\\.`), '');
+
+  if (rootHost.includes('localhost')) {
+    return { host: rootHost, port };
+  }
+
+  return {
+    host: rootHost.startsWith('www.') ? rootHost : `www.${rootHost}`,
+    port: '',
+  };
 }
 
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const subdomain = getSubdomain(hostname);
   const { pathname } = request.nextUrl;
-  const hostnameWithoutPort = hostname.split(':')[0];
+  const { host: hostnameWithoutPort } = splitHostAndPort(hostname);
 
   if (hostnameWithoutPort === OLD_DOMAIN || hostnameWithoutPort === `www.${OLD_DOMAIN}`) {
     const url = request.nextUrl.clone();
@@ -43,11 +63,11 @@ export function middleware(request: NextRequest) {
   if (subdomain && LOYALTY_SUBDOMAINS.includes(subdomain)) {
     // Redirect auth pages to main domain so OAuth uses registered callback URLs
     if (pathname.startsWith('/auth/')) {
-      const mainHost = hostname.replace(`${subdomain}.`, '');
+      const mainAuthHost = getMainAuthHost(hostname, subdomain);
       const protocol = hostname.includes('localhost') ? 'http' : 'https';
       const url = request.nextUrl.clone();
-      url.hostname = mainHost.split(':')[0];
-      url.port = mainHost.includes(':') ? mainHost.split(':')[1] : '';
+      url.hostname = mainAuthHost.host;
+      url.port = mainAuthHost.port;
       url.protocol = protocol;
       if (!url.searchParams.has('callbackUrl')) {
         url.searchParams.set('callbackUrl', `${protocol}://${hostname}/loyalty`);

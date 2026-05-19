@@ -45,6 +45,12 @@ function getSwitchUrl(isLoyaltyContext: boolean): string {
     : `${proto}//${host.replace(/^loyalty\./, 'www.')}`;
 }
 
+function getSignOutCallbackUrl(isLoyaltyContext: boolean): string {
+  if (!isLoyaltyContext || typeof window === 'undefined') return '/';
+
+  return `${window.location.protocol}//${window.location.host}/`;
+}
+
 const Navbar = () => {
   const pathname = usePathname();
   const { data: session } = useSession();
@@ -69,6 +75,9 @@ const Navbar = () => {
 
   const switchLabel = isLoyaltyContext ? 'Credit Card Benefits' : 'Loyalty Points';
   const switchHref = getSwitchUrl(isLoyaltyContext ?? false);
+  const handleSignOut = () => {
+    void signOut({ callbackUrl: getSignOutCallbackUrl(isLoyaltyContext ?? false) });
+  };
 
   return (
     <header role="banner">
@@ -131,7 +140,7 @@ const Navbar = () => {
                     </span>
                   )}
                   <button
-                    onClick={() => signOut()}
+                    onClick={handleSignOut}
                     className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
                   >
                     Sign out
@@ -208,7 +217,7 @@ const Navbar = () => {
                     </div>
                   )}
                   <button
-                    onClick={() => { signOut(); setIsMobileMenuOpen(false); }}
+                    onClick={() => { handleSignOut(); setIsMobileMenuOpen(false); }}
                     className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
                   >
                     Sign out

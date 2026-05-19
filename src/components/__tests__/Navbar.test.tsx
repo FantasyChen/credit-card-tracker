@@ -3,9 +3,9 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import Navbar from '../Navbar';
-import { useSession } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 
 jest.mock('next-auth/react', () => ({
   useSession: jest.fn(),
@@ -18,6 +18,7 @@ jest.mock('@/components/ui/ThemeToggle', () => ({
 }));
 
 const mockUseSession = jest.mocked(useSession);
+const mockSignOut = jest.mocked(signOut);
 
 describe('Navbar', () => {
   beforeEach(() => {
@@ -57,5 +58,27 @@ describe('Navbar', () => {
 
     expect(screen.queryByRole('link', { name: 'Account' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('signs out to a neutral page instead of returning to the current protected page', () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: {
+          id: 'user-1',
+          name: 'Test User',
+          email: 'test@example.com',
+          subscriptionTier: 'FREE',
+        },
+        expires: '2026-12-31',
+      },
+      status: 'authenticated',
+      update: jest.fn(),
+    });
+
+    render(<Navbar />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: '/' });
   });
 });
