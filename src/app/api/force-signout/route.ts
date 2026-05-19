@@ -34,13 +34,11 @@ function getCookieNames(): string[] {
   return Array.from(names);
 }
 
-function getCookieDomains(host: string): Array<string | undefined> {
+function getSharedCookieDomain(host: string): string | undefined {
   const hostname = host.split(':')[0];
   const rootDomain = getRootDomain(hostname);
 
-  if (!rootDomain) return [undefined];
-
-  return [undefined, `.${rootDomain}`];
+  return rootDomain ? `.${rootDomain}` : undefined;
 }
 
 function serializeExpiredCookie(
@@ -91,8 +89,21 @@ function getSafeCallbackUrl(request: NextRequest): URL {
 }
 
 export function GET(request: NextRequest) {
-  const response = NextResponse.redirect(getSafeCallbackUrl(request));
-  const domains = getCookieDomains(request.headers.get('host') || request.nextUrl.host);
+  const host = request.headers.get('host') || request.nextUrl.host;
+  const callbackUrl = getSafeCallbackUrl(request);
+  const sharedCookieDomain = getSharedCookieDomain(host);
+  const isDomainClearStep = request.nextUrl.searchParams.get('step') === 'domain';
+  const redirectUrl =
+    sharedCookieDomain && !isDomainClearStep
+      ? new URL(
+          `/api/force-signout?step=domain&callbackUrl=${encodeURIComponent(callbackUrl.toString())}`,
+          request.url
+        )
+      : callbackUrl;
+  const response = NextResponse.redirect(redirectUrl);
+  const domains = isDomainClearStep && sharedCookieDomain
+    ? [sharedCookieDomain]
+    : [undefined];
 
   for (const name of getCookieNames()) {
     for (const domain of domains) {
