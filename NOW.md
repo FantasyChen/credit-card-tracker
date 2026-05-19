@@ -1,16 +1,15 @@
 # Now
 
 ## Current Focus
-Post-2.0 roadmap implementation is complete through P5, with focused tests and browser screenshots captured.
+Closed the loyalty sign-out/auth-state fix and deployed it to production.
 
 ## Active Blockers
-- Full `tsc --noEmit` still fails on preexisting Jest mock typing issues in older `api/user-cards` and `benefit-migration` tests.
-- Native Node 24 cannot load local signed native modules (`@next/swc-darwin-arm64`, `lightningcss-darwin-arm64`); use the bundled runtime Node plus `NEXT_TEST_WASM_DIR=node_modules/@next/swc-wasm-nodejs` for local browser/test verification.
-- Existing untracked `screenshots/` assets remain parked from the forum screenshot task.
+- Local macOS Node 24 still has native module signature issues for `@next/swc-darwin-arm64` and `lightningcss-darwin-arm64`; focused Jest worked with `NEXT_TEST_WASM_DIR=/Users/lfan/Project/credit-card-tracker/node_modules/@next/swc-wasm-nodejs`.
 
 ## Immediate Next Step
-Review the implementation diff, then decide whether to commit as one roadmap slice or split into duplicate-card, guides/data-quality, docs, and bulk-onboarding commits.
+If auth state looks stale again, first verify production `/sw.js` has `perks-reminder-static-v2` and that `/api/force-signout` performs the two-step cookie-clearing redirect.
 
 ## Session State
-- Last modified: 2026-05-17
-- Product changes in progress: duplicate-card ROI/filtering, guide discoverability, correction links/provenance, iOS companion plan, and bulk card onboarding.
+- Last modified: 2026-05-19T20:58:52Z
+- Touched files: `src/components/Navbar.tsx`, `src/components/__tests__/Navbar.test.tsx`, `src/app/api/force-signout/route.ts`, `public/sw.js`.
+- Verification: `npx tsc --noEmit --pretty false`, focused navbar Jest, production endpoint/header checks, production `sw.js`, and Playwright signed-out loyalty flow.
