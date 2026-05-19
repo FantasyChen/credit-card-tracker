@@ -77,7 +77,7 @@ describe('Navbar', () => {
 
     expect(screen.getByRole('link', { name: 'Sign out' })).toHaveAttribute(
       'href',
-      '/api/auth/force-signout?callbackUrl=%2F'
+      '/api/force-signout?callbackUrl=%2F'
     );
   });
 });

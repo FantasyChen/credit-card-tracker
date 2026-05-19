@@ -57,7 +57,7 @@ function getSignOutCallbackUrl(isLoyaltyContext: boolean): string {
 }
 
 function getSignOutHref(isLoyaltyContext: boolean): string {
-  return `/api/auth/force-signout?callbackUrl=${encodeURIComponent(
+  return `/api/force-signout?callbackUrl=${encodeURIComponent(
     getSignOutCallbackUrl(isLoyaltyContext)
   )}`;
 }
