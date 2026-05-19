@@ -3,14 +3,13 @@
  * Implements intelligent caching strategies for better offline experience
  */
 
-const CACHE_NAME = 'perks-reminder-v1';
-const STATIC_CACHE = 'perks-reminder-static-v1';
-const DYNAMIC_CACHE = 'perks-reminder-dynamic-v1';
-const IMAGE_CACHE = 'perks-reminder-images-v1';
+const CACHE_NAME = 'perks-reminder-v2';
+const STATIC_CACHE = 'perks-reminder-static-v2';
+const DYNAMIC_CACHE = 'perks-reminder-dynamic-v2';
+const IMAGE_CACHE = 'perks-reminder-images-v2';
 
 // Resources to cache immediately
 const STATIC_ASSETS = [
-  '/',
   '/offline', // Offline fallback page
   '/favicon.png',
   '/icons/apple-touch-icon.png',
@@ -104,9 +103,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML pages - stale while revalidate
+  // HTML pages may contain user-specific auth state. Always use network so
+  // stale signed-in pages are not shown after logout.
   if (request.mode === 'navigate') {
-    event.respondWith(staleWhileRevalidateStrategy(request));
+    event.respondWith(navigationStrategy(request));
     return;
   }
 
@@ -210,25 +210,17 @@ async function imageStrategy(request) {
 }
 
 /**
- * Stale while revalidate - return cache immediately, update in background
+ * Navigation strategy - never cache HTML pages because they can contain
+ * user-specific auth state.
  */
-async function staleWhileRevalidateStrategy(request) {
+async function navigationStrategy(request) {
   const cache = await caches.open(DYNAMIC_CACHE);
-  const cachedResponse = await cache.match(request);
-  
-  // Fetch from network in background
-  const networkPromise = fetch(request).then((networkResponse) => {
-    if (networkResponse.status === 200) {
-      cache.put(request, networkResponse.clone());
-    }
-    return networkResponse;
-  }).catch(() => {
-    // Network failed, but we might have cache
-    return cachedResponse;
-  });
-  
-  // Return cache immediately if available, otherwise wait for network
-  return cachedResponse || networkPromise;
+
+  try {
+    return await fetch(request);
+  } catch {
+    return cache.match('/offline');
+  }
 }
 
 // Background sync for offline actions
