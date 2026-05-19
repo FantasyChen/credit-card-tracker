@@ -43,6 +43,27 @@ function getCookieDomains(host: string): Array<string | undefined> {
   return [undefined, `.${rootDomain}`];
 }
 
+function serializeExpiredCookie(
+  name: string,
+  domain: string | undefined,
+  secure: boolean,
+  httpOnly: boolean
+): string {
+  const parts = [
+    `${name}=`,
+    'Path=/',
+    'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+    'Max-Age=0',
+  ];
+
+  if (domain) parts.push(`Domain=${domain}`);
+  if (secure) parts.push('Secure');
+  if (httpOnly) parts.push('HttpOnly');
+  parts.push('SameSite=Lax');
+
+  return parts.join('; ');
+}
+
 function getSafeCallbackUrl(request: NextRequest): URL {
   const fallback = new URL('/', request.url);
   const callbackUrl = request.nextUrl.searchParams.get('callbackUrl');
@@ -72,21 +93,20 @@ function getSafeCallbackUrl(request: NextRequest): URL {
 export function GET(request: NextRequest) {
   const response = NextResponse.redirect(getSafeCallbackUrl(request));
   const domains = getCookieDomains(request.headers.get('host') || request.nextUrl.host);
-  const expires = new Date(0);
 
   for (const name of getCookieNames()) {
     for (const domain of domains) {
       if (name.startsWith('__Host-') && domain) continue;
 
-      response.cookies.set(name, '', {
-        domain,
-        expires,
-        httpOnly: name.includes('session-token'),
-        maxAge: 0,
-        path: '/',
-        sameSite: 'lax',
-        secure: request.nextUrl.protocol === 'https:',
-      });
+      response.headers.append(
+        'Set-Cookie',
+        serializeExpiredCookie(
+          name,
+          domain,
+          request.nextUrl.protocol === 'https:',
+          name.includes('session-token')
+        )
+      );
     }
   }
 
