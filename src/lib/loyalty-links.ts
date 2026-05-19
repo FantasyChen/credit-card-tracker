@@ -1,3 +1,5 @@
+import { PRIMARY_SITE_URL } from './site';
+
 export function buildLoyaltyCallbackUrl(host: string): string | null {
   if (!host.includes('loyalty.') && !host.includes('loyalty.localhost')) {
     return null;
@@ -14,5 +16,9 @@ export function buildLoyaltySignInRedirect(host: string): string {
     return '/api/auth/signin?callbackUrl=/loyalty';
   }
 
-  return `/api/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+  const authBaseUrl = host.includes('localhost')
+    ? `http://${host.replace(/^loyalty\./, '')}`
+    : PRIMARY_SITE_URL;
+
+  return `${authBaseUrl}/api/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 }

@@ -17,7 +17,10 @@ describe('loyalty link helpers', () => {
 
   it('builds loyalty sign-in redirects from an explicit host', () => {
     expect(buildLoyaltySignInRedirect('loyalty.perks-reminder.com')).toBe(
-      '/api/auth/signin?callbackUrl=https%3A%2F%2Floyalty.perks-reminder.com%2Floyalty'
+      'https://www.perks-reminder.com/api/auth/signin?callbackUrl=https%3A%2F%2Floyalty.perks-reminder.com%2Floyalty'
+    );
+    expect(buildLoyaltySignInRedirect('loyalty.localhost:3000')).toBe(
+      'http://localhost:3000/api/auth/signin?callbackUrl=http%3A%2F%2Floyalty.localhost%3A3000%2Floyalty'
     );
     expect(buildLoyaltySignInRedirect('localhost:3000')).toBe('/api/auth/signin?callbackUrl=/loyalty');
   });
