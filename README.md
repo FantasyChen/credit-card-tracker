@@ -10,6 +10,16 @@ Perks Reminder is a free, open-source tool that tracks your credit card perks an
 
 **[Launch Perks Reminder →](https://www.perks-reminder.com/)**
 
+## What It Tracks
+
+| Area | Examples |
+| --- | --- |
+| Card benefits | Monthly credits, annual credits, statement credits, limited-time perks |
+| Welcome bonuses | Signup bonus deadlines, progress notes, card-specific reminders |
+| Annual fees | Renewal dates, retention notes, ROI checks |
+| Loyalty programs | Miles, points, free nights, certificates, expiration dates |
+| Usage guidance | Practical guides for using recurring credits before they expire |
+
 ### 📱 Install on Your Phone
 This is a Progressive Web App (PWA) - install it for a native app experience:
 - **iPhone/iPad:** Open in Safari → Share → "Add to Home Screen"
