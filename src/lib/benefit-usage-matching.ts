@@ -1,6 +1,7 @@
 type BenefitForUsageMatch = {
   category: string;
   description: string;
+  cardName?: string | null;
 };
 
 function includesAny(value: string, terms: string[]): boolean {
@@ -9,6 +10,7 @@ function includesAny(value: string, terms: string[]): boolean {
 
 export function inferBenefitUsageWaySlug(benefit: BenefitForUsageMatch): string {
   const text = `${benefit.category} ${benefit.description}`.toLowerCase();
+  const cardName = benefit.cardName?.toLowerCase() ?? '';
 
   if (includesAny(text, ['global entry', 'tsa precheck', 'security screening'])) {
     return 'security-screening-credits';
@@ -19,6 +21,14 @@ export function inferBenefitUsageWaySlug(benefit: BenefitForUsageMatch): string 
   if (includesAny(text, ['uber one'])) return 'uber-one-credit';
   if (includesAny(text, ['blacklane'])) return 'blacklane-credit';
   if (includesAny(text, ['uber cash', 'lyft', 'rideshare'])) return 'rideshare-credits';
+
+  if (cardName.includes('marriott bonvoy brilliant') && includesAny(text, ['dining credit', 'restaurant'])) {
+    return 'brilliant-doordash-amazon-gift-card';
+  }
+
+  if (cardName.includes('american express business gold') && includesAny(text, ['flexible business', 'office supply'])) {
+    return 'business-gold-office-supply-gift-cards';
+  }
 
   if (includesAny(text, ['doordash', 'instacart', 'grubhub'])) return 'delivery-grocery-credits';
   if (includesAny(text, ['fine dining'])) return 'chase-fine-dining-credit';

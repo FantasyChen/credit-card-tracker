@@ -1,5 +1,26 @@
 # Post-2.0 Product Priorities
 
+## Active Slice: Technical Benefit Usage Guides and Compact Dashboard Guide UI
+
+## Goal
+Make Benefit Usage Guides feel more like Nitan-informed technical playbooks while keeping each dashboard benefit card compact.
+
+## Progress
+- [x] Confirmed Brilliant dining credit community pattern from Nitan posts: DoorDash gift-card marketplace can be used for Amazon-compatible gift cards, with Zift/inventory, DashPass, app/browser/language, and coding caveats.
+- [x] Added a Brilliant-specific usage guide for DoorDash Amazon gift-card usage.
+- [x] Continued deeper Nitan review across AMEX coupon-book summaries, Platinum playbooks, UA TravelBank master threads, Delta/UA rideshare DPs, Resy Toast/deposit DPs, Saks DP discussion, and Business Gold office-supply GC discussion.
+- [x] Added a Business Gold office-supply gift-card guide for the monthly flexible business credit.
+- [x] Deepened existing Airline Fee, Rideshare, Resy/Toast, Saks, Lululemon, and Travel Portal guides with DP-specific technical paths and caveats.
+- [x] Made usage-guide matching card-aware so generic "$25 Monthly Dining Credit" can route to a product-specific guide.
+- [x] Simplified the dashboard benefit-card guide affordance from a large amber block into a compact "How to use" link beside the correction link.
+- [x] Verified with focused Jest, `npx tsc --noEmit --pretty false`, dev DB seed, browser e2e for guide pages/index/card link, and dev DB `next build`.
+
+## Decisions
+- Keep risky/community-DP patterns framed as repeatable playbooks with caveats, not guaranteed issuer-published redemption methods.
+- Mark current/dead risk explicitly: UA TravelBank has old positive DP but current 2026 discussion marks Amex Platinum as likely dead; Uber Eats Family-profile rideshare workaround has recent Amex dead reports.
+- Prefer card-specific guide mapping when benefit descriptions overlap across products, with a generic category/description fallback for existing rows.
+- Keep dashboard cards focused on tracking state and actions; deeper guide content belongs on the guide detail page.
+
 ## Goal
 Use the Nitan competitor research to choose the next product slices that strengthen Perks Reminder's clearest wedge: open-source, cross-platform benefit tracking that explains how to actually use expiring value.
 

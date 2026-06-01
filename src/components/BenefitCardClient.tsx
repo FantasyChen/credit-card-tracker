@@ -302,21 +302,16 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
             </div>
           </div>
 
-          <div className="space-y-2 sm:pl-11">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:pl-11">
             {status.usageWaySlug && (
               <Link
                 href={`/benefits/how-to-use/${status.usageWaySlug}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:border-amber-300 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 transition-colors hover:text-amber-900 hover:underline dark:text-amber-300 dark:hover:text-amber-100"
               >
-                <span className="inline-flex min-w-0 items-center gap-2">
-                  <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                  <span className="truncate">Use guide: qualifies, timing, caveats</span>
-                </span>
-                <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
+                <span>How to use</span>
               </Link>
             )}
             <SuggestCorrectionLink

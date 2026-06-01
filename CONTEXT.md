@@ -1,4 +1,5 @@
 # Context
+<!-- context-harness:schema v2 -->
 
 ## Project
 Perks Reminder is a free, open-source Next.js 15 / React 19 / TypeScript PWA for tracking recurring credit card benefits, free nights/certificates, loyalty program expirations, and reminder emails. It uses Prisma with Neon Postgres, NextAuth, Resend, Vercel cron jobs, Tailwind CSS, and Jest.
@@ -51,6 +52,20 @@ announcement-state/ Local ignored state for one-time announcement batches
 - Punt free-night/certificate dashboard, monthly digest/calendar reminders, and best-card-by-category until the front-loaded priorities are handled.
 - Keep Perks Reminder's wedge centered on open-source cross-platform tracking plus practical usage guidance; avoid trying to out-native Reward Radar/CardFans or out-email PerkPerks in one step.
 - If iOS work starts, make widgets, push notifications, and quick completion the native value rather than rebuilding the whole web app first.
+
+## Language
+- "Nitan" / "泥潭" refers to US Card Forum community research and practical card-user data points.
+- "Benefit Usage Guides" are practical, community-informed instructions for using recurring credit card benefits before expiration.
+- "Benefit status" is the per-cycle materialized tracking row shown on the dashboard.
+- "Predefined" card and benefit data means catalog/template data in Prisma seed records, distinct from user-owned cards and benefits.
+
+## Relationships
+- Template benefit changes affect only future card additions unless existing user cards are migrated and benefit statuses are materialized.
+- Benefit dashboard rendering should consume projected dashboard data from `src/lib/benefit-dashboard.ts` where practical.
+- Guide content should stay practical and action-oriented, with caveats and provenance visible where the UI supports it.
+
+## Flagged Ambiguities
+- None currently flagged.
 
 ## Learned Patterns
 - Resend free transactional quota is recipient-based and 100/day; one email to 481 users consumes 481 quota units, and sent/received emails can both count.

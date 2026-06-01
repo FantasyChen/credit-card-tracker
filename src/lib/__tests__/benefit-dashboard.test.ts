@@ -226,6 +226,44 @@ describe('buildBenefitDashboardProjection', () => {
       ])
     );
   });
+
+  it('prefers card-specific usage guides when benefit names overlap', () => {
+    const brilliantCard = {
+      ...card,
+      name: 'Marriott Bonvoy Brilliant American Express Card',
+    };
+
+    const projection = buildBenefitDashboardProjection({
+      statuses: [
+        rawStatus('brilliant-dining', {
+          benefit: {
+            category: 'Dining',
+            description: '$25 Monthly Dining Credit',
+            creditCard: brilliantCard,
+          } as never,
+        }),
+      ],
+      userCards: [brilliantCard],
+      usageWays: [
+        {
+          slug: 'dining-credits',
+          predefinedBenefits: [{ category: 'Dining', description: '$25 Monthly Dining Credit' }],
+        },
+        {
+          slug: 'brilliant-doordash-amazon-gift-card',
+          predefinedBenefits: [{
+            category: 'Dining',
+            description: '$25 Monthly Dining Credit',
+            predefinedCard: { name: 'Marriott Bonvoy Brilliant American Express Card' },
+          }],
+        },
+      ],
+      predefinedCardFees: [],
+      now: date('2026-05-15'),
+    });
+
+    expect(projection.upcomingBenefits[0].usageWaySlug).toBe('brilliant-doordash-amazon-gift-card');
+  });
 });
 
 describe('applyBenefitDashboardFilters', () => {

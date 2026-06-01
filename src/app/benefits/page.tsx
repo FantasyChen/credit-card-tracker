@@ -45,6 +45,9 @@ export default async function BenefitsDashboardPage() {
         select: {
           category: true,
           description: true,
+          predefinedCard: {
+            select: { name: true },
+          },
         },
       },
     },

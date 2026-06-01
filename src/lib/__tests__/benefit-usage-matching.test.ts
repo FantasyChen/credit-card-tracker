@@ -47,6 +47,18 @@ describe('inferBenefitUsageWaySlug', () => {
 
   it('splits shopping, dining, delivery, and membership credits into targeted guides', () => {
     expect(inferBenefitUsageWaySlug({
+      category: 'Dining',
+      description: '$25 Monthly Dining Credit',
+      cardName: 'Marriott Bonvoy Brilliant American Express Card',
+    })).toBe('brilliant-doordash-amazon-gift-card');
+
+    expect(inferBenefitUsageWaySlug({
+      category: 'Business',
+      description: '$20 Monthly Flexible Business Credit (FedEx, Grubhub, Office Supply)',
+      cardName: 'American Express Business Gold Card',
+    })).toBe('business-gold-office-supply-gift-cards');
+
+    expect(inferBenefitUsageWaySlug({
       category: 'Shopping',
       description: '$75 Quarterly Lululemon Credit (Q1: Jan-Mar)',
     })).toBe('lululemon-credit');

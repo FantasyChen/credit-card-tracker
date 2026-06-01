@@ -1425,6 +1425,23 @@ Be aware these typically don't count:
 
 Refund-based airline workarounds and travel-bank style methods can change quickly and may be clawed back. The dependable workflow is to use the credit for real eligible incidental fees on the selected airline and keep receipts until the credit posts.
 
+## Nitan DP Map
+
+Community playbooks change by airline and calendar year:
+
+- **United TravelBank** had strong 2025 and early-2026 data points for Amex airline-fee credits, usually in $50 or $100 chunks after selecting United. By mid-2026, current Nitan/DoC discussion labels the Amex Platinum path as likely dead, so do not treat old UA data points as current.
+- **Southwest low-fare/change methods** are still discussed as the fallback for some Amex airline-fee credits: keep each incremental airline charge below the apparent reimbursement threshold, then track the resulting refund or travel credit carefully.
+- **Aspire airline credit** is quarterly and does not require the same airline-selection flow as Amex Platinum-style incidental credits; do not copy one card's workflow to another without checking terms.
+- **Ritz/BoA/other airline credits** can have different reimbursement rules and manual-review paths.
+
+## If You Test an Advanced Path
+
+1. Confirm the selected airline or card-specific airline rule first.
+2. Use a small test transaction early in the period.
+3. Wait for the benefit meter or statement credit before scaling.
+4. Track any resulting airline credit expiration separately.
+5. Avoid asking customer service to bless a workaround; it can draw manual review.
+
 ## Pro Tips
 
 - Check your specific issuer's terms for the detailed list
@@ -1478,6 +1495,15 @@ For cards offering Lyft credits:
 - Take advantage during surge pricing times
 - Use for airport rides to maximize value
 - Combine with Lyft Pink membership benefits
+
+## Delta and United Rideshare Caveats
+
+Some cards reimburse rideshare charges but not food delivery. Nitan data points show these are more fragile than ordinary Uber Cash:
+
+- Delta Platinum/Reserve rideshare credits require Amex enrollment and can take up to 24 hours after enrollment to activate.
+- Lyft balance reloads have had positive data points, but the minimum reload can be higher than the monthly credit.
+- The Uber Eats Family-profile workaround that once made food orders post as rideshare is now marked Amex dead in recent community reports.
+- If you need food delivery, use true Uber Cash benefits; if you need a rideshare credit, a real ride or a Lyft balance test is cleaner.
 
 ## Common Issues
 
@@ -1801,6 +1827,13 @@ This guide applies to broad credits that require a bank travel portal, such as C
 
 Some portal credits can be used for flights that later become airline-controlled credit, but this is airline-specific and can leave you with expiring funds. If you consider that path, verify current data points, expiration rules, and who controls the credit before booking.
 
+Nitan summary for this path:
+
+- Non-basic-economy, non-refundable airfare is the usual test vehicle because it can sometimes be changed or canceled into airline credit.
+- Delta, JetBlue, and Alaska have more favorable community data points than American; United can remain OTA-controlled or require extra fees depending on the booking.
+- Airline credits usually expire, often around one year from ticketing or booking activity. Track the expiration separately from the bank benefit.
+- This is best for preserving value for future travel, not for users who have no realistic use for airline credit.
+
 ## Safer Use
 
 - Book travel you already need through the required portal.
@@ -1899,6 +1932,57 @@ Dining credits come in several forms:
         'Link your card to apps at the start of the month',
         'Some credits require enrollment through card issuer portal',
         'Credits can often be used for both dine-in and takeout'
+      ]
+    },
+    {
+      title: 'How to Use Amex Brilliant Dining Credit via DoorDash Amazon Gift Cards',
+      slug: 'brilliant-doordash-amazon-gift-card',
+      description: 'A technical playbook for converting the monthly Marriott Bonvoy Brilliant dining credit into Amazon balance through DoorDash gift cards',
+      category: 'Dining',
+      content: `## Best Repeatable Path
+
+The Marriott Bonvoy Brilliant dining credit is a monthly Amex statement credit. The cleanest community playbook is to run it through DoorDash's gift-card marketplace and buy an Amazon eGift card when Amazon is available.
+
+This is a data-point-driven path, not an issuer-published redemption method. Test with a small purchase after any DoorDash or Amex coding change.
+
+## Setup
+
+1. Add the Brilliant card directly as a DoorDash payment method.
+2. Do not pay with DoorDash gift card balance, Chase DoorDash credits, Apple Pay, or a wallet token if you are trying to preserve merchant coding.
+3. Open DoorDash gift cards. Amazon may appear inside a Zift multi-brand card rather than as a plain Amazon tile.
+4. If Amazon is missing, check alternate Zift card designs and try app vs. desktop before assuming it is gone.
+
+## Monthly Runbook
+
+1. Buy roughly $25 of Amazon-compatible eGift card value through DoorDash.
+2. If DoorDash is running a discount, size the cart so the Brilliant card charge is near $25 rather than the face value.
+3. Save the DoorDash receipt and the eGift delivery email until the Amex credit posts.
+4. Redeem the Amazon code into your own Amazon account immediately so the code is not sitting in email.
+5. Mark the benefit complete in Perks Reminder after the Amex credit posts, not when DoorDash sends the gift card.
+
+## What to Watch
+
+- DoorDash/Zift inventory changes. Amazon can move behind specific card designs or disappear temporarily.
+- DoorDash sometimes makes gift-card promos DashPass-member-only.
+- Browser, app, language, and account history can affect whether checkout succeeds.
+- Amex can change merchant qualification or claw back abusive gift-card patterns.
+- Overseas dining can work when the merchant processes as a restaurant, but local card acceptance is inconsistent; DoorDash gift cards are usually less operationally messy.
+
+## Posting Expectations
+
+Community data points commonly show the Brilliant dining credit posting a few days after a qualifying DoorDash or restaurant charge, but Amex terms can allow longer. Do not wait until the final day of the month if you need time to retry.
+
+## Avoid
+
+- Buying a large gift-card balance before confirming current coding
+- Paying with DoorDash gift-card balance or app credits
+- Letting Amazon codes sit unredeemed
+- Assuming one successful month guarantees future months`,
+      tips: [
+        'Use the Brilliant card directly in DoorDash, not wallet tokens or DoorDash balance',
+        'Look for Amazon inside Zift multi-brand gift cards if no Amazon tile appears',
+        'Test small after DoorDash, Zift, or Amex coding changes',
+        'Mark complete only after the Amex statement credit posts'
       ]
     },
     {
@@ -2101,6 +2185,18 @@ Many Resy restaurants use **Toast** as their point-of-sale system, which allows 
 - Can use for dine-in or takeout
 - Most don't expire
 
+## Prepaid Reservation Deposit Method
+
+Nitan data points also point to a second path: some Resy restaurants require a prepaid reservation deposit that is charged up front and refundable if canceled before the stated cutoff.
+
+1. In Resy, search for restaurants with a prepaid reservation or deposit.
+2. Read the cancellation rule carefully; some seats are non-refundable while nearby time slots or table types are refundable.
+3. Use the enrolled Amex card for the deposit.
+4. Wait for the charge to post and for the Resy credit email or benefit meter to move.
+5. If your plan was only to test, cancel inside the restaurant's stated free-cancellation window.
+
+This is a DP-driven method. It is safer to treat the deposit as money you may actually spend at the restaurant, not as guaranteed cash-out.
+
 ## Verified Toast Restaurants
 
 Popular Resy restaurants using Toast (verify current status):
@@ -2173,7 +2269,8 @@ Popular Resy restaurants using Toast (verify current status):
 
 ⚠️ **Check current terms** - Amex may update which purchases qualify
 ⚠️ **Keep receipts** - Save confirmation for records
-⚠️ **Toast required** - Regular online orders may not trigger credit
+⚠️ **Toast/Resy signal matters** - Toast gift cards and Resy deposits have the strongest community data points
+⚠️ **Test small first** - Some Toast pages post under a restaurant group or sister restaurant and may fail
 ⚠️ **Expiration** - Use credit before period ends (typically 6 months)
 ⚠️ **One credit per period** - Can't stack multiple periods
 
@@ -2181,7 +2278,7 @@ Popular Resy restaurants using Toast (verify current status):
 
 **Credit didn't post?**
 - Wait full 8-12 weeks before inquiring
-- Check that restaurant uses Toast platform
+- Check that the restaurant is actually on Resy and the payment path has a Toast or Resy signal
 - Verify you used correct Amex card
 - Contact Amex if no credit after 12 weeks
 
@@ -2487,6 +2584,9 @@ Fine dining credits are not generic restaurant credits. Check the card benefit p
 ## Practical Use
 
 - Use in-store checkout when you want the cleanest merchant coding.
+- In-store Saks gift cards have recurring positive community data points, but this is not an issuer-published guarantee.
+- Online eGift cards are widely treated as a bad path; buy merchandise online instead if you cannot visit a store.
+- Wait for a Rakuten or shopping-portal boost when buying merchandise directly.
 - Online purchases can work, but shipping, returns, and delayed posting can complicate period-end usage.
 - Buy early in the window so a replacement order is possible if something cancels.
 
@@ -2494,11 +2594,13 @@ Fine dining credits are not generic restaurant credits. Check the card benefit p
 
 - Saks OFF 5TH unless your terms explicitly include it
 - Marketplace or third-party gift-card sellers
+- Saks online eGift cards
 - Returns that reverse the statement credit
 - Orders placed so late that the charge posts after the window closes`,
       tips: [
         'Enroll first if the card requires it',
         'Use Saks Fifth Avenue or Saks.com directly',
+        'In-store gift cards have better data points than online eGift cards',
         'Buy early in the semi-annual window',
         'Avoid returns until the credit is final'
       ]
@@ -2519,19 +2621,21 @@ Fine dining credits are not generic restaurant credits. Check the card benefit p
 ## Practical Use
 
 - In-store purchases are usually the cleanest path.
-- If buying gift cards, verify current terms and merchant coding first.
+- Nitan data points distinguish gift-card paths: in-store gift cards and online physical gift cards have worked, while online eGift cards are commonly reported as not reimbursing.
+- If buying a gift card, make a small test early in the quarter before buying the full credit amount.
 - Use the credit early enough to handle returns, out-of-stock cancellations, or delayed posting.
 
 ## Avoid
 
 - Marketplace checkout
+- Online eGift cards unless fresh data points say otherwise
 - Relying on gift-card behavior without checking current terms
 - Letting the charge post after quarter-end
 - Returning items before the credit is settled`,
       tips: [
         'Use direct Lululemon checkout',
         'Quarter-end posting date matters',
-        'In-store purchases are often cleaner than edge-case online flows',
+        'In-store GC and online physical GC have better data points than eGift cards',
         'Keep receipts until the credit posts'
       ]
     },
@@ -2825,6 +2929,50 @@ Split-payment quirks, order review, and payment update flows can make business c
       ]
     },
     {
+      title: 'How to Use Amex Business Gold Office Supply Credits via Gift Cards',
+      slug: 'business-gold-office-supply-gift-cards',
+      description: 'Use the monthly Amex Business Gold flexible business credit at office-supply merchants with practical gift-card caveats',
+      category: 'Business Services',
+      content: `## Best Repeatable Path
+
+The Business Gold flexible business credit can reimburse eligible U.S. purchases at FedEx, Grubhub, and office-supply stores. Nitan data points repeatedly point to Staples or Office Depot/OfficeMax as the practical monthly path when you do not need FedEx or Grubhub.
+
+## Office-Supply Runbook
+
+1. Enroll the flexible business credit in Amex first.
+2. Wait up to 24 hours after enrollment before testing.
+3. Buy directly from an eligible U.S. office-supply merchant, such as Staples or Office Depot/OfficeMax.
+4. Keep the card charge near the monthly credit amount when possible.
+5. Save the receipt until the Amex credit posts.
+
+## Gift-Card Playbook
+
+- Store gift cards and third-party merchant gift cards have had positive community data points.
+- Amazon or Target gift cards are commonly discussed because they preserve value better than random office supplies.
+- Visa/Mastercard prepaid cards and other cash-equivalent products are explicitly riskier and can trigger level-3-data or cash-equivalent scrutiny.
+- Online Staples eGift-card purchases have had positive data points, but test small after any terms or checkout change.
+
+## What to Watch
+
+- The benefit is monthly and does not roll over.
+- Additional card purchases can count, but the account-level monthly cap still applies.
+- Amex terms exclude prepaid cards and cash equivalents, so do not treat every gift-card path as equally safe.
+- Odd activation-fee totals and large prepaid-card purchases are more likely to stand out than a small merchant gift card.
+
+## Avoid
+
+- Buying VGC/MGC as the default path
+- Running large gift-card transactions before a small test posts
+- Forgetting enrollment or buying immediately after enrollment
+- Assuming a Reddit or Nitan DP means issuer terms cannot change`,
+      tips: [
+        'Enroll first and wait before testing',
+        'Staples and Office Depot/OfficeMax are the practical office-supply paths',
+        'Prefer merchant gift cards over prepaid cash-equivalent cards',
+        'Keep receipts until the monthly credit posts'
+      ]
+    },
+    {
       title: 'How to Use Entertainment Credits',
       slug: 'entertainment-credits',
       description: 'Set up streaming, digital entertainment, ticket, and event credits so they post reliably',
@@ -2958,12 +3106,23 @@ For benefits that do not reimburse a purchase, mark them complete when you redee
   });
   const usageWayIdBySlug = new Map(usageWayRecords.map((way) => [way.slug, way.id]));
   const predefinedBenefits = await prisma.predefinedBenefit.findMany({
-    select: { id: true, category: true, description: true },
+    select: {
+      id: true,
+      category: true,
+      description: true,
+      predefinedCard: {
+        select: { name: true },
+      },
+    },
   });
 
   let linkedUsageWays = 0;
   for (const benefit of predefinedBenefits) {
-    const slug = inferBenefitUsageWaySlug(benefit);
+    const slug = inferBenefitUsageWaySlug({
+      category: benefit.category,
+      description: benefit.description,
+      cardName: benefit.predefinedCard.name,
+    });
     const usageWayId = usageWayIdBySlug.get(slug);
     if (!usageWayId) {
       throw new Error(`Missing BenefitUsageWay seed for slug "${slug}"`);

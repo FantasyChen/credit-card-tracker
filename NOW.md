@@ -1,15 +1,15 @@
 # Now
 
 ## Current Focus
-Closed the loyalty sign-out/auth-state fix and deployed it to production.
+Completed deeper Nitan-informed Benefit Usage Guide expansion and compact dashboard guide UI.
 
 ## Active Blockers
 - Local macOS Node 24 still has native module signature issues for `@next/swc-darwin-arm64` and `lightningcss-darwin-arm64`; focused Jest worked with `NEXT_TEST_WASM_DIR=/Users/lfan/Project/credit-card-tracker/node_modules/@next/swc-wasm-nodejs`.
 
 ## Immediate Next Step
-If auth state looks stale again, first verify production `/sw.js` has `perks-reminder-static-v2` and that `/api/force-signout` performs the two-step cookie-clearing redirect.
+Push the verified main-branch changes to GitHub/production deployment.
 
 ## Session State
-- Last modified: 2026-05-19T20:58:52Z
-- Touched files: `src/components/Navbar.tsx`, `src/components/__tests__/Navbar.test.tsx`, `src/app/api/force-signout/route.ts`, `public/sw.js`.
-- Verification: `npx tsc --noEmit --pretty false`, focused navbar Jest, production endpoint/header checks, production `sw.js`, and Playwright signed-out loyalty flow.
+- Last modified: 2026-06-01T17:54:53Z
+- Touched files: `AGENTS.md`, `CONTEXT.md`, `PLAN.md`, `NOW.md`, `prisma/seed.ts`, `src/lib/benefit-usage-matching.ts`, `src/lib/benefit-dashboard.ts`, `src/app/benefits/page.tsx`, `src/components/BenefitCardClient.tsx`, focused tests, and installed context-harness scripts under `scripts/`.
+- Verification: focused Jest with `NEXT_TEST_WASM_DIR=/Users/lfan/Project/credit-card-tracker/node_modules/@next/swc-wasm-nodejs`, `npx tsc --noEmit --pretty false`, `npm run db:dev:seed`, Playwright against `npm run dev:devdb`, and `PATH=/private/tmp/perks-nodebin:$PATH node scripts/with-dev-db.js npx next build`.

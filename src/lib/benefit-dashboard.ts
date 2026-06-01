@@ -34,6 +34,9 @@ export interface UsageWayForDashboard {
   predefinedBenefits: Array<{
     category: string;
     description: string;
+    predefinedCard?: {
+      name: string;
+    } | null;
   }>;
 }
 
@@ -163,6 +166,9 @@ export function buildUsageWaySlugMap(usageWays: UsageWayForDashboard[]): Map<str
   for (const way of usageWays) {
     for (const benefit of way.predefinedBenefits) {
       usageWayMap.set(`${benefit.category}:${benefit.description}`, way.slug);
+      if (benefit.predefinedCard?.name) {
+        usageWayMap.set(`${benefit.predefinedCard.name}:${benefit.category}:${benefit.description}`, way.slug);
+      }
     }
   }
 
@@ -180,6 +186,9 @@ export function augmentBenefitStatusesForDashboard(
   return statuses.map((status) => {
     const cardOriginal = status.benefit.creditCard;
     const usageWaySlug =
+      (cardOriginal
+        ? usageWayMap.get(`${cardOriginal.name}:${status.benefit.category}:${status.benefit.description}`)
+        : null) ??
       usageWayMap.get(`${status.benefit.category}:${status.benefit.description}`) ?? null;
 
     if (!cardOriginal) {

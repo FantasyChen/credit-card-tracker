@@ -113,4 +113,14 @@ describe('BenefitCardClient', () => {
 
     expect(screen.getByText('$10 Monthly Dining Credit')).toBeInTheDocument();
   });
+
+  it('renders a compact usage guide link when available', () => {
+    const status = createMockStatus({ usageWaySlug: 'brilliant-doordash-amazon-gift-card' });
+    render(<BenefitCardClient status={status} />);
+
+    expect(screen.getByRole('link', { name: /How to use/i })).toHaveAttribute(
+      'href',
+      '/benefits/how-to-use/brilliant-doordash-amazon-gift-card'
+    );
+  });
 });
