@@ -14,6 +14,7 @@ Make Benefit Usage Guides feel more like Nitan-informed technical playbooks whil
 - [x] Made usage-guide matching card-aware so generic "$25 Monthly Dining Credit" can route to a product-specific guide.
 - [x] Simplified the dashboard benefit-card guide affordance from a large amber block into a compact "How to use" link beside the correction link.
 - [x] Verified with focused Jest, `npx tsc --noEmit --pretty false`, dev DB seed, browser e2e for guide pages/index/card link, and dev DB `next build`.
+- [x] Pushed `main` to GitHub and confirmed production guide URLs returned 200 after Vercel deployment.
 
 ## Decisions
 - Keep risky/community-DP patterns framed as repeatable playbooks with caveats, not guaranteed issuer-published redemption methods.
