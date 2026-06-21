@@ -1,0 +1,43 @@
+{
+  "$schema": "../schema.json",
+  "name": "Chase Sapphire Preferred",
+  "issuer": "Chase",
+  "annualFee": 95,
+  "imageUrl": "/images/cards/chase-sapphire-preferred.png",
+  "sources": [
+    {
+      "label": "Chase Sapphire Preferred official product page",
+      "url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred",
+      "accessed": "2026-06-20"
+    },
+    {
+      "label": "plan.cards comparison template",
+      "url": "https://github.com/cocdeshijie/plan.cards/blob/main/card_templates/chase/sapphire_preferred/card.yaml",
+      "accessed": "2026-06-20"
+    }
+  ],
+  "benefits": [
+    {
+      "description": "$100 Annual Hotel Credit (Booked through Chase Travel)",
+      "category": "Travel",
+      "maxAmount": 100,
+      "frequency": "YEARLY",
+      "cycleAlignment": "CARD_ANNIVERSARY"
+    },
+    {
+      "description": "$10 Monthly DoorDash Credit",
+      "category": "Food Delivery",
+      "maxAmount": 10,
+      "frequency": "MONTHLY"
+    },
+    {
+      "description": "$120 Global Entry, TSA PreCheck, or NEXUS Credit (every 4 years)",
+      "category": "Travel",
+      "maxAmount": 120,
+      "frequency": "YEARLY",
+      "cycleAlignment": "CARD_ANNIVERSARY",
+      "fixedCycleDurationMonths": 48
+    }
+  ],
+  "reviewNotes": "This example is intentionally limited to trackable credits. Earning multipliers, partner transfer changes, and one-year promotional subscriptions belong in reviewer notes unless the product adds recurring user-trackable value."
+}

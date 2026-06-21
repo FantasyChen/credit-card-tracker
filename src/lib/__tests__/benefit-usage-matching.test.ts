@@ -84,6 +84,11 @@ describe('inferBenefitUsageWaySlug', () => {
     })).toBe('uber-one-credit');
 
     expect(inferBenefitUsageWaySlug({
+      category: 'Fitness',
+      description: '$10 Monthly Peloton Credit',
+    })).toBe('membership-credits');
+
+    expect(inferBenefitUsageWaySlug({
       category: 'Travel',
       description: '$189 CLEAR Plus Credit',
     })).toBe('clear-credit');

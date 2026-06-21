@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 // Import the actual card creation logic
 import { createCardForUser } from '@/lib/actions/cardUtils';
 import { validateCardDigits } from '@/lib/cardDisplayUtils';
+import { parseIsoDateOnly } from '@/lib/card-lifecycle';
 import { revalidatePath } from 'next/cache';
 
 // Define the expected structure of the imported JSON
@@ -13,11 +14,58 @@ interface ImportCardEntry {
   predefinedCardIssuer: string;
   openedDate: string | null; // Expecting YYYY-MM-DD format
   lastFourDigits?: string | null; // Optional last 4 digits
+  nickname?: string | null;
+  lifecycleStatus?: 'ACTIVE' | 'CLOSED' | 'PRODUCT_CHANGED';
+  closedDate?: string | null;
+  annualFeeAmount?: number | null;
+  annualFeeDueDate?: string | null;
+  signupBonusDeadline?: string | null;
+  spendDeadline?: string | null;
+  productChangedFrom?: string | null;
+  productChangedTo?: string | null;
+  lifecycleNotes?: string | null;
+  events?: Array<{
+    eventType: 'OPENED' | 'ANNUAL_FEE' | 'RETENTION' | 'PRODUCT_CHANGE' | 'CLOSED' | 'SIGNUP_BONUS' | 'SPEND_DEADLINE' | 'NOTE';
+    eventDate: string;
+    description: string;
+    metadata?: unknown;
+  }>;
 }
 
 interface ImportData {
   version: string;
   userCards: ImportCardEntry[];
+}
+
+const allowedLifecycleStatuses = new Set(['ACTIVE', 'CLOSED', 'PRODUCT_CHANGED']);
+const allowedCardEventTypes = new Set(['OPENED', 'ANNUAL_FEE', 'RETENTION', 'PRODUCT_CHANGE', 'CLOSED', 'SIGNUP_BONUS', 'SPEND_DEADLINE', 'NOTE']);
+
+function parseImportDate(dateValue: string | null | undefined, fieldName: string, cardName: string): Date | null {
+  if (!dateValue) return null;
+  const parsedDate = parseIsoDateOnly(dateValue);
+  if (!parsedDate) {
+    throw new Error(`Invalid ${fieldName} for card "${cardName}": Expected a real YYYY-MM-DD date`);
+  }
+
+  return parsedDate;
+}
+
+function parseLifecycleStatus(status: unknown, cardName: string): ImportCardEntry['lifecycleStatus'] {
+  if (status == null || status === '') return 'ACTIVE';
+  if (typeof status !== 'string' || !allowedLifecycleStatuses.has(status)) {
+    throw new Error(`Invalid lifecycleStatus for card "${cardName}"`);
+  }
+
+  return status as ImportCardEntry['lifecycleStatus'];
+}
+
+function parseAnnualFeeAmount(value: unknown, cardName: string): number | undefined {
+  if (value == null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new Error(`Invalid annualFeeAmount for card "${cardName}": Expected a non-negative number`);
+  }
+
+  return value;
 }
 
 export async function POST(request: Request) {
@@ -47,7 +95,7 @@ export async function POST(request: Request) {
     try {
       importData = JSON.parse(text);
       // Basic validation
-      if (!importData || importData.version !== '1.0.0' || !Array.isArray(importData.userCards)) {
+      if (!importData || !['1.0.0', '1.1.0'].includes(importData.version) || !Array.isArray(importData.userCards)) {
         throw new Error('Invalid JSON structure or version');
       }
     } catch (parseError) {
@@ -62,20 +110,10 @@ export async function POST(request: Request) {
 
     for (const cardEntry of importData.userCards) {
       try {
-        const { predefinedCardName, predefinedCardIssuer, openedDate, lastFourDigits } = cardEntry;
+        const { predefinedCardName, predefinedCardIssuer, openedDate, lastFourDigits, nickname } = cardEntry;
 
         // Validate date format (YYYY-MM-DD) if provided
-        let parsedOpenedDate: Date | null = null;
-        if (openedDate) {
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(openedDate)) {
-             throw new Error(`Invalid openedDate format for card \"${predefinedCardName}\": Expected YYYY-MM-DD`);
-          }
-          // Parse the date string. Ensure it's treated consistently (e.g., as UTC)
-          parsedOpenedDate = new Date(openedDate + 'T00:00:00Z');
-          if (isNaN(parsedOpenedDate.getTime())) {
-            throw new Error(`Invalid date value for card \"${predefinedCardName}\"`);
-          }
-        }
+        const parsedOpenedDate = parseImportDate(openedDate, 'openedDate', predefinedCardName);
 
         // Find the corresponding PredefinedCard
         const predefinedCard = await prisma.predefinedCard.findUnique({
@@ -94,6 +132,7 @@ export async function POST(request: Request) {
             name: predefinedCard.name, // Name copied from predefined card
             issuer: predefinedCard.issuer, // Issuer copied from predefined card
             openedDate: parsedOpenedDate, // Compare dates (handles null comparison correctly)
+            nickname: nickname?.trim() || null,
           },
         });
 
@@ -118,7 +157,8 @@ export async function POST(request: Request) {
           userId,
           predefinedCard.id,
           parsedOpenedDate, // Pass the parsed Date object or null
-          processedLastFourDigits // Pass the last 4 digits
+          processedLastFourDigits, // Pass the last digits
+          nickname?.trim() || null
         );
 
         if (!addResult.success) {
@@ -126,6 +166,59 @@ export async function POST(request: Request) {
           throw new Error(addResult.message || `Failed to import card \"${predefinedCardName}\"`);
         }
         // --- End Add Card Logic ---
+
+        if (addResult.cardId && importData.version === '1.1.0') {
+          const processedLifecycleStatus = parseLifecycleStatus(cardEntry.lifecycleStatus, predefinedCardName);
+          const parsedClosedDate = parseImportDate(cardEntry.closedDate, 'closedDate', predefinedCardName);
+          const parsedAnnualFeeDueDate = parseImportDate(cardEntry.annualFeeDueDate, 'annualFeeDueDate', predefinedCardName);
+          const parsedSignupBonusDeadline = parseImportDate(cardEntry.signupBonusDeadline, 'signupBonusDeadline', predefinedCardName);
+          const parsedSpendDeadline = parseImportDate(cardEntry.spendDeadline, 'spendDeadline', predefinedCardName);
+          const processedAnnualFeeAmount = parseAnnualFeeAmount(cardEntry.annualFeeAmount, predefinedCardName);
+          const importedEvents = cardEntry.events ?? [];
+
+          if (processedLifecycleStatus === 'CLOSED' && !parsedClosedDate) {
+            throw new Error(`Closed card "${predefinedCardName}" requires closedDate`);
+          }
+
+          if (!Array.isArray(importedEvents)) {
+            throw new Error(`Invalid events for card "${predefinedCardName}": Expected an array`);
+          }
+
+          await prisma.creditCard.update({
+            where: { id: addResult.cardId },
+            data: {
+              lifecycleStatus: processedLifecycleStatus,
+              closedDate: processedLifecycleStatus === 'CLOSED' ? parsedClosedDate : null,
+              annualFeeAmount: processedAnnualFeeAmount,
+              annualFeeDueDate: parsedAnnualFeeDueDate,
+              signupBonusDeadline: parsedSignupBonusDeadline,
+              spendDeadline: parsedSpendDeadline,
+              productChangedFrom: cardEntry.productChangedFrom?.trim() || null,
+              productChangedTo: cardEntry.productChangedTo?.trim() || null,
+              lifecycleNotes: cardEntry.lifecycleNotes?.trim() || null,
+            },
+          });
+
+          for (const event of importedEvents) {
+            if (!allowedCardEventTypes.has(event.eventType)) {
+              throw new Error(`Invalid eventType for card "${predefinedCardName}"`);
+            }
+            if (event.eventType === 'OPENED') continue;
+            const eventDate = parseImportDate(event.eventDate, 'eventDate', predefinedCardName);
+            if (!eventDate || !event.description?.trim()) continue;
+
+            await prisma.creditCardEvent.create({
+              data: {
+                creditCardId: addResult.cardId,
+                userId,
+                eventType: event.eventType,
+                eventDate,
+                description: event.description.trim(),
+                metadata: event.metadata == null ? undefined : event.metadata,
+              },
+            });
+          }
+        }
 
         importedCount++;
       } catch (cardError: unknown) {
@@ -142,6 +235,7 @@ export async function POST(request: Request) {
         console.log('Import successful, revalidating paths...')
         revalidatePath('/');
         revalidatePath('/cards');
+        revalidatePath('/cards/calendar');
         revalidatePath('/benefits');
     }
 
@@ -156,4 +250,4 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : 'Error importing data';
     return NextResponse.json({ message }, { status: 500 });
   }
-} 
+}

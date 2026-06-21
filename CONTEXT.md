@@ -1,5 +1,5 @@
 # Context
-<!-- context-harness:schema v2 -->
+<!-- context-harness:schema v3 -->
 
 ## Project
 Perks Reminder is a free, open-source Next.js 15 / React 19 / TypeScript PWA for tracking recurring credit card benefits, free nights/certificates, loyalty program expirations, and reminder emails. It uses Prisma with Neon Postgres, NextAuth, Resend, Vercel cron jobs, Tailwind CSS, and Jest.
@@ -28,7 +28,8 @@ announcement-state/ Local ignored state for one-time announcement batches
 2. Always keep changes surgical and aligned with existing Next.js, Prisma, and Tailwind patterns.
 3. Always run focused tests or build checks for code changes; for frontend changes, verify the rendered behavior when practical.
 
-### Objectives
+### Legacy Objectives
+<!-- Deprecated in schema v3. Preserve as project intent; use PLAN.md Done Criteria and Workflow Verification for active checks. -->
 1. Users can sign in on `perks-reminder.com` and see unchanged cards, benefits, loyalty accounts, and settings after the domain migration.
 2. Reminder emails send from `notifications@perks-reminder.com` and link to the new main and loyalty domains.
 3. Existing users are informed before `coupon-cycle.site` expires on May 27, 2026, without duplicate announcement sends.
@@ -80,6 +81,10 @@ announcement-state/ Local ignored state for one-time announcement batches
 - **Notification Digest Pipeline:** `src/lib/notification-digest.ts` owns notification candidate selection, per-user reminder windows, digest assembly, quota checks, batching, and delivery; the cron route should stay limited to auth/date parsing and response handling.
 - **Duplicate Card Identity:** Dashboard filters, grouping, and ROI should use the physical `CreditCard.id` plus display names, not only the product name. Product-name grouping collapses multiple Aspire/Platinum copies and hides which credit belongs to which card.
 - **Community Corrections:** Card, benefit, and guide surfaces should expose contextual correction links and provenance/last-updated signals. Maintainer workflow lives in `docs/community-data-quality-loop.md`; template changes still need seed plus existing-user migration/status creation.
+- **Usage Guide Coverage Audit:** Run `node scripts/with-dev-db.js npm run usage-guides:audit` after catalog or guide-link changes. The audit queries material recurring predefined credits and should report zero missing `usageWayId` links before a catalog update is considered complete.
+- **Card Lifecycle Tracking:** `CreditCard` now owns lifecycle status, annual-fee due date/amount, sign-up/spend deadlines, product-change fields, and lifecycle notes. `CreditCardEvent` owns timeline history. New cards should get annual-fee defaults and an `OPENED` event through `createCardForUser`.
+- **Multi-Year Benefit Cycles:** Security-screening credits and similar four-year benefits are modeled as `YEARLY` with `CARD_ANNIVERSARY` plus `fixedCycleDurationMonths` (for example `48`). `calculateBenefitCycle` must honor the multi-year duration so these credits do not materialize as annual benefits.
+- **Dev DB Wrapper:** `scripts/with-dev-db.js` intentionally spawns commands without an extra shell so quoted arguments such as `--card "Chase Sapphire Preferred"` reach child scripts intact.
 - **Bulk Onboarding:** The first power-user bulk add flow lives on `/cards/new` and parses shorthand such as `plat x2, gold, csr, aspire x3`. Owner is currently folded into the saved nickname/display label rather than a separate household-owner schema field.
 - **iOS Companion Direction:** `docs/ios-support.md` is the source for native iOS planning. Keep iOS focused on widgets, push notifications, quick mark-complete, and glanceable expiring benefits.
 - **Auth-Sensitive Navigation:** Do not cache navigated HTML pages in the PWA service worker because routes like `/loyalty` and `/benefits` contain user-specific session state; use network-first/no-cache navigation and bump SW cache names when changing auth-sensitive caching.

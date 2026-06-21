@@ -4,9 +4,9 @@
 // adr.js — create a tiny numbered Architecture Decision Record.
 // Usage: node scripts/adr.js "<decision title>"
 
-const fs = require("fs");
-const path = require("path");
-const { today } = require("./lib");
+import fs from "fs";
+import path from "path";
+import { today } from "./lib.js";
 
 const title = process.argv.slice(2).join(" ").trim();
 if (!title) {

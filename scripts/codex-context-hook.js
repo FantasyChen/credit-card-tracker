@@ -6,9 +6,9 @@
 // agent invokes context-catch-up, context-init, or context-maintain at the right
 // moment.
 
-const fs = require("fs");
-const path = require("path");
-const { readHookInput, readTextSafe, findProjectRoot } = require("./lib");
+import fs from "fs";
+import path from "path";
+import { readHookInput, readTextSafe, findProjectRoot } from "./lib.js";
 
 const mode = readArg("--mode") || "catch-up";
 const input = readHookInput();
@@ -33,7 +33,7 @@ function runCatchUp(startDir) {
   const agents = readTextSafe(path.join(root, "AGENTS.md"));
   const context = readTextSafe(path.join(root, "CONTEXT.md"));
   const now = trimForHook(readTextSafe(path.join(root, "NOW.md")), 1400);
-  const needsUpgrade = !hasCurrentSchema(agents) || !hasCurrentSchema(context) || !hasContextIndex(agents) || !context.trim();
+  const needsUpgrade = !hasSupportedSchema(agents) || !hasSupportedSchema(context) || !hasContextIndex(agents) || !context.trim();
   emitAdditionalContext(
     [
       "context-harness detected.",
@@ -105,8 +105,8 @@ function trimForHook(text, maxChars) {
   return `${trimmed.slice(0, maxChars).trimEnd()}\n...`;
 }
 
-function hasCurrentSchema(text) {
-  return /<!--\s*context-harness:schema\s+v2\s*-->/.test(text);
+function hasSupportedSchema(text) {
+  return /<!--\s*context-harness:schema\s+v[23]\s*-->/.test(text);
 }
 
 function hasContextIndex(text) {

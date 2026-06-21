@@ -9,6 +9,7 @@ import { CardsPageSkeleton } from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import CardImageWell from '@/components/ui/CardImageWell';
 import PageHeader from '@/components/ui/PageHeader';
+import { formatDateInput } from '@/lib/card-lifecycle';
 
 // Type for cards fetched from the API, assuming benefits are included
 interface FetchedUserCard extends CreditCard {
@@ -45,6 +46,9 @@ const formatOpenedDate = (date: Date | null): string => {
 function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.Dispatch<React.SetStateAction<FetchedUserCard[]>> }) {
   const [isPending, startTransition] = useTransition();
   const totalPotentialValue = card.benefits.reduce((total, benefit) => total + (benefit.maxAmount ?? 0), 0);
+  const annualFeeText = card.annualFeeDueDate
+    ? `${formatDateInput(card.annualFeeDueDate)}${typeof card.annualFeeAmount === 'number' ? `, $${card.annualFeeAmount.toFixed(0)}` : ''}`
+    : null;
 
   const handleDelete = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -62,84 +66,69 @@ function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.D
   };
 
   return (
-    <div className="flex h-full flex-col justify-between overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600">
-       <div> {/* Content wrapper */}
-        {/* Card Image */}
+    <article className="group grid gap-4 rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 sm:grid-cols-[180px_minmax(0,1fr)_160px] sm:items-center">
+      <div className="overflow-hidden rounded-md bg-gray-50 dark:bg-gray-950">
         <CardImageWell
           imageUrl={card.imageUrl}
           alt={card.displayName || card.name}
           issuer={card.issuer}
-          className="h-40 rounded-none border-x-0 border-t-0"
+          className="h-28 rounded-md border-0"
           imageClassName="p-2"
-          sizes="220px"
+          sizes="180px"
           unoptimized
         />
-        
-        <div className="flex-grow p-4">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-              {card.issuer}
-            </span>
-            {totalPotentialValue > 0 && (
-              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-800">
-                ${totalPotentialValue.toFixed(0)} tracked value
-              </span>
-            )}
-          </div>
-          <h2 className="mb-3 text-lg font-semibold leading-snug text-gray-950 dark:text-gray-100">{card.displayName || card.name}</h2> {/* Use displayName */}
-          <div className="space-y-1.5 mb-3">
-            {card.lastFourDigits && (
-               <p className="text-gray-500 dark:text-gray-400 text-sm">
-                 <span className="font-medium">Last {card.lastFourDigits.length}:</span> {'•'.repeat(card.lastFourDigits.length)}{card.lastFourDigits}
-               </p>
-            )}
-            {card.openedDate && (
-               <p className="text-gray-500 dark:text-gray-400 text-sm">
-                 <span className="font-medium">Opened:</span> {formatOpenedDate(card.openedDate)}
-               </p>
-            )}
-          </div>
+      </div>
 
-          {card.benefits.length > 0 && (
-            <div className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-700">
-              <h3 className="text-sm font-semibold mb-2 text-gray-800 dark:text-gray-200">
-                Key benefits ({card.benefits.length})
-              </h3>
-              <ul className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                {card.benefits.slice(0, 3).map(benefit => (
-                  <li key={benefit.id} className="leading-relaxed">- {benefit.description}</li>
-                ))}
-                {card.benefits.length > 3 && (
-                  <li className="text-blue-600 dark:text-blue-400 font-medium">
-                    +{card.benefits.length - 3} more benefit{card.benefits.length - 3 > 1 ? 's' : ''}
-                  </li>
-                )}
-              </ul>
-            </div>
+      <div className="min-w-0">
+        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+          <span>{card.issuer}</span>
+          {card.lastFourDigits && <span>•••• {card.lastFourDigits}</span>}
+          {card.lifecycleStatus && card.lifecycleStatus !== 'ACTIVE' && (
+            <span>{card.lifecycleStatus === 'CLOSED' ? 'Closed' : 'Product changed'}</span>
           )}
         </div>
-       </div>
+        <h2 className="truncate text-base font-semibold text-gray-950 dark:text-gray-100">{card.displayName || card.name}</h2>
+        <dl className="mt-3 grid gap-2 text-sm text-gray-600 dark:text-gray-300 sm:grid-cols-3">
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">Opened</dt>
+            <dd className="mt-0.5 font-medium text-gray-800 dark:text-gray-200">{formatOpenedDate(card.openedDate)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">Annual fee</dt>
+            <dd className="mt-0.5 font-medium text-gray-800 dark:text-gray-200">{annualFeeText || 'Not set'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">Tracked value</dt>
+            <dd className="mt-0.5 font-medium text-gray-800 dark:text-gray-200">{totalPotentialValue > 0 ? `$${totalPotentialValue.toFixed(0)}` : 'No credits'}</dd>
+          </div>
+        </dl>
+        {card.benefits.length > 0 && (
+          <p className="mt-3 truncate text-sm text-gray-500 dark:text-gray-400">
+            {card.benefits[0].description}
+            {card.benefits.length > 1 ? `, plus ${card.benefits.length - 1} more` : ''}
+          </p>
+        )}
+      </div>
 
-       {/* Action Buttons */}
-       <div className="flex items-center justify-between gap-2 border-t border-gray-200 p-4 dark:border-gray-700">
-          <Link
-            href={`/cards/${card.id}/edit`}
-            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-center text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+      <div className="flex gap-2 sm:flex-col">
+        <Link
+          href={`/cards/${card.id}/edit`}
+          className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-950 dark:hover:bg-gray-200"
+        >
+          Edit
+        </Link>
+        <form onSubmit={handleDelete} className="flex-1">
+          <input type="hidden" name="cardId" value={card.id} />
+          <button
+            type="submit"
+            disabled={isPending}
+            className={`inline-flex min-h-10 w-full items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${isPending ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500' : 'border-gray-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-red-900 dark:hover:bg-red-950/30 dark:hover:text-red-300'}`}
           >
-            Edit
-          </Link>
-          <form onSubmit={handleDelete} className="flex-1">
-            <input type="hidden" name="cardId" value={card.id} />
-            <button
-               type="submit"
-               disabled={isPending} // Disable button while deleting
-               className={`w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors ${isPending ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400' : 'bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-800/30'}`}
-             >
-               {isPending ? 'Removing...' : 'Remove'}
-             </button>
-          </form>
-       </div>
-    </div>
+            {isPending ? 'Removing...' : 'Remove'}
+          </button>
+        </form>
+      </div>
+    </article>
   );
 }
 
@@ -198,9 +187,14 @@ export default function UserCardsPage() {
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       <PageHeader title="My Cards" description="Manage the cards whose benefits you track.">
         {!isLoading && !error && (
-          <Link href="/cards/new" className="inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700">
-            Add New Card
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/cards/calendar" className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700">
+              Calendar
+            </Link>
+            <Link href="/cards/new" className="inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700">
+              Add New Card
+            </Link>
+          </div>
         )}
       </PageHeader>
 
@@ -252,7 +246,7 @@ export default function UserCardsPage() {
       )}
 
       {!isLoading && !error && cards.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-3">
           {cards.map((card) => (
             <CardItem key={card.id} card={card} setCards={setRawCards} />
           ))}

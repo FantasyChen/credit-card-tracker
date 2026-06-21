@@ -33,7 +33,6 @@ const devDirectUrl = devUrl.replace('-pooler.', '.');
 const child = spawn(args[0], args.slice(1), {
   stdio: 'inherit',
   env: { ...process.env, DATABASE_URL: devUrl, DIRECT_URL: devDirectUrl },
-  shell: true,
 });
 
 child.on('close', (code) => {

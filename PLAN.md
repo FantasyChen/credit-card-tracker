@@ -1,5 +1,41 @@
 # Post-2.0 Product Priorities
 
+## Active Slice: plan.cards Competitor Research
+
+## Goal
+Compare plan.cards against Perks Reminder on UI/UX, card support, and benefit freshness, then turn the useful gaps into an implementation plan.
+
+## Findings
+- plan.cards is positioned as a full credit-card lifecycle tracker, not just a benefit tracker: profiles, open/close/product-change events, annual-fee dates, 5/24, spend/sign-up bonus deadlines, list/calendar/timeline views, and import/export are all first-class.
+- Its demo dashboard is stronger for Nitan-style family/power-user operations because profile ownership, last digits, 5/24 drop-off dates, upcoming annual-fee/bonus alerts, issuer counts, fee totals, recurring credits, and spend thresholds are all visible in one place.
+- Its mobile layout is dense but usable, with persistent bottom navigation and profile selection; overdue alerts can dominate the first viewport.
+- Repository card support is much broader: 403 `card.yaml` templates across 27 issuer directories, with 137 recurring credits, 31 spend thresholds, and 702 bonus-category rows in template data.
+- The public card-template contribution model is cleaner than the current seed-centered workflow: each card has a folder containing `card.yaml` plus card-art files.
+- plan.cards is currently faster on broad catalog freshness signals, including Chase Sapphire Preferred 2026 refresh and new Atmos card coverage.
+- Freshness is mixed at benefit-detail level: plan.cards models Chase Sapphire Reserve DoorDash closer to the current $300 annual promo value, while our seed still says `$10 Monthly DoorDash Credit`; plan.cards omits some CSR credits we track, such as Apple subscriptions, and its period modeling is coarser.
+- Perks Reminder remains stronger on benefit-cycle materialization, fixed-period splitting, completion semantics, and practical Benefit Usage Guides.
+
+## Recommended Plan
+- [x] P0: Audit and patch high-visible stale templates, starting with Chase Sapphire Preferred 2026 and Chase Sapphire Reserve DoorDash/Peloton modeling.
+- [x] P1: Add a GitHub-friendly card-template contribution path or generator so catalog updates do not require contributors to edit one giant seed file.
+- [x] P2: Replace clearly mapped low-resolution card art with higher-resolution US Card Forum Apple Pay captures and record provenance.
+- [x] P3: Add card lifecycle primitives that fit Perks Reminder's wedge: annual-fee due dates, closed/product-changed history, and a lightweight event timeline.
+- [x] P4: Add a calendar view for annual fees, card anniversaries, spend/sign-up bonus deadlines, and expiring benefit cycles.
+- [x] P5: Expand predefined card breadth using plan.cards as a candidate-source list, but verify every imported card against official terms or trusted community data before seeding.
+- [x] P6: Preserve our differentiation by linking every important recurring credit to a usage guide and keeping template benefit changes tied to existing-user migration/status materialization.
+
+## Progress
+- Updated `prisma/seed.ts` for the high-confidence Chase gaps: Sapphire Preferred hotel credit from $50 to $100, added CSP Global Entry/TSA PreCheck/NEXUS 4-year credit, changed Sapphire Reserve DoorDash from $10/month to $25/month promo credits, added the $10/month Peloton credit, restored the CSR $300 annual travel credit, added the CSR $250 select Chase Travel hotel credit, added CSR Global Entry/TSA PreCheck/NEXUS, and modeled The Edit as two annual $250 occurrences.
+- Updated DoorDash guide copy to distinguish statement credits from promo-wallet discounts and routed Peloton credits to the membership guide.
+- Added `card-templates/` with a JSON intake format, schema, example CSP refresh template, and `npm run card-template:validate`.
+- Replaced 14 mapped card images from US Card Forum/CubeUpload Apple Pay captures and recorded sources in `docs/card-image-sources.md`.
+- Added card lifecycle schema and UI: active/closed/product-changed status, closed date, annual-fee amount/date, sign-up bonus and spend deadlines, lifecycle notes, and card timeline events.
+- Added `/cards/calendar` to surface annual fees, anniversaries, sign-up/spend deadlines, timeline events, and expiring unclaimed benefit cycles.
+- Extended card create/edit, API payloads, import/export (`1.1.0` with backward-compatible `1.0.0` import), and cards grid display for lifecycle data. Tightened date/import validation so impossible dates, invalid lifecycle statuses, invalid event types, bad annual-fee amounts, and closed cards without close dates are rejected instead of normalized or persisted.
+- Added `scripts/audit-usage-guide-links.cjs` plus `npm run usage-guides:audit`; dev audit verified 94/94 material recurring credits have usage-guide links.
+- Closed the plan.cards card-breadth gap as a verified-first pipeline rather than a blind mass import: the catalog now includes high-signal newer coverage such as Atmos cards and Citi Strata Elite, while `card-templates/` gives contributors a structured intake path for the remaining long tail.
+- Verified with official Chase Preferred/Reserve pages, `npm run card-template:validate`, full Jest (`31` suites, `224` passing, `1` skipped), `npx tsc --noEmit --pretty false`, `git diff --check`, image dimension checks, dev DB migration/seed, existing-user migration dry runs for Chase Sapphire Preferred/Reserve, `node scripts/with-dev-db.js npm run usage-guides:audit`, `node scripts/with-dev-db.js npx next build`, and production-mode browser smoke checks for `/cards`, `/cards/[id]/edit`, `/cards/calendar`, and the refreshed Chase Sapphire Reserve detail page.
+
 ## Active Slice: Technical Benefit Usage Guides and Compact Dashboard Guide UI
 
 ## Goal

@@ -94,6 +94,24 @@ describe('calculateBenefitCycle', () => {
         expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // Nov 30, 2024 end
         expect(cycleEndDate).toEqual(expectedEndDate);
       });
+
+      it('should honor multi-year anniversary durations for security screening credits', () => {
+        const cardOpened = utcDate(2024, 3, 10);
+        const refDate = utcDate(2026, 6, 20);
+        const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
+          BenefitFrequency.YEARLY,
+          refDate,
+          cardOpened,
+          BenefitCycleAlignment.CARD_ANNIVERSARY,
+          null,
+          48
+        );
+
+        expect(cycleStartDate).toEqual(utcDate(2024, 3, 1));
+        const expectedEndDate = utcDate(2028, 3, 1);
+        expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1);
+        expect(cycleEndDate).toEqual(expectedEndDate);
+      });
     });
   });
 
@@ -341,4 +359,4 @@ describe('calculateOneTimeBenefitLifetime', () => {
     expect(cycleEndDate.getUTCDate()).toBe(31); // 31st
   });
 
-}); 
+});

@@ -33,6 +33,7 @@ model User {
   emailAlertsResetAt      DateTime?
   accounts                Account[]
   benefitStatuses         BenefitStatus[]
+  cardEvents              CreditCardEvent[]
   creditCards             CreditCard[]
   loyaltyAccounts         LoyaltyAccount[]
   loyaltyCertificates     LoyaltyCertificate[]
@@ -67,19 +68,46 @@ model Session {
 }
 
 model CreditCard {
-  id             String    @id @default(cuid())
-  name           String
-  issuer         String
-  cardNumber     String?
-  expiryDate     DateTime?
-  openedDate     DateTime?
-  userId         String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  lastFourDigits String?
-  nickname       String?
-  benefits       Benefit[]
-  user           User      @relation(fields: [userId], references: [id])
+  id                  String              @id @default(cuid())
+  name                String
+  issuer              String
+  cardNumber          String?
+  expiryDate          DateTime?
+  openedDate          DateTime?
+  userId              String
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  lastFourDigits      String?
+  nickname            String?
+  lifecycleStatus     CardLifecycleStatus @default(ACTIVE)
+  closedDate          DateTime?
+  annualFeeAmount     Float?
+  annualFeeDueDate    DateTime?
+  signupBonusDeadline DateTime?
+  spendDeadline       DateTime?
+  productChangedFrom  String?
+  productChangedTo    String?
+  lifecycleNotes      String?
+  benefits            Benefit[]
+  events              CreditCardEvent[]
+  user                User                @relation(fields: [userId], references: [id])
+}
+
+model CreditCardEvent {
+  id           String        @id @default(cuid())
+  creditCardId String
+  userId       String
+  eventType    CardEventType
+  eventDate    DateTime
+  description  String
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  creditCard   CreditCard    @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([creditCardId, eventDate])
+  @@index([userId, eventDate])
 }
 
 model Benefit {
@@ -259,6 +287,23 @@ enum BenefitFrequency {
 enum BenefitCycleAlignment {
   CARD_ANNIVERSARY
   CALENDAR_FIXED
+}
+
+enum CardLifecycleStatus {
+  ACTIVE
+  CLOSED
+  PRODUCT_CHANGED
+}
+
+enum CardEventType {
+  OPENED
+  ANNUAL_FEE
+  RETENTION
+  PRODUCT_CHANGE
+  CLOSED
+  SIGNUP_BONUS
+  SPEND_DEADLINE
+  NOTE
 }
 
 enum LoyaltyProgramType {

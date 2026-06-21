@@ -4,7 +4,18 @@ import React, { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateCardAction } from './actions';
 import { isAmexCard } from '@/lib/cardDisplayUtils';
+import { formatDateInput, getCardEventLabel } from '@/lib/card-lifecycle';
 import { Tooltip } from '@/components/ui/Tooltip';
+
+type CardLifecycleStatus = 'ACTIVE' | 'CLOSED' | 'PRODUCT_CHANGED';
+type CardEventType = 'ANNUAL_FEE' | 'RETENTION' | 'PRODUCT_CHANGE' | 'CLOSED' | 'SIGNUP_BONUS' | 'SPEND_DEADLINE' | 'NOTE';
+
+interface CreditCardEvent {
+  id: string;
+  eventType: CardEventType | 'OPENED';
+  eventDate: string | Date;
+  description: string;
+}
 
 interface CreditCard {
   id: string;
@@ -13,6 +24,16 @@ interface CreditCard {
   lastFourDigits: string | null;
   openedDate: Date | null;
   nickname: string | null;
+  lifecycleStatus: CardLifecycleStatus;
+  closedDate: Date | string | null;
+  annualFeeAmount: number | null;
+  annualFeeDueDate: Date | string | null;
+  signupBonusDeadline: Date | string | null;
+  spendDeadline: Date | string | null;
+  productChangedFrom: string | null;
+  productChangedTo: string | null;
+  lifecycleNotes: string | null;
+  events: CreditCardEvent[];
 }
 
 const months = [
@@ -31,6 +52,7 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [cardId, setCardId] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<CardLifecycleStatus>('ACTIVE');
   const router = useRouter();
 
   useEffect(() => {
@@ -47,6 +69,7 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
         }
         const cardData = await response.json();
         setCard(cardData);
+        setSelectedStatus(cardData.lifecycleStatus || 'ACTIVE');
       } catch (error) {
         console.error('Error fetching card:', error);
         setError(error instanceof Error ? error.message : 'Failed to load card');
@@ -61,12 +84,13 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    
+
     startTransition(async () => {
       try {
         const result = await updateCardAction(formData);
         if (result.success) {
           router.push('/cards');
+          router.refresh();
         } else {
           setError(result.error || 'Failed to update card');
         }
@@ -78,20 +102,20 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-4">
-        <p className="text-center text-gray-500 mt-10 dark:text-gray-400">Loading card...</p>
+      <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <p className="text-center text-sm text-gray-500 dark:text-gray-400">Loading card...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="text-center py-10 px-4 border border-dashed rounded-lg dark:border-gray-700">
+      <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-lg border border-dashed border-gray-300 px-4 py-10 text-center dark:border-gray-700">
           <p className="text-red-500 dark:text-red-400">Error: {error}</p>
           <button
             onClick={() => router.push('/cards')}
-            className="mt-4 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200 dark:bg-blue-600 dark:hover:bg-blue-700"
+            className="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-950 dark:hover:bg-gray-200"
           >
             Back to Cards
           </button>
@@ -102,12 +126,12 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
 
   if (!card) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="text-center py-10 px-4 border border-dashed rounded-lg dark:border-gray-700">
+      <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-lg border border-dashed border-gray-300 px-4 py-10 text-center dark:border-gray-700">
           <p className="text-gray-500 dark:text-gray-400">Card not found</p>
           <button
             onClick={() => router.push('/cards')}
-            className="mt-4 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200 dark:bg-blue-600 dark:hover:bg-blue-700"
+            className="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-950 dark:hover:bg-gray-200"
           >
             Back to Cards
           </button>
@@ -117,6 +141,9 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
   }
 
   const openedDate = card.openedDate ? new Date(card.openedDate) : null;
+  const sortedEvents = [...(card.events || [])].sort((a, b) => {
+    return new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime();
+  });
 
   // Check if this is an AMEX card for dynamic form constraints
   const isAmex = isAmexCard(card.issuer);
@@ -124,109 +151,299 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
   const pattern = isAmex ? "[0-9]{4,5}" : "[0-9]{4}";
   const placeholder = isAmex ? "12345" : "1234";
   const label = isAmex ? "Last 5 Digits" : "Last 4 Digits";
-  const helperText = isAmex 
+  const helperText = isAmex
     ? "Enter the last 5 digits from your AMEX card (4 digits also accepted)"
     : "Helps identify your specific card if you have multiple of the same type";
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="max-w-md mx-auto">
-        <h1 className="text-2xl font-bold mb-6 dark:text-white">Edit Card</h1>
-        
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <div>
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Card settings</p>
+            <h1 className="text-2xl font-semibold text-gray-950 dark:text-white">Edit {card.nickname || card.name}</h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{card.name} · {card.issuer}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push('/cards')}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+          >
+            Back to cards
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit}>
           <input type="hidden" name="cardId" value={cardId || ''} />
-          
-          <div className="border rounded-lg p-4 shadow-md bg-white dark:bg-gray-800 dark:border-gray-700">
-            <h2 className="text-lg font-semibold mb-2 dark:text-gray-100">{card.name}</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">{card.issuer}</p>
 
-            {/* Nickname Field */}
-            <div className="mb-3">
-              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
-                Nickname <span className="text-xs text-gray-400 ml-1">(optional)</span>
-                <Tooltip content="Give this card a nickname to easily identify it" />
-              </label>
-              <input
-                type="text"
-                name="nickname"
-                maxLength={50}
-                placeholder="Work Card, Personal Travel..."
-                defaultValue={card.nickname || ''}
-                className="block w-full px-3 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 dark:placeholder-gray-400"
-              />
-            </div>
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="space-y-8">
+              <section className="border-b border-gray-200 pb-8 dark:border-gray-800">
+                <h2 className="text-base font-semibold text-gray-950 dark:text-gray-100">Identity</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Name and distinguish this physical card.</p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
+                      Nickname <span className="text-xs text-gray-400 ml-1">(optional)</span>
+                      <Tooltip content="Give this card a nickname to easily identify it" />
+                    </label>
+                    <input
+                      type="text"
+                      name="nickname"
+                      maxLength={50}
+                      placeholder="Work Card, Personal Travel..."
+                      defaultValue={card.nickname || ''}
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                    />
+                  </div>
 
-            {/* Last Digits Field (Dynamic for AMEX) */}
-            <div className="mb-3">
-              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
-                {label} <span className="text-xs text-gray-400 ml-1">(optional)</span>
-                <Tooltip content={helperText} />
-              </label>
-              <input
-                type="text"
-                name="lastFourDigits"
-                maxLength={maxLength}
-                pattern={pattern}
-                placeholder={placeholder}
-                defaultValue={card.lastFourDigits || ''}
-                className="block w-full px-3 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 dark:placeholder-gray-400"
-                onInput={(e) => {
-                  const target = e.target as HTMLInputElement;
-                  const cleaned = target.value.replace(/[^0-9]/g, '');
-                  target.value = cleaned.slice(0, maxLength);
-                }}
-              />
-            </div>
+                  <div>
+                    <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
+                      {label} <span className="text-xs text-gray-400 ml-1">(optional)</span>
+                      <Tooltip content={helperText} />
+                    </label>
+                    <input
+                      type="text"
+                      name="lastFourDigits"
+                      maxLength={maxLength}
+                      pattern={pattern}
+                      placeholder={placeholder}
+                      defaultValue={card.lastFourDigits || ''}
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                      onInput={(e) => {
+                        const target = e.target as HTMLInputElement;
+                        const cleaned = target.value.replace(/[^0-9]/g, '');
+                        target.value = cleaned.slice(0, maxLength);
+                      }}
+                    />
+                  </div>
 
-            {/* Anniversary Date Fields */}
-            <div className="mb-4">
-              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
-                Anniversary Date <span className="text-xs text-gray-400 ml-1">(optional)</span>
-                <Tooltip content="The card anniversary date affects when annual benefits reset" />
-              </label>
-              <div className="flex gap-2">
-                <select
-                  name="openedMonth"
-                  className="block w-1/2 px-2 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
-                  defaultValue={openedDate ? openedDate.getUTCMonth() + 1 : ''}
+                  <div className="sm:col-span-2">
+                    <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-100 mb-1">
+                      Anniversary Date <span className="text-xs text-gray-400 ml-1">(optional)</span>
+                      <Tooltip content="The card anniversary date affects when annual benefits reset" />
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        name="openedMonth"
+                        className="block w-full rounded-md border-gray-300 px-2 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        defaultValue={openedDate ? openedDate.getUTCMonth() + 1 : ''}
+                      >
+                        <option value="">Month...</option>
+                        {months.map((month) => (
+                          <option key={month.value} value={month.value}>{month.label}</option>
+                        ))}
+                      </select>
+                      <select
+                        name="openedYear"
+                        className="block w-full rounded-md border-gray-300 px-2 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        defaultValue={openedDate ? openedDate.getUTCFullYear() : ''}
+                      >
+                        <option value="">Year...</option>
+                        {years.map((year) => (
+                          <option key={year} value={year}>{year}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="border-b border-gray-200 pb-8 dark:border-gray-800">
+                <h2 className="text-base font-semibold text-gray-950 dark:text-gray-100">Lifecycle</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Track dates that affect renewals, bonuses, and product changes.</p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Status</label>
+                    <select
+                      name="lifecycleStatus"
+                      value={selectedStatus}
+                      onChange={(event) => setSelectedStatus(event.target.value as CardLifecycleStatus)}
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    >
+                      <option value="ACTIVE">Active</option>
+                      <option value="CLOSED">Closed</option>
+                      <option value="PRODUCT_CHANGED">Product changed</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Closed date</label>
+                    <input
+                      type="date"
+                      name="closedDate"
+                      defaultValue={formatDateInput(card.closedDate)}
+                      disabled={selectedStatus !== 'CLOSED'}
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:disabled:bg-gray-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Annual fee amount</label>
+                    <input
+                      type="number"
+                      name="annualFeeAmount"
+                      min="0"
+                      step="1"
+                      defaultValue={card.annualFeeAmount ?? ''}
+                      placeholder="550"
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Next annual fee date</label>
+                    <input
+                      type="date"
+                      name="annualFeeDueDate"
+                      defaultValue={formatDateInput(card.annualFeeDueDate)}
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Sign-up bonus deadline</label>
+                    <input
+                      type="date"
+                      name="signupBonusDeadline"
+                      defaultValue={formatDateInput(card.signupBonusDeadline)}
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Spend deadline</label>
+                    <input
+                      type="date"
+                      name="spendDeadline"
+                      defaultValue={formatDateInput(card.spendDeadline)}
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Product changed from</label>
+                    <input
+                      type="text"
+                      name="productChangedFrom"
+                      defaultValue={card.productChangedFrom || ''}
+                      disabled={selectedStatus !== 'PRODUCT_CHANGED'}
+                      placeholder="Original card"
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:disabled:bg-gray-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Product changed to</label>
+                    <input
+                      type="text"
+                      name="productChangedTo"
+                      defaultValue={card.productChangedTo || ''}
+                      disabled={selectedStatus !== 'PRODUCT_CHANGED'}
+                      placeholder="New card"
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:disabled:bg-gray-800"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Lifecycle notes</label>
+                    <textarea
+                      name="lifecycleNotes"
+                      rows={3}
+                      defaultValue={card.lifecycleNotes || ''}
+                      placeholder="Retention offer, downgrade plan, authorized user notes..."
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="border-b border-gray-200 pb-8 dark:border-gray-800">
+                <h2 className="text-base font-semibold text-gray-950 dark:text-gray-100">Timeline note</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Optional. Add a dated note when something important happens.</p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-[180px_160px_minmax(0,1fr)]">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Type</label>
+                    <select
+                      name="eventType"
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      defaultValue="NOTE"
+                    >
+                      <option value="NOTE">Note</option>
+                      <option value="RETENTION">Retention</option>
+                      <option value="ANNUAL_FEE">Annual fee</option>
+                      <option value="PRODUCT_CHANGE">Product change</option>
+                      <option value="CLOSED">Closed</option>
+                      <option value="SIGNUP_BONUS">Sign-up bonus</option>
+                      <option value="SPEND_DEADLINE">Spend deadline</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Date</label>
+                    <input
+                      type="date"
+                      name="eventDate"
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-100">Description</label>
+                    <input
+                      type="text"
+                      name="eventDescription"
+                      placeholder="Called for retention offer, fee posted, bonus met..."
+                      className="block w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => router.push('/cards')}
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
-                  <option value="">Month...</option>
-                  {months.map((month) => (
-                    <option key={month.value} value={month.value}>{month.label}</option>
-                  ))}
-                </select>
-                <select
-                  name="openedYear"
-                  className="block w-1/2 px-2 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
-                  defaultValue={openedDate ? openedDate.getUTCFullYear() : ''}
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className={`inline-flex min-h-10 items-center justify-center rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-950 dark:hover:bg-gray-200 ${isPending ? 'cursor-not-allowed opacity-50' : ''}`}
                 >
-                  <option value="">Year...</option>
-                  {years.map((year) => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
+                  {isPending ? 'Saving...' : 'Save changes'}
+                </button>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={() => router.push('/cards')}
-                className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 transition-colors dark:bg-gray-600 dark:hover:bg-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isPending}
-                className={`flex-1 bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors dark:bg-blue-600 dark:hover:bg-blue-700 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isPending ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
+            <aside className="h-fit rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+              <h2 className="text-base font-semibold text-gray-950 dark:text-gray-100">Timeline</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">A simple history for this card.</p>
+              {sortedEvents.length === 0 ? (
+                <p className="mt-4 rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                  No lifecycle events yet.
+                </p>
+              ) : (
+                <ol className="mt-4 space-y-4">
+                  {sortedEvents.map((event) => (
+                    <li key={event.id} className="border-b border-gray-100 pb-4 last:border-b-0 last:pb-0 dark:border-gray-800">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                          {getCardEventLabel(event.eventType)}
+                        </span>
+                        <time className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(event.eventDate))}
+                        </time>
+                      </div>
+                      <p className="mt-2 text-sm text-gray-800 dark:text-gray-100">{event.description}</p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </aside>
           </div>
         </form>
       </div>
     </div>
   );
-} 
+}

@@ -7,9 +7,11 @@
 //   node scripts/context-index.js list
 //   node scripts/context-index.js query "term"
 //   node scripts/context-index.js section "Rules"
+//   node scripts/context-index.js check
 
 import fs from "fs";
 import path from "path";
+import { findProjectRoot, readSection, readTextSafe } from "./lib.js";
 
 const START = "<!-- context-harness:index:start -->";
 const END = "<!-- context-harness:index:end -->";
@@ -17,7 +19,7 @@ const END = "<!-- context-harness:index:end -->";
 const PURPOSES = {
   Project: "identity and purpose",
   Structure: "repo map",
-  Rules: "constraints, habits, objectives",
+  Rules: "constraints and habits",
   Workflow: "setup, run, test, lint, deploy",
   Language: "canonical terms",
   Relationships: "durable invariants",
@@ -60,7 +62,12 @@ function main() {
     return;
   }
 
-  console.error("Usage: node scripts/context-index.js [update|list|query|section] [text]");
+  if (command === "check") {
+    checkHarness(context);
+    return;
+  }
+
+  console.error("Usage: node scripts/context-index.js [update|list|query|section|check] [text]");
   process.exit(1);
 }
 
@@ -111,7 +118,7 @@ function replaceManagedBlock(text, block) {
 
 function defaultAgents() {
   return `# Agent Instructions
-<!-- context-harness:schema v2 -->
+<!-- context-harness:schema v3 -->
 
 ## Context Contract
 - At session start/resume, read \`NOW.md\` first, then use the Context Index below to choose relevant \`CONTEXT.md\` sections.
@@ -124,6 +131,86 @@ function defaultAgents() {
 - Before ending, update \`NOW.md\` with current focus, blockers, next step, and
   touched files.
 `;
+}
+
+function checkHarness(context) {
+  const failures = [];
+  const warnings = [];
+  const agents = readTextSafe(agentsFile);
+  const now = readTextSafe(path.join(root, "NOW.md"));
+  const plan = readTextSafe(path.join(root, "PLAN.md"));
+
+  const requiredSections = [
+    "Project",
+    "Structure",
+    "Rules",
+    "Workflow",
+    "Language",
+    "Relationships",
+    "Flagged Ambiguities",
+    "Learned Patterns",
+  ];
+
+  if (!hasSchema(context)) failures.push("CONTEXT.md is missing a context-harness schema marker.");
+  else if (hasLegacySchema(context)) warnings.push("CONTEXT.md uses legacy schema v2.");
+
+  if (!agents.trim()) failures.push("AGENTS.md is missing.");
+  else if (!hasSchema(agents)) failures.push("AGENTS.md is missing a context-harness schema marker.");
+  else if (hasLegacySchema(agents)) warnings.push("AGENTS.md uses legacy schema v2.");
+
+  for (const heading of requiredSections) {
+    if (!hasHeading(context, 2, heading)) failures.push(`CONTEXT.md is missing ## ${heading}.`);
+  }
+
+  if (agents.trim()) {
+    if (!agents.includes(START) || !agents.includes(END)) {
+      failures.push("AGENTS.md is missing the generated Context Index block.");
+    } else if (!indexIsFresh(agents, context)) {
+      failures.push("AGENTS.md Context Index is stale; run `node scripts/context-index.js update`.");
+    }
+  }
+
+  if (now.trim()) {
+    const nowLines = now.trimEnd().split("\n").length;
+    if (nowLines > 20) failures.push(`NOW.md has ${nowLines} lines; keep it under 20.`);
+  }
+
+  if (plan.trim()) {
+    const planLines = plan.trimEnd().split("\n").length;
+    if (planLines > 150) failures.push(`PLAN.md has ${planLines} lines; prune or archive completed work.`);
+  }
+
+  for (const warning of warnings) console.log(`WARN ${warning}`);
+  if (failures.length) {
+    for (const failure of failures) console.log(`FAIL ${failure}`);
+    process.exit(1);
+  }
+  console.log("OK context-harness check passed.");
+}
+
+function hasSchema(text) {
+  return /<!--\s*context-harness:schema\s+v[23]\s*-->/.test(text);
+}
+
+function hasLegacySchema(text) {
+  return /<!--\s*context-harness:schema\s+v2\s*-->/.test(text);
+}
+
+function hasHeading(markdown, level, heading) {
+  const hashes = "#".repeat(level);
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${hashes}\\s+${escaped}\\s*$`, "m").test(markdown);
+}
+
+function indexIsFresh(agents, context) {
+  const expected = renderIndex(context).trim();
+  const start = agents.indexOf(START);
+  const end = agents.indexOf(END);
+  if (start === -1 || end === -1 || end <= start) return false;
+  const headingStart = agents.lastIndexOf("## Context Index", start);
+  const actualStart = headingStart === -1 ? start : headingStart;
+  const actual = agents.slice(actualStart, end + END.length).trim();
+  return actual === expected;
 }
 
 function parseSections(context) {
@@ -226,52 +313,4 @@ function cleanMarkdown(line) {
 function truncate(text, max) {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 3).trimEnd()}...`;
-}
-
-function readTextSafe(file) {
-  try {
-    return fs.readFileSync(file, "utf8");
-  } catch {
-    return "";
-  }
-}
-
-function findProjectRoot(startDir) {
-  const markers = [
-    "package.json",
-    "pyproject.toml",
-    "Cargo.toml",
-    "go.mod",
-    "Gemfile",
-    ".git",
-  ];
-  let current = path.resolve(startDir);
-  while (current !== path.dirname(current)) {
-    if (markers.some((marker) => fs.existsSync(path.join(current, marker)))) return current;
-    current = path.dirname(current);
-  }
-  return startDir;
-}
-
-function readSection(markdown, heading) {
-  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const headingRe = new RegExp(`^(#{1,6})\\s+${escaped}\\s*$`);
-  const lines = markdown.split("\n");
-  const out = [];
-  let currentDepth = 0;
-  let inSection = false;
-  for (const line of lines) {
-    const match = line.match(headingRe);
-    if (match && !inSection) {
-      inSection = true;
-      currentDepth = match[1].length;
-      continue;
-    }
-    if (inSection) {
-      const boundary = line.match(/^(#{1,6})\s+/);
-      if (boundary && boundary[1].length <= currentDepth) break;
-      out.push(line);
-    }
-  }
-  return out.join("\n");
 }

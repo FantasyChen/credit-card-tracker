@@ -10,6 +10,7 @@ import {
   type DisplayBenefitStatus,
   type RawDisplayBenefitStatus,
 } from '../benefit-dashboard';
+import { CardLifecycleStatus } from '@/generated/prisma';
 
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
@@ -91,6 +92,15 @@ describe('buildBenefitDashboardProjection', () => {
     updatedAt: new Date('2025-01-01T00:00:00.000Z'),
     lastFourDigits: '1234',
     nickname: null,
+    lifecycleStatus: CardLifecycleStatus.ACTIVE,
+    closedDate: null,
+    annualFeeAmount: null,
+    annualFeeDueDate: null,
+    signupBonusDeadline: null,
+    spendDeadline: null,
+    productChangedFrom: null,
+    productChangedTo: null,
+    lifecycleNotes: null,
   };
 
   function rawStatus(

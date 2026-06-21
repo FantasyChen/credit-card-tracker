@@ -125,25 +125,47 @@ jest.mock('next/cache', () => ({
 // Global test environment setup
 global.fetch = jest.fn();
 
+function copyHeaders(target: Map<string, string>, headers: any) {
+  if (!headers) return;
+
+  if (typeof headers.forEach === 'function') {
+    headers.forEach((value: string, key: string) => {
+      target.set(key.toLowerCase(), value);
+    });
+    return;
+  }
+
+  if (typeof headers[Symbol.iterator] === 'function') {
+    for (const [key, value] of headers) {
+      target.set(String(key).toLowerCase(), String(value));
+    }
+    return;
+  }
+
+  Object.entries(headers).forEach(([key, value]) => {
+    target.set(key.toLowerCase(), value as string);
+  });
+}
+
 // Mock Next.js Request and Response objects for API tests
 global.Request = class Request {
-  url: string;
+  private _url: string;
   method: string;
   headers: Map<string, string>;
   body?: any;
 
   constructor(url: string, init?: any) {
-    this.url = url;
+    this._url = url;
     this.method = init?.method || 'GET';
     this.headers = new Map();
     
-    if (init?.headers) {
-      Object.entries(init.headers).forEach(([key, value]) => {
-        this.headers.set(key.toLowerCase(), value as string);
-      });
-    }
+    copyHeaders(this.headers, init?.headers);
     
     this.body = init?.body;
+  }
+
+  get url() {
+    return this._url;
   }
 
   async json() {
@@ -163,11 +185,7 @@ global.Response = class Response {
     this.headers = new Map();
     this.body = body;
 
-    if (init?.headers) {
-      Object.entries(init.headers).forEach(([key, value]) => {
-        this.headers.set(key, value as string);
-      });
-    }
+    copyHeaders(this.headers, init?.headers);
   }
 
   async json() {

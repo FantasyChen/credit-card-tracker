@@ -18,6 +18,16 @@ export async function GET() {
       where: { userId: session.user.id },
       include: {
         benefits: true, // Include benefits associated with the card
+        events: {
+          orderBy: { eventDate: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            eventType: true,
+            eventDate: true,
+            description: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc', // Show newest cards first
@@ -56,4 +66,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-} 
+}

@@ -4,9 +4,9 @@
 // All scripts in this directory should import from here to keep one source
 // of truth for hook I/O, project detection, markdown parsing, and commands.
 
-const { execSync } = require("child_process");
-const fs = require("fs");
-const path = require("path");
+import { execSync } from "child_process";
+import fs from "fs";
+import path from "path";
 
 // ---------------------------------------------------------------------------
 // Hook I/O
@@ -293,7 +293,7 @@ function today() {
 
 // ---------------------------------------------------------------------------
 
-module.exports = {
+export {
   readHookInput,
   normalizeHookInput,
   block,

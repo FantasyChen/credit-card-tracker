@@ -17,7 +17,7 @@ export async function GET(
 
   try {
     const card = await prisma.creditCard.findFirst({
-      where: { 
+      where: {
         id: id,
         userId: session.user.id // Ensure user owns the card
       },
@@ -28,6 +28,24 @@ export async function GET(
         lastFourDigits: true,
         nickname: true,
         openedDate: true,
+        lifecycleStatus: true,
+        closedDate: true,
+        annualFeeAmount: true,
+        annualFeeDueDate: true,
+        signupBonusDeadline: true,
+        spendDeadline: true,
+        productChangedFrom: true,
+        productChangedTo: true,
+        lifecycleNotes: true,
+        events: {
+          orderBy: { eventDate: 'desc' },
+          select: {
+            id: true,
+            eventType: true,
+            eventDate: true,
+            description: true,
+          },
+        },
       }
     });
 
@@ -43,4 +61,4 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+}

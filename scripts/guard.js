@@ -5,7 +5,7 @@
 // Blocks --no-verify, detects secrets, protects linter configs.
 // Exit: 0 = allow, 2 = block.
 
-const { readHookInput, block } = require("./lib");
+import { readHookInput, block } from "./lib.js";
 
 const toolInput = readHookInput();
 const command = toolInput.command || "";

@@ -90,10 +90,11 @@ export function calculateBenefitCycle(
     }
   } else {
     // --- CARD_ANNIVERSARY or Default Logic (existing logic) ---
-    let cycleStartYear: number;
-    let cycleStartMonth: number; // 0-indexed
-    let cycleEndYear: number;
-    let cycleEndMonth: number; // 0-indexed
+    let cycleStartYear = 0;
+    let cycleStartMonth = 0; // 0-indexed
+    let cycleEndYear = 0;
+    let cycleEndMonth = 0; // 0-indexed
+    let assignedCycleDates = false;
 
     switch (frequency) {
       case BenefitFrequency.WEEKLY: {
@@ -140,6 +141,22 @@ export function calculateBenefitCycle(
       case BenefitFrequency.YEARLY:
         if (cardOpenedDate) {
           const openedMonth = cardOpenedDate.getUTCMonth();
+          if (fixedCycleDurationMonths && fixedCycleDurationMonths > 12) {
+            const openedYear = cardOpenedDate.getUTCFullYear();
+            const monthDiff = ((refYear - openedYear) * 12) + (refMonth - openedMonth);
+            const cycleIndex = Math.max(0, Math.floor(monthDiff / fixedCycleDurationMonths));
+            const cycleStartMonthIndex = (openedYear * 12) + openedMonth + (cycleIndex * fixedCycleDurationMonths);
+            const cycleStartYear = Math.floor(cycleStartMonthIndex / 12);
+            const cycleStartMonth = cycleStartMonthIndex % 12;
+
+            cycleStartDate = new Date(Date.UTC(cycleStartYear, cycleStartMonth, 1, 0, 0, 0, 0));
+            cycleEndDate = new Date(cycleStartDate.getTime());
+            cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
+            cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
+            assignedCycleDates = true;
+            break;
+          }
+
           if (refMonth >= openedMonth) {
             cycleStartYear = refYear;
           } else {
@@ -163,7 +180,9 @@ export function calculateBenefitCycle(
     }
 
     // Assign the calculated cycle dates
-    if (frequency === BenefitFrequency.YEARLY && cardOpenedDate) {
+    if (assignedCycleDates) {
+      // Multi-year card-anniversary cycles are already assigned above.
+    } else if (frequency === BenefitFrequency.YEARLY && cardOpenedDate) {
         cycleStartDate = new Date(Date.UTC(cycleStartYear, cycleStartMonth, 1, 0, 0, 0, 0));
         cycleEndDate = new Date(Date.UTC(cycleEndYear, cycleEndMonth, 1, 0, 0, 0, 0));
         cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);

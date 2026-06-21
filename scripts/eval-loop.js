@@ -12,9 +12,9 @@
 //
 // Exit: 0 if objectives met, 1 otherwise.
 
-const fs = require("fs");
-const readline = require("readline");
-const { readSection, runCheck } = require("./lib");
+import fs from "fs";
+import readline from "readline";
+import { readSection, runCheck } from "./lib.js";
 
 const MAX_ITERATIONS = parseInt(process.env.MAX_ITERATIONS || "5", 10);
 const PASS_THRESHOLD = process.env.PASS_THRESHOLD || "all";

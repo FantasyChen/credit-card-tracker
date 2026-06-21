@@ -27,9 +27,9 @@ async function main() {
       imageUrl: '/images/cards/chase-sapphire-preferred.png',
       benefits: [
         {
-          description: '$50 Annual Hotel Credit (Booked through Chase Travel)',
+          description: '$100 Annual Hotel Credit (Booked through Chase Travel)',
           category: 'Travel',
-          maxAmount: 50,
+          maxAmount: 100,
           frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           // cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY (default)
@@ -40,6 +40,15 @@ async function main() {
           maxAmount: 10,
           frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
+        },
+        {
+          description: '$120 Global Entry, TSA PreCheck, or NEXUS Credit (every 4 years)',
+          category: 'Travel',
+          maxAmount: 120,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
+          fixedCycleDurationMonths: 48,
         },
       ],
     },
@@ -121,6 +130,14 @@ async function main() {
       imageUrl: '/images/cards/chase-sapphire-reserve.jpg',
       benefits: [
         {
+          description: '$300 Annual Travel Credit',
+          category: 'Travel',
+          maxAmount: 300,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
+        },
+        {
           description: '$150 Semi-Annual Fine Dining Credit (Select Restaurants - Jan-Jun)',
           category: 'Dining',
           maxAmount: 150,
@@ -141,24 +158,23 @@ async function main() {
           fixedCycleDurationMonths: 6,
         },
         {
-          description: '$250 Hotel Credit (The Edit by Chase Properties - Jan-Jun)',
+          description: '$250 The Edit Credit (up to 2 prepaid bookings annually)',
           category: 'Travel',
           maxAmount: 250,
-          frequency: BenefitFrequency.YEARLY, // This specific credit occurs once a year in this window
+          frequency: BenefitFrequency.YEARLY,
           percentage: 0,
-          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
-          fixedCycleStartMonth: 1, // January
-          fixedCycleDurationMonths: 6,
+          cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
+          occurrencesInCycle: 2,
         },
         {
-          description: '$250 Hotel Credit (The Edit by Chase Properties - Jul-Dec)',
+          description: '$250 Select Chase Travel Hotel Credit (through 12/31/2026)',
           category: 'Travel',
           maxAmount: 250,
-          frequency: BenefitFrequency.YEARLY, // This specific credit occurs once a year in this window
+          frequency: BenefitFrequency.YEARLY,
           percentage: 0,
           cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
-          fixedCycleStartMonth: 7, // July
-          fixedCycleDurationMonths: 6,
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 12,
         },
         {
           description: '$150 Semi-Annual StubHub Credit (Event Tickets - Jan-Jun)',
@@ -181,9 +197,9 @@ async function main() {
           fixedCycleDurationMonths: 6,
         },
         {
-          description: '$10 Monthly DoorDash Credit',
+          description: '$25 Monthly DoorDash Promo Credits',
           category: 'Food Delivery',
-          maxAmount: 10,
+          maxAmount: 25,
           frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
         },
@@ -200,6 +216,22 @@ async function main() {
           maxAmount: 20.83,
           frequency: BenefitFrequency.MONTHLY,
           percentage: 0,
+        },
+        {
+          description: '$10 Monthly Peloton Credit',
+          category: 'Fitness',
+          maxAmount: 10,
+          frequency: BenefitFrequency.MONTHLY,
+          percentage: 0,
+        },
+        {
+          description: '$120 Global Entry, TSA PreCheck, or NEXUS Credit (every 4 years)',
+          category: 'Travel',
+          maxAmount: 120,
+          frequency: BenefitFrequency.YEARLY,
+          percentage: 0,
+          cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
+          fixedCycleDurationMonths: 48,
         },
         {
           description: 'Points Boost: Up to 2¢ per point on select Chase Travel bookings',
@@ -1610,14 +1642,14 @@ This applies to benefits labeled The Edit by Chase. Book through Chase Travel an
 
 1. Open Chase Travel from the account that has the eligible Sapphire card.
 2. Search hotels and select a property marked The Edit.
-3. Check the benefit period, such as Jan-Jun or Jul-Dec, before paying.
+3. Confirm the annual terms, booking cap, and any two-night minimum before paying.
 4. Pay with the eligible Chase card.
 5. Save the booking confirmation and final folio.
 
 ## Practical Use
 
 - Use it for a stay you expect to complete.
-- Track each semi-annual window separately.
+- Track each eligible booking separately when the credit allows more than one annual use.
 - Do not assume ordinary Chase Travel hotels qualify.
 - Watch for prepaid versus pay-at-property terms in checkout.
 
@@ -1629,11 +1661,11 @@ The Edit is its own hotel collection, separate from generic Chase Travel credits
 
 - Booking a regular Chase Travel hotel without The Edit branding
 - Treating a cancelled booking as reliable value
-- Waiting until the last week of the benefit period
+- Waiting until the last week of the annual benefit period
 - Paying with a different card`,
       tips: [
         'Confirm The Edit branding before checkout',
-        'Track Jan-Jun and Jul-Dec credits separately',
+        'Track each eligible prepaid booking separately',
         'Use the eligible Chase card for payment',
         'Cancelled bookings can carry clawback risk'
       ]
@@ -1885,10 +1917,10 @@ Dining credits come in several forms:
 ## Popular Credit Programs
 
 **DoorDash Credits (Chase, Amex):**
-- Monthly credit ($10-$15 typical)
-- Includes DashPass subscription costs
-- Can use for pickup orders too
-- Must have DashPass membership
+- Monthly credits or promo-wallet discounts can range from small statement credits to larger Chase/DashPass promo bundles
+- Current Chase Sapphire Reserve-style offers can include separate restaurant and non-restaurant DoorDash promos in the same month
+- Add the eligible card directly in DoorDash or Caviar and avoid wallet tokens if the terms require the card as the default payment method
+- Promos often require active DashPass enrollment and usually expire monthly
 
 **Grubhub Credits (Amex Gold):**
 - Part of the $10 monthly dining credit

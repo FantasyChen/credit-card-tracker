@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
 import { canAddCard } from '@/lib/subscription';
+import { deriveNextAnnualFeeDueDate } from '@/lib/card-lifecycle';
 
 interface CreateCardResult {
   success: boolean;
@@ -77,6 +78,20 @@ export async function createCardForUser(
         openedDate: openedDate, // Use the determined openedDate
         lastFourDigits: lastFourDigits || null, // Include last 4 digits if provided
         nickname: nickname || null, // Include nickname if provided
+        annualFeeAmount: predefinedCard.annualFee,
+        annualFeeDueDate: predefinedCard.annualFee > 0
+          ? deriveNextAnnualFeeDueDate(openedDate)
+          : null,
+      },
+    });
+
+    await prisma.creditCardEvent.create({
+      data: {
+        creditCardId: newCreditCard.id,
+        userId,
+        eventType: 'OPENED',
+        eventDate: openedDate,
+        description: `Opened ${predefinedCard.name}`,
       },
     });
 

@@ -5,9 +5,9 @@
 // Usage: node scripts/context-gen.js [project-root]
 // Output: Project + Structure + Suggested Rules + Memory Prompts markdown.
 
-const fs = require("fs");
-const path = require("path");
-const { detectStack } = require("./lib");
+import fs from "fs";
+import path from "path";
+import { detectStack } from "./lib.js";
 
 const root = path.resolve(process.argv[2] || ".");
 const stack = detectStack(root);

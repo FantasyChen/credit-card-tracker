@@ -51,7 +51,7 @@ export function inferBenefitUsageWaySlug(benefit: BenefitForUsageMatch): string 
   if (includesAny(text, ['renowned hotels', 'united hotels', 'united travel credit', 'united purchase credit'])) {
     return 'united-hotel-travel-credits';
   }
-  if (includesAny(text, ['travel portal', 'capital one travel', 'hsbc travel', 'travel bookings', 'travel credit'])) {
+  if (includesAny(text, ['travel portal', 'capital one travel', 'hsbc travel', 'chase travel hotel', 'travel bookings', 'travel credit'])) {
     return 'travel-portal-credits';
   }
 
@@ -74,7 +74,7 @@ export function inferBenefitUsageWaySlug(benefit: BenefitForUsageMatch): string 
 
   if (includesAny(text, ['clear'])) return 'clear-credit';
   if (includesAny(text, ['oura'])) return 'oura-credit';
-  if (includesAny(text, ['walmart+', 'priority pass', 'united club', 'admirals club'])) {
+  if (includesAny(text, ['walmart+', 'peloton', 'priority pass', 'united club', 'admirals club'])) {
     return 'membership-credits';
   }
 

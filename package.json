@@ -26,6 +26,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
+    "card-template:validate": "node scripts/validate-card-template.cjs",
+    "usage-guides:audit": "node scripts/audit-usage-guide-links.cjs",
     "postinstall": "prisma generate",
     "db:check": "node scripts/check-database-connection.js",
     "db:dev:migrate": "node scripts/with-dev-db.js npx prisma migrate deploy",

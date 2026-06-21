@@ -81,7 +81,13 @@ describe('GET /api/user-cards', () => {
     expect(creditCardMock.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: 'user-1' },
-        include: { benefits: true },
+        include: expect.objectContaining({
+          benefits: true,
+          events: expect.objectContaining({
+            take: 1,
+            orderBy: { eventDate: 'desc' },
+          }),
+        }),
       })
     );
   });
