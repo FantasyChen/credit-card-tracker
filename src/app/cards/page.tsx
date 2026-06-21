@@ -72,8 +72,7 @@ function CardItem({ card, setCards }: { card: DisplayUserCard, setCards: React.D
           imageUrl={card.imageUrl}
           alt={card.displayName || card.name}
           issuer={card.issuer}
-          className="h-28 rounded-md border-0"
-          imageClassName="p-2"
+          className="h-28 rounded-md border-0 !p-1"
           sizes="180px"
           unoptimized
         />
