@@ -6,7 +6,7 @@ import GitHubProvider from 'next-auth/providers/github';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { getCanonicalAuthUrl, getSharedCookieDomain } from './site';
-import { enrollBetaUser, getEffectiveTier, isBetaMode } from './subscription';
+import { getEffectiveTier } from './subscription';
 
 declare module "next-auth" {
   interface Session {
@@ -179,14 +179,6 @@ export const authOptions: NextAuthOptions = {
         session.user.isBetaUser = token.isBetaUser;
       }
       return session;
-    },
-  },
-  events: {
-    async createUser({ user }) {
-      // Enroll new OAuth users as beta users when beta mode is active
-      if (isBetaMode() && user.id) {
-        await enrollBetaUser(user.id);
-      }
     },
   },
   debug: process.env.NODE_ENV === 'development',

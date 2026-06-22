@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
-import { canAddCard } from '@/lib/subscription';
 import { deriveNextAnnualFeeDueDate } from '@/lib/card-lifecycle';
 
 interface CreateCardResult {
@@ -33,15 +32,6 @@ export async function createCardForUser(
   }
 
   try {
-    // 0. Check subscription tier card limit
-    const allowed = await canAddCard(userId);
-    if (!allowed) {
-      return { 
-        success: false, 
-        message: 'You\'ve reached the maximum number of cards for your plan. Upgrade to Pro for unlimited cards.' 
-      };
-    }
-
     // 1. Fetch the predefined card and its benefits
     const predefinedCard = await prisma.predefinedCard.findUnique({
       where: { id: predefinedCardId },

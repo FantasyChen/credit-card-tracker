@@ -179,7 +179,7 @@ export async function runNotificationDigest({
             const user = userMap.get(task.userId);
             const allowed = user ? canSendEmailAlertForUser(user, today) : false;
             if (!allowed) {
-              console.log(`⏭️ Skipping email to ${task.to} — Free tier limit reached`);
+              console.log(`⏭️ Skipping email to ${task.to} because alert delivery is not allowed`);
               emailsSkippedByLimit++;
               return null;
             }
@@ -206,7 +206,7 @@ export async function runNotificationDigest({
     }
 
     const totalMs = Date.now() - startMs;
-    console.log(`✅ Done in ${totalMs}ms: ${usersToNotify.length} users, ${emailsSent}/${emailTasks.length} digest emails sent, ${emailsSkippedByLimit} skipped (tier limit)`);
+    console.log(`✅ Done in ${totalMs}ms: ${usersToNotify.length} users, ${emailsSent}/${emailTasks.length} digest emails sent, ${emailsSkippedByLimit} skipped`);
 
     return {
       body: {

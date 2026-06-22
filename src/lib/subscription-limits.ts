@@ -1,12 +1,13 @@
-// Pure subscription configuration shared by server and client code.
+// Pure access configuration shared by server and client code.
+// Paid tiers are deprecated: every account gets the full product.
 
 export const TIER_LIMITS = {
   FREE: {
-    maxCards: 5,
-    maxEmailAlertsPerMonth: 2,
-    customExpirationDays: false,
+    maxCards: Infinity,
+    maxEmailAlertsPerMonth: Infinity,
+    customExpirationDays: true,
     defaultExpirationDays: 7,
-    prioritySupport: false,
+    prioritySupport: true,
   },
   PRO: {
     maxCards: Infinity,

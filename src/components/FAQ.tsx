@@ -6,7 +6,7 @@ import { ChevronDownIcon } from '@heroicons/react/24/outline';
 const faqs = [
   {
     question: 'Is it really free?',
-    answer: 'Yes! The Free plan gives you benefit tracking for up to 5 cards, ROI analysis, and 2 email alerts per month — completely free, forever. During our beta period, all registered users also get Pro features at no cost.',
+    answer: 'Yes. Perks Reminder is completely free: unlimited cards, benefit tracking, ROI analysis, loyalty tracking, data export, and email reminders are included.',
   },
   {
     question: 'Do you access my bank accounts?',
@@ -14,11 +14,11 @@ const faqs = [
   },
   {
     question: 'How do notifications work?',
-    answer: 'We send a daily email digest when you have benefits starting a new cycle or expiring soon. You control which notification types you receive in your settings. Pro users get unlimited alerts; Free users get 2 per month.',
+    answer: 'We send a daily email digest when you have benefits starting a new cycle or expiring soon. You control which notification types you receive and how far ahead reminders should arrive in your settings.',
   },
   {
-    question: 'What happens after beta?',
-    answer: 'During beta, every registered user gets Pro features for free. When beta ends, you\'ll keep your Free plan (which is always free). If you want to keep Pro features like unlimited email alerts and custom expiration windows, you can upgrade at that point.',
+    question: 'Is there a paid Pro plan?',
+    answer: 'No. The old Pro plan is deprecated. Current product features are free for every account.',
   },
   {
     question: 'What cards are supported?',

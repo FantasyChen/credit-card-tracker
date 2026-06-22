@@ -4,9 +4,8 @@ import { TIER_LIMITS, type TierName } from './subscription-limits';
 
 export { TIER_LIMITS, type TierName } from './subscription-limits';
 
-// Whether the application is in beta mode (all registered users get Pro)
 export function isBetaMode(): boolean {
-  return process.env.BETA_MODE !== 'false'; // Default true unless explicitly disabled
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -15,16 +14,14 @@ export function isBetaMode(): boolean {
 
 /**
  * Returns the effective subscription tier for a user.
- * Beta users are treated as Pro regardless of their stored tier.
+ * Paid tiers are deprecated, so every account receives the full free product.
+ * Stored tier fields are retained only as legacy database state.
  */
-export function getEffectiveTier(user: {
+export function getEffectiveTier(_user: {
   subscriptionTier: SubscriptionTier;
   isBetaUser: boolean;
 }): TierName {
-  if (user.isBetaUser && isBetaMode()) {
-    return 'PRO';
-  }
-  return user.subscriptionTier;
+  return 'FREE';
 }
 
 /**
@@ -189,7 +186,7 @@ export async function getEmailAlertUsage(userId: string): Promise<{
       emailAlertsResetAt: true,
     },
   });
-  if (!user) return { used: 0, limit: 2, canSend: false };
+  if (!user) return { used: 0, limit: null, canSend: false };
 
   const tier = getEffectiveTier(user);
   const limits = TIER_LIMITS[tier];
@@ -214,7 +211,7 @@ export async function getEmailAlertUsage(userId: string): Promise<{
 
 /**
  * Get the effective expiration days for a user.
- * Free users are locked to the default (7 days).
+ * Every user can customize reminder timing.
  */
 export function getEffectiveExpirationDays(
   tier: TierName,
@@ -253,32 +250,20 @@ export function isFeatureAvailable(tier: TierName, feature: Feature): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Enroll a user as a beta user (called during signup when BETA_MODE is active).
+ * Legacy no-op retained for older auth call sites and tests.
  */
-export async function enrollBetaUser(userId: string): Promise<void> {
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      isBetaUser: true,
-      betaEnrolledAt: new Date(),
-    },
-  });
+export async function enrollBetaUser(_userId: string): Promise<void> {
+  return;
 }
 
 // ---------------------------------------------------------------------------
 // Tier Display Helpers
 // ---------------------------------------------------------------------------
 
-export function getTierDisplayName(tier: TierName, isBetaUser: boolean): string {
-  if (isBetaUser && isBetaMode()) {
-    return 'Pro (Beta)';
-  }
-  return tier === 'PRO' ? 'Pro' : 'Free';
+export function getTierDisplayName(_tier: TierName, _isBetaUser: boolean): string {
+  return 'Free';
 }
 
-export function getTierBadgeColor(tier: TierName, isBetaUser: boolean): string {
-  if (tier === 'PRO' || (isBetaUser && isBetaMode())) {
-    return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white';
-  }
+export function getTierBadgeColor(_tier: TierName, _isBetaUser: boolean): string {
   return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
 }

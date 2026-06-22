@@ -4,7 +4,7 @@ import FAQ from '@/components/FAQ';
 
 export const metadata: Metadata = {
   title: 'Pricing | Perks Reminder',
-  description: 'Compare Perks Reminder Free and Pro plans.',
+  description: 'Perks Reminder is completely free with unlimited cards, reminders, loyalty tracking, and data export.',
 };
 
 export default function PricingPage() {

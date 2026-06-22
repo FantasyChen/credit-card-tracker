@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { getEffectiveExpirationDays, getUserTier } from '@/lib/subscription';
 
 export async function updateNotificationSettingsAction(formData: FormData) {
   const session = await getServerSession(authOptions);
@@ -25,9 +24,6 @@ export async function updateNotificationSettingsAction(formData: FormData) {
     console.warn('Invalid benefit expiration days provided, defaulting to 7.');
     notifyExpirationDays = 7;
   }
-  const tier = await getUserTier(session.user.id);
-  notifyExpirationDays = getEffectiveExpirationDays(tier, notifyExpirationDays);
-
   let pointsExpirationDays = parseInt(pointsExpirationDaysString, 10);
   if (isNaN(pointsExpirationDays) || pointsExpirationDays < 1) {
     console.warn('Invalid points expiration days provided, defaulting to 30.');

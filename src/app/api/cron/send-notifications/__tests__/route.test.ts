@@ -261,7 +261,7 @@ describe('/api/cron/send-notifications', () => {
         }));
     });
 
-    it('should use the default 7-day benefit expiration window for free users', async () => {
+    it('should honor custom benefit expiration windows for free users', async () => {
         const systemTime = utcDate(2023, 8, 15, 11, 0, 0);
         const sevenDayExpiry = utcDate(2023, 8, 22, 12, 0, 0);
         const thirtyDayExpiry = utcDate(2023, 9, 14, 12, 0, 0);
@@ -288,7 +288,7 @@ describe('/api/cron/send-notifications', () => {
         const response = await (NextResponse.json as jest.Mock).mock.results.at(-1)?.value.json();
         const expiringQuery = (prisma.benefitStatus.findMany as jest.Mock).mock.calls[0][0];
         expect(response.emailsAttempted).toBe(1);
-        expect(expiringQuery.where.cycleEndDate.lte).toEqual(utcDate(2023, 8, 22, 23, 59, 59, 999));
+        expect(expiringQuery.where.cycleEndDate.lte).toEqual(utcDate(2023, 9, 14, 23, 59, 59, 999));
     });
 
     it('should send digest email for expiring loyalty program points', async () => {

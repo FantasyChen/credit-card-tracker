@@ -1,5 +1,27 @@
 # Post-2.0 Product Priorities
 
+## Active Slice: Completely Free Product Pivot
+
+## Goal
+Deprecate the effectively-free paid Pro concept and make "completely free" a code-backed product invariant.
+
+## Findings
+- Public context already described Perks Reminder as free and open-source, but the app still had visible Pro/Beta language on the homepage, pricing page, FAQ, navbar, settings, and notification settings.
+- The old `FREE`/`PRO` model was not just cosmetic: with beta mode disabled, stored Free users could have been limited to 5 cards, 2 email alerts per month, and a fixed 7-day benefit reminder window.
+- No active Stripe/payment integration was found in the app code, so the pivot is a subscription-gate and product-language cleanup rather than a payment-provider removal.
+
+## Decisions
+- Make the pivot code-backed: every account gets unlimited cards, unlimited email reminders, custom reminder windows, loyalty tracking, and data import/export.
+- Keep `subscriptionTier` and `isBetaUser` database/session fields as dormant legacy state for now to avoid an unnecessary schema migration.
+- Keep `/pricing` as a stable route, but make it explain the free-product commitment instead of comparing Free and Pro plans.
+
+## Progress
+- Updated subscription access helpers so stored `FREE` and `PRO` users resolve to full free access; beta mode is disabled and beta enrollment is a no-op.
+- Removed the card-add limit branch, notification reminder-window lock, email-alert limit UI, Pro/Beta navbar badge, and Pro/Beta pricing copy.
+- Reworked `/pricing` into a free-product commitment page and updated homepage, FAQ, settings, and notification settings language.
+- Added/updated focused tests for subscription access, pricing, navbar, notification settings, and notification digest behavior.
+- Verified with focused Jest, `npx tsc --noEmit --pretty false`, `node scripts/with-dev-db.js npx next build`, and `git diff --check`.
+
 ## Active Slice: plan.cards Competitor Research
 
 ## Goal

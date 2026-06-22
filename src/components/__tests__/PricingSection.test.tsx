@@ -7,10 +7,12 @@ import { render, screen } from '@testing-library/react';
 import PricingSection from '../PricingSection';
 
 describe('PricingSection', () => {
-  it('routes subscription actions to sign up instead of sign in', () => {
+  it('presents the product as completely free without Pro upsells', () => {
     render(<PricingSection />);
 
-    expect(screen.getByRole('link', { name: 'Get Started Free' })).toHaveAttribute('href', '/auth/signup');
-    expect(screen.getByRole('link', { name: 'Sign Up — Get Pro Free' })).toHaveAttribute('href', '/auth/signup');
+    expect(screen.getByRole('heading', { name: 'Completely free' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Create Free Account' })).toHaveAttribute('href', '/auth/signup');
+    expect(screen.queryByText(/\bPro\b/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/beta/i)).not.toBeInTheDocument();
   });
 });

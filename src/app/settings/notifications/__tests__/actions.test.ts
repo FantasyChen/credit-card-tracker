@@ -21,11 +21,7 @@ describe('updateNotificationSettingsAction', () => {
     mockGetServerSession.mockResolvedValue({ user: { id: 'user-1' }, expires: '2026-12-31' });
   });
 
-  it('locks free users to the default benefit expiration reminder window', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({
-      subscriptionTier: 'FREE',
-      isBetaUser: false,
-    } as any);
+  it('saves custom benefit expiration reminder windows for every user', async () => {
     mockPrisma.user.update.mockResolvedValue({} as any);
 
     const formData = new FormData();
@@ -38,7 +34,7 @@ describe('updateNotificationSettingsAction', () => {
     expect(mockPrisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'user-1' },
       data: expect.objectContaining({
-        notifyExpirationDays: 7,
+        notifyExpirationDays: 30,
         pointsExpirationDays: 45,
       }),
     }));

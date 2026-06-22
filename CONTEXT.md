@@ -53,6 +53,7 @@ announcement-state/ Local ignored state for one-time announcement batches
 - Punt free-night/certificate dashboard, monthly digest/calendar reminders, and best-card-by-category until the front-loaded priorities are handled.
 - Keep Perks Reminder's wedge centered on open-source cross-platform tracking plus practical usage guidance; avoid trying to out-native Reward Radar/CardFans or out-email PerkPerks in one step.
 - If iOS work starts, make widgets, push notifications, and quick completion the native value rather than rebuilding the whole web app first.
+- Paid Pro is deprecated. Perks Reminder should present and enforce the current product as completely free, with unlimited cards, reminders, custom reminder windows, loyalty tracking, and data export included for every account.
 
 ## Language
 - "Nitan" / "泥潭" refers to US Card Forum community research and practical card-user data points.
@@ -64,6 +65,7 @@ announcement-state/ Local ignored state for one-time announcement batches
 - Template benefit changes affect only future card additions unless existing user cards are migrated and benefit statuses are materialized.
 - Benefit dashboard rendering should consume projected dashboard data from `src/lib/benefit-dashboard.ts` where practical.
 - Guide content should stay practical and action-oriented, with caveats and provenance visible where the UI supports it.
+- Legacy `subscriptionTier` and `isBetaUser` database fields may remain for compatibility, but runtime capability checks must not use them to downgrade users or reintroduce paid feature gates.
 
 ## Flagged Ambiguities
 - None currently flagged.
@@ -73,7 +75,7 @@ announcement-state/ Local ignored state for one-time announcement batches
 - The local Resend API key is send-only; it cannot list sent emails, so batch scripts need local audit state or deterministic resume points.
 - Announcement sends should use `Perks Reminder <notifications@perks-reminder.com>` explicitly because local `.env` may still contain the old `coupon-cycle.site` sender.
 - Old `coupon-cycle.site` and `loyalty.coupon-cycle.site` aliases currently redirect to the new domains at Vercel level.
-- **NextAuth Session State:** You can expose database fields (like `subscriptionTier` and `isBetaUser`) to the client without repeated DB hits by mapping them in the NextAuth `jwt` and `session` callbacks.
+- **Legacy Subscription State:** `subscriptionTier` and `isBetaUser` are legacy database/session fields after the free-product pivot. Keep them dormant unless a future migration removes them; do not use them for user-facing badges or feature gates.
 - Nitan competitor research shows the clearest product wedge is privacy-first manual tracking plus community-verified benefit/loyalty data, not bank-link automation against MaxRewards/CardPointers.
 - **Benefit Dashboard Projection:** `src/lib/benefit-dashboard.ts` owns shaping BenefitStatus records into dashboard tabs, totals, usage-guide slugs, and card-level ROI. Keep dashboard math there instead of duplicating it in pages or components.
 - **Benefit Cycle Materialization:** `src/lib/benefit-cycle-materialization.ts` owns turning a Benefit plus card/start-date context into normalized BenefitStatus rows. Use it from cron, card creation, migrations, and custom benefit creation when status rows are needed.

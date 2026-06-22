@@ -23,7 +23,7 @@ describe('Navbar', () => {
     jest.clearAllMocks();
   });
 
-  it('shows an Account link for signed-in users', () => {
+  it('shows an Account link for signed-in users without legacy plan badges', () => {
     mockUseSession.mockReturnValue({
       data: {
         user: {
@@ -42,7 +42,8 @@ describe('Navbar', () => {
     render(<Navbar />);
 
     expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute('href', '/settings');
-    expect(screen.getByText('Beta Pro')).toBeInTheDocument();
+    expect(screen.queryByText('Beta Pro')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pro')).not.toBeInTheDocument();
   });
 
   it('hides the Account link for signed-out users', () => {

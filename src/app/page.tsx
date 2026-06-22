@@ -63,14 +63,14 @@ export default async function Home() {
         <div className="relative container mx-auto max-w-screen-xl px-4 py-16 lg:py-24">
           <div className="grid lg:grid-cols-12 lg:gap-12 items-center">
             <div className="lg:col-span-7 mb-12 lg:mb-0">
-              {/* Beta badge */}
+              {/* Free access badge */}
               <div className="inline-flex items-center gap-2 rounded-md border border-indigo-200 bg-white px-3 py-1.5 shadow-sm dark:border-indigo-800 dark:bg-gray-900">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
                 </span>
                 <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                  Pro is free during Beta — sign up now
+                  Completely free, no paid plan
                 </span>
               </div>
 
@@ -106,8 +106,8 @@ export default async function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">Free plan available</p>
-                    <p className="text-xs text-indigo-600 dark:text-indigo-400">Pro free during beta</p>
+                    <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">Free forever</p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400">Unlimited cards and reminders</p>
                   </div>
                 </div>
                 <div className="inline-flex items-center gap-2.5 rounded-lg border border-green-200 bg-white px-4 py-2.5 shadow-sm dark:border-green-800 dark:bg-gray-900">
@@ -179,7 +179,7 @@ export default async function Home() {
             Ready to stop wasting your card benefits?
           </h2>
           <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-8">
-            Join during beta and get Pro features free. Track your benefits, get smart reminders, and maximize your ROI.
+            Track your benefits, get smart reminders, and maximize your ROI without a paid subscription.
           </p>
           <Link
             href="/auth/signin"

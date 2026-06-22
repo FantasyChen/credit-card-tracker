@@ -12,7 +12,6 @@ import {
   ShieldCheckIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline';
-import { getUserSubscriptionStatus } from '@/lib/subscription';
 import PageHeader from '@/components/ui/PageHeader';
 
 export const metadata: Metadata = {
@@ -71,16 +70,6 @@ export default async function SettingsPage() {
     redirect('/api/auth/signin?callbackUrl=/settings');
   }
 
-  const subscription = await getUserSubscriptionStatus(session.user.id);
-  const planName = subscription.tier === 'PRO'
-    ? subscription.isBetaUser ? 'Beta Pro' : 'Pro'
-    : 'Free';
-  const planDescription = subscription.tier === 'PRO'
-    ? subscription.isBetaUser
-      ? 'Pro features are active for your account during the beta period.'
-      : 'Your account has Pro access.'
-    : 'Your account is on the Free plan.';
-
   const settingsItems = [
     {
       href: '/settings/notifications',
@@ -122,12 +111,12 @@ export default async function SettingsPage() {
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
       <PageHeader title="Settings" description="Manage your account preferences and data." />
 
-      {/* Account and Plan */}
+      {/* Account and Access */}
       <div className="mb-8 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-5 flex items-center gap-2">
           <SparklesIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Account & Plan
+            Account
           </h2>
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -159,35 +148,25 @@ export default async function SettingsPage() {
                 Verified
               </span>
             </div>
-            {subscription.tier === 'PRO' ? (
-              <div className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center gap-2">
-                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                  {planName} Plan
-                </span>
-              </div>
-            ) : (
-              <div className="px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Free Plan
-                </span>
-              </div>
-            )}
+            <div className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center gap-2">
+              <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                Free Access
+              </span>
+            </div>
           </div>
         </div>
         <div className="mt-5 grid gap-3 border-t border-indigo-100 pt-5 text-sm dark:border-indigo-800 sm:grid-cols-3">
           <div>
-            <p className="font-medium text-gray-900 dark:text-white">Current plan</p>
-            <p className="mt-1 text-gray-600 dark:text-gray-400">{planName}</p>
+            <p className="font-medium text-gray-900 dark:text-white">Access</p>
+            <p className="mt-1 text-gray-600 dark:text-gray-400">Free</p>
           </div>
           <div>
-            <p className="font-medium text-gray-900 dark:text-white">Plan status</p>
-            <p className="mt-1 text-gray-600 dark:text-gray-400">{planDescription}</p>
+            <p className="font-medium text-gray-900 dark:text-white">Included</p>
+            <p className="mt-1 text-gray-600 dark:text-gray-400">Unlimited cards, reminders, and exports.</p>
           </div>
           <div>
-            <p className="font-medium text-gray-900 dark:text-white">Manage plan</p>
-            <Link href="/pricing" className="mt-1 inline-block text-indigo-600 hover:underline dark:text-indigo-400">
-              View plan details
-            </Link>
+            <p className="font-medium text-gray-900 dark:text-white">Billing</p>
+            <p className="mt-1 text-gray-600 dark:text-gray-400">No paid subscription.</p>
           </div>
         </div>
       </div>
