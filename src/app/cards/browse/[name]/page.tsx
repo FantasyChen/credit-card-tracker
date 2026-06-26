@@ -39,13 +39,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export async function generateStaticParams() {
-  const cards = await prisma.predefinedCard.findMany({
-    select: { name: true },
-  });
+  try {
+    const cards = await prisma.predefinedCard.findMany({
+      select: { name: true },
+    });
 
-  return cards.map((card) => ({
-    name: encodeURIComponent(card.name),
-  }));
+    return cards.map((card) => ({
+      name: encodeURIComponent(card.name),
+    }));
+  } catch (error) {
+    console.warn('PredefinedCard table unavailable, returning empty card browse params', error);
+    return [];
+  }
 }
 
 // Helper to get frequency display label

@@ -198,6 +198,7 @@ export default async function Home() {
 
   const userId = session.user.id;
 
+  try {
   // Fetch card count
   const cardCount = await prisma.creditCard.count({
     where: { userId: userId },
@@ -526,6 +527,42 @@ export default async function Home() {
             </ul>
            </div>
         )}
+      </div>
+    </div>
+  );
+  } catch (error) {
+    console.error('Failed to load homepage dashboard:', error);
+    return <DashboardUnavailable />;
+  }
+}
+
+function DashboardUnavailable() {
+  return (
+    <div className="mx-auto max-w-2xl rounded-xl border border-amber-200 bg-amber-50 p-6 text-center shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+        </svg>
+      </div>
+      <h1 className="text-2xl font-semibold text-gray-950 dark:text-white">
+        Dashboard temporarily unavailable
+      </h1>
+      <p className="mt-3 text-sm leading-6 text-gray-700 dark:text-gray-300">
+        We cannot load your card and benefit data right now because the database is unavailable. Your account data is not deleted; try again after the database connection is restored.
+      </p>
+      <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+        <Link
+          href="/"
+          className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+        >
+          Try again
+        </Link>
+        <Link
+          href="/pricing"
+          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
+          View public site
+        </Link>
       </div>
     </div>
   );
