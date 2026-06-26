@@ -41,7 +41,7 @@ for (const name of scriptNames) {
   const next = fs.readFileSync(source, "utf8");
   if (fs.existsSync(target)) {
     const current = fs.readFileSync(target, "utf8");
-    if (current === next || current.includes("context-harness")) {
+    if (current === next || isContextHarnessRuntime(current, name)) {
       fs.writeFileSync(target, next);
       copied += 1;
       continue;
@@ -52,6 +52,17 @@ for (const name of scriptNames) {
   }
 
   fs.writeFileSync(target, next);
+  copied += 1;
+}
+
+const packageJsonTarget = path.join(targetDir, "package.json");
+const packageJsonContent = `${JSON.stringify({
+  private: true,
+  type: "commonjs",
+  description: "context-harness runtime scripts"
+}, null, 2)}\n`;
+if (!fs.existsSync(packageJsonTarget) || readPackageType(packageJsonTarget) !== "commonjs") {
+  fs.writeFileSync(packageJsonTarget, packageJsonContent);
   copied += 1;
 }
 
@@ -78,4 +89,18 @@ function parseArgs(args) {
     process.exit(1);
   }
   return { profile, targetRoot: path.resolve(rootArg || process.cwd()) };
+}
+
+function readPackageType(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")).type || "";
+  } catch {
+    return "";
+  }
+}
+
+function isContextHarnessRuntime(text, name) {
+  return text.includes("context-harness")
+    || text.includes(`${name} —`)
+    || text.includes(`${name} -`);
 }

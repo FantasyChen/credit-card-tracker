@@ -4,9 +4,9 @@
 // All scripts in this directory should import from here to keep one source
 // of truth for hook I/O, project detection, markdown parsing, and commands.
 
-import { execSync } from "child_process";
-import fs from "fs";
-import path from "path";
+const { execSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
 
 // ---------------------------------------------------------------------------
 // Hook I/O
@@ -90,6 +90,7 @@ function readTextSafe(file) {
 
 function findProjectRoot(startDir) {
   const markers = [
+    "CONTEXT.md",
     "package.json",
     "pyproject.toml",
     "Cargo.toml",
@@ -293,7 +294,7 @@ function today() {
 
 // ---------------------------------------------------------------------------
 
-export {
+module.exports = {
   readHookInput,
   normalizeHookInput,
   block,

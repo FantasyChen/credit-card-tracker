@@ -4,10 +4,10 @@
 // format-on-edit.js — PostToolUse hook: auto-format edited files.
 // Exit: always 0 (formatting is best-effort, never blocks).
 
-import { execSync } from "child_process";
-import { existsSync } from "fs";
-import { extname, dirname } from "path";
-import { readHookInput, findProjectRoot, hasConfig } from "./lib.js";
+const { execSync } = require("child_process");
+const { existsSync } = require("fs");
+const { extname, dirname } = require("path");
+const { readHookInput, findProjectRoot, hasConfig } = require("./lib");
 
 const input = readHookInput();
 const filePath = (input.file_path || "").trim();

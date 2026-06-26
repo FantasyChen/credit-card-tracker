@@ -3,11 +3,11 @@
 
 // context-gen.js — auto-detect project metadata and emit CONTEXT.md sections.
 // Usage: node scripts/context-gen.js [project-root]
-// Output: Project + Structure + Suggested Rules + Memory Prompts markdown.
+// Output: Project + Structure + Suggested Rules + Suggested Workflow + Memory Prompts markdown.
 
-import fs from "fs";
-import path from "path";
-import { detectStack } from "./lib.js";
+const fs = require("fs");
+const path = require("path");
+const { detectStack } = require("./lib");
 
 const root = path.resolve(process.argv[2] || ".");
 const stack = detectStack(root);
@@ -51,18 +51,15 @@ console.log("");
 console.log("### Always");
 rules.always.forEach((r, i) => console.log(`${i + 1}. ${r}`));
 console.log("");
-console.log("### Objectives");
+
+// --- Suggested Workflow section --------------------------------------------
+
+console.log("## Suggested Workflow");
 console.log("");
-console.log("_Outcome-level goals that determine whether the project succeeds at its purpose._");
-console.log("_Not auto-filled — ask the user. Hygiene (tests pass, lint clean) belongs in Always._");
-console.log("_Prefer verifiable form: `<outcome> (<command> exits 0)`. Observable-only is OK if unavoidable._");
+console.log("_Use this to fill `CONTEXT.md` `## Workflow`; verification commands are project habits, not durable Objectives._");
 console.log("");
-console.log("Examples of the right altitude:");
-rules.objectiveExamples.forEach((r) => console.log(`- _e.g._ ${r}`));
-console.log("");
-console.log("1. [Outcome — what does success look like for THIS project?]");
-console.log("2. [Outcome]");
-console.log("3. [Outcome]");
+console.log("### Verification");
+rules.verification.forEach((r) => console.log(`- ${r}`));
 console.log("");
 
 // --- Memory Prompts section -------------------------------------------------
@@ -73,8 +70,9 @@ console.log("_Use these to capture durable human input and agent discoveries._")
 console.log("");
 console.log("- Keep `AGENTS.md` as the always-read Context Contract for Codex and compatible agents.");
 console.log("- Add domain terms, canonical names, relationships, and resolved ambiguities to `CONTEXT.md` `## Language`.");
-console.log("- Add surprising or hard-to-reverse trade-off decisions as tiny ADRs in `docs/adr/`.");
+console.log("- Keep ordinary decisions in `PLAN.md`; use ADRs only when the project already has an ADR workflow.");
 console.log("- For multi-context repositories, add `CONTEXT-MAP.md` only when one root `CONTEXT.md` becomes ambiguous.");
+console.log("- Treat `.context-harness/DREAM.md` as an audit log only; do not read it during normal catch-up or task work.");
 
 // ---------------------------------------------------------------------------
 
@@ -138,12 +136,10 @@ function suggestedRules(stack) {
     "Always handle errors explicitly (no silent catches)",
   ];
 
-  // Outcome-level examples shown to the user as altitude guides — not
-  // filled into the Objectives list. The user defines actual objectives.
-  const objectiveExamples = [
-    "Users can complete <core workflow> end-to-end on a fresh install (tests/smoke.sh exits 0)",
-    "Public API surface stays stable across minor versions (scripts/api-diff.js exits 0)",
-    "Docs cover every public entry point (scripts/doc-coverage.js exits 0)",
+  const verification = [
+    "Run the project test command before completing code changes.",
+    "Run the project lint/typecheck command when available.",
+    "For UI changes, verify the changed screen or workflow manually or with browser automation.",
   ];
 
   const tsLike = (testCmd) => ({
@@ -153,7 +149,11 @@ function suggestedRules(stack) {
       "Always write tests for new public functions",
       ...commonAlways,
     ],
-    objectiveExamples,
+    verification: [
+      `${testCmd} exits 0`,
+      "tsc --noEmit exits 0",
+      "Changed UI routes render without console errors when applicable",
+    ],
   });
 
   switch (stack.lang) {
@@ -170,7 +170,11 @@ function suggestedRules(stack) {
           "Always write tests for new public functions",
           ...commonAlways,
         ],
-        objectiveExamples,
+        verification: [
+          `${testCmdForNode(stack)} exits 0`,
+          "The project lint command exits 0 when available",
+          "Changed UI routes render without console errors when applicable",
+        ],
       };
     case "Python":
       return {
@@ -180,7 +184,11 @@ function suggestedRules(stack) {
           "Always run `pytest` and `ruff check` before committing",
           ...commonAlways,
         ],
-        objectiveExamples,
+        verification: [
+          "pytest exits 0",
+          "ruff check exits 0",
+          "Changed CLI/API workflows are exercised by a smoke check when applicable",
+        ],
       };
     case "Go":
       return {
@@ -190,7 +198,11 @@ function suggestedRules(stack) {
           "Always write table-driven tests",
           ...commonAlways,
         ],
-        objectiveExamples,
+        verification: [
+          "go test ./... exits 0",
+          "go vet ./... exits 0",
+          "Changed CLI/API workflows are exercised by a smoke check when applicable",
+        ],
       };
     case "Rust":
       return {
@@ -199,7 +211,11 @@ function suggestedRules(stack) {
           "Always run `cargo test` and `cargo clippy -- -D warnings` before committing",
           ...commonAlways,
         ],
-        objectiveExamples,
+        verification: [
+          "cargo test exits 0",
+          "cargo clippy -- -D warnings exits 0",
+          "Changed CLI/API workflows are exercised by a smoke check when applicable",
+        ],
       };
     case "Ruby":
       return {
@@ -208,7 +224,11 @@ function suggestedRules(stack) {
           "Always run `bundle exec rspec` and `rubocop` before committing",
           ...commonAlways,
         ],
-        objectiveExamples,
+        verification: [
+          "bundle exec rspec exits 0",
+          "rubocop exits 0",
+          "Changed workflows are exercised by a smoke check when applicable",
+        ],
       };
     default:
       return {
@@ -218,7 +238,7 @@ function suggestedRules(stack) {
           "Always run the test suite and linter before committing",
           "Always write tests for new public functions",
         ],
-        objectiveExamples,
+        verification,
       };
   }
 }

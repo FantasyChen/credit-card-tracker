@@ -6,9 +6,9 @@
 // agent invokes context-catch-up, context-init, or context-maintain at the right
 // moment.
 
-import fs from "fs";
-import path from "path";
-import { readHookInput, readTextSafe, findProjectRoot } from "./lib.js";
+const fs = require("fs");
+const path = require("path");
+const { readHookInput, readTextSafe, findProjectRoot } = require("./lib");
 
 const mode = readArg("--mode") || "catch-up";
 const input = readHookInput();
