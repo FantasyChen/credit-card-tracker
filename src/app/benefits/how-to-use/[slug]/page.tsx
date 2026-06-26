@@ -1,15 +1,26 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { BenefitFrequency } from '@/generated/prisma';
 import ShareButton from '@/components/ShareButton';
 import CardImageWell from '@/components/ui/CardImageWell';
 import SuggestCorrectionLink from '@/components/SuggestCorrectionLink';
 import React from 'react';
+import {
+  benefitUsageWays,
+  getPublicStaticCards,
+  STATIC_CATALOG_UPDATED_AT,
+  type PublicStaticBenefit,
+  type PublicStaticCard,
+  type StaticBenefitFrequency,
+  type StaticBenefitUsageWay,
+} from '@/lib/static-catalog';
+
+type RelatedBenefit = PublicStaticBenefit & {
+  predefinedCard: Pick<PublicStaticCard, 'name' | 'issuer'>;
+};
 
 // Helper function to get next reset date based on frequency
-function getNextResetDate(frequency: BenefitFrequency): string {
+function getNextResetDate(frequency: StaticBenefitFrequency): string {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
@@ -40,7 +51,7 @@ function getNextResetDate(frequency: BenefitFrequency): string {
   }
 }
 
-function getFrequencyLabel(frequency: BenefitFrequency): string {
+function getFrequencyLabel(frequency: StaticBenefitFrequency): string {
   switch (frequency) {
     case 'WEEKLY': return 'Resets weekly';
     case 'MONTHLY': return 'Resets monthly';
@@ -57,9 +68,8 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const usageWay = await prisma.benefitUsageWay.findUnique({
-    where: { slug },
-  });
+  const usageWays: readonly StaticBenefitUsageWay[] = benefitUsageWays;
+  const usageWay = usageWays.find((way) => way.slug === slug);
 
   if (!usageWay) {
     return {
@@ -83,49 +93,35 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export async function generateStaticParams() {
-  try {
-    const usageWays = await prisma.benefitUsageWay.findMany({
-      select: { slug: true },
-    });
-
-    return usageWays.map((way) => ({
-      slug: way.slug,
-    }));
-  } catch {
-    console.warn('BenefitUsageWay table not found, returning empty params');
-    return [];
-  }
+  return benefitUsageWays.map((way) => ({
+    slug: way.slug,
+  }));
 }
 
 export default async function UsageWayDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  let usageWay;
-  try {
-    usageWay = await prisma.benefitUsageWay.findUnique({
-      where: { slug },
-      include: {
-        predefinedBenefits: {
-          include: {
-            predefinedCard: true,
-          },
-        },
-      },
-    });
-  } catch {
-    console.warn('BenefitUsageWay table not found');
-    notFound();
-  }
+  const usageWays: readonly StaticBenefitUsageWay[] = benefitUsageWays;
+  const usageWay = usageWays.find((way) => way.slug === slug);
 
   if (!usageWay) {
     notFound();
   }
 
-  // Get related cards
-  const relatedCards = usageWay.predefinedBenefits
-    .map((benefit) => benefit.predefinedCard)
-    .filter((card, index, self) => 
-      index === self.findIndex((c) => c.id === card.id)
-    );
+  const allCards = getPublicStaticCards();
+  const relatedBenefits: RelatedBenefit[] = allCards.flatMap((card) =>
+    card.benefits
+      .filter((benefit) => benefit.usageWay?.slug === usageWay.slug)
+      .map((benefit) => ({
+        ...benefit,
+        predefinedCard: {
+          name: card.name,
+          issuer: card.issuer,
+        },
+      }))
+  );
+  const relatedCards = allCards.filter((card) =>
+    card.benefits.some((benefit) => benefit.usageWay?.slug === usageWay.slug)
+  );
 
   // Helper function to render text with inline bold formatting
   const renderTextWithBold = (text: string, keyPrefix: string): React.ReactNode => {
@@ -252,7 +248,7 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
           <span>
-            Updated {usageWay.updatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            Updated {new Date(STATIC_CATALOG_UPDATED_AT).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
           <span className="hidden sm:inline">•</span>
           <span>Source: issuer terms plus community data points</span>
@@ -351,13 +347,13 @@ export default async function UsageWayDetailPage({ params }: PageProps) {
       )}
 
       {/* Related Benefits with Reset Dates */}
-      {usageWay.predefinedBenefits.length > 0 && (
+      {relatedBenefits.length > 0 && (
         <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-8">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
             Benefits in This Guide
           </h2>
           <div className="space-y-4">
-            {usageWay.predefinedBenefits.map((benefit) => (
+            {relatedBenefits.map((benefit) => (
               <div
                 key={benefit.id}
                 className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600"

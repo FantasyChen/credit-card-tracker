@@ -1,9 +1,8 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { prisma } from '@/lib/prisma';
-import { BenefitUsageWay } from '@/generated/prisma';
 import PageHeader from '@/components/ui/PageHeader';
 import SuggestCorrectionLink from '@/components/SuggestCorrectionLink';
+import { benefitUsageWays, STATIC_CATALOG_UPDATED_AT, type StaticBenefitUsageWay } from '@/lib/static-catalog';
 
 export const metadata: Metadata = {
   title: 'How to Use Credit Card Benefits - Complete Guide',
@@ -21,16 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default async function HowToUseIndexPage() {
-  let usageWays: BenefitUsageWay[] = [];
-  try {
-    usageWays = await prisma.benefitUsageWay.findMany({
-      orderBy: {
-        category: 'asc',
-      },
-    });
-  } catch {
-    console.warn('BenefitUsageWay table not found, skipping how-to-use content');
-  }
+  const usageWays = [...benefitUsageWays].sort((a, b) => a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
 
   // Group by category
   const groupedByCategory = usageWays.reduce((acc, way) => {
@@ -40,7 +30,7 @@ export default async function HowToUseIndexPage() {
     }
     acc[category].push(way);
     return acc;
-  }, {} as Record<string, BenefitUsageWay[]>);
+  }, {} as Record<string, StaticBenefitUsageWay[]>);
 
   const categoryIcons: Record<string, string> = {
     'Travel': '✈️',
@@ -69,7 +59,7 @@ export default async function HowToUseIndexPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {ways.map((way) => (
                 <Link
-                  key={way.id}
+                  key={way.slug}
                   href={`/benefits/how-to-use/${way.slug}`}
                   className="group block"
                 >
@@ -114,7 +104,7 @@ export default async function HowToUseIndexPage() {
                         </svg>
                       </div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        Updated {way.updatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        Updated {new Date(STATIC_CATALOG_UPDATED_AT).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
                     </div>
                   </div>

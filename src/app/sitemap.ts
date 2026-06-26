@@ -1,22 +1,11 @@
 import { MetadataRoute } from 'next'
-import { prisma } from '@/lib/prisma'
 import { PRIMARY_SITE_URL } from '@/lib/site'
+import { benefitUsageWays, STATIC_CATALOG_UPDATED_AT } from '@/lib/static-catalog'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = PRIMARY_SITE_URL
   
-  // Fetch all benefit usage way slugs for dynamic pages
-  let usageWays: { slug: string; updatedAt: Date }[] = []
-  try {
-    usageWays = await prisma.benefitUsageWay.findMany({
-      select: {
-        slug: true,
-        updatedAt: true,
-      },
-    })
-  } catch (error) {
-    console.warn('Could not fetch benefit usage ways for sitemap:', error)
-  }
+  const catalogUpdatedAt = new Date(STATIC_CATALOG_UPDATED_AT)
   
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [
@@ -71,9 +60,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]
   
   // Dynamic benefit usage guide pages
-  const dynamicPages: MetadataRoute.Sitemap = usageWays.map((way) => ({
+  const dynamicPages: MetadataRoute.Sitemap = benefitUsageWays.map((way) => ({
     url: `${baseUrl}/benefits/how-to-use/${way.slug}`,
-    lastModified: way.updatedAt,
+    lastModified: catalogUpdatedAt,
     changeFrequency: 'monthly' as const,
     priority: 0.7,
   }))

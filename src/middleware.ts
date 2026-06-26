@@ -38,6 +38,20 @@ function getMainAuthHost(hostname: string, subdomain: string): { host: string; p
   };
 }
 
+function hasSessionCookie(request: NextRequest): boolean {
+  return (
+    request.cookies.has('next-auth.session-token') ||
+    request.cookies.has('__Secure-next-auth.session-token')
+  );
+}
+
+function redirectToSignin(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  url.pathname = '/auth/signin';
+  url.searchParams.set('callbackUrl', request.nextUrl.pathname + request.nextUrl.search);
+  return NextResponse.redirect(url);
+}
+
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const subdomain = getSubdomain(hostname);
@@ -58,6 +72,10 @@ export function middleware(request: NextRequest) {
     url.hostname = `loyalty.${NEW_DOMAIN}`;
     url.port = '';
     return NextResponse.redirect(url, 308);
+  }
+
+  if (pathname === '/cards/new' && !hasSessionCookie(request)) {
+    return redirectToSignin(request);
   }
 
   if (subdomain && LOYALTY_SUBDOMAINS.includes(subdomain)) {

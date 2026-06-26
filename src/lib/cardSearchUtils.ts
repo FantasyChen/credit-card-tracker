@@ -1,11 +1,22 @@
-import type { PredefinedCard, PredefinedBenefit } from '@/generated/prisma';
-
-export type CardWithBenefits = PredefinedCard & {
-  benefits: PredefinedBenefit[];
+export type SearchableBenefit = {
+  category: string;
+  description: string;
+  maxAmount: number | null;
 };
 
-export interface SearchResult {
-  card: CardWithBenefits;
+export type SearchableCard = {
+  id: string;
+  name: string;
+  issuer: string;
+  annualFee: number;
+  imageUrl?: string | null;
+  benefits: SearchableBenefit[];
+};
+
+export type CardWithBenefits = SearchableCard;
+
+export interface SearchResult<TCard extends SearchableCard = SearchableCard> {
+  card: TCard;
   score: number;
   matchedFields: string[];
 }
@@ -110,7 +121,7 @@ function matchesAlias(searchTerm: string, text: string, aliases: Record<string, 
 /**
  * Searches credit cards with enhanced functionality
  */
-export function searchCards(cards: CardWithBenefits[], searchTerm: string): SearchResult[] {
+export function searchCards<TCard extends SearchableCard>(cards: TCard[], searchTerm: string): SearchResult<TCard>[] {
   if (!searchTerm.trim()) {
     return cards.map(card => ({
       card,
@@ -119,7 +130,7 @@ export function searchCards(cards: CardWithBenefits[], searchTerm: string): Sear
     }));
   }
 
-  const results: SearchResult[] = [];
+  const results: SearchResult<TCard>[] = [];
   const normalizedSearch = normalizeString(searchTerm);
 
   for (const card of cards) {
@@ -196,7 +207,7 @@ export function searchCards(cards: CardWithBenefits[], searchTerm: string): Sear
 /**
  * Get search suggestions based on available cards
  */
-export function getSearchSuggestions(cards: CardWithBenefits[]): string[] {
+export function getSearchSuggestions<TCard extends SearchableCard>(cards: TCard[]): string[] {
   const suggestions = new Set<string>();
   
   // Add common issuers
@@ -228,4 +239,4 @@ export function getSearchSuggestions(cards: CardWithBenefits[]): string[] {
   suggestions.add('credit');
   
   return Array.from(suggestions).sort();
-} 
+}

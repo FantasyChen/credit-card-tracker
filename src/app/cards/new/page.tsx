@@ -241,7 +241,7 @@ export default function AddNewCardPage() {
   useEffect(() => {
     async function fetchCards() {
       try {
-        const response = await fetch('/api/predefined-cards-with-benefits');
+        const response = await fetch('/api/predefined-cards-with-benefits?source=db');
         if (!response.ok) {
           throw new Error('Failed to fetch cards');
         }

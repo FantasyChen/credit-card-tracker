@@ -1,8 +1,8 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { prisma } from '@/lib/prisma';
 import CardImageWell from '@/components/ui/CardImageWell';
 import PageHeader from '@/components/ui/PageHeader';
+import { calculateAnnualBenefitValue, getPublicStaticCards } from '@/lib/static-catalog';
 
 export const metadata: Metadata = {
   title: 'Browse Credit Cards | Perks Reminder',
@@ -21,15 +21,7 @@ export const metadata: Metadata = {
 };
 
 export default async function BrowseCardsPage() {
-  const predefinedCards = await prisma.predefinedCard.findMany({
-    include: {
-      benefits: true,
-    },
-    orderBy: [
-      { issuer: 'asc' },
-      { name: 'asc' },
-    ],
-  });
+  const predefinedCards = getPublicStaticCards();
 
   // Group cards by issuer
   const cardsByIssuer = predefinedCards.reduce((acc, card) => {
@@ -44,23 +36,8 @@ export default async function BrowseCardsPage() {
   const sortedIssuers = Object.keys(cardsByIssuer).sort();
 
   // Calculate total benefits value for a card
-  const calculateTotalValue = (benefits: { maxAmount: number | null; frequency: string }[]) => {
-    return benefits.reduce((total, benefit) => {
-      if (!benefit.maxAmount) return total;
-      switch (benefit.frequency) {
-        case 'WEEKLY':
-          return total + benefit.maxAmount * 52;
-        case 'MONTHLY':
-          return total + benefit.maxAmount * 12;
-        case 'QUARTERLY':
-          return total + benefit.maxAmount * 4;
-        case 'YEARLY':
-        case 'ONE_TIME':
-        default:
-          return total + benefit.maxAmount;
-      }
-    }, 0);
-  };
+  const calculateTotalValue = (benefits: typeof predefinedCards[number]['benefits']) =>
+    benefits.reduce((total, benefit) => total + calculateAnnualBenefitValue(benefit.maxAmount, benefit.frequency), 0);
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">

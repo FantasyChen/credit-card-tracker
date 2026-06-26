@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
-import { prisma } from '@/lib/prisma';
+import { getPublicStaticCards } from '@/lib/static-catalog';
 
 export const metadata: Metadata = {
   title: 'Credit Card Referral Links | Perks Reminder',
@@ -76,16 +76,8 @@ const referralData: Record<string, { cards: { name: string; description: string;
 };
 
 export default async function ReferralsPage() {
-  // Get predefined cards to show images
-  const predefinedCards = await prisma.predefinedCard.findMany({
-    where: {
-      name: {
-        in: Object.values(referralData).flatMap(issuer => issuer.cards.map(c => c.name)),
-      },
-    },
-  });
-
-  const cardImageMap = predefinedCards.reduce((acc, card) => {
+  const referralCardNames = new Set(Object.values(referralData).flatMap(issuer => issuer.cards.map(c => c.name)));
+  const cardImageMap = getPublicStaticCards().filter((card) => referralCardNames.has(card.name)).reduce((acc, card) => {
     acc[card.name] = card.imageUrl;
     return acc;
   }, {} as Record<string, string | null>);
@@ -258,6 +250,5 @@ export default async function ReferralsPage() {
     </div>
   );
 }
-
 
 

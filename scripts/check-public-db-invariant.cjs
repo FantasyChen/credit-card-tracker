@@ -6,6 +6,10 @@ const publicSurfaceFiles = [
   'src/app/page.tsx',
   'src/app/cards/browse/page.tsx',
   'src/app/cards/browse/[name]/page.tsx',
+  'src/app/benefits/how-to-use/page.tsx',
+  'src/app/benefits/how-to-use/[slug]/page.tsx',
+  'src/app/referrals/page.tsx',
+  'src/app/sitemap.ts',
   'src/components/SupportedCreditCards.tsx',
 ];
 

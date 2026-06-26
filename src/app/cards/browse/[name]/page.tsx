@@ -1,10 +1,15 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { BenefitFrequency } from '@/generated/prisma';
 import CardImageWell from '@/components/ui/CardImageWell';
 import SuggestCorrectionLink from '@/components/SuggestCorrectionLink';
+import {
+  calculateAnnualBenefitValue,
+  getFrequencyLabel,
+  getPublicStaticCardByName,
+  getPublicStaticCards,
+  getPublicStaticRelatedCards,
+} from '@/lib/static-catalog';
 
 interface PageProps {
   params: Promise<{ name: string }>;
@@ -13,9 +18,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { name } = await params;
   const cardName = decodeURIComponent(name);
-  const card = await prisma.predefinedCard.findUnique({
-    where: { name: cardName },
-  });
+  const card = getPublicStaticCardByName(cardName);
 
   if (!card) {
     return {
@@ -39,43 +42,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export async function generateStaticParams() {
-  try {
-    const cards = await prisma.predefinedCard.findMany({
-      select: { name: true },
-    });
-
-    return cards.map((card) => ({
-      name: encodeURIComponent(card.name),
-    }));
-  } catch (error) {
-    console.warn('PredefinedCard table unavailable, returning empty card browse params', error);
-    return [];
-  }
-}
-
-// Helper to get frequency display label
-function getFrequencyLabel(frequency: BenefitFrequency): string {
-  switch (frequency) {
-    case 'WEEKLY': return 'Weekly';
-    case 'MONTHLY': return 'Monthly';
-    case 'QUARTERLY': return 'Quarterly';
-    case 'YEARLY': return 'Yearly';
-    case 'ONE_TIME': return 'One-time';
-    default: return '';
-  }
-}
-
-// Helper to calculate annual value of a benefit
-function calculateAnnualValue(maxAmount: number | null, frequency: BenefitFrequency): number {
-  if (!maxAmount) return 0;
-  switch (frequency) {
-    case 'WEEKLY': return maxAmount * 52;
-    case 'MONTHLY': return maxAmount * 12;
-    case 'QUARTERLY': return maxAmount * 4;
-    case 'YEARLY':
-    case 'ONE_TIME':
-    default: return maxAmount;
-  }
+  return getPublicStaticCards().map((card) => ({
+    name: encodeURIComponent(card.name),
+  }));
 }
 
 // Issuer URLs mapping
@@ -94,40 +63,17 @@ const issuerUrls: Record<string, string> = {
 export default async function CardDetailPage({ params }: PageProps) {
   const { name } = await params;
   const cardName = decodeURIComponent(name);
-  
-  const card = await prisma.predefinedCard.findUnique({
-    where: { name: cardName },
-    include: {
-      benefits: {
-        include: {
-          usageWay: true,
-        },
-        orderBy: {
-          maxAmount: 'desc',
-        },
-      },
-    },
-  });
+  const card = getPublicStaticCardByName(cardName);
 
   if (!card) {
     notFound();
   }
 
-  // Get other cards from the same issuer
-  const relatedCards = await prisma.predefinedCard.findMany({
-    where: {
-      issuer: card.issuer,
-      id: { not: card.id },
-    },
-    include: {
-      benefits: true,
-    },
-    take: 4,
-  });
+  const relatedCards = getPublicStaticRelatedCards(card, 4);
 
   // Calculate total annual value
   const totalAnnualValue = card.benefits.reduce((total, benefit) => {
-    return total + calculateAnnualValue(benefit.maxAmount, benefit.frequency);
+    return total + calculateAnnualBenefitValue(benefit.maxAmount, benefit.frequency);
   }, 0);
 
   const netValue = totalAnnualValue - card.annualFee;
@@ -239,7 +185,7 @@ export default async function CardDetailPage({ params }: PageProps) {
             <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
               <div className="font-medium text-gray-900 dark:text-white">Catalog provenance</div>
               <div className="mt-1">
-                Last updated {card.updatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Benefits are community-maintained from issuer terms and public data points.
+                Last updated {new Date(card.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Benefits are community-maintained from issuer terms and public data points.
               </div>
             </div>
           </div>
@@ -285,7 +231,7 @@ export default async function CardDetailPage({ params }: PageProps) {
                         </p>
                         {benefit.maxAmount && (
                           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            Annual value: ${calculateAnnualValue(benefit.maxAmount, benefit.frequency).toLocaleString()}
+                            Annual value: ${calculateAnnualBenefitValue(benefit.maxAmount, benefit.frequency).toLocaleString()}
                           </p>
                         )}
                         <div className="mt-2">

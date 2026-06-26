@@ -1,9 +1,5 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import Image from 'next/image';
-import { BenefitStatus, Benefit, CreditCard as PrismaCreditCard } from '@/generated/prisma';
 import { CreditCardIcon } from '@heroicons/react/24/outline';
 import SupportedCreditCards from '@/components/SupportedCreditCards';
 import DashboardBenefitRow from '@/components/DashboardBenefitRow';
@@ -11,13 +7,13 @@ import HowItWorks from '@/components/HowItWorks';
 import PricingSection from '@/components/PricingSection';
 import FAQ from '@/components/FAQ';
 import { PRIMARY_SITE_URL, SITE_NAME } from '@/lib/site';
-
-// Define a type for the upcoming benefits data
-interface UpcomingBenefit extends BenefitStatus {
-  benefit: Benefit & { creditCard: PrismaCreditCard };
-}
+import type { UpcomingBenefit } from '@/lib/home-dashboard-data';
 
 export default async function Home() {
+  const [{ getServerSession }, { authOptions }] = await Promise.all([
+    import('next-auth'),
+    import('@/lib/auth'),
+  ]);
   const session = await getServerSession(authOptions);
 
   // Structured data for SEO
@@ -199,93 +195,14 @@ export default async function Home() {
   const userId = session.user.id;
 
   try {
-  // Fetch card count
-  const cardCount = await prisma.creditCard.count({
-    where: { userId: userId },
-  });
-
-  // Calculate total annual fees and claimed benefits value
-  const userCards = await prisma.creditCard.findMany({
-    where: { userId },
-    select: { name: true }
-  });
-
-  // Count the quantity of each card type
-  const cardCounts = userCards.reduce((acc, card) => {
-    acc[card.name] = (acc[card.name] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const totalAnnualFees = await prisma.predefinedCard.findMany({
-    where: {
-      name: {
-        in: Object.keys(cardCounts)
-      }
-    }
-  }).then(predefinedCards => {
-    return predefinedCards.reduce((total, card) => {
-      const quantity = cardCounts[card.name] || 1;
-      return total + (card.annualFee * quantity);
-    }, 0);
-  });
-
-  // Calculate total claimed value using usedAmount (includes partial completions)
-  const totalClaimedValue = await prisma.benefitStatus.findMany({
-    where: {
-      userId: userId,
-      isNotUsable: false, // Exclude not usable benefits
-    },
-    select: {
-      usedAmount: true,
-    }
-  }).then(statuses => {
-    return statuses.reduce((total, status) => total + (status.usedAmount ?? 0), 0);
-  });
-
-  const now = new Date();
-  const sevenDaysFromNow = new Date(now);
-  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-
-  // Fetch benefits expiring within 7 days (urgent) - only those in active cycle
-  const expiringSoonBenefits = await prisma.benefitStatus.findMany({
-    where: {
-      userId: userId,
-      isCompleted: false,
-      cycleStartDate: { lte: now },
-      cycleEndDate: { gte: now, lte: sevenDaysFromNow },
-    },
-    include: {
-      benefit: {
-        include: {
-          creditCard: true,
-        },
-      },
-    },
-    orderBy: {
-      cycleEndDate: 'asc',
-    },
-  }) as UpcomingBenefit[];
-
-  // Fetch upcoming benefits (in active cycle, expiring after 7 days, limit 5)
-  const upcomingBenefits = await prisma.benefitStatus.findMany({
-    where: {
-      userId: userId,
-      isCompleted: false,
-      cycleStartDate: { lte: now },
-      cycleEndDate: { gt: sevenDaysFromNow },
-    },
-    include: {
-      benefit: {
-        include: {
-          creditCard: true,
-        },
-      },
-    },
-    orderBy: {
-      cycleEndDate: 'asc',
-    },
-    take: 5,
-  }) as UpcomingBenefit[];
+  const { loadHomeDashboardData } = await import('@/lib/home-dashboard-data');
+  const {
+    cardCount,
+    totalAnnualFees,
+    totalClaimedValue,
+    expiringSoonBenefits,
+    upcomingBenefits,
+  } = await loadHomeDashboardData(userId);
 
   return (
     <div>

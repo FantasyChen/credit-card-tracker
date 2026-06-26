@@ -71,24 +71,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      {
-        source: '/api/predefined-cards',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=3600, stale-while-revalidate=86400',
-          },
-        ],
-      },
-      {
-        source: '/api/predefined-cards-with-benefits',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=3600, stale-while-revalidate=86400',
-          },
-        ],
-      },
     ];
   },
   

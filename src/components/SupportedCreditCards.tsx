@@ -1,64 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
-import type { PredefinedCard, PredefinedBenefit } from '@/generated/prisma';
 import { searchCards } from '@/lib/cardSearchUtils';
-import SearchInput from './SearchInput';
 import CardImageWell from '@/components/ui/CardImageWell';
-
-// Interface for card with benefits
-interface CardWithBenefits extends PredefinedCard {
-  benefits: PredefinedBenefit[];
-}
+import { getPublicStaticCards, type PublicStaticCard } from '@/lib/static-catalog';
 
 export default function SupportedCreditCards() {
-  const [cards, setCards] = useState<CardWithBenefits[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [cards] = useState(() => getPublicStaticCards());
   const [showAll, setShowAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-
-  useEffect(() => {
-    async function fetchCards() {
-      try {
-        const response = await fetch('/api/predefined-cards-with-benefits');
-        if (!response.ok) {
-          // Fallback to basic predefined cards API if the detailed one doesn't exist yet
-          const basicResponse = await fetch('/api/predefined-cards');
-          if (!basicResponse.ok) {
-            throw new Error('Failed to fetch cards');
-          }
-          const basicData: PredefinedCard[] = await basicResponse.json();
-          setCards(basicData.map(card => ({ ...card, benefits: [] })));
-        } else {
-          const data: CardWithBenefits[] = await response.json();
-          setCards(data);
-        }
-      } catch (error) {
-        console.error("Error fetching cards:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchCards();
-  }, []);
-
-  // Enhanced search functionality with server-side optimization
-  const [searchResults, setSearchResults] = useState<Array<{card: CardWithBenefits, score: number, matchedFields: string[]}>>([]);
-  const [isSearching, setIsSearching] = useState(false);
   
-  // Memoize the search handler to prevent infinite loops
-  const handleSearch = useCallback((query: string, results: any[]) => {
-    setSearchTerm(query);
-    setSearchResults(results);
-    setIsSearching(false);
-  }, []);
-  
-  // Use client-side search as fallback
   const fallbackResults = searchCards(cards, searchTerm);
-  const filteredCards = searchResults.length > 0 ? searchResults.map(result => result.card) : fallbackResults.map(result => result.card);
+  const filteredCards = fallbackResults.map(result => result.card);
 
   // Show only first 6 cards initially, or all if showAll is true
   const displayedCards = showAll ? filteredCards : filteredCards.slice(0, 6);
@@ -71,22 +26,7 @@ export default function SupportedCreditCards() {
     }
     acc[card.issuer].push(card);
     return acc;
-  }, {} as Record<string, CardWithBenefits[]>);
-
-  if (isLoading) {
-    return (
-      <section className="py-16 bg-white dark:bg-gray-900">
-        <div className="container mx-auto px-4">
-          <div className="text-center">
-            <div className="animate-pulse">
-              <div className="h-8 bg-gray-300 dark:bg-gray-700 rounded w-64 mx-auto mb-4"></div>
-              <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-96 mx-auto"></div>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  }, {} as Record<string, PublicStaticCard[]>);
 
   return (
     <div>
@@ -175,31 +115,18 @@ export default function SupportedCreditCards() {
 
           {/* Enhanced Search Bar */}
           <div className="max-w-lg mx-auto mb-8 space-y-4">
-            <SearchInput
-              onSearch={handleSearch as any}
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search cards, issuers, benefits... Try 'amex', 'travel', 'dining', 'uber'"
-              showSuggestions={true}
-              debounceMs={300}
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400"
             />
             
             {/* Search results count */}
             {searchTerm && (
               <div className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                {isSearching ? (
-                  <span className="flex items-center justify-center">
-                    <div className="w-4 h-4 border-2 border-gray-300 border-t-indigo-500 rounded-full animate-spin mr-2" />
-                    Searching...
-                  </span>
-                ) : (
-                  <>
-                    Found {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} matching &ldquo;{searchTerm}&rdquo;
-                    {searchResults.length > 0 && (
-                      <span className="ml-2 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded">
-                        Optimized
-                      </span>
-                    )}
-                  </>
-                )}
+                Found {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} matching &ldquo;{searchTerm}&rdquo;
               </div>
             )}
           </div>

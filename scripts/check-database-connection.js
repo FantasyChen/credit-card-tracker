@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import dotenv from 'dotenv';
-import { execFileSync } from 'child_process';
+const dotenv = require('dotenv');
+const { execFileSync } = require('child_process');
 
 dotenv.config();
 
