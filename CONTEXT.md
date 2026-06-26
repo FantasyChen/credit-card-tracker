@@ -97,6 +97,7 @@ announcement-state/ Local ignored state for one-time announcement batches
 - **Public DB-Free Catalog:** Anonymous marketing/catalog routes must not query Prisma. `src/lib/static-catalog.ts` is the shared source for public predefined cards and Benefit Usage Guides; `prisma/seed.ts` imports the same data for DB seeding. Run `npm run check:public-db` after public route/catalog changes.
 - **Explicit Catalog Seeding:** Production builds must not run `prisma db seed`; use `npm run db:seed` intentionally after verifying the target database when catalog/template data needs updating.
 - **Supabase Fallback Gate:** Supabase is the preferred Postgres-compatible fallback if Neon remains unusable, but production cutover waits for a Neon export unless the user explicitly approves an empty fallback DB. Runbook lives in `docs/supabase-fallback.md`.
+- **Production Vercel Alias:** `perks-reminder.com`, `www.perks-reminder.com`, and loyalty/coupon-cycle aliases are served by the Vercel `coupon-cycle` project, while this local checkout is also linked to `credit-card-tracker`. For public-domain verification, inspect `vercel ls coupon-cycle` and the custom aliases, not only the local `.vercel/project.json` project.
 
 ## Imported Agent Notes
 <!-- Migrated from the pre-v3 AGENTS.md during the one-time context-harness upgrade. Keep durable facts here; keep AGENTS.md small. -->
