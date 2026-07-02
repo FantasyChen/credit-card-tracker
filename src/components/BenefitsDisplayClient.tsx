@@ -325,27 +325,30 @@ export default function BenefitsDisplayClient({
     });
   };
 
-  // Group benefits by credit card (handles null creditCard for custom benefits)
+  // Group benefits by credit card (handles null creditCard for custom benefits).
+  // Use card IDs as group keys so multiple copies of the same card stay distinct even
+  // if they share the same card name or nickname.
   const groupBenefitsByCard = (benefits: DisplayBenefitStatus[]) => {
     const grouped = benefits.reduce((acc, benefit) => {
-      // Use "Custom Benefits" as the group name for standalone benefits
-      const cardGroupName = benefit.benefit.creditCard?.displayName || CUSTOM_BENEFITS_CARD_NAME;
-      if (!acc[cardGroupName]) {
-        acc[cardGroupName] = [];
+      const card = benefit.benefit.creditCard;
+      const cardGroupKey = card?.id ?? CUSTOM_BENEFITS_CARD_NAME;
+      const cardGroupLabel = card?.displayName || CUSTOM_BENEFITS_CARD_NAME;
+      if (!acc[cardGroupKey]) {
+        acc[cardGroupKey] = { label: cardGroupLabel, benefits: [] };
       }
-      acc[cardGroupName].push(benefit);
+      acc[cardGroupKey].benefits.push(benefit);
       return acc;
-    }, {} as Record<string, DisplayBenefitStatus[]>);
+    }, {} as Record<string, { label: string; benefits: DisplayBenefitStatus[] }>);
 
     // Sort cards by total value (descending), but always put "Custom Benefits" first
     return Object.entries(grouped).sort(([keyA, a], [keyB, b]) => {
       // Put custom benefits first
       if (keyA === CUSTOM_BENEFITS_CARD_NAME) return -1;
       if (keyB === CUSTOM_BENEFITS_CARD_NAME) return 1;
-      
-      const aTotal = a.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
-      const bTotal = b.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
-      return bTotal - aTotal;
+
+      const aTotal = a.benefits.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
+      const bTotal = b.benefits.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
+      return bTotal - aTotal || a.label.localeCompare(b.label) || keyA.localeCompare(keyB);
     });
   };
 
@@ -453,11 +456,11 @@ export default function BenefitsDisplayClient({
     
     return (
       <div className="space-y-6">
-        {cardGroupedBenefits.map(([cardName, cardBenefits]) => (
+        {cardGroupedBenefits.map(([cardKey, group]) => (
           <CategoryBenefitsGroup
-            key={cardName}
-            category={cardName}
-            benefits={cardBenefits}
+            key={cardKey}
+            category={group.label}
+            benefits={group.benefits}
             onStatusChange={handleStatusChange}
             onNotUsableChange={handleNotUsableChange}
             onDelete={handleDeleteBenefit}

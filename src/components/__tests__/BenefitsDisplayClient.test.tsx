@@ -14,9 +14,10 @@ jest.mock('../BenefitCardClient', () => {
 });
 jest.mock('../CategoryBenefitsGroup', () => ({
   __esModule: true,
-  default: function MockCategoryBenefitsGroup({ benefits }: { benefits: DisplayBenefitStatus[] }) {
+  default: function MockCategoryBenefitsGroup({ category, benefits }: { category: string; benefits: DisplayBenefitStatus[] }) {
     return (
       <div data-testid="category-group">
+        <h2>{category}</h2>
         <div data-testid="category-count">{benefits.length}</div>
         {benefits.map((b) => (
           <div key={b.id}>{b.benefit.description}</div>
@@ -211,5 +212,31 @@ describe('BenefitsDisplayClient', () => {
 
     expect(screen.getByText('Q2 airline credit - card two')).toBeInTheDocument();
     expect(screen.queryByText('Q2 airline credit - card one')).not.toBeInTheDocument();
+  });
+
+  it('keeps same-name card instances in separate card groups', () => {
+    render(
+      <BenefitsDisplayClient
+        {...defaultProps}
+        upcomingBenefits={[
+          benefitStatus('duplicate-1', 'Dining credit - first physical card', 'MONTHLY', {
+            id: 'card-duplicate-1',
+            name: 'American Express Gold Card',
+            displayName: 'American Express Gold Card',
+          }),
+          benefitStatus('duplicate-2', 'Dining credit - second physical card', 'MONTHLY', {
+            id: 'card-duplicate-2',
+            name: 'American Express Gold Card',
+            displayName: 'American Express Gold Card',
+          }),
+        ]}
+      />
+    );
+
+    const groups = screen.getAllByTestId('category-group');
+    expect(groups).toHaveLength(2);
+    expect(screen.getAllByText('American Express Gold Card')).toHaveLength(2);
+    expect(groups[0]).toHaveTextContent('Dining credit - first physical card');
+    expect(groups[1]).toHaveTextContent('Dining credit - second physical card');
   });
 });
