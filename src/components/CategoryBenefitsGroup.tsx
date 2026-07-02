@@ -10,7 +10,7 @@ import { calculateBenefitGroupSummary } from '@/lib/benefit-dashboard';
 interface CategoryBenefitsGroupProps {
   category: string;
   benefits: DisplayBenefitStatus[];
-  onStatusChange?: (statusId: string, newIsCompleted: boolean) => void;
+  onStatusChange?: (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => void;
   onNotUsableChange?: (statusId: string, newIsNotUsable: boolean) => void;
   onDelete?: (benefitId: string) => void;
   onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;

@@ -29,6 +29,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
   const [showPartialModal, setShowPartialModal] = useState(false);
   const [partialAmount, setPartialAmount] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const benefitAmount = status.benefit.maxAmount || 0;
   const usedAmount = status.usedAmount ?? 0;
@@ -42,12 +43,13 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
 
     startTransition(async () => {
       try {
+        setActionError(null);
         await toggleBenefitStatusAction(formData);
         // Call the callback to update parent state
         onStatusChange?.(status.id, newIsCompleted);
       } catch (error) {
         console.error('Failed to toggle benefit status:', error);
-        // You might want to show an error message to the user here
+        setActionError(error instanceof Error ? error.message : 'Failed to update benefit status.');
       }
     });
   };
@@ -58,10 +60,16 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
 
     startTransition(async () => {
       try {
-        await markFullCompletionAction(formData);
-        onStatusChange?.(status.id, true, benefitAmount);
+        setActionError(null);
+        const result = await markFullCompletionAction(formData);
+        if (result?.success) {
+          onStatusChange?.(status.id, true, result.usedAmount);
+          return;
+        }
+        setActionError('Failed to mark benefit as used.');
       } catch (error) {
         console.error('Failed to mark full completion:', error);
+        setActionError(error instanceof Error ? error.message : 'Failed to mark benefit as used.');
       }
     });
   };
@@ -77,6 +85,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
 
     startTransition(async () => {
       try {
+        setActionError(null);
         const result = await addPartialCompletionAction(formData);
         if (result.success) {
           if (result.isComplete) {
@@ -86,9 +95,12 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
           }
           setShowPartialModal(false);
           setPartialAmount('');
+          return;
         }
+        setActionError('Failed to add used amount.');
       } catch (error) {
         console.error('Failed to add partial completion:', error);
+        setActionError(error instanceof Error ? error.message : 'Failed to add used amount.');
       }
     });
   };
@@ -100,12 +112,13 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
 
     startTransition(async () => {
       try {
+        setActionError(null);
         await markBenefitAsNotUsableAction(formData);
         // Call the callback to update parent state
         onNotUsableChange?.(status.id, newIsNotUsable);
       } catch (error) {
         console.error('Failed to mark benefit as not usable:', error);
-        // You might want to show an error message to the user here
+        setActionError(error instanceof Error ? error.message : 'Failed to update benefit status.');
       }
     });
   };
@@ -325,6 +338,14 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               className="text-xs"
             />
           </div>
+
+          {actionError && (
+            <div className="sm:pl-11">
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
+                {actionError}
+              </div>
+            </div>
+          )}
 
           {/* Action buttons - full width on mobile, fixed width on larger screens */}
           <div className="sm:pl-11">

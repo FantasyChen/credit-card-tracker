@@ -9,7 +9,7 @@ import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard';
 interface DraggableBenefitCardProps {
   status: DisplayBenefitStatus;
   isDragMode: boolean;
-  onStatusChange?: (statusId: string, newIsCompleted: boolean) => void;
+  onStatusChange?: (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => void;
   onNotUsableChange?: (statusId: string, newIsNotUsable: boolean) => void;
   onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;
 }

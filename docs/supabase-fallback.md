@@ -39,6 +39,31 @@ If `pg_dump` and `psql` are unavailable locally, install PostgreSQL client tools
    - export data
 4. Update Vercel `DATABASE_URL` and `DIRECT_URL` only after the smoke test passes.
 
+## Fresh Database Migration Caveat
+
+The checked-in Prisma migration history does not currently replay cleanly on an
+empty database because the three January 2025 migrations sort before
+`20250428230736_init_postgres`, while two of them assume tables from the init
+migration already exist. For an emergency empty fallback database:
+
+1. Verify the target is the fallback database, not production.
+2. If `20250109000000_add_performance_indexes` failed first, mark it rolled back.
+3. Mark these historical pre-init migrations as applied:
+   - `20250109000000_add_performance_indexes`
+   - `20250115000000_add_search_indexes`
+   - `20250116000000_remove_suggest_review_functionality`
+4. Run `npx prisma migrate deploy`.
+5. Run the SQL files from those three pre-init migrations manually with
+   `npx prisma db execute --schema prisma/schema.prisma --file <migration.sql>`.
+6. Run `npx prisma db push` without force reset to sync schema drift that is not
+   represented in the migration history.
+7. Run `npm run db:seed`.
+
+This initializes an empty fallback database for service recovery, but it does
+not preserve existing user data. Do not cut production over to it unless Neon
+data has been exported/restored or the user explicitly approves temporary loss
+of access to existing user data.
+
 ## Rollback
 
 Keep Neon credentials and the latest dump until Supabase production traffic is verified. If Supabase cutover fails before user writes occur, restore Vercel env vars to Neon and redeploy.
