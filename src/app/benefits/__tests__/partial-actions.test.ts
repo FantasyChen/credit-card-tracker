@@ -331,6 +331,23 @@ describe('markFullCompletionAction', () => {
     );
   });
 
+  it('returns a friendly failure instead of throwing for stale status rows', async () => {
+    mockGetServerSession.mockResolvedValue(mockSession);
+    mockPrisma.benefitStatus.findFirst.mockResolvedValue(null);
+
+    const formData = createFormData({
+      benefitStatusId: 'missing-status',
+    });
+
+    const result = await markFullCompletionAction(formData);
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to mark benefit as complete.',
+    });
+    expect(mockPrisma.benefitStatus.update).not.toHaveBeenCalled();
+  });
+
   it('requires authentication', async () => {
     mockGetServerSession.mockResolvedValue(null);
 

@@ -210,7 +210,10 @@ export async function markFullCompletionAction(formData: FormData) {
 
   } catch (error) {
     console.error('Error marking full completion:', error);
-    throw new Error('Failed to mark benefit as complete.');
+    return {
+      success: false,
+      error: 'Failed to mark benefit as complete.',
+    };
   }
 }
 

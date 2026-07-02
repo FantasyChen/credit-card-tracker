@@ -66,7 +66,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
           onStatusChange?.(status.id, true, result.usedAmount);
           return;
         }
-        setActionError('Failed to mark benefit as used.');
+        setActionError(result?.error ?? 'Failed to mark benefit as used.');
       } catch (error) {
         console.error('Failed to mark full completion:', error);
         setActionError(error instanceof Error ? error.message : 'Failed to mark benefit as used.');
