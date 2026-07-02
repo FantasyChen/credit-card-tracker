@@ -59,17 +59,33 @@ export function calculateBenefitCycle(
         cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
         cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
       }
+    } else if (frequency === BenefitFrequency.QUARTERLY && fixedCycleDurationMonths === 3) {
+      // Quarterly fixed cycles recur throughout the year from the configured start month.
+      // For example, a January-start Aspire flight credit should materialize Jan-Mar,
+      // Apr-Jun, Jul-Sep, and Oct-Dec cycles instead of jumping from Q1 to next Q1.
+      const startMonthIndex = fixedCycleStartMonth - 1;
+      const referenceMonthIndex = refYear * 12 + refMonth;
+      const anchorMonthIndex = refYear * 12 + startMonthIndex;
+      const cyclesSinceAnchor = Math.floor((referenceMonthIndex - anchorMonthIndex) / fixedCycleDurationMonths);
+      const cycleStartMonthIndex = anchorMonthIndex + cyclesSinceAnchor * fixedCycleDurationMonths;
+      const cycleStartYear = Math.floor(cycleStartMonthIndex / 12);
+      const cycleStartMonth = cycleStartMonthIndex % 12;
+
+      cycleStartDate = new Date(Date.UTC(cycleStartYear, cycleStartMonth, 1, 0, 0, 0, 0));
+      cycleEndDate = new Date(cycleStartDate.getTime());
+      cycleEndDate.setUTCMonth(cycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
+      cycleEndDate.setUTCMilliseconds(cycleEndDate.getUTCMilliseconds() - 1);
     } else {
-      // Multiple cycles per year (monthly, quarterly, etc.)
-      // FIXED: Each benefit represents only its OWN cycle pattern, not all possible cycles
-      // For example, Jan-Jun benefit only calculates Jan-Jun cycles, not Jul-Dec cycles
-      
+      // Multiple cycles per year for fixed seasonal benefits.
+      // Each benefit represents only its own cycle pattern, not all possible cycles.
+      // For example, Jan-Jun benefit only calculates Jan-Jun cycles, not Jul-Dec cycles.
+
       // Current year cycle for this specific benefit
       const currentYearCycleStartDate = new Date(Date.UTC(refYear, fixedCycleStartMonth - 1, 1, 0, 0, 0, 0));
       const currentYearCycleEndDate = new Date(currentYearCycleStartDate.getTime());
       currentYearCycleEndDate.setUTCMonth(currentYearCycleEndDate.getUTCMonth() + fixedCycleDurationMonths);
       currentYearCycleEndDate.setUTCMilliseconds(currentYearCycleEndDate.getUTCMilliseconds() - 1);
-      
+
       // Check if reference date falls within the current year's cycle for this benefit
       if (referenceDate >= currentYearCycleStartDate && referenceDate <= currentYearCycleEndDate) {
         // Current cycle is active

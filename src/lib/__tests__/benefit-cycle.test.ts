@@ -185,23 +185,30 @@ describe('calculateBenefitCycle', () => {
       expect(cycleEndDate).toEqual(expectedEndDate);
     });
 
-    it('should handle quarterly calendar fixed cycles (Aspire card scenario)', () => {
-      // Test the specific Aspire quarterly flight credit configuration
-      const septemberDate = utcDate(2025, 9, 2); // September 2, 2025
-      const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
-        BenefitFrequency.QUARTERLY,
-        septemberDate,
-        null,
-        BenefitCycleAlignment.CALENDAR_FIXED,
-        1, // January (Q1 benefit)
-        3  // 3 months duration (Jan-Mar for Q1 benefit)
-      );
-      // For a Q1 benefit (Jan-Mar), September 2025 is past the 2025 Q1 cycle,
-      // so it should return the next Q1 cycle (2026)
-      expect(cycleStartDate).toEqual(utcDate(2026, 1, 1)); // Jan 1, 2026
-      const expectedEndDate = utcDate(2026, 4, 1); // Apr 1, 2026
-      expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1); // Mar 31, 2026 end
-      expect(cycleEndDate).toEqual(expectedEndDate);
+    it('should handle recurring quarterly calendar fixed cycles (Aspire card scenario)', () => {
+      // Test the specific Aspire quarterly flight credit configuration.
+      // A January-start quarterly benefit recurs every calendar quarter.
+      const cases = [
+        { referenceDate: utcDate(2025, 9, 2), startDate: utcDate(2025, 7, 1), nextStartDate: utcDate(2025, 10, 1) },
+        { referenceDate: utcDate(2026, 4, 1), startDate: utcDate(2026, 4, 1), nextStartDate: utcDate(2026, 7, 1) },
+        { referenceDate: utcDate(2026, 7, 1), startDate: utcDate(2026, 7, 1), nextStartDate: utcDate(2026, 10, 1) },
+      ];
+
+      cases.forEach(({ referenceDate, startDate, nextStartDate }) => {
+        const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
+          BenefitFrequency.QUARTERLY,
+          referenceDate,
+          null,
+          BenefitCycleAlignment.CALENDAR_FIXED,
+          1, // January, recurring calendar quarters
+          3  // 3 months duration
+        );
+
+        expect(cycleStartDate).toEqual(startDate);
+        const expectedEndDate = new Date(nextStartDate);
+        expectedEndDate.setUTCMilliseconds(expectedEndDate.getUTCMilliseconds() - 1);
+        expect(cycleEndDate).toEqual(expectedEndDate);
+      });
     });
 
     it('should handle fixed cycle spanning year end', () => {

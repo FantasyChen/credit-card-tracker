@@ -156,11 +156,15 @@ export class BenefitMigrationEngine {
     for (const cardUpdate of plan.cardUpdates) {
       for (const benefit of cardUpdate.benefits) {
         try {
-          // Test cycle calculation with mock data
+          // Test cycle calculation with representative mock data. For fixed quarterly
+          // benefits, validate against the configured quarter instead of today's quarter.
           const mockCardOpenDate = new Date('2024-01-15'); // Use a reasonable test date
+          const referenceDate = benefit.frequency === BenefitFrequency.QUARTERLY && benefit.fixedCycleStartMonth
+            ? new Date(Date.UTC(2024, benefit.fixedCycleStartMonth - 1, 15, 0, 0, 0, 0))
+            : new Date();
           const { cycleStartDate, cycleEndDate } = calculateBenefitCycle(
             benefit.frequency,
-            new Date(),
+            referenceDate,
             benefit.frequency === BenefitFrequency.YEARLY ? mockCardOpenDate : null,
             benefit.cycleAlignment,
             benefit.fixedCycleStartMonth,
