@@ -11,6 +11,11 @@ import {
   type RawDisplayBenefitStatus,
 } from '../benefit-dashboard';
 import { CardLifecycleStatus } from '@/generated/prisma';
+import {
+  buildDashboardStatusWhere,
+  buildRelevantBenefitSignatureWhere,
+  getDashboardHistoryStart,
+} from '../benefit-dashboard-data';
 
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
@@ -273,6 +278,48 @@ describe('buildBenefitDashboardProjection', () => {
     });
 
     expect(projection.upcomingBenefits[0].usageWaySlug).toBe('brilliant-doordash-amazon-gift-card');
+  });
+});
+
+describe('benefit dashboard data loading helpers', () => {
+  it('builds a bounded status window for current/future and current-year resolved history', () => {
+    const now = new Date('2026-07-02T12:00:00.000Z');
+
+    expect(getDashboardHistoryStart(now)).toEqual(new Date('2026-01-01T00:00:00.000Z'));
+    expect(buildDashboardStatusWhere('user-1', now)).toEqual({
+      userId: 'user-1',
+      OR: [
+        { cycleEndDate: { gte: now } },
+        {
+          cycleEndDate: { gte: new Date('2026-01-01T00:00:00.000Z') },
+          OR: [
+            { isCompleted: true },
+            { isNotUsable: true },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('builds unique relevant usage-way benefit signatures from dashboard statuses', () => {
+    const statuses = [
+      {
+        benefit: { category: 'Travel', description: '$50 Quarterly Flight Credit' },
+      },
+      {
+        benefit: { category: 'Travel', description: '$50 Quarterly Flight Credit' },
+      },
+      {
+        benefit: { category: 'Dining', description: '$25 Monthly Dining Credit' },
+      },
+    ] as RawDisplayBenefitStatus[];
+
+    expect(buildRelevantBenefitSignatureWhere(statuses)).toEqual({
+      OR: [
+        { category: 'Travel', description: '$50 Quarterly Flight Credit' },
+        { category: 'Dining', description: '$25 Monthly Dining Credit' },
+      ],
+    });
   });
 });
 

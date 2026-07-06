@@ -193,6 +193,9 @@ model BenefitStatus {
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([benefitId, userId, cycleStartDate, occurrenceIndex])
+  @@index([userId, orderIndex, cycleEndDate], map: "BenefitStatus_dashboard_user_order_end_idx")
+  @@index([userId, cycleEndDate], map: "BenefitStatus_dashboard_user_end_idx")
+  @@index([userId, isCompleted, isNotUsable, cycleEndDate], map: "BenefitStatus_dashboard_user_state_end_idx")
 }
 
 model playing_with_neon {

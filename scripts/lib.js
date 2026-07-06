@@ -88,6 +88,15 @@ function readTextSafe(file) {
   }
 }
 
+function writeJson(file, value) {
+  ensureDir(path.dirname(file));
+  fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function ensureDir(dir) {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
 function findProjectRoot(startDir) {
   const markers = [
     "CONTEXT.md",
@@ -300,6 +309,8 @@ module.exports = {
   block,
   readJSONSafe,
   readTextSafe,
+  writeJson,
+  ensureDir,
   findProjectRoot,
   detectStack,
   detectTools,

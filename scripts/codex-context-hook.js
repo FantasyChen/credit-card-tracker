@@ -38,7 +38,7 @@ function runCatchUp(startDir) {
     [
       "context-harness detected.",
       needsUpgrade
-        ? "Before planning/editing: use context-catch-up Compatibility Upgrade; preserve context, add schema marker, install scripts, refresh AGENTS index."
+        ? "Before planning/editing: use context-catch-up to report context drift, then use explicit context-upgrade for layout migration or repair."
         : "Before planning/editing: use context-catch-up; read NOW.md, then relevant AGENTS-indexed CONTEXT.md sections.",
       now ? `Current NOW.md:\n${now}` : "",
     ]

@@ -3,7 +3,7 @@
 
 // context-gen.js — auto-detect project metadata and emit CONTEXT.md sections.
 // Usage: node scripts/context-gen.js [project-root]
-// Output: Project + Structure + Suggested Rules + Suggested Workflow + Memory Prompts markdown.
+// Output: Project + Structure + Suggested Operating Constraints + Suggested Workflow + Memory Prompts markdown.
 
 const fs = require("fs");
 const path = require("path");
@@ -38,18 +38,14 @@ const adrCount = countAdrs(root);
 if (adrCount > 0) console.log(`Existing ADRs: ${adrCount}`);
 console.log("");
 
-// --- Suggested Rules section ------------------------------------------------
+// --- Suggested Operating Constraints section --------------------------------
 
-const rules = suggestedRules(stack);
-console.log("## Suggested Rules");
+const suggestions = suggestedOperatingContext(stack);
+console.log("## Suggested Operating Constraints");
 console.log("");
-console.log(`_Detected stack: ${stack.lang}${stack.framework ? ` / ${stack.framework}` : ""}. Present these to the user to confirm or edit._`);
+console.log(`_Detected stack: ${stack.lang}${stack.framework ? ` / ${stack.framework}` : ""}. Keep only project-specific constraints a future agent would not infer from code or docs._`);
 console.log("");
-console.log("### Never");
-rules.never.forEach((r, i) => console.log(`${i + 1}. ${r}`));
-console.log("");
-console.log("### Always");
-rules.always.forEach((r, i) => console.log(`${i + 1}. ${r}`));
+suggestions.constraints.forEach((item) => console.log(`- ${item}`));
 console.log("");
 
 // --- Suggested Workflow section --------------------------------------------
@@ -59,7 +55,7 @@ console.log("");
 console.log("_Use this to fill `CONTEXT.md` `## Workflow`; verification commands are project habits, not durable Objectives._");
 console.log("");
 console.log("### Verification");
-rules.verification.forEach((r) => console.log(`- ${r}`));
+suggestions.verification.forEach((r) => console.log(`- ${r}`));
 console.log("");
 
 // --- Memory Prompts section -------------------------------------------------
@@ -126,14 +122,10 @@ function countAdrs(root) {
   }
 }
 
-function suggestedRules(stack) {
-  const commonNever = [
-    "Never store secrets or credentials in the repo",
-    "Never ignore failing tests",
-  ];
-  const commonAlways = [
-    "Always prefer CLI, MCP tools, or skills over browser automation when they can accomplish the task",
-    "Always handle errors explicitly (no silent catches)",
+function suggestedOperatingContext(stack) {
+  const commonConstraints = [
+    "Do not store secrets or credentials in the repo.",
+    "Treat failing tests as blocking unless the user explicitly accepts the risk.",
   ];
 
   const verification = [
@@ -142,13 +134,9 @@ function suggestedRules(stack) {
     "For UI changes, verify the changed screen or workflow manually or with browser automation.",
   ];
 
+  const withCommon = (constraints) => [...constraints, ...commonConstraints];
   const tsLike = (testCmd) => ({
-    never: ["Never weaken `strict` mode in tsconfig.json", ...commonNever],
-    always: [
-      `Always run \`${testCmd}\` and \`tsc --noEmit\` before committing`,
-      "Always write tests for new public functions",
-      ...commonAlways,
-    ],
+    constraints: withCommon(["Preserve TypeScript strictness unless the user explicitly approves weakening it."]),
     verification: [
       `${testCmd} exits 0`,
       "tsc --noEmit exits 0",
@@ -161,15 +149,7 @@ function suggestedRules(stack) {
       return tsLike(testCmdForNode(stack));
     case "Node.js":
       return {
-        never: [
-          "Never use `any` without a TODO justification",
-          ...commonNever,
-        ],
-        always: [
-          `Always run \`${testCmdForNode(stack)}\` and the linter before committing`,
-          "Always write tests for new public functions",
-          ...commonAlways,
-        ],
+        constraints: withCommon(["Avoid `any` unless the code includes a TODO justification or existing local convention requires it."]),
         verification: [
           `${testCmdForNode(stack)} exits 0`,
           "The project lint command exits 0 when available",
@@ -178,12 +158,7 @@ function suggestedRules(stack) {
       };
     case "Python":
       return {
-        never: ["Never catch bare `Exception` without re-raising", ...commonNever],
-        always: [
-          "Always type-annotate public functions",
-          "Always run `pytest` and `ruff check` before committing",
-          ...commonAlways,
-        ],
+        constraints: withCommon(["Do not catch broad exceptions without re-raising or documenting the recovery path."]),
         verification: [
           "pytest exits 0",
           "ruff check exits 0",
@@ -192,12 +167,7 @@ function suggestedRules(stack) {
       };
     case "Go":
       return {
-        never: ["Never ignore returned errors", ...commonNever],
-        always: [
-          "Always run `go test ./...` and `go vet ./...` before committing",
-          "Always write table-driven tests",
-          ...commonAlways,
-        ],
+        constraints: withCommon(["Do not ignore returned errors unless the discard is explicitly justified."]),
         verification: [
           "go test ./... exits 0",
           "go vet ./... exits 0",
@@ -206,11 +176,7 @@ function suggestedRules(stack) {
       };
     case "Rust":
       return {
-        never: ["Never use `unwrap()` on untrusted input", ...commonNever],
-        always: [
-          "Always run `cargo test` and `cargo clippy -- -D warnings` before committing",
-          ...commonAlways,
-        ],
+        constraints: withCommon(["Avoid `unwrap()` on untrusted input; prefer explicit error handling."]),
         verification: [
           "cargo test exits 0",
           "cargo clippy -- -D warnings exits 0",
@@ -219,11 +185,7 @@ function suggestedRules(stack) {
       };
     case "Ruby":
       return {
-        never: ["Never rescue `StandardError` without re-raising", ...commonNever],
-        always: [
-          "Always run `bundle exec rspec` and `rubocop` before committing",
-          ...commonAlways,
-        ],
+        constraints: withCommon(["Do not rescue `StandardError` without re-raising or documenting the recovery path."]),
         verification: [
           "bundle exec rspec exits 0",
           "rubocop exits 0",
@@ -232,12 +194,7 @@ function suggestedRules(stack) {
       };
     default:
       return {
-        never: [...commonNever, "Never disable or weaken type checking"],
-        always: [
-          ...commonAlways,
-          "Always run the test suite and linter before committing",
-          "Always write tests for new public functions",
-        ],
+        constraints: withCommon(["Preserve existing type or validation checks unless the user explicitly approves weakening them."]),
         verification,
       };
   }

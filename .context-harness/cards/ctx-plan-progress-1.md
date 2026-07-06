@@ -1,0 +1,30 @@
+---
+id: ctx-plan-progress-1
+kind: plan
+importance: 0.85
+confidence: confirmed
+source: PLAN.md#progress-1
+chunk: null
+tokens_est: 651
+tags: [plan, progress]
+---
+
+# PLAN.md: Progress
+
+## Summary
+Updated prisma/seed.ts for the high-confidence Chase gaps: Sapphire Preferred hotel credit from $50 to $100, added CSP Global Entry/TSA PreCheck/NEXUS 4-year credit, changed Sapphire Reserve DoorDash from $10/month to...
+
+## Use when
+- continuing the active task
+- checking done criteria or decisions
+- update context with task-local progress
+
+## Key facts
+- Updated prisma/seed.ts for the high-confidence Chase gaps: Sapphire Preferred hotel credit from $50 to $100, added CSP Global Entry/TSA PreCheck/NEXUS 4-year...
+- Updated DoorDash guide copy to distinguish statement credits from promo-wallet discounts and routed Peloton credits to the membership guide.
+- Added card-templates/ with a JSON intake format, schema, example CSP refresh template, and npm run card-template:validate.
+- Replaced 14 mapped card images from US Card Forum/CubeUpload Apple Pay captures and recorded sources in docs/card-image-sources.md.
+- Added card lifecycle schema and UI: active/closed/product-changed status, closed date, annual-fee amount/date, sign-up bonus and spend deadlines, lifecycle n...
+
+## Open next
+- `PLAN.md#progress-1`

@@ -8,6 +8,10 @@ import {
   buildBenefitDashboardProjection,
   type DisplayBenefitStatus,
 } from '@/lib/benefit-dashboard';
+import {
+  fetchDashboardBenefitStatuses,
+  fetchRelevantUsageWays,
+} from '@/lib/benefit-dashboard-data';
 
 export const metadata: Metadata = {
   title: "Benefits Dashboard - Track All Your Credit Card Benefits",
@@ -35,49 +39,20 @@ export default async function BenefitsDashboardPage() {
   const now = new Date(); // Revert to actual system time
 
   // Fetch source records, then let the dashboard projection module own display shaping.
-  const userCards = await prisma.creditCard.findMany({
-    where: { userId },
-  });
+  const [userCards, allStatusesRaw] = await Promise.all([
+    prisma.creditCard.findMany({
+      where: { userId },
+    }),
+    fetchDashboardBenefitStatuses(prisma, userId, now),
+  ]);
 
-  const usageWays = await prisma.benefitUsageWay.findMany({
-    include: {
-      predefinedBenefits: {
-        select: {
-          category: true,
-          description: true,
-          predefinedCard: {
-            select: { name: true },
-          },
-        },
-      },
-    },
-  });
-
-  const allStatusesRaw = await prisma.benefitStatus.findMany({
-    where: {
-      userId: userId,
-    },
-    include: {
-      benefit: {
-        include: {
-          creditCard: true, 
-        },
-      },
-    },
-    orderBy: [
-      {
-        orderIndex: 'asc', // Primary sort by user's preferred order
-      },
-      {
-        cycleEndDate: 'asc', // Secondary sort by cycle end date
-      },
-    ],
-  });
-
-  const predefinedCardsForRoi = await prisma.predefinedCard.findMany({
-    where: { name: { in: userCards.map((card) => card.name) } },
-    select: { name: true, annualFee: true },
-  });
+  const [usageWays, predefinedCardsForRoi] = await Promise.all([
+    fetchRelevantUsageWays(prisma, allStatusesRaw),
+    prisma.predefinedCard.findMany({
+      where: { name: { in: userCards.map((card) => card.name) } },
+      select: { name: true, annualFee: true },
+    }),
+  ]);
 
   const projection = buildBenefitDashboardProjection({
     statuses: allStatusesRaw,

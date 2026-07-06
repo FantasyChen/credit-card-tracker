@@ -1,0 +1,54 @@
+# Near-Term Priority Roadmap
+
+
+### P0: Worktree Hygiene Before Product Work
+Finish or park the existing broad uncommitted work before starting another feature. The current tree has screenshot assets plus prior UI/catalog/config changes, so starting a new product slice without sorting it will make review and rollback painful.
+
+Success signal: `git status --short` is understandable by bucket, and the next implementation touches only the selected product slice.
+
+Status: complete. Preexisting changes were limited to context docs plus parked forum screenshot assets in `screenshots/perks-reminder-2.0-prod/`. Product edits started from a clean application-code baseline.
+
+### P1: Audit Duplicate Card Identity and Per-Card Tracking
+Double-check whether duplicate-card tracking is already fully handled. Verify card nickname, last four/five, owner/source labels, benefit cards, filters, bulk actions, ROI views, screenshots, and mobile layouts. If gaps remain, fix those before adding new product surface area.
+
+Why now: The user suspects this may already be done, but competitor comments show duplicate-card ambiguity is one of the fastest ways to lose power users. Perkmon tried benefit merging and later moved back toward clearer per-card tracking.
+
+Success signal: a user with four Aspire cards can immediately tell which quarterly flight credits are unused, on both desktop and mobile.
+
+Status: implemented. Dashboard grouping, card filters, search, and ROI now use per-card IDs/display names instead of collapsing duplicate products by raw card name. Benefit cards show nickname/display name, underlying product, issuer, and last-four/five where available.
+
+### P2: Make Benefit Usage Guides the Core Wedge
+Deepen the guide system so every important benefit answers: what qualifies, how to trigger it, timing/posting expectations, common DP caveats, and what to avoid. Surface guide links more prominently inside dashboard and reminders.
+
+Why now: Most competitors track checkboxes; few explain how to use benefits. CardFans' later Nitan tips feature validates that community playbooks are valuable.
+
+Success signal: a user can go from "I have this credit" to "I know exactly how to use it" without leaving Perks Reminder.
+
+Status: implemented. Dashboard cards now surface stronger guide links, the guide index advertises practical guide coverage, and guide detail pages show the checklist users should expect: what qualifies, trigger, timing, caveats, and what to avoid.
+
+### P3: Community Data Quality Loop
+Make data quality visible and easier to improve: suggest corrections on every card/benefit/guide, show last-updated dates, and keep admin review/migration flows reliable for existing users.
+
+Why now: Every competitor thread contains card/benefit/rate corrections. Users trust tools that visibly handle errors and update existing accounts, not just new templates.
+
+Success signal: corrections become an obvious workflow, and existing users receive updated benefits/statuses without manual support.
+
+Status: implemented. Card, benefit, and guide surfaces now include correction links with contextual email templates. Catalog and guide pages show last-updated/provenance signals. The maintainer workflow is documented in `docs/community-data-quality-loop.md`.
+
+### P4: Native iOS as a Focused Companion, Not a Full Rewrite
+If building iOS, prioritize native-only value: widgets, push notifications, quick mark-complete, and glanceable expiring benefits. Keep the web/PWA as the canonical product and data model.
+
+Why now: Reward Radar's strongest emotional hook is widgets; CardFans/Loyalty Hub show native push and local device affordances matter. A native shell that merely mirrors the web UI is less differentiated.
+
+Success signal: the iOS app makes the existing web product more useful on the lock/home screen.
+
+Status: planned. `docs/ios-support.md` now records the focused companion plan: widgets, push, quick mark-complete, smallest TestFlight milestone, and technical risks.
+
+### P5: Bulk Card Onboarding for Power Users
+Build a fast add-cards flow for Nitan-style users with many cards. Accept abbreviations and counts, for example `plat x2, gold, csr, aspire x3`, then let users set owner/nickname/last-four before confirming.
+
+Why after P1-P4: Perkmon and PerkPerks both received strong feedback that adding many cards one-by-one is a conversion blocker, but the current strategy is to first lock down the existing core wedge and data trust story.
+
+Success signal: a user with 20 cards can create a realistic wallet in under two minutes without visiting 20 separate add-card forms.
+
+Status: first shippable version implemented. `/cards/new` accepts shorthand such as `plat x2, gold, csr, aspire x3`, expands counts, lets users review matches, and captures owner/nickname/last digits before one bulk submit.

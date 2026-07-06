@@ -16,23 +16,17 @@ public/           PWA assets and credit card images
 announcement-state/ Local ignored state for one-time announcement batches
 ```
 
-## Rules
+## Operating Constraints
 
-### Never
-1. Never run destructive production database commands such as `prisma migrate reset`, `db push --force-reset`, or manual data deletion unless the user explicitly asks and the target is verified.
-2. Never create or modify `.env`; assume it already exists locally and production secrets live in Vercel/provider dashboards.
-3. Never send production email batches without a dry run, recipient count, and a resumable state or limit.
-
-### Always
-1. Always verify database target before production data work; use `npm run db:check` or the narrow script's own dry run first.
-2. Always keep changes surgical and aligned with existing Next.js, Prisma, and Tailwind patterns.
-3. Always run focused tests or build checks for code changes; for frontend changes, verify the rendered behavior when practical.
-
-### Legacy Objectives
-<!-- Deprecated in schema v3. Preserve as project intent; use PLAN.md Done Criteria and Workflow Verification for active checks. -->
-1. Users can sign in on `perks-reminder.com` and see unchanged cards, benefits, loyalty accounts, and settings after the domain migration.
-2. Reminder emails send from `notifications@perks-reminder.com` and link to the new main and loyalty domains.
-3. Existing users are informed before `coupon-cycle.site` expires on May 27, 2026, without duplicate announcement sends.
+- Do not run destructive production database commands such as `prisma migrate reset`, `db push --force-reset`, or manual data deletion unless the user explicitly asks and the target is verified.
+- Do not create or modify `.env`; assume it already exists locally and production secrets live in Vercel/provider dashboards.
+- Do not send production email batches without a dry run, recipient count, and a resumable state or limit.
+- Verify database target before production data work; use `npm run db:check` or the narrow script's own dry run first.
+- Keep changes surgical and aligned with existing Next.js, Prisma, and Tailwind patterns.
+- Run focused tests or build checks for code changes; for frontend changes, verify the rendered behavior when practical.
+- Users can sign in on `perks-reminder.com` and see unchanged cards, benefits, loyalty accounts, and settings after the domain migration.
+- Reminder emails send from `notifications@perks-reminder.com` and link to the new main and loyalty domains.
+- Existing users are informed before `coupon-cycle.site` expires on May 27, 2026, without duplicate announcement sends.
 
 ## Workflow
 - Setup: `npm install`
