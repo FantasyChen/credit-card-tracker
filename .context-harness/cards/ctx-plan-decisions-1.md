@@ -25,5 +25,10 @@ Keep risky/community-DP patterns framed as repeatable playbooks with caveats, no
 - Prefer card-specific guide mapping when benefit descriptions overlap across products, with a generic category/description fallback for existing rows.
 - Keep dashboard cards focused on tracking state and actions; deeper guide content belongs on the guide detail page.
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `PLAN.md#decisions-1`

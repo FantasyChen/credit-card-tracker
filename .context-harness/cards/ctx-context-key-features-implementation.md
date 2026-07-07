@@ -24,5 +24,10 @@ Tabbed Interface: "Upcoming" and "Claimed" benefits
 - Visual Indicators: Progress bars, completion status, cycle dates
 - Real-time Updates: Server actions for marking benefits complete
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `CONTEXT.md#key-features-implementation`

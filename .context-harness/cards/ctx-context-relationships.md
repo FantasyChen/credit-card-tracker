@@ -25,5 +25,10 @@ AGENTS.md is the small activation layer; CONTEXT.md is the durable source of tru
 - Guide content should stay practical and action-oriented, with caveats and provenance visible where the UI supports it.
 - Legacy subscriptionTier and isBetaUser database fields may remain for compatibility, but runtime capability checks must not use them to downgrade users or re...
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `CONTEXT.md#relationships`

@@ -26,5 +26,10 @@ tags: [plan, progress]
 - [x] Added a Business Gold office-supply gift-card guide for the monthly flexible business credit.
 - [x] Deepened existing Airline Fee, Rideshare, Resy/Toast, Saks, Lululemon, and Travel Portal guides with DP-specific technical paths and caveats.
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `PLAN.md#progress-2`

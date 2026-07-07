@@ -20,5 +20,10 @@ tags: [context, context-index]
 ## Key facts
 - > 🤖 PRIMARY AI REFERENCE: This document is the main source of truth for AI agents working on this project. It contains complete system architecture, busines...
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `CONTEXT.md#context-index`

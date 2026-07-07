@@ -26,5 +26,10 @@ tags: [plan, recommended-plan]
 - [x] P3: Add card lifecycle primitives that fit Perks Reminder's wedge: annual-fee due dates, closed/product-changed history, and a lightweight event timeline.
 - [x] P4: Add a calendar view for annual fees, card anniversaries, spend/sign-up bonus deadlines, and expiring benefit cycles.
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `PLAN.md#recommended-plan`

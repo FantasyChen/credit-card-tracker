@@ -24,6 +24,11 @@ Local Development:
 - ✅ AGENT NOTE: AI agents cannot see the .env file directly due to security isolation, but the file exists and is fully configured
 - All local commands and the application will automatically read from the existing .env file
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `CONTEXT.md#development-guidelines`
 - `.context-harness/chunks/ctx-context-development-guidelines.md`

@@ -26,5 +26,10 @@ Nitan users repeatedly reward tools that are fast, mobile-native feeling, and lo
 - Users with many cards need owner/nickname/last-four and sometimes P1/P2-style grouping.
 - Valuation is subjective and contentious. Keep claimed ROI separate from subjective "true value" unless the assumptions are editable.
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `PLAN.md#findings-2`

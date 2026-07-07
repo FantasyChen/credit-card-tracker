@@ -24,5 +24,10 @@ Free Night / Certificate Dashboard: Still valuable, but punted for now despite s
 - Monthly Digest and Calendar Reminder Mode: Useful and validated by PerkPerks, but lower priority than guide quality, correction workflows, and native compani...
 - Best Card by Category: Valuable but crowded; Reward Radar and PerkPerks compete directly here. Revisit only after the core benefit-tracking wedge is stronger.
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `PLAN.md#punted-ideas`

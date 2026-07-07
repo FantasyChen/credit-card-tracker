@@ -26,5 +26,10 @@ Updated prisma/seed.ts for the high-confidence Chase gaps: Sapphire Preferred ho
 - Replaced 14 mapped card images from US Card Forum/CubeUpload Apple Pay captures and recorded sources in docs/card-image-sources.md.
 - Added card lifecycle schema and UI: active/closed/product-changed status, closed date, annual-fee amount/date, sign-up bonus and spend deadlines, lifecycle n...
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `PLAN.md#progress-1`

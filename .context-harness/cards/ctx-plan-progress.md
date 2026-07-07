@@ -26,5 +26,10 @@ Updated subscription access helpers so stored FREE and PRO users resolve to full
 - Added/updated focused tests for subscription access, pricing, navbar, notification settings, and notification digest behavior.
 - Verified with focused Jest, npx tsc --noEmit --pretty false, node scripts/with-dev-db.js npx next build, and git diff --check.
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `PLAN.md#progress`

@@ -4,13 +4,12 @@
 // install-project.js — copy context-harness runtime scripts into a target repo.
 // Usage:
 //   node <context-harness>/scripts/install-project.js [project-root]
-//   node <context-harness>/scripts/install-project.js --profile legacy [project-root]
 
 const fs = require("fs");
 const path = require("path");
 
 const sourceDir = __dirname;
-const { profile, targetRoot } = parseArgs(process.argv.slice(2));
+const { targetRoot } = parseArgs(process.argv.slice(2));
 const targetDir = path.join(targetRoot, "scripts");
 const coreScriptNames = [
   "codex-context-hook.js",
@@ -23,10 +22,7 @@ const coreScriptNames = [
   "session-end.js",
   "task.js",
 ];
-const legacyScriptNames = ["adr.js", "eval-loop.js"];
-const scriptNames = profile === "legacy"
-  ? [...legacyScriptNames, ...coreScriptNames]
-  : coreScriptNames;
+const scriptNames = coreScriptNames;
 
 fs.mkdirSync(targetDir, { recursive: true });
 
@@ -66,29 +62,34 @@ if (!fs.existsSync(packageJsonTarget) || readPackageType(packageJsonTarget) !== 
   copied += 1;
 }
 
-console.log(`Installed ${copied} context-harness ${profile} scripts to ${path.relative(targetRoot, targetDir) || "scripts"}.`);
+console.log(`Installed ${copied} context-harness scripts to ${path.relative(targetRoot, targetDir) || "scripts"}.`);
 if (skipped > 0) {
   console.error(`Skipped ${skipped} existing non-context-harness scripts.`);
   process.exit(1);
 }
 
 function parseArgs(args) {
-  let profile = "default";
   let rootArg = "";
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "--profile") {
-      profile = args[i + 1] || "";
-      i++;
-    } else if (!rootArg) {
-      rootArg = arg;
+  for (const arg of args) {
+    if (arg === "--help" || arg === "-h") {
+      usage(0);
     }
+    if (arg.startsWith("-")) {
+      console.error(`Unknown argument: ${arg}`);
+      usage(1);
+    }
+    if (rootArg) {
+      console.error(`Unexpected extra argument: ${arg}`);
+      usage(1);
+    }
+    rootArg = arg;
   }
-  if (!["default", "legacy"].includes(profile)) {
-    console.error("Usage: install-project.js [--profile default|legacy] [project-root]");
-    process.exit(1);
-  }
-  return { profile, targetRoot: path.resolve(rootArg || process.cwd()) };
+  return { targetRoot: path.resolve(rootArg || process.cwd()) };
+}
+
+function usage(code) {
+  console.error("Usage: install-project.js [project-root]");
+  process.exit(code);
 }
 
 function readPackageType(file) {

@@ -24,6 +24,11 @@ Frontend: Next.js 15 (App Router), React 19, Tailwind CSS 4
 - ORM: Prisma with generated client
 - Authentication: NextAuth.js with OAuth (Google, GitHub, Facebook) + custom email/password with verification
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `CONTEXT.md#current-system-architecture`
 - `.context-harness/chunks/ctx-context-current-system-architecture.md`

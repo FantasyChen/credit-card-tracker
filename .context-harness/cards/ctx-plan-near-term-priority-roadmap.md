@@ -26,6 +26,11 @@ Finish or park the existing broad uncommitted work before starting another featu
 - Double-check whether duplicate-card tracking is already fully handled. Verify card nickname, last four/five, owner/source labels, benefit cards, filters, bul...
 - Why now: The user suspects this may already be done, but competitor comments show duplicate-card ambiguity is one of the fastest ways to lose power users. Pe...
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `PLAN.md#near-term-priority-roadmap`
 - `.context-harness/chunks/ctx-plan-near-term-priority-roadmap.md`

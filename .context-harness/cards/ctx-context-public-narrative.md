@@ -23,5 +23,10 @@ The published Nitan / US Card Forum 2.0 announcement positions Perks Reminder ar
 - A native iOS app is publicly framed as a possible future roadmap item after validating interest in the 2.0 web/PWA experience.
 - Real logged-in 2.0 screenshots for forum/social use live in screenshots/perks-reminder-2.0-prod/ and use the dedicated production demo account demo+screensho...
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `CONTEXT.md#public-narrative`

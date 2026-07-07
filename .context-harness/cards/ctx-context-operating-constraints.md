@@ -26,5 +26,10 @@ Do not run destructive production database commands such as prisma migrate reset
 - Verify database target before production data work; use npm run db:check or the narrow script's own dry run first.
 - Keep changes surgical and aligned with existing Next.js, Prisma, and Tailwind patterns.
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `CONTEXT.md#operating-constraints`

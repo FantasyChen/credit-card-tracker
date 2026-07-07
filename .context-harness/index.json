@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "updated_at": "2026-07-07",
-  "source_hash": "9f58179397f7fa90c0fc3c57663082f0aef3081533af7e030e82ad1b8af536b2",
+  "source_hash": "20619ea4bb65b1356bf3f271992fdeaa8258463ad38d01b4d7ca8eb9bf644486",
   "sources": [
     {
       "path": "CONTEXT.md",
@@ -10,13 +10,13 @@
     },
     {
       "path": "NOW.md",
-      "sha256": "e6b8eb0b1e1da26069f2fad451cf7ee362b010fdab0fdc43a33d86fb3bad06cc",
+      "sha256": "46e96582a6dc88aeb9562b659efae39546f22d68f60c66fdff6a523305458e55",
       "lines": 18
     },
     {
       "path": "PLAN.md",
-      "sha256": "5067660b802c01369bb4c1bdd8608b83d9a5546af1c7f39232e4bf3bf02c9b27",
-      "lines": 170
+      "sha256": "075e0550282330ddc3c183325b959fbd8e49d7dd5af9ded846375d9a7efb9edc",
+      "lines": 173
     }
   ],
   "cards": [
@@ -908,7 +908,7 @@
       "importance": 0.95,
       "confidence": "confirmed",
       "recency": "2026-07-07",
-      "tokens_est": 795,
+      "tokens_est": 796,
       "tags": [
         "now",
         "resume"
@@ -920,7 +920,7 @@
       ],
       "card_path": ".context-harness/cards/ctx-now-now.md",
       "chunk_path": ".context-harness/chunks/ctx-now-now.md",
-      "content_sha256": "e6b8eb0b1e1da26069f2fad451cf7ee362b010fdab0fdc43a33d86fb3bad06cc",
+      "content_sha256": "46e96582a6dc88aeb9562b659efae39546f22d68f60c66fdff6a523305458e55",
       "key_facts": [
         "Continued the broad redesign work already present in the working tree. The redesign currently touches the public homepage, navbar/footer, pricing/FAQ/free-pr...",
         "No active blocker for the local redesign validation.",
@@ -939,7 +939,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 27,
       "tags": [
         "plan",
@@ -967,7 +967,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 144,
       "tags": [
         "plan",
@@ -997,7 +997,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 107,
       "tags": [
         "plan",
@@ -1027,7 +1027,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 173,
       "tags": [
         "plan",
@@ -1059,7 +1059,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 36,
       "tags": [
         "plan",
@@ -1087,7 +1087,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 411,
       "tags": [
         "plan",
@@ -1119,7 +1119,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 277,
       "tags": [
         "plan",
@@ -1151,7 +1151,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 651,
       "tags": [
         "plan",
@@ -1183,7 +1183,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 32,
       "tags": [
         "plan",
@@ -1211,7 +1211,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 329,
       "tags": [
         "plan",
@@ -1243,7 +1243,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 153,
       "tags": [
         "plan",
@@ -1274,7 +1274,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 53,
       "tags": [
         "plan",
@@ -1295,15 +1295,15 @@
     {
       "id": "ctx-plan-progress-3",
       "title": "PLAN.md: Progress",
-      "summary": "[x] Identify closest Nitan-built alternatives: Reward Radar, CardFans, Perkmon/Perkly, PerkPerks, AMEX Benefit Dashboard, Card Verdict, Notion CC Tracker, and Loyalty Hub.",
+      "summary": "[ ] Resolve preexisting whole-project TypeScript test mock errors separately if a clean tsc --noEmit gate is needed.",
       "source": "PLAN.md#progress-3",
       "source_path": "PLAN.md",
       "kind": "plan",
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
-      "tokens_est": 173,
+      "recency": "2026-07-07",
+      "tokens_est": 30,
       "tags": [
         "plan",
         "progress"
@@ -1315,13 +1315,9 @@
       ],
       "card_path": ".context-harness/cards/ctx-plan-progress-3.md",
       "chunk_path": "",
-      "content_sha256": "af1b87295844219651670e5c6d1beb33e0d5748c0a6a169332953b9a4b5d222f",
+      "content_sha256": "2d7c01a68cb2440d0a6c3d7ca0837292ea3938fca483c6e408cd16c1f9e2ce95",
       "key_facts": [
-        "[x] Identify closest Nitan-built alternatives: Reward Radar, CardFans, Perkmon/Perkly, PerkPerks, AMEX Benefit Dashboard, Card Verdict, Notion CC Tracker, an...",
-        "[x] Compare their posts/comments against Perks Reminder's current positioning.",
-        "[x] Rank next improvements by strategic impact, user pain, and fit with the 2.0 public narrative.",
-        "[x] Before coding, review the current dirty worktree and decide what to preserve, stage, or park.",
-        "[x] Implement the first selected slices through P5."
+        "[ ] Resolve preexisting whole-project TypeScript test mock errors separately if a clean tsc --noEmit gate is needed."
       ]
     },
     {
@@ -1334,7 +1330,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 1200,
       "tags": [
         "plan",
@@ -1372,7 +1368,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 129,
       "tags": [
         "plan",
@@ -1402,7 +1398,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 183,
       "tags": [
         "plan",
@@ -1434,7 +1430,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 150,
       "tags": [
         "plan",
@@ -1465,7 +1461,7 @@
       "scope": "task",
       "importance": 0.85,
       "confidence": "confirmed",
-      "recency": "2026-06-22",
+      "recency": "2026-07-07",
       "tokens_est": 49,
       "tags": [
         "plan",
@@ -1481,6 +1477,38 @@
       "content_sha256": "47f8d43c29df6bd3c05307af23d617f12663505601600a8e3c980ac80364e945",
       "key_facts": [
         "Domain migration announcement remains paused. If resumed, use announcement-state/migration-announcement-remaining.txt, dry run first, send capped batches, an..."
+      ]
+    },
+    {
+      "id": "ctx-plan-archive",
+      "title": "PLAN.md: Archive",
+      "summary": "Identify closest Nitan-built alternatives: Reward Radar, CardFans, Perkmon/Perkly, PerkPerks, AMEX Benefit Dashboard, Card Verdict, Notion CC Tracker, and Loyalty Hub. (archived 2026-07-07)",
+      "source": "PLAN.md#archive",
+      "source_path": "PLAN.md",
+      "kind": "plan",
+      "scope": "task",
+      "importance": 0.85,
+      "confidence": "confirmed",
+      "recency": "2026-07-07",
+      "tokens_est": 170,
+      "tags": [
+        "plan",
+        "archive"
+      ],
+      "read_when": [
+        "continuing the active task",
+        "checking done criteria or decisions",
+        "update context with task-local progress"
+      ],
+      "card_path": ".context-harness/cards/ctx-plan-archive.md",
+      "chunk_path": "",
+      "content_sha256": "aa66e8191053829537fde287a8394e069b7a4a015a63c0856f079f31032ac52a",
+      "key_facts": [
+        "Identify closest Nitan-built alternatives: Reward Radar, CardFans, Perkmon/Perkly, PerkPerks, AMEX Benefit Dashboard, Card Verdict, Notion CC Tracker, and Lo...",
+        "Compare their posts/comments against Perks Reminder's current positioning. (archived 2026-07-07)",
+        "Rank next improvements by strategic impact, user pain, and fit with the 2.0 public narrative. (archived 2026-07-07)",
+        "Before coding, review the current dirty worktree and decide what to preserve, stage, or park. (archived 2026-07-07)",
+        "Implement the first selected slices through P5. (archived 2026-07-07)"
       ]
     }
   ]

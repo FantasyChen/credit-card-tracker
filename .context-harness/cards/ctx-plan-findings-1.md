@@ -26,5 +26,10 @@ plan.cards is positioned as a full credit-card lifecycle tracker, not just a ben
 - Repository card support is much broader: 403 card.yaml templates across 27 issuer directories, with 137 recurring credits, 31 spend thresholds, and 702 bonus...
 - The public card-template contribution model is cleaner than the current seed-centered workflow: each card has a folder containing card.yaml plus card-art files.
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `PLAN.md#findings-1`

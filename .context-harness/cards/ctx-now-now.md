@@ -5,7 +5,7 @@ importance: 0.95
 confidence: confirmed
 source: NOW.md#now
 chunk: .context-harness/chunks/ctx-now-now.md
-tokens_est: 795
+tokens_est: 796
 tags: [now, resume]
 ---
 
@@ -26,6 +26,11 @@ Continued the broad redesign work already present in the working tree. The redes
 - The working tree is still broad and uncommitted; review the diff by bucket before committing or deploying.
 - Review the final diff for product/design consistency, then decide whether to commit the redesign as one bundle or split it. If proceeding toward deploy, run...
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `NOW.md#now`
 - `.context-harness/chunks/ctx-now-now.md`

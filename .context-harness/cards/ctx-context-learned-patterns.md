@@ -25,6 +25,11 @@ Resend free transactional quota is recipient-based and 100/day; one email to 481
 - Old coupon-cycle.site and loyalty.coupon-cycle.site aliases currently redirect to the new domains at Vercel level.
 - Legacy Subscription State: subscriptionTier and isBetaUser are legacy database/session fields after the free-product pivot. Keep them dormant unless a future...
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `CONTEXT.md#learned-patterns`
 - `.context-harness/chunks/ctx-context-learned-patterns.md`

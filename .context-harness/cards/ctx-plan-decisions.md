@@ -24,5 +24,10 @@ Make the pivot code-backed: every account gets unlimited cards, unlimited email 
 - Keep subscriptionTier and isBetaUser database/session fields as dormant legacy state for now to avoid an unnecessary schema migration.
 - Keep /pricing as a stable route, but make it explain the free-product commitment instead of comparing Free and Pro plans.
 
-## Open next
+## Retrieval order
+- Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
+- Use this card before opening bulky `PLAN.md`, chunks, or raw source sections for this topic.
+- Open raw detail only when this summary is insufficient for the task.
+
+## Open next only if needed
 - `PLAN.md#decisions`
