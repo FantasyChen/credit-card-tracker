@@ -84,12 +84,6 @@ Make Benefit Usage Guides feel more like Nitan-informed technical playbooks whil
 Use the Nitan competitor research to choose the next product slices that strengthen Perks Reminder's clearest wedge: open-source, cross-platform benefit tracking that explains how to actually use expiring value.
 
 ## Progress
-- [x] Identify closest Nitan-built alternatives: Reward Radar, CardFans, Perkmon/Perkly, PerkPerks, AMEX Benefit Dashboard, Card Verdict, Notion CC Tracker, and Loyalty Hub.
-- [x] Compare their posts/comments against Perks Reminder's current positioning.
-- [x] Rank next improvements by strategic impact, user pain, and fit with the 2.0 public narrative.
-- [x] Before coding, review the current dirty worktree and decide what to preserve, stage, or park.
-- [x] Implement the first selected slices through P5.
-- [x] Run focused validation and capture browser screenshots.
 - [ ] Resolve preexisting whole-project TypeScript test mock errors separately if a clean `tsc --noEmit` gate is needed.
 
 ## Near-Term Priority Roadmap
@@ -168,3 +162,12 @@ Status: first shippable version implemented. `/cards/new` accepts shorthand such
 
 ## Parked
 - Domain migration announcement remains paused. If resumed, use `announcement-state/migration-announcement-remaining.txt`, dry run first, send capped batches, and stop on `daily_quota_exceeded`.
+
+
+## Archive
+- Identify closest Nitan-built alternatives: Reward Radar, CardFans, Perkmon/Perkly, PerkPerks, AMEX Benefit Dashboard, Card Verdict, Notion CC Tracker, and Loyalty Hub. (archived 2026-07-07)
+- Compare their posts/comments against Perks Reminder's current positioning. (archived 2026-07-07)
+- Rank next improvements by strategic impact, user pain, and fit with the 2.0 public narrative. (archived 2026-07-07)
+- Before coding, review the current dirty worktree and decide what to preserve, stage, or park. (archived 2026-07-07)
+- Implement the first selected slices through P5. (archived 2026-07-07)
+- Run focused validation and capture browser screenshots. (archived 2026-07-07)

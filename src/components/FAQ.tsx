@@ -2,69 +2,34 @@
 
 import React, { useState } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
-
-const faqs = [
-  {
-    question: 'Is it really free?',
-    answer: 'Yes. Perks Reminder is completely free: unlimited cards, benefit tracking, ROI analysis, loyalty tracking, data export, and email reminders are included.',
-  },
-  {
-    question: 'Do you access my bank accounts?',
-    answer: 'Absolutely not. We never ask for banking credentials, account numbers, or financial login information. You simply tell us which cards you have and we track the publicly-known benefits for those cards.',
-  },
-  {
-    question: 'How do notifications work?',
-    answer: 'We send a daily email digest when you have benefits starting a new cycle or expiring soon. You control which notification types you receive and how far ahead reminders should arrive in your settings.',
-  },
-  {
-    question: 'Is there a paid Pro plan?',
-    answer: 'No. The old Pro plan is deprecated. Current product features are free for every account.',
-  },
-  {
-    question: 'What cards are supported?',
-    answer: 'We support a growing catalog of premium cards from major issuers including American Express, Chase, Capital One, Citi, Bank of America, US Bank, and more. We\'re constantly adding new cards based on user requests.',
-  },
-  {
-    question: 'Can I track loyalty points too?',
-    answer: 'Yes! Our Loyalty Program tracker monitors your airline miles, hotel points, and other rewards programs. Get alerts before your points expire due to inactivity.',
-  },
-  {
-    question: 'Is my data safe?',
-    answer: 'Your data is stored securely on encrypted databases. We don\'t sell your data or share it with third parties. You can export or delete your data anytime from the Settings page.',
-  },
-];
+import { faqs } from '@/lib/faq-data';
 
 export default function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="py-20 bg-white dark:bg-gray-900">
-      <div className="container mx-auto max-w-screen-xl px-4">
-        {/* Section Header */}
-        <div className="text-center mb-16">
-          <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-3">
-            FAQ
-          </p>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+    <section id="faq" className="border-b border-border bg-background py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto mb-12 max-w-2xl text-center">
+          <h2 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
             Common questions
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="mt-4 text-base leading-7 text-muted-foreground">
             Everything you need to know about Perks Reminder.
           </p>
         </div>
 
-        {/* FAQ Items */}
-        <div className="max-w-3xl mx-auto divide-y divide-gray-200 dark:divide-gray-700">
+        <div className="mx-auto max-w-3xl divide-y divide-border rounded-xl border border-border bg-card px-5 shadow-sm shadow-black/[0.03]">
           {faqs.map((faq, index) => {
             const isOpen = openIndex === index;
             return (
               <div key={index} className="py-1">
                 <button
                   onClick={() => setOpenIndex(isOpen ? null : index)}
-                  className="flex w-full items-center justify-between py-5 text-left transition-colors duration-150 hover:text-indigo-600 dark:hover:text-indigo-400"
+                  className="flex w-full items-center justify-between py-5 text-left transition-colors duration-150 hover:text-foreground"
                   aria-expanded={isOpen}
                 >
-                  <span className="text-base font-medium text-gray-900 dark:text-white pr-8">
+                  <span className="pr-8 text-base font-medium text-foreground">
                     {faq.question}
                   </span>
                   <ChevronDownIcon
@@ -78,7 +43,7 @@ export default function FAQ() {
                     isOpen ? 'max-h-96 opacity-100 pb-5' : 'max-h-0 opacity-0'
                   }`}
                 >
-                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed pr-12">
+                  <p className="pr-12 text-sm leading-relaxed text-muted-foreground">
                     {faq.answer}
                   </p>
                 </div>

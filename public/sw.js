@@ -3,10 +3,10 @@
  * Implements intelligent caching strategies for better offline experience
  */
 
-const CACHE_NAME = 'perks-reminder-v2';
-const STATIC_CACHE = 'perks-reminder-static-v2';
-const DYNAMIC_CACHE = 'perks-reminder-dynamic-v2';
-const IMAGE_CACHE = 'perks-reminder-images-v2';
+const CACHE_NAME = 'perks-reminder-v3';
+const STATIC_CACHE = 'perks-reminder-static-v3';
+const DYNAMIC_CACHE = 'perks-reminder-dynamic-v3';
+const IMAGE_CACHE = 'perks-reminder-images-v3';
 
 // Resources to cache immediately
 const STATIC_ASSETS = [
@@ -28,7 +28,6 @@ const NETWORK_FIRST_ROUTES = [
 const CACHE_FIRST_ROUTES = [
   '/images/',
   '/icons/',
-  '/_next/static/',
   '/favicon',
 ];
 

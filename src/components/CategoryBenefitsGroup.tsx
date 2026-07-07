@@ -197,9 +197,9 @@ export default function CategoryBenefitsGroup({
           <div className="flex min-w-0 items-center space-x-3">
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="flex min-w-0 items-center space-x-3 text-left w-full hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+              className="flex w-full min-w-0 items-center space-x-3 text-left transition-colors hover:text-foreground"
             >
-              <div className="p-2 bg-indigo-100 dark:bg-indigo-800/30 rounded-lg text-indigo-600 dark:text-indigo-400">
+              <div className="rounded-xl bg-muted p-2 text-muted-foreground">
                 {getCategoryIcon(category)}
               </div>
               <div className="min-w-0">
@@ -207,14 +207,14 @@ export default function CategoryBenefitsGroup({
                   {category}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {benefits.length} benefit{benefits.length !== 1 ? 's' : ''} • ${categoryTotal.toFixed(2)} total
-                  {completedTotal > 0 && ` • $${completedTotal.toFixed(2)} claimed`}
+                  {benefits.length} benefit{benefits.length !== 1 ? 's' : ''} / ${categoryTotal.toFixed(2)} total
+                  {completedTotal > 0 && ` / $${completedTotal.toFixed(2)} claimed`}
                 </p>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   ${groupSummary.remainingValue.toFixed(2)} remaining
-                  {' '}• ${groupSummary.claimedValue.toFixed(2)} claimed
-                  {groupSummary.partialCount > 0 && ` • ${groupSummary.partialCount} partial`}
-                  {groupSummary.soonestDueDate && ` • next due ${formatDate(groupSummary.soonestDueDate)}`}
+                  {' '}/ ${groupSummary.claimedValue.toFixed(2)} claimed
+                  {groupSummary.partialCount > 0 && ` / ${groupSummary.partialCount} partial`}
+                  {groupSummary.soonestDueDate && ` / next due ${formatDate(groupSummary.soonestDueDate)}`}
                 </p>
               </div>
             </button>

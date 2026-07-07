@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
+import { PRIMARY_SITE_URL, SITE_NAME } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: "Credit Card Benefits Guide - How to Maximize Your Rewards",
@@ -22,8 +23,28 @@ export const metadata: Metadata = {
 };
 
 export default function GuidePage() {
+  const articleJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: 'Complete Guide to Maximizing Credit Card Benefits',
+    description: metadata.description,
+    author: {
+      '@type': 'Organization',
+      name: SITE_NAME,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: SITE_NAME,
+    },
+    mainEntityOfPage: `${PRIMARY_SITE_URL}/guide`,
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
       <article className="prose prose-lg max-w-none">
         <h1>Complete Guide to Maximizing Credit Card Benefits</h1>
         
@@ -171,8 +192,8 @@ export default function GuidePage() {
             Perks Reminder makes it easy to track all your credit card benefits in one place. 
             Get smart notifications, calculate ROI, and never miss a valuable benefit again.
           </p>
-          <Link 
-            href="/auth/signin" 
+          <Link
+            href="/auth/signup?callbackUrl=%2Fcards%2Fnew"
             className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
           >
             Get Started Free

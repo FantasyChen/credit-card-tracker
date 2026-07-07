@@ -4,8 +4,9 @@ import React, { useState, useMemo } from 'react';
 import BenefitCardClient from '@/components/BenefitCardClient';
 import CategoryBenefitsGroup from '@/components/CategoryBenefitsGroup';
 import EmptyState from '@/components/ui/EmptyState';
+import PageHeader from '@/components/ui/PageHeader';
 import Link from 'next/link';
-import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { BellAlertIcon, MagnifyingGlassIcon, FunnelIcon, XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import {
   applyBenefitDashboardFilters,
   CUSTOM_BENEFITS_CARD_NAME,
@@ -25,6 +26,9 @@ interface BenefitsDisplayProps {
   totalNotUsableValue: number;
   totalAnnualFees: number;
   cardLevelRoi?: CardLevelRoi[];
+  cardCount?: number;
+  notifyBenefitExpiration?: boolean;
+  notifyExpirationDays?: number;
 }
 
 export default function BenefitsDisplayClient({
@@ -37,6 +41,9 @@ export default function BenefitsDisplayClient({
   totalNotUsableValue,
   totalAnnualFees,
   cardLevelRoi = [],
+  cardCount = 0,
+  notifyBenefitExpiration = false,
+  notifyExpirationDays = 7,
 }: BenefitsDisplayProps) {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,6 +53,7 @@ export default function BenefitsDisplayClient({
   const [freeNightOnly, setFreeNightOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showRoiBreakdown, setShowRoiBreakdown] = useState(false);
+  const [isReminderPromptDismissed, setIsReminderPromptDismissed] = useState(false);
 
   const [viewMode, setViewMode] = useState<'category' | 'card'>('card');
   const [sortMode, setSortMode] = useState<'expires' | 'value' | 'card'>('expires');
@@ -79,6 +87,14 @@ export default function BenefitsDisplayClient({
       })
       .sort((a, b) => b.netRoi - a.netRoi || b.claimedValue - a.claimedValue);
   }, [cardLevelRoi, localUpcomingBenefits, localCompletedBenefits]);
+
+  const reminderWindowDays = Math.max(1, notifyExpirationDays || 7);
+  const reminderWindowEnd = Date.now() + reminderWindowDays * 24 * 60 * 60 * 1000;
+  const expiringReminderBenefitCount = localUpcomingBenefits.filter((status) => {
+    const endTime = new Date(status.cycleEndDate).getTime();
+    return Number.isFinite(endTime) && endTime >= Date.now() && endTime <= reminderWindowEnd;
+  }).length;
+  const shouldShowReminderPrompt = cardCount > 0 && !notifyBenefitExpiration && expiringReminderBenefitCount > 0 && !isReminderPromptDismissed;
 
   const handleStatusChange = (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => {
     if (newIsCompleted) {
@@ -356,7 +372,7 @@ export default function BenefitsDisplayClient({
     if (benefits.length === 0) {
       return (
         <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400">No scheduled benefits.</p>
+          <p className="text-muted-foreground">No scheduled benefits.</p>
         </div>
       );
     }
@@ -386,7 +402,15 @@ export default function BenefitsDisplayClient({
   const renderCategoryView = (benefits: DisplayBenefitStatus[]) => {
     if (benefits.length === 0) {
       const emptyStateProps = {
-        upcoming: {
+        upcoming: cardCount === 0 ? {
+          icon: 'credit-card' as const,
+          title: 'Add your first card',
+          description: 'Choose a card to create your benefit checklist. Recurring credits, reset windows, and reminders will appear here.',
+          actionLabel: 'Add your first card',
+          actionHref: '/cards/new',
+          secondaryActionLabel: 'Browse supported cards',
+          secondaryActionHref: '/cards/browse',
+        } : {
           icon: 'clock' as const,
           title: 'No upcoming benefits',
           description: 'Add credit cards with benefits to start tracking your rewards and credits.',
@@ -430,7 +454,15 @@ export default function BenefitsDisplayClient({
   const renderCardView = (benefits: DisplayBenefitStatus[]) => {
     if (benefits.length === 0) {
       const emptyStateProps = {
-        upcoming: {
+        upcoming: cardCount === 0 ? {
+          icon: 'credit-card' as const,
+          title: 'Add your first card',
+          description: 'Choose a card to create your benefit checklist. Recurring credits, reset windows, and reminders will appear here.',
+          actionLabel: 'Add your first card',
+          actionHref: '/cards/new',
+          secondaryActionLabel: 'Browse supported cards',
+          secondaryActionHref: '/cards/browse',
+        } : {
           icon: 'credit-card' as const,
           title: 'No Benefits Available',
           description: "You don't have any upcoming benefits. Add some credit cards to get started!",
@@ -473,195 +505,105 @@ export default function BenefitsDisplayClient({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-6 flex flex-col gap-4 border-b border-gray-200 pb-5 dark:border-gray-800 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-950 dark:text-white sm:text-3xl">Benefits Dashboard</h1>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-            Prioritize what expires soon, record claimed value, and keep annual fees honest.
-          </p>
-        </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
-          {/* Add Custom Benefit Button */}
-          <Link
-            href="/benefits/how-to-use"
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-900/30"
-          >
-            <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-            How-to Guides
-          </Link>
-          <Link
-            href="/benefits/custom"
-            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
-          >
-            <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Custom
-          </Link>
-          <button
-            onClick={setCategoryView}
-            className={`inline-flex min-h-10 items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'category' 
-                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200'
-            }`}
-          >
-            <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H3m16 14H5" />
-            </svg>
-            Group by Category
-          </button>
-          <button
-            onClick={setCardView}
-            className={`inline-flex min-h-10 items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'card' 
-                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200'
-            }`}
-          >
-            <svg className="h-4 w-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-            Group by Card
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Benefits Dashboard"
+        description="Prioritize what expires soon, record claimed value, and keep annual fees honest."
+      >
+        <Link
+          href="/benefits/how-to-use"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-sm shadow-black/[0.03] transition-colors hover:bg-accent"
+        >
+          How-to guides
+        </Link>
+        <Link
+          href="/benefits/custom"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm shadow-black/5 transition-colors hover:bg-primary/90"
+        >
+          Add custom
+        </Link>
+        <button
+          type="button"
+          onClick={setCategoryView}
+          className={`inline-flex min-h-10 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            viewMode === 'category'
+              ? 'bg-foreground text-background'
+              : 'border border-border bg-card text-foreground shadow-sm shadow-black/[0.03] hover:bg-accent'
+          }`}
+        >
+          Group by Category
+        </button>
+        <button
+          type="button"
+          onClick={setCardView}
+          className={`inline-flex min-h-10 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            viewMode === 'card'
+              ? 'bg-foreground text-background'
+              : 'border border-border bg-card text-foreground shadow-sm shadow-black/[0.03] hover:bg-accent'
+          }`}
+        >
+          Group by Card
+        </button>
+      </PageHeader>
 
-      {/* Summary Widgets */}
+      {shouldShowReminderPrompt && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm shadow-black/[0.03] dark:border-amber-900/60 dark:bg-amber-950/30">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+              <BellAlertIcon className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-amber-950 dark:text-amber-100">
+                Turn on benefit expiration reminders
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-amber-900/80 dark:text-amber-100/80">
+                You have {expiringReminderBenefitCount} benefit{expiringReminderBenefitCount === 1 ? '' : 's'} expiring in the next {reminderWindowDays} day{reminderWindowDays === 1 ? '' : 's'}. Enable reminder emails so they do not slip by.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <Link
+                  href="/settings/notifications#notifyBenefitExpiration"
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg bg-amber-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-800 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
+                >
+                  Enable reminders
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsReminderPromptDismissed(true)}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-300 bg-transparent px-3 py-2 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsReminderPromptDismissed(true)}
+              className="rounded-lg p-1 text-amber-700 transition-colors hover:bg-amber-100 hover:text-amber-900 dark:text-amber-300 dark:hover:bg-amber-900/40 dark:hover:text-amber-100"
+              aria-label="Dismiss reminder prompt"
+            >
+              <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {/* Upcoming Benefits Widget */}
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="p-2 bg-blue-500 rounded-lg">
-                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="ml-4 sm:ml-5 flex-1 min-w-0">
-                <dl>
-                  <dt className="text-sm font-medium text-blue-600 dark:text-blue-300">Upcoming Benefits</dt>
-                  <dd>
-                    <div className="text-xl font-semibold tabular-nums text-gray-950 dark:text-white sm:text-2xl">${localTotalUnusedValue.toFixed(2)}</div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
+        {[
+          ['Upcoming Benefits', `$${localTotalUnusedValue.toFixed(2)}`, 'Still available this cycle'],
+          ['Claimed Benefits', `$${localTotalUsedValue.toFixed(2)}`, 'Recorded as used'],
+          ['Not Usable', `$${localTotalNotUsableValue.toFixed(2)}`, 'Excluded from ROI'],
+          ['Annual Fee ROI', `$${(localTotalUsedValue - totalAnnualFees).toFixed(2)}`, `$${localTotalUsedValue.toFixed(2)} claimed vs $${totalAnnualFees.toFixed(2)} fees`],
+        ].map(([label, value, detail]) => (
+          <div key={label} className="rounded-xl border border-border bg-card p-4 shadow-sm shadow-black/[0.03]">
+            <p className="text-sm font-medium text-muted-foreground">{label}</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">{value}</p>
+            <p className="mt-3 text-xs leading-5 text-muted-foreground">{detail}</p>
           </div>
-        </div>
-
-        {/* Claimed Benefits Widget */}
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="p-2 bg-green-500 rounded-lg">
-                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              </div>
-              <div className="ml-4 sm:ml-5 flex-1 min-w-0">
-                <dl>
-                  <dt className="text-sm font-medium text-green-600 dark:text-green-300">Claimed Benefits</dt>
-                  <dd>
-                    <div className="text-xl font-semibold tabular-nums text-gray-950 dark:text-white sm:text-2xl">${localTotalUsedValue.toFixed(2)}</div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Not Usable Benefits Widget */}
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="p-2 bg-gray-500 rounded-lg">
-                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
-                  </svg>
-                </div>
-              </div>
-              <div className="ml-4 sm:ml-5 flex-1 min-w-0">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-600 dark:text-gray-300">Not Usable</dt>
-                  <dd>
-                    <div className="text-xl font-semibold tabular-nums text-gray-950 dark:text-gray-100 sm:text-2xl">${localTotalNotUsableValue.toFixed(2)}</div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Annual Fee ROI Widget */}
-        <div className={`overflow-hidden rounded-lg border shadow-sm ${
-          localTotalUsedValue >= totalAnnualFees 
-            ? 'bg-white dark:bg-gray-800 border-emerald-200 dark:border-emerald-700'
-            : 'bg-white dark:bg-gray-800 border-orange-200 dark:border-orange-700'
-        }`}>
-          <div className="p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className={`p-2 rounded-lg ${
-                  localTotalUsedValue >= totalAnnualFees 
-                    ? 'bg-emerald-500' 
-                    : 'bg-orange-500'
-                }`}>
-                  {localTotalUsedValue >= totalAnnualFees ? (
-                    <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  ) : (
-                    <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  )}
-                </div>
-              </div>
-              <div className="ml-4 sm:ml-5 flex-1 min-w-0">
-                <dl>
-                  <dt className={`text-sm font-medium ${
-                    localTotalUsedValue >= totalAnnualFees 
-                      ? 'text-emerald-600 dark:text-emerald-300' 
-                      : 'text-orange-600 dark:text-orange-300'
-                  }`}>
-                    Annual Fee ROI
-                  </dt>
-                  <dd>
-                    <div className="space-y-1">
-                      <div className={`text-xl sm:text-2xl font-bold ${
-                        localTotalUsedValue >= totalAnnualFees 
-                          ? 'text-emerald-900 dark:text-emerald-100' 
-                          : 'text-orange-900 dark:text-orange-100'
-                      }`}>
-                        ${(localTotalUsedValue - totalAnnualFees).toFixed(2)}
-                      </div>
-                      <div className={`text-xs ${
-                        localTotalUsedValue >= totalAnnualFees 
-                          ? 'text-emerald-600 dark:text-emerald-300' 
-                          : 'text-orange-600 dark:text-orange-300'
-                      }`}>
-                        ${localTotalUsedValue.toFixed(2)} claimed vs ${totalAnnualFees.toFixed(2)} fees
-                      </div>
-                    </div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Card-level ROI breakdown (collapsible) */}
       {cardLevelRoiLive.length > 0 && (
-        <div className="mb-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-6 overflow-hidden rounded-xl border border-border bg-card shadow-sm shadow-black/[0.03]">
           <button
             type="button"
             onClick={() => setShowRoiBreakdown(prev => !prev)}
@@ -671,7 +613,7 @@ export default function BenefitsDisplayClient({
           >
             <div className="text-left">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">ROI by card</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Claimed value vs annual fee per card</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Claimed value vs annual fee per card</p>
             </div>
             <ChevronRightIcon
               className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${showRoiBreakdown ? 'rotate-90' : ''}`}
@@ -683,10 +625,10 @@ export default function BenefitsDisplayClient({
                 <li key={row.cardName} className="px-4 py-3 flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium text-gray-900 dark:text-white truncate">{row.cardDisplayName}</span>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">
+                    <span className="text-muted-foreground">
                       ${row.claimedValue.toFixed(2)} claimed
                     </span>
-                    <span className="text-gray-500 dark:text-gray-400">
+                    <span className="text-muted-foreground">
                       ${row.annualFee.toFixed(2)} fee
                     </span>
                     <span
@@ -707,14 +649,14 @@ export default function BenefitsDisplayClient({
       )}
 
       {/* Tabs */}
-      <div className="mb-4 overflow-x-auto border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-4 sm:space-x-8 min-w-max" aria-label="Tabs">
+      <div className="mb-4 overflow-x-auto border-b border-border">
+        <nav className="-mb-px flex min-w-max gap-4 sm:gap-6" aria-label="Tabs">
           <button
             onClick={() => setActiveTab('upcoming')}
-            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm 
-              ${activeTab === 'upcoming' 
-                ? 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}
+            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm
+              ${activeTab === 'upcoming'
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}
             `}
           >
             <span className="hidden sm:inline">Upcoming ({localUpcomingBenefits.length})</span>
@@ -722,10 +664,10 @@ export default function BenefitsDisplayClient({
           </button>
           <button
             onClick={() => setActiveTab('completed')}
-            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm 
-              ${activeTab === 'completed' 
-                ? 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}
+            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm
+              ${activeTab === 'completed'
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}
             `}
           >
             <span className="hidden sm:inline">Claimed ({localCompletedBenefits.length})</span>
@@ -733,10 +675,10 @@ export default function BenefitsDisplayClient({
           </button>
           <button
             onClick={() => setActiveTab('not-usable')}
-            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm 
-              ${activeTab === 'not-usable' 
-                ? 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}
+            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm
+              ${activeTab === 'not-usable'
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}
             `}
           >
             <span className="hidden sm:inline">Not Usable ({localNotUsableBenefits.length})</span>
@@ -745,10 +687,10 @@ export default function BenefitsDisplayClient({
           {localScheduledBenefits.length > 0 && (
             <button
               onClick={() => setActiveTab('scheduled')}
-              className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm 
-                ${activeTab === 'scheduled' 
-                  ? 'border-purple-500 text-purple-600 dark:border-purple-400 dark:text-purple-400' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}
+              className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm
+                ${activeTab === 'scheduled'
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}
               `}
             >
               <span className="hidden sm:inline">Scheduled ({localScheduledBenefits.length})</span>
@@ -759,7 +701,7 @@ export default function BenefitsDisplayClient({
       </div>
 
       {/* Search & Filters */}
-      <div className="mb-5 space-y-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="mb-5 space-y-3 rounded-xl border border-border bg-card p-3 shadow-sm shadow-black/[0.03]">
         <div className="flex flex-col gap-3 lg:flex-row">
           <div className="relative flex-1">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -768,7 +710,7 @@ export default function BenefitsDisplayClient({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search benefits, cards, categories..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
+              className="w-full rounded-lg border border-input bg-card py-2 pl-10 pr-4 text-sm text-foreground shadow-sm shadow-black/[0.02] focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
             />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
@@ -778,7 +720,7 @@ export default function BenefitsDisplayClient({
               aria-label="Sort benefits"
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
-              className="min-h-10 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              className="min-h-10 rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm shadow-black/[0.02] focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
             >
               <option value="expires">Expires soon</option>
               <option value="value">Highest value</option>
@@ -790,7 +732,7 @@ export default function BenefitsDisplayClient({
               aria-label="Filter by frequency"
               value={filterFrequency}
               onChange={(e) => setFilterFrequency(e.target.value as BenefitDashboardFrequency)}
-              className="min-h-10 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              className="min-h-10 rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm shadow-black/[0.02] focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
             >
               <option value="ALL">All cycles</option>
               <option value="WEEKLY">Weekly</option>
@@ -804,8 +746,8 @@ export default function BenefitsDisplayClient({
               onClick={() => setFreeNightOnly((value) => !value)}
               className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                 freeNightOnly
-                  ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300'
-                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  ? 'border-foreground bg-foreground text-background'
+                  : 'border-border bg-card text-foreground hover:bg-accent'
               }`}
               aria-pressed={freeNightOnly}
             >
@@ -816,14 +758,14 @@ export default function BenefitsDisplayClient({
               onClick={() => setShowFilters(!showFilters)}
               className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
                 showFilters || hasActiveFilters
-                  ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300'
-                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  ? 'border-foreground bg-foreground text-background'
+                  : 'border-border bg-card text-foreground hover:bg-accent'
               }`}
             >
               <FunnelIcon className="h-5 w-5 mr-2" />
               Filters
               {hasActiveFilters && (
-                <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-500 text-white">
+                <span className="ml-1 inline-flex items-center justify-center rounded-full bg-background px-2 py-0.5 text-xs font-medium text-foreground">
                   on
                 </span>
               )}
@@ -843,7 +785,7 @@ export default function BenefitsDisplayClient({
         {showFilters && (
           <div className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/30 sm:grid-cols-2">
             <div>
-              <label htmlFor="filter-category" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+              <label htmlFor="filter-category" className="block text-xs font-medium text-muted-foreground mb-1">
                 Category
               </label>
               <select
@@ -861,7 +803,7 @@ export default function BenefitsDisplayClient({
               </select>
             </div>
             <div>
-              <label htmlFor="filter-card" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+              <label htmlFor="filter-card" className="block text-xs font-medium text-muted-foreground mb-1">
                 Card
               </label>
               <select
@@ -901,15 +843,10 @@ export default function BenefitsDisplayClient({
         )}
         {activeTab === 'scheduled' && (
           <section>
-            <div className="mb-4 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-              <div className="flex items-center">
-                <svg className="h-5 w-5 text-purple-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-sm text-purple-700 dark:text-purple-300">
-                  These benefits are scheduled to start in the future. They will appear in &quot;Upcoming&quot; once their start date arrives.
-                </p>
-              </div>
+            <div className="mb-4 rounded-xl border border-border bg-card p-4 shadow-sm shadow-black/[0.03]">
+              <p className="text-sm text-muted-foreground">
+                These benefits are scheduled to start in the future. They will appear in &quot;Upcoming&quot; once their start date arrives.
+              </p>
             </div>
             {renderScheduledBenefitsList(sortBenefits(applyPowerUserFilters(filterBenefits(localScheduledBenefits))))}
           </section>

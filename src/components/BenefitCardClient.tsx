@@ -149,53 +149,50 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
   const cardIdentityDetails = card
     ? [
         card.nickname?.trim() ? card.name : null,
-        card.lastFourDigits ? `Last ${card.lastFourDigits.length}: ${'•'.repeat(card.lastFourDigits.length)}${card.lastFourDigits}` : null,
+        card.lastFourDigits ? `Last ${card.lastFourDigits.length}: ${'*'.repeat(card.lastFourDigits.length)}${card.lastFourDigits}` : null,
       ].filter(Boolean)
     : [];
 
   return (
     <div className={`group relative overflow-hidden rounded-lg border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
       isScheduled
-        ? 'bg-white border-violet-200 dark:bg-gray-800 dark:border-violet-700'
+        ? 'bg-card border-border'
         : isCompleted
-          ? 'bg-white border-emerald-200 dark:bg-gray-800 dark:border-emerald-700'
+          ? 'bg-card border-emerald-200 dark:border-emerald-900/70'
           : isNotUsable
-            ? 'bg-gray-50 border-gray-200 dark:bg-gray-800/80 dark:border-gray-700'
-            : 'bg-white border-gray-200 hover:border-indigo-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:border-indigo-600'
+            ? 'bg-muted/45 border-border'
+            : 'bg-card border-border hover:bg-accent/35'
     }`}>
-      {/* Status indicator */}
-      <div className={`absolute top-0 left-0 w-1 h-full ${
-        isScheduled ? 'bg-purple-500' : isCompleted ? 'bg-green-500' : isNotUsable ? 'bg-gray-500' : 'bg-indigo-500'
+            <div className={`absolute top-0 left-0 w-1 h-full ${
+        isScheduled ? 'bg-muted-foreground' : isCompleted ? 'bg-emerald-500' : isNotUsable ? 'bg-muted-foreground' : 'bg-amber-500'
       }`} />
 
       <div className="p-4 sm:p-5">
-        {/* Mobile-first layout: Stack content vertically on small screens */}
-        <div className="space-y-4">
-          {/* Top section: Icon, title, and amount */}
-          <div className="flex items-start gap-3">
+                <div className="space-y-4">
+                    <div className="flex items-start gap-3">
             <div className={`flex-shrink-0 p-2 rounded-lg ${
               isScheduled
-                ? 'bg-purple-100 dark:bg-purple-800/30'
+                ? 'bg-muted'
                 : isCompleted
-                  ? 'bg-green-100 dark:bg-green-800/30'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/30'
                   : isNotUsable
-                    ? 'bg-gray-100 dark:bg-gray-800/30'
-                    : 'bg-indigo-100 dark:bg-indigo-800/30'
+                    ? 'bg-muted'
+                    : 'bg-muted'
             }`}>
               {isScheduled ? (
-                <svg className="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               ) : isCompleted ? (
-                <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               ) : isNotUsable ? (
-                <svg className="h-5 w-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
                 </svg>
               ) : (
-                <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               )}
@@ -204,25 +201,25 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                   isScheduled
-                    ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-900/30 dark:text-violet-200 dark:ring-violet-800'
+                    ? 'bg-muted text-muted-foreground ring-1 ring-border'
                     : isCompleted
                       ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-800'
                       : isNotUsable
                         ? 'bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600'
                         : hasPartialProgress
                           ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-800'
-                          : 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-200 dark:ring-indigo-800'
+                          : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:ring-amber-900/60'
                 }`}>
                   {statusLabel}
                 </span>
-                <span className="text-xs font-medium uppercase tracking-normal text-gray-500 dark:text-gray-400">
+                <span className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
                   {status.benefit.category}
                 </span>
               </div>
-              <h3 className="text-base font-semibold text-gray-950 dark:text-gray-100 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors leading-snug">
+              <h3 className="text-base font-semibold text-gray-950 dark:text-gray-100 group-hover:text-foreground transition-colors leading-snug">
                 {status.benefit.description}
                 {status.benefit.occurrencesInCycle && status.benefit.occurrencesInCycle > 1 && (
-                  <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
                     ({(status.occurrenceIndex || 0) + 1} of {status.benefit.occurrencesInCycle})
                   </span>
                 )}
@@ -231,12 +228,12 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 <div className="mt-1">
                   <p className={`text-lg sm:text-xl font-semibold tabular-nums ${
                     isCompleted
-                      ? 'text-green-600 dark:text-green-400'
+                      ? 'text-emerald-600 dark:text-emerald-400'
                       : isNotUsable
-                        ? 'text-gray-600 dark:text-gray-400'
+                        ? 'text-muted-foreground'
                         : hasPartialProgress
                           ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-indigo-600 dark:text-indigo-400'
+                          : 'text-muted-foreground'
                   }`}>
                     {hasPartialProgress ? (
                       <span>
@@ -246,9 +243,8 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                       <span>${benefitAmount.toFixed(2)}</span>
                     )}
                   </p>
-                  {/* Progress bar for partial completion */}
                   {hasPartialProgress && (
-                    <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div className="mt-2 w-full bg-muted rounded-full h-2">
                       <div
                         className="bg-amber-500 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${completionPercent}%` }}
@@ -265,26 +261,26 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
             {card ? (
               // Regular credit card benefit
               <>
-                <div className="flex items-start text-sm text-gray-600 dark:text-gray-300">
+                <div className="flex items-start text-sm text-muted-foreground">
                   <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                   </svg>
                   <span className="min-w-0 font-medium leading-snug break-words" title={card.displayName}>
                     {card.displayName}
                   </span>
-                  <span className="mx-2 hidden sm:inline">•</span>
-                  <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">{card.issuer}</span>
+                  <span className="mx-2 hidden sm:inline text-border">/</span>
+                  <span className="text-muted-foreground hidden sm:inline">{card.issuer}</span>
                 </div>
                 {cardIdentityDetails.length > 0 && (
-                  <div className="flex items-start text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex items-start text-xs text-muted-foreground">
                     <svg className="h-4 w-4 mr-2 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586l6.257-6.257A6 6 0 1121 9z" />
                     </svg>
-                    <span>{cardIdentityDetails.join(' • ')}</span>
+                    <span>{cardIdentityDetails.join(' / ')}</span>
                   </div>
                 )}
                 {/* Show issuer on mobile in a separate line for better readability */}
-                <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 sm:hidden">
+                <div className="flex items-center text-sm text-muted-foreground sm:hidden">
                   <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h4a1 1 0 011 1v5m-6 0V9a1 1 0 011-1h4a1 1 0 011 1v11" />
                   </svg>
@@ -293,22 +289,22 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               </>
             ) : (
               // Custom/standalone benefit - no credit card
-              <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                <svg className="h-4 w-4 mr-2 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex items-center text-sm text-muted-foreground">
+                <svg className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                 </svg>
-                <span className="font-medium text-purple-600 dark:text-purple-400">Custom Benefit</span>
-                <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full">
+                <span className="font-medium text-muted-foreground">Custom Benefit</span>
+                <span className="ml-2 px-2 py-0.5 text-xs bg-muted text-muted-foreground rounded-full">
                   Personal
                 </span>
               </div>
             )}
-            <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+            <div className="flex items-center text-sm text-muted-foreground">
               <svg className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               {isScheduled ? (
-                <span>Starts: <span className="font-medium text-purple-600 dark:text-purple-400">{formatDate(status.cycleStartDate)}</span></span>
+                <span>Starts: <span className="font-medium text-muted-foreground">{formatDate(status.cycleStartDate)}</span></span>
               ) : (
                 <span>Due: <span className="font-medium">{formatDate(status.cycleEndDate)}</span></span>
               )}
@@ -388,7 +384,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                         type="button"
                         onClick={handleFullCompletion}
                         disabled={isPending}
-                        className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 bg-green-600 hover:bg-green-700 text-white shadow-sm focus:ring-green-500 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm focus:ring-green-500 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {isPending ? (
                           <div className="flex items-center justify-center">
@@ -437,8 +433,8 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                     disabled={isPending}
                     className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                       isNotUsable
-                        ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 focus:ring-indigo-500 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30 dark:text-indigo-200 dark:border-indigo-800'
-                        : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 focus:ring-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
+                        ? 'border border-border bg-card text-foreground hover:bg-accent focus:ring-ring'
+                        : 'border border-border bg-card text-foreground hover:bg-accent focus:ring-ring'
                     } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     {isPending ? (
@@ -495,17 +491,17 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="rounded-xl border border-border bg-card shadow-xl shadow-black/10 max-w-md w-full p-6">
             <div className="flex items-center mb-4">
               <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full mr-3">
                 <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Custom Benefit</h3>
+              <h3 className="text-lg font-semibold text-foreground">Delete Custom Benefit</h3>
             </div>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-muted-foreground mb-6">
               Are you sure you want to delete <strong>&quot;{status.benefit.description}&quot;</strong>? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
@@ -542,27 +538,27 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
 
       {/* Partial Amount Modal */}
       {showPartialModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="rounded-xl border border-border bg-card shadow-xl shadow-black/10 max-w-md w-full p-6">
             <div className="flex items-center mb-4">
               <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full mr-3">
                 <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Partial Amount</h3>
+              <h3 className="text-lg font-semibold text-foreground">Add Partial Amount</h3>
             </div>
 
             <div className="mb-4">
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+              <p className="text-sm text-muted-foreground mb-2">
                 {status.benefit.description}
               </p>
-              <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Used: ${usedAmount.toFixed(2)}</span>
                 <span>Remaining: ${remainingAmount.toFixed(2)}</span>
               </div>
               {/* Progress bar */}
-              <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div className="mt-2 w-full bg-muted rounded-full h-2">
                 <div
                   className="bg-amber-500 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${completionPercent}%` }}

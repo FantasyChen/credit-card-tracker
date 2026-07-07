@@ -22,55 +22,58 @@ function CheckIcon() {
   );
 }
 
-export default function PricingSection() {
+interface PricingSectionProps {
+  headingLevel?: 'h1' | 'h2';
+}
+
+export default function PricingSection({ headingLevel = 'h2' }: PricingSectionProps) {
+  const Heading = headingLevel;
+
   return (
-    <section id="pricing" className="py-20 bg-gray-50 dark:bg-gray-800">
-      <div className="container mx-auto max-w-screen-xl px-4">
-        <div className="text-center mb-16">
-          <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-3">
-            Pricing
-          </p>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+    <section id="pricing" className="border-b border-border bg-background py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto mb-12 max-w-2xl text-center">
+          <Heading className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
             Completely free
-          </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          </Heading>
+          <p className="mt-4 text-base leading-7 text-muted-foreground">
             Perks Reminder has no paid plan, no subscription, and no card or reminder limit.
           </p>
         </div>
 
-        <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-black/[0.03]">
           <div className="grid gap-8 p-8 md:grid-cols-[0.8fr_1.2fr] md:p-10">
             <div>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <p className="text-sm font-medium text-muted-foreground">
                 Price
               </p>
               <div className="mt-2">
-                <span className="text-5xl font-bold text-gray-900 dark:text-white">$0</span>
-                <span className="ml-2 text-gray-500 dark:text-gray-400">forever</span>
+                <span className="text-5xl font-bold text-foreground">$0</span>
+                <span className="ml-2 text-muted-foreground">forever</span>
               </div>
-              <p className="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">
+              <p className="mt-4 text-sm leading-6 text-muted-foreground">
                 Built as a free, open-source tracker for people who want reminders without bank-link access or another paid finance app.
               </p>
               <Link
                 href="/auth/signup"
-                className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-indigo-700 sm:w-auto"
+                className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm shadow-black/5 transition-colors hover:bg-primary/90 sm:w-auto"
               >
                 Create Free Account
               </Link>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-foreground">
                 Everything included
               </h3>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 {features.map((feature) => (
                   <div key={feature} className="flex items-start gap-3">
                     <CheckIcon />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{feature}</span>
+                    <span className="text-sm text-muted-foreground">{feature}</span>
                   </div>
                 ))}
               </div>
-              <p className="mt-6 rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+              <p className="mt-6 rounded-lg border border-border bg-muted/45 px-4 py-3 text-sm text-muted-foreground">
                 If the product needs limits for abuse prevention later, they should be operational safeguards, not paid feature gates.
               </p>
             </div>

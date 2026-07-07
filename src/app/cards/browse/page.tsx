@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import CardImageWell from '@/components/ui/CardImageWell';
 import PageHeader from '@/components/ui/PageHeader';
+import { PRIMARY_SITE_URL } from '@/lib/site';
 import { calculateAnnualBenefitValue, getPublicStaticCards } from '@/lib/static-catalog';
 
 export const metadata: Metadata = {
@@ -39,8 +40,24 @@ export default async function BrowseCardsPage() {
   const calculateTotalValue = (benefits: typeof predefinedCards[number]['benefits']) =>
     benefits.reduce((total, benefit) => total + calculateAnnualBenefitValue(benefit.maxAmount, benefit.frequency), 0);
 
+  const itemListJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Supported credit cards in Perks Reminder',
+    itemListElement: predefinedCards.map((card, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      url: `${PRIMARY_SITE_URL}/cards/browse/${encodeURIComponent(card.name)}`,
+      name: card.name,
+    })),
+  };
+
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+      />
       <PageHeader
         title="Browse Credit Cards"
         description={`Explore ${predefinedCards.length}+ supported cards with trackable benefits. Sign in to add cards to your collection and start tracking cycles.`}
@@ -143,10 +160,10 @@ export default async function BrowseCardsPage() {
             Start Tracking Your Benefits
           </h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
-            Sign in to add these cards to your collection and never miss another credit card benefit.
+            Create a free account to add these cards to your collection and never miss another credit card benefit.
           </p>
           <Link
-            href="/auth/signin"
+            href="/auth/signup?callbackUrl=%2Fcards%2Fnew"
             className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors shadow-lg hover:shadow-xl"
           >
             Get Started Free

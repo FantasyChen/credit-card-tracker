@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next'
 import { PRIMARY_SITE_URL } from '@/lib/site'
-import { benefitUsageWays, STATIC_CATALOG_UPDATED_AT } from '@/lib/static-catalog'
+import { benefitUsageWays, getPublicStaticCards, STATIC_CATALOG_UPDATED_AT } from '@/lib/static-catalog'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = PRIMARY_SITE_URL
@@ -22,6 +22,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     },
     {
+      url: `${baseUrl}/pricing`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
       url: `${baseUrl}/benefits`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
@@ -40,9 +46,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
+      url: `${baseUrl}/cards/browse`,
+      lastModified: catalogUpdatedAt,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
       url: `${baseUrl}/loyalty`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/loyalty-landing`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
       priority: 0.7,
     },
     {
@@ -59,6 +77,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ]
   
+  const cardPages: MetadataRoute.Sitemap = getPublicStaticCards().map((card) => ({
+    url: `${baseUrl}/cards/browse/${encodeURIComponent(card.name)}`,
+    lastModified: new Date(card.updatedAt),
+    changeFrequency: 'monthly' as const,
+    priority: 0.7,
+  }))
+
   // Dynamic benefit usage guide pages
   const dynamicPages: MetadataRoute.Sitemap = benefitUsageWays.map((way) => ({
     url: `${baseUrl}/benefits/how-to-use/${way.slug}`,
@@ -66,6 +91,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: 'monthly' as const,
     priority: 0.7,
   }))
-  
-  return [...staticPages, ...dynamicPages]
+
+  return [...staticPages, ...cardPages, ...dynamicPages]
 }

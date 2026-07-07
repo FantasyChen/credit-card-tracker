@@ -1,51 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
-// Optional: Add search analytics tracking
+function getClientIp(request: NextRequest) {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0]?.trim() || null;
+  }
+
+  return request.headers.get('x-real-ip');
+}
+
+function parseNonNegativeInteger(value: unknown) {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
-    // Only track if user is authenticated (optional)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
-    const { query, resultCount, searchTime } = body;
+    const query = typeof body.query === 'string' ? body.query.trim().toLowerCase().slice(0, 200) : '';
+    const resultCount = parseNonNegativeInteger(body.resultCount);
+    const searchTime = parseNonNegativeInteger(body.searchTime);
 
-    // Validate required fields
-    if (!query || typeof query !== 'string' || resultCount === undefined || searchTime === undefined) {
+    if (!query || resultCount === null || searchTime === null) {
       return NextResponse.json(
         { error: 'Invalid analytics data' },
         { status: 400 }
       );
     }
 
-    // For now, just log the analytics data
-    // In production, you might want to store this in a database
-    console.log('Search Analytics:', {
-      query: query.trim(),
-      resultCount,
-      searchTime,
-      userId: session.user.id,
-      timestamp: new Date().toISOString(),
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
-      userAgent: request.headers.get('user-agent'),
+    await prisma.searchAnalytics.create({
+      data: {
+        query,
+        resultCount,
+        searchTime,
+        userId: session.user.id,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent'),
+      },
     });
-
-    // You could store this in a database table like:
-    // await prisma.searchAnalytics.create({
-    //   data: {
-    //     query: query.trim(),
-    //     resultCount,
-    //     searchTime,
-    //     userId: session.user.id,
-    //     ipAddress: request.headers.get('x-forwarded-for'),
-    //     userAgent: request.headers.get('user-agent'),
-    //   },
-    // });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -57,30 +56,47 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET endpoint for search analytics dashboard (admin only)
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    
     if (!session?.user?.id || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // const { searchParams } = new URL(request.url);
-    // const limit = parseInt(searchParams.get('limit') || '50');
-    // const timeframe = searchParams.get('timeframe') || '24h';
+    const [totalSearches, searchesWithResults, averageSearchTime, popularQueries, recentSearches] = await Promise.all([
+      prisma.searchAnalytics.count(),
+      prisma.searchAnalytics.count({ where: { resultCount: { gt: 0 } } }),
+      prisma.searchAnalytics.aggregate({ _avg: { searchTime: true } }),
+      prisma.searchAnalytics.groupBy({
+        by: ['query'],
+        _count: { query: true },
+        orderBy: { _count: { query: 'desc' } },
+        take: 10,
+      }),
+      prisma.searchAnalytics.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        select: {
+          id: true,
+          query: true,
+          resultCount: true,
+          searchTime: true,
+          userId: true,
+          createdAt: true,
+        },
+      }),
+    ]);
 
-    // This would query the SearchAnalytics table
-    // For now, return mock data
-    const mockAnalytics = {
-      totalSearches: 0,
-      averageSearchTime: 0,
-      popularQueries: [],
-      searchSuccessRate: 0,
-      recentSearches: [],
-    };
-
-    return NextResponse.json(mockAnalytics);
+    return NextResponse.json({
+      totalSearches,
+      averageSearchTime: averageSearchTime._avg.searchTime ?? 0,
+      popularQueries: popularQueries.map((row) => ({
+        query: row.query,
+        count: row._count.query,
+      })),
+      searchSuccessRate: totalSearches === 0 ? 0 : searchesWithResults / totalSearches,
+      recentSearches,
+    });
   } catch (error) {
     console.error('Search analytics GET error:', error);
     return NextResponse.json(

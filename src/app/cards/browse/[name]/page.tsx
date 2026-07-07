@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import CardImageWell from '@/components/ui/CardImageWell';
 import SuggestCorrectionLink from '@/components/SuggestCorrectionLink';
+import { PRIMARY_SITE_URL } from '@/lib/site';
 import {
   calculateAnnualBenefitValue,
   getFrequencyLabel,
@@ -77,6 +78,34 @@ export default async function CardDetailPage({ params }: PageProps) {
   }, 0);
 
   const netValue = totalAnnualValue - card.annualFee;
+  const cardUrl = `${PRIMARY_SITE_URL}/cards/browse/${encodeURIComponent(card.name)}`;
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Browse Cards',
+        item: `${PRIMARY_SITE_URL}/cards/browse`,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: card.name,
+        item: cardUrl,
+      },
+    ],
+  };
+  const cardJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FinancialProduct',
+    name: card.name,
+    brand: card.issuer,
+    url: cardUrl,
+    feesAndCommissionsSpecification: `$${card.annualFee} annual fee`,
+    description: `Track ${card.name} benefits including ${card.benefits.length} recurring credits and perks.`,
+  };
 
   // Group benefits by category
   const benefitsByCategory = card.benefits.reduce((acc, benefit) => {
@@ -89,6 +118,14 @@ export default async function CardDetailPage({ params }: PageProps) {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(cardJsonLd) }}
+      />
       {/* Breadcrumb */}
       <nav className="mb-8 flex items-center text-sm text-gray-600 dark:text-gray-400">
         <Link href="/cards/browse" className="hover:text-indigo-600 dark:hover:text-indigo-400">
@@ -166,7 +203,7 @@ export default async function CardDetailPage({ params }: PageProps) {
                 </a>
               )}
               <Link
-                href="/auth/signin"
+                href="/auth/signup?callbackUrl=%2Fcards%2Fnew"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors text-sm font-medium"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -308,10 +345,10 @@ export default async function CardDetailPage({ params }: PageProps) {
           Track Your {card.name} Benefits
         </h2>
         <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
-          Sign in to add this card to your collection and never miss a benefit again.
+          Create a free account to add this card to your collection and never miss a benefit again.
         </p>
         <Link
-          href="/auth/signin"
+          href="/auth/signup?callbackUrl=%2Fcards%2Fnew"
           className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors shadow-lg hover:shadow-xl"
         >
           Start Tracking Free

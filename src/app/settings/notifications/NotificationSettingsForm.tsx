@@ -104,11 +104,11 @@ export default function NotificationSettingsForm({
         </div>
 
         {/* Benefit Expiration Notification Setting */}
-        <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+        <div id="notifyBenefitExpiration" className="scroll-mt-24 rounded-lg border border-gray-200 p-4 dark:border-gray-700">
         <div className="flex items-start">
           <div className="flex items-center h-5">
             <input
-              id="notifyBenefitExpiration"
+              id="notifyBenefitExpirationInput"
               name="notifyBenefitExpiration"
               type="checkbox"
               defaultChecked={initialSettings.notifyBenefitExpiration}
@@ -116,7 +116,7 @@ export default function NotificationSettingsForm({
             />
           </div>
           <div className="ml-3 text-sm">
-            <label htmlFor="notifyBenefitExpiration" className="font-medium text-gray-700 dark:text-gray-100">
+            <label htmlFor="notifyBenefitExpirationInput" className="font-medium text-gray-700 dark:text-gray-100">
               Benefit Expiration Reminder
             </label>
             <p className="text-gray-500 dark:text-gray-400">Send an email reminder before a benefit cycle is about to expire.</p>

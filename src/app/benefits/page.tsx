@@ -39,11 +39,18 @@ export default async function BenefitsDashboardPage() {
   const now = new Date(); // Revert to actual system time
 
   // Fetch source records, then let the dashboard projection module own display shaping.
-  const [userCards, allStatusesRaw] = await Promise.all([
+  const [userCards, allStatusesRaw, notificationSettings] = await Promise.all([
     prisma.creditCard.findMany({
       where: { userId },
     }),
     fetchDashboardBenefitStatuses(prisma, userId, now),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        notifyBenefitExpiration: true,
+        notifyExpirationDays: true,
+      },
+    }),
   ]);
 
   const [usageWays, predefinedCardsForRoi] = await Promise.all([
@@ -66,6 +73,9 @@ export default async function BenefitsDashboardPage() {
   return (
     <BenefitsDisplayClient
       {...projection}
+      cardCount={userCards.length}
+      notifyBenefitExpiration={notificationSettings?.notifyBenefitExpiration ?? false}
+      notifyExpirationDays={notificationSettings?.notifyExpirationDays ?? 7}
     />
   );
 }

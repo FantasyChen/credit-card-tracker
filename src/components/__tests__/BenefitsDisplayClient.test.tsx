@@ -130,11 +130,18 @@ describe('BenefitsDisplayClient', () => {
   });
 
   it('shows empty state when no upcoming benefits', () => {
-    render(<BenefitsDisplayClient {...defaultProps} />);
+    render(<BenefitsDisplayClient {...defaultProps} cardCount={1} />);
 
     expect(
       screen.getByText(/You don't have any upcoming benefits|Add some credit cards to get started/i)
     ).toBeInTheDocument();
+  });
+
+  it('shows first-card onboarding when the user has no cards', () => {
+    render(<BenefitsDisplayClient {...defaultProps} />);
+
+    expect(screen.getByRole('heading', { name: 'Add your first card' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Browse supported cards' })).toBeInTheDocument();
   });
 
   it('renders view mode toggle (Group by Category / Group by Card)', () => {

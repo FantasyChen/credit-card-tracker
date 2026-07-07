@@ -82,27 +82,27 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
     const today = new Date();
     const expiry = new Date(expirationDate);
     const diffTime = expiry.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
   const getDateStatus = (expirationDate: Date | null, neverExpires = false) => {
     if (neverExpires) {
-      return { status: 'never', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300', border: 'border-l-green-500' };
+      return { status: 'never', color: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200', border: 'border-l-emerald-500' };
     }
 
     const daysUntilExpiration = calculateDaysUntilExpiration(expirationDate);
-    if (daysUntilExpiration === null) return { status: 'unknown', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', border: 'border-l-gray-400' };
-    
+    if (daysUntilExpiration === null) return { status: 'unknown', color: 'border-border bg-muted text-muted-foreground', border: 'border-l-muted-foreground' };
+
     if (daysUntilExpiration <= 0) {
-      return { status: 'expired', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300', border: 'border-l-red-500' };
-    } else if (daysUntilExpiration <= 30) {
-      return { status: `${daysUntilExpiration} days`, color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300', border: 'border-l-orange-500' };
-    } else if (daysUntilExpiration <= 90) {
-      return { status: `${daysUntilExpiration} days`, color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300', border: 'border-l-yellow-500' };
-    } else {
-      return { status: `${daysUntilExpiration} days`, color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300', border: 'border-l-green-500' };
+      return { status: 'expired', color: 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200', border: 'border-l-red-500' };
     }
+    if (daysUntilExpiration <= 30) {
+      return { status: `${daysUntilExpiration} days`, color: 'border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-200', border: 'border-l-orange-500' };
+    }
+    if (daysUntilExpiration <= 90) {
+      return { status: `${daysUntilExpiration} days`, color: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200', border: 'border-l-amber-500' };
+    }
+    return { status: `${daysUntilExpiration} days`, color: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200', border: 'border-l-emerald-500' };
   };
 
   const getPointsExpirationStatus = (account: LoyaltyAccount) => {
@@ -170,7 +170,7 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
     return new Intl.NumberFormat('en-US').format(balance);
   };
 
-  const getBalanceLabel = (type: string) => type === 'AIRLINE' ? 'Miles Remaining' : 'Points Remaining';
+  const getBalanceLabel = (type: string) => type === 'AIRLINE' ? 'Miles remaining' : 'Points remaining';
 
   const totalCertificates = userAccounts.reduce((total, account) => (
     total + account.certificates
@@ -178,101 +178,92 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
       .reduce((sum, certificate) => sum + certificate.quantity, 0)
   ), 0);
 
+  const expiringSoonCount = userAccounts.filter(account => {
+    const days = calculateDaysUntilExpiration(getUrgencyDate(account));
+    return days !== null && days <= 90 && days > 0;
+  }).length;
+
   return (
     <div className="space-y-6">
-      {/* Summary Stats */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Card>
           <CardContent className="p-5">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 rounded-lg dark:bg-blue-900">
-                <Plus className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-              </div>
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Programs</p>
-                <p className="text-2xl font-bold dark:text-white">{userAccounts.length}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Programs</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{userAccounts.length}</p>
+              </div>
+              <div className="rounded-xl bg-muted p-2 text-muted-foreground">
+                <Plus className="h-5 w-5" aria-hidden="true" />
               </div>
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-5">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-orange-100 rounded-lg dark:bg-orange-900">
-                <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-300" />
-              </div>
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Expiring Soon</p>
-                <p className="text-2xl font-bold dark:text-white">
-                  {userAccounts.filter(account => {
-                    const days = calculateDaysUntilExpiration(getUrgencyDate(account));
-                    return days !== null && days <= 90 && days > 0;
-                  }).length}
-                </p>
+                <p className="text-sm font-medium text-muted-foreground">Expiring Soon</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{expiringSoonCount}</p>
+              </div>
+              <div className="rounded-xl bg-muted p-2 text-muted-foreground">
+                <AlertTriangle className="h-5 w-5" aria-hidden="true" />
               </div>
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-5">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-green-100 rounded-lg dark:bg-green-900">
-                <Ticket className="h-5 w-5 text-green-600 dark:text-green-300" />
-              </div>
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Free Nights</p>
-                <p className="text-2xl font-bold dark:text-white">
-                  {totalCertificates}
-                </p>
+                <p className="text-sm font-medium text-muted-foreground">Free Nights</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{totalCertificates}</p>
+              </div>
+              <div className="rounded-xl bg-muted p-2 text-muted-foreground">
+                <Ticket className="h-5 w-5" aria-hidden="true" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Add New Account Button */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-gray-950 dark:text-white">Your Loyalty Accounts</h2>
+        <h2 className="text-xl font-semibold text-foreground">Your loyalty accounts</h2>
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="loyalty-sort" className="sr-only">Sort loyalty accounts</label>
           <select
             id="loyalty-sort"
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
-            className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            className="h-10 rounded-lg border border-input bg-card px-3 text-sm text-foreground shadow-sm shadow-black/[0.02] focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
           >
             <option value="urgency">Expiring soon</option>
             <option value="program">Program name</option>
             <option value="type">Program type</option>
           </select>
-          <Button
-            onClick={() => setShowAddModal(true)}
-            disabled={isPending || availablePrograms.length === 0}
-            className="flex items-center space-x-2"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Program</span>
+          <Button onClick={() => setShowAddModal(true)} disabled={isPending || availablePrograms.length === 0}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            <span>Add program</span>
           </Button>
         </div>
       </div>
 
-      {/* Accounts Grid */}
       {userAccounts.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
             <div className="flex flex-col items-center space-y-4">
-              <div className="p-4 bg-gray-100 rounded-full dark:bg-gray-700">
-                <Calendar className="h-8 w-8 text-gray-400" />
+              <div className="rounded-xl bg-muted p-4 text-muted-foreground">
+                <Calendar className="h-8 w-8" aria-hidden="true" />
               </div>
               <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">No loyalty programs yet</h3>
-                <p className="text-gray-500 dark:text-gray-400">Add your first loyalty program to track points, miles, and certificates.</p>
+                <h3 className="text-lg font-semibold text-foreground">No loyalty programs yet</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Add your first loyalty program to track points, miles, and certificates.</p>
               </div>
               <Button onClick={() => setShowAddModal(true)} disabled={availablePrograms.length === 0}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Program
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add first program
               </Button>
             </div>
           </CardContent>
@@ -290,77 +281,64 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
             return (
               <Card key={account.id} className={`relative border-l-4 ${cardStatus.border}`}>
                 <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex min-w-0 items-center space-x-3">
-                      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">{getTypeIcon(account.loyaltyProgram.type)}</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                        {getTypeIcon(account.loyaltyProgram.type)}
+                      </span>
                       <div className="min-w-0">
-                        <CardTitle className="truncate text-lg leading-snug">{account.loyaltyProgram.displayName}</CardTitle>
+                        <CardTitle className="truncate">{account.loyaltyProgram.displayName}</CardTitle>
                         <CardDescription className="truncate">{account.loyaltyProgram.company}</CardDescription>
                       </div>
                     </div>
-                    <div className="flex space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingAccount(account)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Edit className="h-4 w-4" />
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => setEditingAccount(account)} className="h-8 w-8 p-0" aria-label={`Edit ${account.loyaltyProgram.displayName}`}>
+                        <Edit className="h-4 w-4" aria-hidden="true" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteAccount(account.id)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteAccount(account.id)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700" aria-label={`Delete ${account.loyaltyProgram.displayName}`}>
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
-                
+
                 <CardContent className="space-y-4">
-                  {/* Account Number */}
                   {account.accountNumber && (
                     <div>
-                      <p className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Account Number</p>
-                      <p className="break-all text-sm font-mono dark:text-white">{account.accountNumber}</p>
+                      <p className="text-xs font-medium text-muted-foreground">Account number</p>
+                      <p className="mt-1 break-all font-mono text-sm text-foreground">{account.accountNumber}</p>
                     </div>
                   )}
 
-                  {/* Points/Miles Balance */}
                   {balance && (
                     <div>
-                      <p className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{getBalanceLabel(account.loyaltyProgram.type)}</p>
-                      <p className="flex items-center gap-1 text-sm font-semibold dark:text-white">
-                        <Coins className="h-4 w-4 text-gray-500" />
+                      <p className="text-xs font-medium text-muted-foreground">{getBalanceLabel(account.loyaltyProgram.type)}</p>
+                      <p className="mt-1 flex items-center gap-1 text-sm font-semibold tabular-nums text-foreground">
+                        <Coins className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                         {balance}
                       </p>
                     </div>
                   )}
-                  
-                  {/* Last Activity */}
+
                   <div>
-                    <p className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Last Activity</p>
-                    <p className="text-sm dark:text-white">{new Date(account.lastActivityDate).toLocaleDateString('en-US', { timeZone: 'UTC' })}</p>
+                    <p className="text-xs font-medium text-muted-foreground">Last activity</p>
+                    <p className="mt-1 text-sm text-foreground">{new Date(account.lastActivityDate).toLocaleDateString('en-US', { timeZone: 'UTC' })}</p>
                   </div>
-                  
-                  {/* Expiration Status */}
+
                   <div>
-                    <p className="mb-1 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Points/Miles Expiration</p>
-                    <Badge className={pointsExpirationStatus.color}>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">Points or miles expiration</p>
+                    <Badge variant="outline" className={pointsExpirationStatus.color}>
                       {pointsExpirationStatus.status === 'never' ? 'Never expires' :
                        pointsExpirationStatus.status === 'expired' ? 'Expired' :
                        `Expires in ${pointsExpirationStatus.status}`}
                     </Badge>
                   </div>
 
-                  {/* Free Night Certificates */}
                   {account.loyaltyProgram.type === 'HOTEL' && (
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Free Night Certificates</p>
+                      <p className="mb-2 text-xs font-medium text-muted-foreground">Free Night Certificates</p>
                       {activeCertificates.length === 0 ? (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">None recorded</p>
+                        <p className="text-sm text-muted-foreground">None recorded</p>
                       ) : (
                         <div className="space-y-2">
                           {activeCertificates.slice(0, 3).map((certificate) => {
@@ -368,24 +346,24 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
                             const label = certificate.label || 'Free night certificate';
 
                             return (
-                              <div key={certificate.id} className="rounded-md bg-gray-50 p-2 dark:bg-gray-700">
+                              <div key={certificate.id} className="rounded-lg border border-border bg-muted/45 p-3">
                                 <div className="flex items-start justify-between gap-2">
-                                  <p className="min-w-0 text-sm font-medium text-gray-900 dark:text-white">
+                                  <p className="min-w-0 text-sm font-medium text-foreground">
                                     <span className="break-words">{label}</span>
-                                    {certificate.quantity > 1 && <span className="text-gray-500 dark:text-gray-300"> x{certificate.quantity}</span>}
+                                    {certificate.quantity > 1 && <span className="text-muted-foreground"> x{certificate.quantity}</span>}
                                   </p>
-                                  <Badge className={certificateStatus.color}>
+                                  <Badge variant="outline" className={certificateStatus.color}>
                                     {certificateStatus.status === 'expired' ? 'Expired' : `Expires in ${certificateStatus.status}`}
                                   </Badge>
                                 </div>
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                   {new Date(certificate.expirationDate).toLocaleDateString('en-US', { timeZone: 'UTC' })}
                                 </p>
                               </div>
                             );
                           })}
                           {activeCertificates.length > 3 && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                            <p className="text-xs text-muted-foreground">
                               +{activeCertificates.length - 3} more certificate{activeCertificates.length - 3 === 1 ? '' : 's'}
                             </p>
                           )}
@@ -393,24 +371,22 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
                       )}
                     </div>
                   )}
-                  
-                  {/* Website Link */}
+
                   {account.loyaltyProgram.website && (
                     <a
                       href={account.loyaltyProgram.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      className="inline-flex items-center text-sm font-medium text-foreground underline-offset-4 hover:underline"
                     >
-                      Visit website <ExternalLink className="h-3 w-3 ml-1" />
+                      Visit website <ExternalLink className="ml-1 h-3 w-3" aria-hidden="true" />
                     </a>
                   )}
-                  
-                  {/* Notes */}
+
                   {account.notes && (
                     <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Notes</p>
-                      <p className="text-sm text-gray-700 dark:text-gray-300">{account.notes}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Notes</p>
+                      <p className="mt-1 text-sm text-foreground">{account.notes}</p>
                     </div>
                   )}
                 </CardContent>
@@ -420,7 +396,6 @@ export function LoyaltyAccountsClient({ userAccounts, availablePrograms }: Loyal
         </div>
       )}
 
-      {/* Modals */}
       {showAddModal && (
         <AddLoyaltyAccountModal
           availablePrograms={availablePrograms}

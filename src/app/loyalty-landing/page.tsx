@@ -24,6 +24,9 @@ export const metadata: Metadata = {
     'points expiration alerts',
     'miles tracker free',
   ],
+  alternates: {
+    canonical: '/loyalty-landing',
+  },
 };
 
 export default async function LoyaltyLandingPage() {

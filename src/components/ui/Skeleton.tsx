@@ -8,7 +8,7 @@ export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
       className={cn(
-        'animate-pulse rounded-md bg-gray-200 dark:bg-gray-700',
+        'animate-pulse rounded-md bg-muted',
         className
       )}
     />
@@ -18,7 +18,7 @@ export function Skeleton({ className }: SkeletonProps) {
 // Card skeleton for loading credit cards
 export function CardSkeleton() {
   return (
-    <div className="border rounded-lg p-4 shadow-md bg-white dark:bg-gray-800 dark:border-gray-700">
+    <div className="rounded-xl border border-border shadow-sm shadow-black/[0.03] p-4 shadow-md bg-card dark:border-border">
       {/* Card image placeholder */}
       <Skeleton className="h-40 w-full mb-4 rounded-lg" />
       
@@ -32,7 +32,7 @@ export function CardSkeleton() {
       </div>
       
       {/* Benefits section */}
-      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+      <div className="mt-4 pt-3 border-t border-border">
         <Skeleton className="h-4 w-24 mb-2" />
         <div className="space-y-2">
           <Skeleton className="h-3 w-full" />
@@ -42,7 +42,7 @@ export function CardSkeleton() {
       </div>
       
       {/* Action buttons */}
-      <div className="mt-6 flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+      <div className="mt-6 flex gap-2 pt-3 border-t border-border">
         <Skeleton className="h-10 flex-1 rounded-md" />
         <Skeleton className="h-10 flex-1 rounded-md" />
       </div>
@@ -53,9 +53,9 @@ export function CardSkeleton() {
 // Benefit card skeleton
 export function BenefitCardSkeleton() {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 sm:p-6">
+    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm shadow-black/[0.03] sm:p-6">
       {/* Status indicator */}
-      <div className="absolute top-0 left-0 w-1 h-full bg-gray-200 dark:bg-gray-700" />
+      <div className="absolute left-0 top-0 h-full w-1 bg-muted" />
       
       <div className="space-y-4">
         {/* Top section */}
@@ -86,7 +86,7 @@ export function BenefitCardSkeleton() {
 // Summary widget skeleton
 export function SummaryWidgetSkeleton() {
   return (
-    <div className="overflow-hidden rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 p-6">
+    <div className="overflow-hidden rounded-xl border border-border bg-card p-6 shadow-sm shadow-black/[0.03]">
       <div className="flex items-center">
         <Skeleton className="h-12 w-12 rounded-xl flex-shrink-0" />
         <div className="ml-4 flex-1">
@@ -162,7 +162,7 @@ export function BenefitsPageSkeleton() {
       </div>
       
       {/* Tabs */}
-      <div className="mb-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="mb-4 border-b border-border">
         <div className="flex space-x-8">
           <Skeleton className="h-10 w-24" />
           <Skeleton className="h-10 w-24" />
@@ -184,7 +184,7 @@ export function BenefitsPageSkeleton() {
 // Table row skeleton
 export function TableRowSkeleton({ columns = 4 }: { columns?: number }) {
   return (
-    <tr className="border-b border-gray-200 dark:border-gray-700">
+    <tr className="border-b border-border">
       {Array.from({ length: columns }).map((_, i) => (
         <td key={i} className="px-4 py-4">
           <Skeleton className="h-4 w-full" />
@@ -197,7 +197,7 @@ export function TableRowSkeleton({ columns = 4 }: { columns?: number }) {
 // Loyalty account skeleton
 export function LoyaltyAccountSkeleton() {
   return (
-    <div className="border rounded-lg p-4 bg-white dark:bg-gray-800 dark:border-gray-700">
+    <div className="rounded-xl border border-border shadow-sm shadow-black/[0.03] p-4 bg-card dark:border-border">
       <div className="flex items-start gap-4">
         <Skeleton className="h-12 w-12 rounded-lg flex-shrink-0" />
         <div className="flex-1">

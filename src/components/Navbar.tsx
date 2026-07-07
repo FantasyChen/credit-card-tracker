@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { useState, useMemo, useEffect } from 'react';
 import { Bars3Icon, XMarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import ThemeToggle from '@/components/ui/ThemeToggle';
+import { cn } from '@/lib/utils';
 
 interface NavItem {
   name: string;
@@ -28,13 +29,10 @@ const loyaltyNavigation: NavItem[] = [
   { name: 'Contact', href: '/contact' },
 ];
 
-/** Build the URL to switch between main and loyalty contexts. */
 function getSwitchUrl(isLoyaltyContext: boolean): string {
   if (!isLoyaltyContext) {
-    // Main → Loyalty: use same-origin /loyalty path (works on localhost and production)
     return '/loyalty';
   }
-  // Loyalty → Main: need to go back to main domain (since middleware rewrites / on loyalty subdomain)
   if (typeof window === 'undefined') return '/';
   const host = window.location.hostname;
   const port = window.location.port;
@@ -89,149 +87,155 @@ const Navbar = () => {
   const signOutHref = getSignOutHref(isLoyaltyContext ?? false);
 
   return (
-    <header role="banner">
-    <nav className="bg-white shadow-sm dark:bg-gray-800" role="navigation" aria-label="Main navigation">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Link href="/" className="flex items-center text-xl font-bold text-gray-900 dark:text-white">
-                <Image 
+    <header role="banner" className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+      <nav role="navigation" aria-label="Main navigation">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-5">
+              <Link href="/" className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+                <Image
                   src="/favicon.png"
-                  alt="Perks Reminder Logo" 
-                  width={32}
-                  height={32}
-                  className="mr-2"
+                  alt="Perks Reminder Logo"
+                  width={30}
+                  height={30}
+                  className="rounded-lg"
                 />
-                Perks Reminder
+                <span className="truncate text-base">Perks Reminder</span>
               </Link>
+
+              <div className="hidden lg:flex lg:items-center lg:gap-1">
+                {navigation.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={cn(
+                        'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-foreground text-background'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                      )}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-            {/* Desktop navigation links */}
-            <div className="hidden lg:ml-6 lg:flex lg:space-x-8">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
-                    pathname === item.href
-                      ? 'border-indigo-500 text-gray-900 dark:text-indigo-400 dark:border-indigo-400'
-                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:text-gray-100'
-                  }`}
-                  onClick={() => setIsMobileMenuOpen(false)} // Close mobile menu on desktop nav click (good practice)
-                >
-                  {item.name}
-                </Link>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center">
-            {/* Site switcher - link to other product */}
-            <div className="hidden lg:block">
+
+            <div className="flex items-center gap-2">
               <a
                 href={switchHref}
-                className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
+                className="hidden items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground shadow-sm shadow-black/[0.03] transition-colors hover:bg-accent lg:inline-flex"
               >
                 {switchLabel}
-                <ArrowRightIcon className="ml-1 h-4 w-4" aria-hidden="true" />
+                <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+              </a>
+
+              <div className="hidden lg:block">
+                <ThemeToggle />
+              </div>
+
+              <div className="hidden lg:flex lg:items-center">
+                {session ? (
+                  <a
+                    href={signOutHref}
+                    className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground shadow-sm shadow-black/[0.03] transition-colors hover:bg-accent"
+                  >
+                    Sign out
+                  </a>
+                ) : (
+                  <Link
+                    href="/auth/signin"
+                    className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm shadow-black/5 transition-colors hover:bg-primary/90"
+                  >
+                    Sign in
+                  </Link>
+                )}
+              </div>
+
+              <div className="flex items-center lg:hidden">
+                <ThemeToggle />
+                <button
+                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                  className="ml-2 inline-flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
+                  aria-expanded={isMobileMenuOpen}
+                  aria-controls="mobile-menu"
+                >
+                  <span className="sr-only">Open main menu</span>
+                  {isMobileMenuOpen ? (
+                    <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+                  ) : (
+                    <Bars3Icon className="h-5 w-5" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {isMobileMenuOpen && (
+          <div className="border-t border-border bg-background lg:hidden" id="mobile-menu" role="menu" aria-label="Mobile navigation menu">
+            <div className="space-y-1 px-4 py-3">
+              {navigation.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={cn(
+                      'block rounded-lg px-3 py-2 text-base font-medium transition-colors',
+                      isActive
+                        ? 'bg-foreground text-background'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                    )}
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    role="menuitem"
+                  >
+                    {item.name}
+                  </Link>
+                );
+              })}
+
+              <a
+                href={switchHref}
+                className="flex items-center justify-between rounded-lg px-3 py-2 text-base font-medium text-foreground transition-colors hover:bg-accent"
+                onClick={() => setIsMobileMenuOpen(false)}
+                role="menuitem"
+              >
+                {switchLabel}
+                <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
               </a>
             </div>
-            {/* Theme Toggle - visible on all screen sizes */}
-            <div className="hidden lg:block lg:ml-2">
-              <ThemeToggle />
-            </div>
-            {/* Desktop Sign in/out button */}
-            <div className="hidden lg:ml-2 lg:flex lg:items-center lg:space-x-3">
+
+            <div className="border-t border-border px-4 py-3">
               {session ? (
                 <a
                   href={signOutHref}
-                  className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block w-full rounded-lg px-3 py-2 text-left text-base font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   Sign out
                 </a>
               ) : (
                 <Link
                   href="/auth/signin"
-                  className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block w-full rounded-lg bg-primary px-3 py-2 text-center text-base font-semibold text-primary-foreground shadow-sm shadow-black/5 transition-colors hover:bg-primary/90"
                 >
                   Sign in
                 </Link>
               )}
             </div>
-            {/* Mobile menu button & Theme Toggle */}
-            <div className="ml-2 flex items-center lg:hidden">
-              <ThemeToggle />
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="ml-2 inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:focus:ring-indigo-400"
-                aria-expanded={isMobileMenuOpen}
-              >
-                <span className="sr-only">Open main menu</span>
-                {isMobileMenuOpen ? (
-                  <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
-                ) : (
-                  <Bars3Icon className="block h-6 w-6" aria-hidden="true" />
-                )}
-              </button>
-            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Mobile menu, show/hide based on menu state. */}
-      {isMobileMenuOpen && (
-        <div className="lg:hidden" id="mobile-menu" role="menu" aria-label="Mobile navigation menu">
-          <div className="space-y-1 px-2 pb-3 pt-2">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`block rounded-md px-3 py-2 text-base font-medium ${
-                  pathname === item.href
-                    ? 'bg-indigo-50 text-indigo-700 dark:bg-gray-900 dark:text-indigo-400'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
-                }`}
-                aria-current={pathname === item.href ? 'page' : undefined}
-                onClick={() => setIsMobileMenuOpen(false)} // Close menu on item click
-                role="menuitem"
-              >
-                {item.name}
-              </Link>
-            ))}
-            {/* Site switcher for mobile */}
-            <a
-              href={switchHref}
-              className="block rounded-md px-3 py-2 text-base font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
-              onClick={() => setIsMobileMenuOpen(false)}
-              role="menuitem"
-            >
-              {switchLabel} →
-            </a>
-          </div>
-           {/* Sign in/out button now part of the header for mobile too */}
-           <div className="border-t border-gray-200 px-2 pt-3 pb-3 dark:border-gray-700">
-            {session ? (
-                <a
-                  href={signOutHref}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
-                >
-                  Sign out
-                </a>
-              ) : (
-                <Link
-                  href="/auth/signin"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="block w-full rounded-md bg-indigo-600 px-3 py-2 text-center text-base font-medium text-white shadow-sm hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-                >
-                  Sign in
-                </Link>
-            )}
-          </div>
-        </div>
-      )}
-    </nav>
+        )}
+      </nav>
     </header>
   );
 };
 
-export default Navbar; 
+export default Navbar;

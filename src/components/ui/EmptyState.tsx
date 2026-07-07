@@ -57,16 +57,16 @@ export default function EmptyState({
   const IconComponent = iconMap[icon];
 
   return (
-    <div className={`rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-10 ${className}`}>
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-gray-100 text-gray-400 dark:bg-gray-900 dark:text-gray-500">
+    <div className={`rounded-xl border border-dashed border-border bg-card p-8 text-center shadow-sm shadow-black/[0.03] sm:p-10 ${className}`}>
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <IconComponent className="h-8 w-8" strokeWidth={1.5} />
       </div>
       
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+      <h3 className="mb-2 text-lg font-semibold text-foreground">
         {title}
       </h3>
       
-      <p className="mx-auto mb-6 max-w-sm text-sm leading-6 text-gray-500 dark:text-gray-400">
+      <p className="mx-auto mb-6 max-w-sm text-sm leading-6 text-muted-foreground">
         {description}
       </p>
       
@@ -75,7 +75,7 @@ export default function EmptyState({
           actionHref ? (
             <Link
               href={actionHref}
-              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-transparent bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm shadow-black/5 transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring/30 focus:ring-offset-2 focus:ring-offset-background active:translate-y-px"
             >
               <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -85,7 +85,7 @@ export default function EmptyState({
           ) : (
             <button
               onClick={onAction}
-              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-transparent bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm shadow-black/5 transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring/30 focus:ring-offset-2 focus:ring-offset-background active:translate-y-px"
             >
               <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -98,7 +98,7 @@ export default function EmptyState({
         {secondaryActionLabel && secondaryActionHref && (
           <Link
             href={secondaryActionHref}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-offset-gray-900"
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-sm shadow-black/5 transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring/30 focus:ring-offset-2 focus:ring-offset-background active:translate-y-px"
           >
             {secondaryActionLabel}
           </Link>

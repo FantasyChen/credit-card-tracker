@@ -5,7 +5,7 @@ importance: 0.78
 confidence: confirmed
 source: CONTEXT.md#learned-patterns
 chunk: .context-harness/chunks/ctx-context-learned-patterns.md
-tokens_est: 1882
+tokens_est: 1919
 tags: [context, learned-patterns, lesson]
 ---
 
