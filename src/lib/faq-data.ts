@@ -17,7 +17,15 @@ export const faqs = [
   },
   {
     question: 'What cards are supported?',
-    answer: "We support a growing catalog of premium cards from major issuers including American Express, Chase, Capital One, Citi, Bank of America, US Bank, and more. We're constantly adding new cards based on user requests.",
+    answer: "We support a growing catalog of premium cards from major issuers including American Express, Chase, Capital One, Citi, Bank of America, US Bank, and more. If a card is missing or a benefit looks stale, use the correction links or contact page so we can review the data.",
+  },
+  {
+    question: 'Can this replace my credit card benefits spreadsheet?',
+    answer: 'Yes. If your spreadsheet tracks card, opening date, annual fee, recurring benefit, reset cadence, claimed value, and reminder date, Perks Reminder can move that workflow into the app and add cycle logic, email reminders, ROI summaries, and Benefit Usage Guides.',
+  },
+  {
+    question: 'Can I track multiple copies or P2 cards?',
+    answer: 'Yes. You can add duplicate physical cards, use nicknames or last-four labels, keep separate annual-fee dates, track benefit usage independently, add custom benefits, and review ROI for each card copy.',
   },
   {
     question: 'Can I track loyalty points too?',

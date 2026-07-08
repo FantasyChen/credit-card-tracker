@@ -4,15 +4,15 @@ kind: resume
 importance: 0.95
 confidence: confirmed
 source: NOW.md#now
-chunk: .context-harness/chunks/ctx-now-now.md
-tokens_est: 796
+chunk: null
+tokens_est: 378
 tags: [now, resume]
 ---
 
 # NOW.md: Now
 
 ## Summary
-Continued the broad redesign work already present in the working tree. The redesign currently touches the public homepage, navbar/footer, pricing/FAQ/free-product messaging, card browse/detail pages, benefits dashboar...
+Closing the visible public website/product-positioning gap for Perks Reminder after comparison with Thrifty Traveler's credit-card benefits tracker article.
 
 ## Use when
 - resuming the current session
@@ -20,11 +20,11 @@ Continued the broad redesign work already present in the working tree. The redes
 - update context after current work
 
 ## Key facts
-- Continued the broad redesign work already present in the working tree. The redesign currently touches the public homepage, navbar/footer, pricing/FAQ/free-pr...
-- No active blocker for the local redesign validation.
-- Non-blocking warning remains during Jest/build: @next/swc 15.5.7 is installed while Next.js is 15.5.11.
-- The working tree is still broad and uncommitted; review the diff by bucket before committing or deploying.
-- Review the final diff for product/design consistency, then decide whether to commit the redesign as one bundle or split it. If proceeding toward deploy, run...
+- Closing the visible public website/product-positioning gap for Perks Reminder after comparison with Thrifty Traveler's credit-card benefits tracker article.
+- No active blocker for the requested copy and positioning edits.
+- Full npm run build intentionally not run because this repo's build can involve Prisma/deployment-sensitive behavior.
+- Push the verified changes, wait for deployment, and verify the production homepage.
+- Last modified: 2026-07-08
 
 ## Retrieval order
 - Read `NOW.md` and concise `CONTEXT.md` as the always-read layer.
@@ -33,4 +33,3 @@ Continued the broad redesign work already present in the working tree. The redes
 
 ## Open next only if needed
 - `NOW.md#now`
-- `.context-harness/chunks/ctx-now-now.md`

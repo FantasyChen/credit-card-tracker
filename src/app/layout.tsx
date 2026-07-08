@@ -21,11 +21,12 @@ const geistSans = GeistSans;
 const geistMono = GeistMono;
 
 export const metadata: Metadata = {
+  applicationName: SITE_NAME,
   title: {
     default: `${SITE_NAME} - Credit Card Benefits Tracker | Never Miss Rewards Again`,
     template: `%s | ${SITE_NAME}`
   },
-  description: `${SITE_DESCRIPTION} Free tool for Chase, Amex, Capital One, and a growing catalog of premium cards. Get ROI insights and smart notifications.`,
+  description: SITE_DESCRIPTION,
   keywords: [
     "credit card benefits tracker",
     "credit card rewards tracker", 
@@ -49,9 +50,12 @@ export const metadata: Metadata = {
     telephone: false,
   },
   metadataBase: new URL(PRIMARY_SITE_URL),
+  alternates: {
+    canonical: PRIMARY_SITE_URL,
+  },
   openGraph: {
     title: `${SITE_NAME} - Credit Card Benefits Tracker`,
-    description: "Never miss a credit card benefit again. Track every perk and maximize your annual fees.",
+    description: SITE_DESCRIPTION,
     url: PRIMARY_SITE_URL,
     siteName: SITE_NAME,
     images: [
@@ -68,7 +72,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: `${SITE_NAME} - Credit Card Benefits Tracker`,
-    description: "Never miss a credit card benefit again. Track every perk and maximize your annual fees.",
+    description: SITE_DESCRIPTION,
     images: ['/hero-image.jpg'],
     creator: '@fantasy_c',
   },
@@ -101,6 +105,14 @@ export const metadata: Metadata = {
   },
 };
 
+const websiteJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE_NAME,
+  alternateName: 'perks-reminder.com',
+  url: PRIMARY_SITE_URL,
+};
+
 export const viewport = {
   width: "device-width",
   initialScale: 1,
@@ -131,6 +143,10 @@ export default async function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
         <link rel="shortcut icon" href="/favicon.png" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
         
         {/* Google Analytics */}
         {process.env.GOOGLE_ANALYTICS_ID && (

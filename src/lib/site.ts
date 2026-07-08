@@ -1,6 +1,6 @@
 export const SITE_NAME = 'Perks Reminder';
 export const SITE_DESCRIPTION =
-  'Track credit card benefits, maximize rewards, and never miss expiring perks again.';
+  'Credit card benefit tracker. Track recurring credits, reset windows, loyalty expirations, and annual fee ROI without connecting bank accounts.';
 export const ROOT_DOMAIN = 'perks-reminder.com';
 export const PRIMARY_SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || `https://www.${ROOT_DOMAIN}`;

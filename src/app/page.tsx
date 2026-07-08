@@ -20,6 +20,7 @@ import PricingSection from '@/components/PricingSection';
 import FAQ from '@/components/FAQ';
 import { PRIMARY_SITE_URL, SITE_NAME } from '@/lib/site';
 import { buildFaqJsonLd } from '@/lib/faq-data';
+import { getPublicStaticCards } from '@/lib/static-catalog';
 
 function LandingMetric({ value, label, detail }: { value: string; label: string; detail: string }) {
   return (
@@ -27,6 +28,15 @@ function LandingMetric({ value, label, detail }: { value: string; label: string;
       <p className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{value}</p>
       <p className="mt-1 text-sm font-medium text-foreground">{label}</p>
       <p className="mt-1 text-sm leading-5 text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function Differentiator({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm shadow-black/[0.03]">
+      <h3 className="text-base font-semibold text-foreground">{title}</h3>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">{children}</p>
     </div>
   );
 }
@@ -74,12 +84,14 @@ export default async function Home() {
     import('@/lib/auth'),
   ]);
   const session = await getServerSession(authOptions);
+  const publicCards = getPublicStaticCards();
+  const publicBenefitCount = publicCards.reduce((total, card) => total + (card.benefits?.length ?? 0), 0);
 
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
     "name": SITE_NAME,
-    "description": "Track credit card benefits, maximize rewards, and never miss expiring perks again. Free tool for Chase, Amex, Capital One, and a growing catalog of premium cards.",
+    "description": "Credit card benefit tracker. Track recurring credits, reset windows, loyalty expirations, and annual fee ROI without connecting bank accounts.",
     "url": PRIMARY_SITE_URL,
     "applicationCategory": "FinanceApplication",
     "operatingSystem": "Web Browser",
@@ -94,11 +106,13 @@ export default async function Home() {
       "url": "https://github.com/FantasyChen"
     },
     "featureList": [
-      "Credit Card Benefits Tracking",
-      "Annual Fee ROI Analysis",
-      "Smart Notifications",
-      "Loyalty Program Management",
-      "Data Export/Import"
+      "Spreadsheet replacement for credit card benefits",
+      "Recurring credit reset tracking",
+      "Benefit usage guides",
+      "Annual fee ROI analysis",
+      "Loyalty expiration tracking",
+      "Data import/export",
+      "Open-source manual tracking"
     ],
     "screenshot": `${PRIMARY_SITE_URL}/hero-image.jpg`
   };
@@ -116,18 +130,18 @@ export default async function Home() {
         />
 
         <section className="border-b border-border bg-background">
-          <div className="mx-auto grid min-h-[calc(100dvh-4rem)] max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-20">
+          <div className="mx-auto grid min-h-[calc(82dvh-4rem)] max-w-7xl items-center gap-12 px-4 py-12 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-16">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-sm font-medium text-muted-foreground shadow-sm shadow-black/[0.03]">
                 <ShieldCheckIcon className="h-4 w-4" aria-hidden="true" />
-                No bank credentials required
+                Free, open source, no bank login
               </div>
 
               <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-foreground md:text-5xl xl:text-6xl">
-                Track every card perk before it expires.
+                Replace your credit-card benefits spreadsheet.
               </h1>
               <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-                Monitor recurring credits, reset windows, loyalty expirations, and annual fee ROI in one private checklist.
+                Track recurring credits, reset windows, free-night certificates, loyalty expirations, and annual-fee ROI without connecting bank accounts.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -139,10 +153,10 @@ export default async function Home() {
                   <ArrowRightIcon className="ml-2 h-4 w-4" aria-hidden="true" />
                 </Link>
                 <a
-                  href="#how-it-works"
+                  href="https://github.com/lifan-builds/perks-reminder"
                   className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-5 py-3 text-sm font-semibold text-foreground shadow-sm shadow-black/[0.03] transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring/30 focus:ring-offset-2 focus:ring-offset-background active:translate-y-px"
                 >
-                  See workflow
+                  View source
                 </a>
               </div>
             </div>
@@ -154,6 +168,7 @@ export default async function Home() {
                     src="/hero-image.jpg"
                     alt={`${SITE_NAME} benefit tracking overview`}
                     fill
+                    sizes="(min-width: 1024px) 44rem, 100vw"
                     className="object-contain p-4"
                     priority
                   />
@@ -181,9 +196,36 @@ export default async function Home() {
 
         <section className="border-b border-border bg-card py-10">
           <div className="mx-auto grid max-w-7xl gap-6 px-4 sm:grid-cols-3 sm:px-6 lg:px-8">
-            <LandingMetric value="$500+" label="Common annual value" detail="Premium cards often carry credits that reset monthly, quarterly, or yearly." />
-            <LandingMetric value="2 min" label="Fast setup" detail="Add cards manually and track benefits without linking financial accounts." />
-            <LandingMetric value="Free" label="No paid plan" detail="Use reminders, benefit tracking, and ROI summaries without a subscription." />
+            <LandingMetric value={`${publicCards.length}+`} label="Popular cards" detail="Static public catalog entries ready for manual tracking." />
+            <LandingMetric value={`${publicBenefitCount}+`} label="Tracked benefits" detail="Recurring credits, certificates, and card benefits with reset logic." />
+            <LandingMetric value="$0" label="Subscription" detail="Use tracking, reminders, import/export, and ROI summaries for free." />
+          </div>
+        </section>
+
+        <section className="border-b border-border bg-background py-16">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="max-w-3xl">
+              <h2 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+                Built for serious card stacks
+              </h2>
+              <p className="mt-4 text-base leading-7 text-muted-foreground">
+                Perks Reminder keeps the control of a manual spreadsheet, then adds the pieces spreadsheets are bad at: reset logic, reminders, usage notes, and annual-fee value tracking.
+              </p>
+            </div>
+            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <Differentiator title="Reset dates handled">
+                Monthly, quarterly, annual, and card-anniversary benefits without spreadsheet formulas.
+              </Differentiator>
+              <Differentiator title="No bank connection">
+                No card numbers, bank credentials, Plaid, or transaction history.
+              </Differentiator>
+              <Differentiator title="Usage guides included">
+                Practical trigger notes, timing caveats, and correction paths.
+              </Differentiator>
+              <Differentiator title="Multiple copies work">
+                Duplicate physical cards, display labels, custom benefits, annual-fee dates, and import/export.
+              </Differentiator>
+            </div>
           </div>
         </section>
 
