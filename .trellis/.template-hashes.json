@@ -4,7 +4,7 @@
     ".claude/agents/trellis-check.md": "9e48342243f311d55386f8fb42933945e87aba73d5ade547133aa98345a06128",
     ".claude/agents/trellis-implement.md": "73b56b3047c0e852382c4630aa181fb847d1e5ea1f63459dac4bf728f43fd097",
     ".claude/agents/trellis-research.md": "add4aa4259ded425b04ec992802c646490352bb4eb3730a7ab450beea87d4faa",
-    ".claude/settings.json": "d13cd05659281a287d7f50c7e25eb6a89c2a6597773511bd6885538acced2855",
+    ".claude/settings.json": "1a65892b2b161910468970ab30ebc3f8216241640f75fccbe4be5552c58a2752",
     ".claude/hooks/inject-subagent-context.py": "c8ea04062990530dffb26c4d1efa3e6887e042d3086da2f2325b491c9d544931",
     ".claude/hooks/inject-workflow-state.py": "0946e5b5c4c154538c1848c25c7f92a76c8ecc863b9a1c0f4b2e03bee071fcd0",
     ".claude/hooks/session-start.py": "86d489760d53926076489e6e55890c1bf20b1f7597a73154911f9058b4dbca3f",
