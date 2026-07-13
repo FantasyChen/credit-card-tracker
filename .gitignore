@@ -65,10 +65,8 @@ announcement-state/
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# Cursor - ignore workspace files but keep skills and rules
-.cursor/*
-!.cursor/skills/
-!.cursor/rules/
+# Cursor local state is not part of the Claude + Codex Trellis integration
+.cursor/
 
 # Playwright MCP debug screenshots
 .playwright-mcp/

@@ -1,0 +1,5 @@
+# Preserve Trellis 0.6.6 managed Markdown bytes, including intentional hard breaks.
+.agents/skills/trellis-channel/references/command-reference.md -whitespace
+.agents/skills/trellis-meta/references/local-architecture/workspace-memory.md -whitespace
+.claude/skills/trellis-channel/references/command-reference.md -whitespace
+.claude/skills/trellis-meta/references/local-architecture/workspace-memory.md -whitespace
