@@ -5,11 +5,12 @@ These specifications are the durable project context for Perks Reminder, a Next.
 ## Pre-Development Checklist
 
 1. Read [Architecture and Domain Invariants](architecture-and-domain.md) before changing data flow, authentication, benefit cycles, notifications, public routes, or product access.
-2. Read [Database and Data Safety](database-and-data-safety.md) before running any command that can connect to a database or changing Prisma schema, migrations, seed data, or scripts.
-3. For card, benefit, guide, or catalog changes, follow [Catalog and Benefit Updates](catalog-and-benefit-updates.md); template changes alone do not update existing users.
-4. Read [Deployment and External Effects](deployment-and-external-effects.md) before builds, deployments, cron calls, email/notification work, Vercel changes, or production-domain checks.
-5. Choose checks from [Verification](verification.md). Never substitute a production-affecting command for a safe static check.
-6. Do not read, create, copy, or modify `.env`; secrets and runtime configuration stay outside Git and in provider dashboards or existing local state.
+2. Read the [Frontend Engineering Specifications](../frontend/index.md) before changing App Router pages, Client Components, shared UI, hooks, browser state, frontend types, or UI tests.
+3. Read [Database and Data Safety](database-and-data-safety.md) before running any command that can connect to a database or changing Prisma schema, migrations, seed data, or scripts.
+4. For card, benefit, guide, or catalog changes, follow [Catalog and Benefit Updates](catalog-and-benefit-updates.md); template changes alone do not update existing users.
+5. Read [Deployment and External Effects](deployment-and-external-effects.md) before builds, deployments, cron calls, email/notification work, Vercel changes, or production-domain checks.
+6. Choose checks from [Verification](verification.md). Never substitute a production-affecting command for a safe static check.
+7. Do not read, create, copy, or modify `.env`; secrets and runtime configuration stay outside Git and in provider dashboards or existing local state.
 
 ## Topics
 
@@ -29,4 +30,4 @@ Before completing work:
 - for catalog changes, confirm source provenance, static catalog/seed consistency, existing-user disposition, status materialization, and guide-link disposition;
 - run the applicable safe checks in [Verification](verification.md), plus `git diff --check`;
 - inspect every changed and untracked path and classify residual Context Harness or Cursor references;
-- run `python3 ./.trellis/scripts/get_context.py --mode packages` and verify that `perks-reminder` is discoverable.
+- run `python3 ./.trellis/scripts/get_context.py --mode packages` and verify that the single-repo `perks-reminder` and `frontend` spec layers are discoverable.
