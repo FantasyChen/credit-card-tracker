@@ -1,0 +1,58 @@
+[
+  {
+    "trackers": [
+      {
+        "sorBenefitId": "invented-spend-id",
+        "benefitName": "Synthetic Travel Credit",
+        "category": "spend",
+        "status": "ACTIVE",
+        "trackerDuration": "2026 calendar year",
+        "tracker": {
+          "spentAmount": "12.50",
+          "targetAmount": "100.00",
+          "remainingAmount": "87.50",
+          "targetCurrency": "USD",
+          "targetCurrencySymbol": "$",
+          "targetUnit": "MONETARY"
+        }
+      },
+      {
+        "sorBenefitId": "invented-earned-id",
+        "benefitName": "Synthetic Earned Credit",
+        "category": "usage",
+        "status": "ACTIVE",
+        "periodStartDate": "2026-07-01",
+        "periodEndDate": "2026-07-31",
+        "tracker": {
+          "spentAmount": "15.00",
+          "targetAmount": "20.00",
+          "targetCurrency": "USD",
+          "targetUnit": "MONETARY"
+        }
+      },
+      {
+        "sorBenefitId": "invented-complete-id",
+        "benefitName": "Synthetic Completed Benefit",
+        "category": "loan",
+        "status": "ACHIEVED",
+        "tracker": {
+          "spentAmount": "25",
+          "targetAmount": "25",
+          "targetCurrency": "USD",
+          "targetUnit": "MONETARY"
+        }
+      },
+      {
+        "benefitId": "invented-count-id",
+        "benefitName": "Synthetic Visit Counter",
+        "category": "access",
+        "status": "ACTIVE",
+        "tracker": {
+          "spentAmount": "2",
+          "targetAmount": "10",
+          "targetUnit": "PASSES"
+        }
+      }
+    ]
+  }
+]
