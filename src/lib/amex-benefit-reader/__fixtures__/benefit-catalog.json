@@ -1,0 +1,35 @@
+{
+  "cardProduct": { "ignored": true },
+  "benefits": {
+    "spend-fixture": {
+      "sorBenefitId": "invented-spend-id",
+      "benefitTitle": "Synthetic Travel Credit",
+      "layoutType": "ENROLLED",
+      "isEnrollable": true
+    },
+    "earned-fixture": {
+      "sorBenefitId": "invented-earned-id",
+      "benefitTitle": "Synthetic Earned Credit",
+      "layoutType": "ENROLLED",
+      "isEnrollable": true
+    },
+    "complete-fixture": {
+      "sorBenefitId": "invented-complete-id",
+      "benefitTitle": "Synthetic Completed Benefit",
+      "layoutType": "ENROLLED",
+      "isEnrollable": true
+    },
+    "candidate-fixture": {
+      "sorBenefitId": "invented-candidate-id",
+      "benefitShortTitle": "Synthetic Enrollment Candidate",
+      "layoutType": "NOTENROLLED",
+      "isEnrollable": true
+    },
+    "informational-fixture": {
+      "sorBenefitId": "invented-info-id",
+      "benefitTitle": "Synthetic Information Only",
+      "layoutType": "ENROLLED",
+      "isEnrollable": false
+    }
+  }
+}
