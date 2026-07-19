@@ -13,7 +13,7 @@
 - Portable strict contracts, identity, storage policy, private read client, response adapter, and sequential scan engine live under `src/lib/amex-benefit-reader/`.
 - Tampermonkey entry, panel, visible-context guard, and GM storage adapter live under `src/userscripts/`.
 - `scripts/build-amex-benefit-reader.mjs` builds the ignored artifact `build/amex-benefit-reader.user.js`.
-- Installed metadata version is `0.2.1`; preserve namespace `https://perks-reminder.com/` or Tampermonkey will treat the update as a different script.
+- The repository build metadata version is `0.2.3`; the last owner-installed and browser-validated version is `0.2.2`. Preserve namespace `https://perks-reminder.com/` or Tampermonkey will treat an update as a different script.
 - The exact provider operations, privacy boundary, response shapes, and redacted runtime evidence are in `prd.md`, `design.md`, `implement.md`, `amex-research.md`, and `research/`.
 - Reusable project guidance is in `.trellis/spec/perks-reminder/browser-read-integrations.md`.
 
@@ -55,3 +55,31 @@
 4. The remaining unchecked browser checklist items in `implement.md` are deliberately conservative. Do not mark them complete solely from automated evidence.
 5. Treat website profile synchronization and Chrome extension packaging as future work requiring explicit planning and approval; neither is part of the current Phase 1 implementation.
 6. The normalized Tampermonkey observations currently remain in the user's browser. Do not clear them unless the user explicitly asks.
+
+## 2026-07-17 continuation result
+
+- Codex Computer Use completed a second owner-authorized, read-only end-to-end scan from the logged-in Amex tab.
+- The reader restored 16 records before scanning, attempted all 16 cards, retained 130 normalized observations, and restored the same timestamps after a real reload without auto-starting another scan.
+- Five duplicate-product groups containing 14 physical cards remained separate. The scan stayed conservatively partial with six unknown-quantity, two benefit-identity-conflict, and three HTTP issue messages; the visible route/card context remained unchanged.
+- Full Jest passed (42 suites, 300 passed, one skipped), strict TypeScript passed, and the isolated userscript build/diff checks passed. Repository lint retains the same eight unrelated baseline errors.
+- Tampermonkey also contains an enabled legacy `0.1.0` copy. Only one panel mounted and current `0.2.1` behavior ran. The legacy copy was left unchanged pending explicit owner approval to disable or delete it.
+
+## 2026-07-17 card-first UI revision
+
+- `panel.ts` now uses a Perks Reminder-styled single-card workspace with a product/ending-digits switcher, benefit-state filters, human status labels, compatible-unit progress, and separate observation-quality labels.
+- Synthetic visual QA covered the default panel, pressed filters, duplicate-product card switching, scrolled benefit/details content, and the privacy disclosure without using provider data.
+- Panel coverage includes a 16-card / 130-observation scale test and explicit empty-filter and error/no-data states.
+- Final verification: 42 suites passed with 304 tests passing and one skipped; strict TypeScript, targeted ESLint, userscript build, structured task/artifact audits, and diff checks passed. Repository lint still has the same eight unrelated baseline errors.
+- The built artifact and intended installed script are now `0.2.2`. The owner completed Tampermonkey's protected update confirmation, and a signed-in reload restored exactly one card-first panel with 16 cards and 130 observations in manual idle state.
+- The legacy `0.1.0` copy was not disabled, removed, or otherwise modified.
+
+## 2026-07-19 generated-bundle Chromium harness
+
+- Added a task-scoped `@playwright/test` harness that rebuilds and injects the actual ignored `build/amex-benefit-reader.user.js` IIFE into real Playwright Chromium. No source entry/runtime module is substituted for the bundle.
+- Interception is installed before navigation to an invented document at the approved Amex benefits URL. The catch-all fulfills only that document, the exact synthetic member/tracker/catalog reads, and required CORS preflights for the two reviewed POST paths; all other requests abort without fallback. Chromium service workers are blocked.
+- The harness uses invented account tokens, four/five-digit endings, upstream IDs, quantities, and synthetic title wrappers. Exact card and credit phrases come only from the repository's public static catalog because the fail-closed matcher must recognize them; no live account value is used. A Node-owned in-memory `GM` adapter makes normalized persistence inspectable without any production export/debug interface. A receiver-neutral bound-native-fetch facade models Tampermonkey's callable sandbox fetch while every request still passes through Playwright routing.
+- `npm run test:e2e:amex` covers no autoscan, manual progress/completion, duplicate product labels across primary/supplementary cards, supported-credit filtering, card switching, normalized persistence, reload restoration without autoscan, visible-context invariance, confirmed deletion of both keys, and a deterministic catalog-`500` partial-data path.
+- `npm run test:e2e:amex:visual` runs the synthetic flow in headed Chromium and writes an ignored screenshot under `test-results/amex-benefit-reader/`. Default E2E is unattended and exits; traces/screenshots are retained only on failure.
+- After dependency installation, a machine without the Playwright-managed browser must run `npx playwright install chromium` once before the E2E commands. No system Chrome or real browser profile is required.
+- Playwright downloaded only its Chromium browser family (Chrome for Testing plus the Chromium headless shell) into the user's standard Playwright cache. It did not open or use a real browser profile.
+- This replaces Tampermonkey/live Amex for routine bundle-level regression iterations only. Milestone validation still requires the bounded owner-only live checks for current response schemas, authenticated cookie/CORS behavior, actual Tampermonkey grants/sandbox behavior, and issuer-side no-mutation evidence.
