@@ -263,7 +263,11 @@ npm run test:e2e:amex:visual         # optional headed synthetic preview
 ```
 
 ```ts
-type HarnessScenario = "complete" | "catalog_failure";
+type HarnessScenario =
+  | "complete"
+  | "catalog_failure"
+  | "cancellation"
+  | "rescan_tracker_failure";
 
 class SyntheticAmexHarness {
   readonly storage: Map<string, unknown>;
@@ -320,7 +324,10 @@ For each generated-bundle provider harness, assert:
 - no named provider operation occurs before the explicit scan action;
 - exact complete-flow operation counts, duplicate physical-card reachability, supported/non-credit filtering, card switching, and visible route/display invariance;
 - normalized GM storage excludes raw fixture tokens and upstream identifiers, survives reload without autoscan, and clear-data removes both store and identity keys;
-- at least one deterministic partial/failure path exercises the built artifact and exact retry/error behavior;
+- deterministic partial/failure paths exercise the built artifact and exact retry/error behavior;
+- a route gate proves cancellation aborts a later physical-card read only after an earlier card is committed, starts no later work, and records the engine's interrupted attempt/disposition counts;
+- a successful scan followed by a failed rescan proves a successful card advances with changed data while the failed card preserves its entire prior observation as stale after exactly one retry;
+- expected cancellation failures are matched to the exact gated browser request rather than accepted by URL or scenario alone;
 - an unapproved-origin probe is aborted by the catch-all, and every routing/runtime error collection is empty at scenario end;
 - alternate transports, popups, navigations, service workers, page errors, console errors, failed requests, and dialogs cannot pass silently;
 - the visual command is optional, bounded, synthetic-only, and writes to an ignored location;

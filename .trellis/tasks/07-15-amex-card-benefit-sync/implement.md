@@ -141,10 +141,12 @@
 - [x] Build and inject the actual generated `build/amex-benefit-reader.user.js` IIFE, then interact only through the mounted open Shadow DOM.
 - [x] Cover no autoscan, manual progress/completion, primary/supplementary duplicate products, supported-credit inclusion and non-credit/wrong-card omission, card switching, normalized storage, reload restoration without autoscan, visible-context invariance, confirmed two-key deletion, and unexpected-network refusal.
 - [x] Add a deterministic catalog-`500` retry scenario proving tracker observations remain current partial data.
+- [x] Gate a later physical-card tracker request, cancel through the built panel after the first card commits, and prove the final interrupted summary retains only safe committed data without starting remaining work.
+- [x] Run a successful scan followed by a manual rescan where one card updates and a different card's required tracker read exhausts exactly one retry; prove prior data and `observedAt` are retained with new stale/error attempt metadata.
 - [x] Add `npm run test:e2e:amex:visual` for a headed synthetic preview whose screenshot remains below ignored `test-results/`.
 - [x] Record that routine iterations use the harness while milestone releases still need bounded owner-only checks for live schemas, session/CORS, Tampermonkey behavior, and issuer-side no-mutation evidence.
 
-**Gate:** `npm run test:e2e:amex` passes in installed Playwright Chromium with two unattended scenarios and no unexpected request; the optional headed preview passes and writes only a synthetic ignored screenshot.
+**Gate:** `npm run test:e2e:amex` passes in installed Playwright Chromium with four unattended scenarios and no unexpected request or runtime error; the optional headed preview passes and writes only a synthetic ignored screenshot.
 
 ## 6. Automated quality checks
 

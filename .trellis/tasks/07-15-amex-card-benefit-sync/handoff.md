@@ -83,3 +83,10 @@
 - After dependency installation, a machine without the Playwright-managed browser must run `npx playwright install chromium` once before the E2E commands. No system Chrome or real browser profile is required.
 - Playwright downloaded only its Chromium browser family (Chrome for Testing plus the Chromium headless shell) into the user's standard Playwright cache. It did not open or use a real browser profile.
 - This replaces Tampermonkey/live Amex for routine bundle-level regression iterations only. Milestone validation still requires the bounded owner-only live checks for current response schemas, authenticated cookie/CORS behavior, actual Tampermonkey grants/sandbox behavior, and issuer-side no-mutation evidence.
+
+## 2026-07-19 cancellation and stale-rescan harness coverage
+
+- The generated-bundle Chromium suite now contains four unattended scenarios. No production reader source, parser contract, storage schema, endpoint definition, or userscript version changed.
+- A deterministic route gate holds the supplementary card's tracker read after the first physical card commits. The real panel **Cancel** control aborts that in-flight request, produces an interrupted final summary, retains the first card's normalized current observation, starts no later catalog work, persists no second-card snapshot, and leaves route/display context unchanged.
+- A separate two-pass scenario first completes both cards, then updates the primary card while the supplementary card's required tracker read returns two synthetic HTTP `500` responses under the production one-retry policy. The primary observation and attempt timestamps advance; the supplementary card retains its original normalized observation and `observedAt`, gains a new `lastAttemptAt` plus `stale_error`/`http_error`, and the aggregate scan remains partial.
+- Safe request records contain only operation, synthetic card role, and scan ordinal. The fail-closed no-fallback route, alternate-transport guards, one worker, zero Playwright retries, synthetic-only artifacts, exact tuple/body assertions, and raw-token storage assertions remain in force.
