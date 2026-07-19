@@ -243,7 +243,11 @@ export class AmexBenefitScanEngine {
             endingDigits: prepared.endingDigits,
             phase: "normalizing",
           });
-          const normalized = normalizeBenefits(trackerResponse, catalogResponse);
+          const normalized = normalizeBenefits({
+            productName: prepared.productName,
+            trackerResponse,
+            catalogResponse,
+          });
           const issueCodes = Array.from(new Set<IssueCode>([
             ...normalized.issueCodes,
             ...(catalogIssueCode ? [catalogIssueCode] : []),

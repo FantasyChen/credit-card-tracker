@@ -10,11 +10,11 @@ const times = [
 ];
 
 const memberResponse = memberResponseSchema.parse({ accounts: [
-  { account_token: "invented-token-a", relationship: "BASIC", product: { description: "Synthetic Card" }, display_account_number: "1234" },
-  { account_token: "invented-token-b", relationship: "BASIC", product: { description: "Synthetic Card" }, display_account_number: "54321" },
+  { account_token: "invented-token-a", relationship: "BASIC", product: { description: "American Express Business Platinum Card" }, display_account_number: "1234" },
+  { account_token: "invented-token-b", relationship: "BASIC", product: { description: "American Express Business Platinum Card" }, display_account_number: "54321" },
 ] });
 const trackers = trackerResponseSchema.parse([{ trackers: [{
-  benefitName: "Synthetic Counter",
+  benefitName: "Synthetic Wireless Bill Credit",
   category: "spend",
   status: "ACTIVE",
   tracker: { spentAmount: "1", targetAmount: "5", targetUnit: "PASSES" },
@@ -43,7 +43,7 @@ class MemoryStore implements ResultStore {
 function existingRecord(localCardId: string, fingerprint: string, endingDigits: string): StoredCardRecordV1 {
   return {
     localCardId,
-    identity: { sourceFingerprint: fingerprint, productName: "Synthetic Card", endingDigits },
+    identity: { sourceFingerprint: fingerprint, productName: "American Express Business Platinum Card", endingDigits },
     latest: null,
     freshness: "error_no_data",
     completeness: "failed",
@@ -166,7 +166,7 @@ describe("API Amex scan engine", () => {
       identity: {
         localCardId: firstId,
         sourceFingerprint: "a".repeat(64),
-        productName: "Synthetic Card",
+        productName: "American Express Business Platinum Card",
         endingDigits: "1234",
       },
       attemptedAt: times[0],
@@ -174,7 +174,7 @@ describe("API Amex scan engine", () => {
         contractVersion: "amex-benefits/1",
         issuer: "american_express_us",
         localCardId: firstId,
-        productName: "Synthetic Card",
+        productName: "American Express Business Platinum Card",
         endingDigits: "1234",
         observedAt: times[0],
         parserVersion: "fixture/1",
@@ -250,7 +250,7 @@ describe("API Amex scan engine", () => {
       observation: {
         completeness: "partial",
         issueCodes: ["network_error"],
-        benefits: [expect.objectContaining({ title: "Synthetic Counter", activityKind: "spend_progress" })],
+        benefits: [expect.objectContaining({ title: "Synthetic Wireless Bill Credit", activityKind: "spend_progress" })],
       },
     });
   });

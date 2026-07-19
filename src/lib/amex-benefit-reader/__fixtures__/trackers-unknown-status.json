@@ -3,7 +3,7 @@
     "trackers": [
       {
         "sorBenefitId": "invented-unknown-status-id",
-        "benefitName": "Synthetic Unknown Status",
+        "benefitName": "Synthetic Adobe Credit",
         "category": "spend",
         "status": "FUTURE_STATUS",
         "tracker": {

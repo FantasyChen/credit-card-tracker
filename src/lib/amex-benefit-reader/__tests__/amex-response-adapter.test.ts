@@ -4,7 +4,15 @@ import malformedCatalogFixture from "../__fixtures__/catalog-malformed.json";
 import trackersFixture from "../__fixtures__/benefit-trackers.json";
 import unknownStatusFixture from "../__fixtures__/trackers-unknown-status.json";
 import { catalogResponseSchema, memberResponseSchema, trackerResponseSchema } from "../amex-api-contract";
-import { normalizeBenefits, parseAccountDiscovery } from "../amex-response-adapter";
+import { normalizeBenefits as normalizeBenefitsForCard, parseAccountDiscovery } from "../amex-response-adapter";
+
+function normalizeBenefits(
+  trackerResponse: Parameters<typeof normalizeBenefitsForCard>[0]["trackerResponse"],
+  catalogResponse: Parameters<typeof normalizeBenefitsForCard>[0]["catalogResponse"],
+  productName = "American Express Business Platinum Card",
+) {
+  return normalizeBenefitsForCard({ productName, trackerResponse, catalogResponse });
+}
 
 describe("Amex private response adapter", () => {
   it("flattens only characterized BASIC and SUPP cards with explicit endings", () => {
@@ -166,7 +174,7 @@ describe("Amex private response adapter", () => {
     expect(count.targetOrLimit).toEqual({ state: "observed", value: { value: "10", unit: "count", currency: null } });
     const candidate = result.benefits[4];
     expect(candidate).toMatchObject({
-      title: "Synthetic Enrollment Candidate",
+      title: "Synthetic Adobe Credit",
       enrollmentState: { state: "observed", value: "required" },
       targetOrLimit: { state: "not_exposed" },
       period: { state: "not_exposed" },
@@ -174,33 +182,75 @@ describe("Amex private response adapter", () => {
     expect(result.benefits.some((benefit) => benefit.title === "Synthetic Information Only")).toBe(false);
   });
 
+  it("keeps only represented credits for the corresponding card without marking omissions partial", () => {
+    const result = normalizeBenefits(
+      trackerResponseSchema.parse([{ trackers: [
+        { benefitName: "Monthly Dining Credit", category: "spend", status: "ACTIVE" },
+        { benefitName: "Saks Fifth Avenue Credit", category: "spend", status: "ACTIVE" },
+        { benefitName: "Cell Phone Protection", category: "usage", status: "ACTIVE" },
+        { benefitName: "Centurion Lounge Access", category: "access", status: "ACTIVE" },
+        { benefitName: "Global Dining Access by Resy", category: "future-category", status: "FUTURE_STATUS" },
+      ] }]),
+      catalogResponseSchema.parse({ benefits: {
+        resy: { benefitTitle: "Resy Dining Credit", layoutType: "NOTENROLLED", isEnrollable: true },
+        clear: { benefitTitle: "CLEAR Plus Credit", layoutType: "NOTENROLLED", isEnrollable: true },
+        information: { benefitTitle: "Premium Global Assist Hotline", layoutType: "FUTURE_LAYOUT" },
+      } }),
+      "American Express Gold Card",
+    );
+
+    expect(result.issueCodes).toEqual([]);
+    expect(result.benefits.map((benefit) => benefit.title)).toEqual([
+      "Monthly Dining Credit",
+      "Resy Dining Credit",
+    ]);
+  });
+
+  it("fails closed for unknown cards and deduplicates supported wording variants", () => {
+    const trackerResponse = trackerResponseSchema.parse([{ trackers: [
+      { benefitName: "Resy Credit", category: "spend", status: "ACTIVE" },
+      { benefitName: "Resy Dining Credit", category: "spend", status: "ACTIVE" },
+    ] }]);
+    const catalogResponse = catalogResponseSchema.parse({ benefits: {} });
+
+    const known = normalizeBenefits(trackerResponse, catalogResponse, "American Express Gold Card");
+    expect(known.issueCodes).toEqual([]);
+    expect(known.benefits).toHaveLength(1);
+    expect(known.benefits[0].title).toBe("Resy Credit");
+
+    expect(normalizeBenefits(trackerResponse, catalogResponse, "Unknown Gold-Like Card")).toEqual({
+      benefits: [],
+      issueCodes: [],
+    });
+  });
+
   it("maps characterized live tracker and catalog enums without inventing enrollment or units", () => {
     const result = normalizeBenefits(
       trackerResponseSchema.parse([{ trackers: [
         {
           sorBenefitId: "access-id",
-          benefitName: "Synthetic Access Counter",
+          benefitName: "Synthetic Centurion Lounge Access",
           category: "access",
           status: "IN_PROGRESS",
           tracker: { spentAmount: "2", targetAmount: "10", targetUnit: "PASSES" },
         },
         {
           sorBenefitId: "usage-id",
-          benefitName: "Synthetic Usage Counter",
+          benefitName: "Synthetic Hilton Credit",
           category: "usage",
           status: "ACTIVE",
           tracker: { spentAmount: "3", targetAmount: "8", targetUnit: "PASSES" },
         },
         {
           sorBenefitId: "loan-id",
-          benefitName: "Synthetic Loan Progress",
+          benefitName: "Synthetic Adobe Credit",
           category: "loan",
           status: "IN_PROGRESS",
           tracker: { spentAmount: "25.00", targetAmount: "100.00", targetUnit: "MONETARY", targetCurrency: "USD" },
         },
         {
           sorBenefitId: "spend-id",
-          benefitName: "Synthetic Spend Progress",
+          benefitName: "Synthetic Airline Fee Credit",
           category: "spend",
           status: "IN_PROGRESS",
         },
@@ -208,17 +258,16 @@ describe("Amex private response adapter", () => {
       catalogResponseSchema.parse({ benefits: {
         access: { sorBenefitId: "access-id", layoutType: "LOGGEDIN" },
         usage: { sorBenefitId: "usage-id", layoutType: "SUPP" },
-        loan: { sorBenefitId: "loan-id", layoutType: "ENROLLED" },
-        spend: { sorBenefitId: "spend-id", layoutType: "NOTENROLLED", isEnrollable: true },
+        loan: { sorBenefitId: "loan-id", benefitTitle: "Synthetic Adobe Credit", layoutType: "ENROLLED" },
+        spend: { sorBenefitId: "spend-id", benefitTitle: "Synthetic Airline Fee Credit", layoutType: "NOTENROLLED", isEnrollable: true },
         loggedInOnly: { sorBenefitId: "catalog-only-logged-in", benefitTitle: "Synthetic Logged In Information", layoutType: "LOGGEDIN" },
         supplementaryOnly: { sorBenefitId: "catalog-only-supp", benefitTitle: "Synthetic Supplementary Information", layoutType: "SUPP" },
       } }),
     );
 
     expect(result.issueCodes).toEqual([]);
-    expect(result.benefits).toHaveLength(4);
+    expect(result.benefits).toHaveLength(3);
     expect(result.benefits.map((benefit) => [benefit.category, benefit.activityKind])).toEqual([
-      [{ state: "observed", value: "access" }, "spend_progress"],
       [{ state: "observed", value: "usage" }, "spend_progress"],
       [{ state: "observed", value: "loan" }, "spend_progress"],
       [{ state: "observed", value: "spend" }, "spend_progress"],
@@ -227,20 +276,20 @@ describe("Amex private response adapter", () => {
       enrollmentState: { state: "not_exposed" },
       trackerState: { state: "observed", value: "in_progress" },
       completionState: { state: "observed", value: "incomplete" },
-      earnedOrUsed: { state: "observed", value: { value: "2", unit: "count", currency: null } },
+      earnedOrUsed: { state: "observed", value: { value: "3", unit: "count", currency: null } },
     });
-    expect(result.benefits[1].enrollmentState).toEqual({ state: "not_exposed" });
-    expect(result.benefits[2]).toMatchObject({
+    expect(result.benefits[1]).toMatchObject({
       enrollmentState: { state: "observed", value: "enrolled" },
       targetOrLimit: { state: "observed", value: { value: "100.00", unit: "USD", currency: "USD" } },
     });
-    expect(result.benefits[3].enrollmentState).toEqual({ state: "observed", value: "required" });
+    expect(result.benefits[2].enrollmentState).toEqual({ state: "observed", value: "required" });
+    expect(result.benefits.some((benefit) => benefit.title.includes("Lounge Access"))).toBe(false);
   });
 
   it("maps IN_PROGRESS to in-progress and incomplete for a characterized category", () => {
     const result = normalizeBenefits(
       trackerResponseSchema.parse([{ trackers: [{
-        benefitName: "Synthetic In-Progress Usage",
+        benefitName: "Synthetic Hilton Credit",
         category: "usage",
         status: "IN_PROGRESS",
       }] }]),
@@ -257,20 +306,20 @@ describe("Amex private response adapter", () => {
     const result = normalizeBenefits(
       trackerResponseSchema.parse([{ trackers: [{
         sorBenefitId: "not-enrollable-id",
-        benefitName: "Synthetic Noncandidate Tracker",
+        benefitName: "Synthetic Adobe Credit",
         category: "spend",
         status: "ACTIVE",
       }] }]),
       catalogResponseSchema.parse({ benefits: {
         joined: {
           sorBenefitId: "not-enrollable-id",
-          benefitTitle: "Synthetic Noncandidate Tracker",
+          benefitTitle: "Synthetic Adobe Credit",
           layoutType: "NOTENROLLED",
           isEnrollable: false,
         },
         catalogOnly: {
           sorBenefitId: "catalog-only-noncandidate",
-          benefitTitle: "Synthetic Catalog Noncandidate",
+          benefitTitle: "Synthetic Hilton Credit",
           layoutType: "NOTENROLLED",
           isEnrollable: false,
         },
@@ -279,7 +328,7 @@ describe("Amex private response adapter", () => {
     expect(result.issueCodes).toEqual([]);
     expect(result.benefits).toHaveLength(1);
     expect(result.benefits[0]).toMatchObject({
-      title: "Synthetic Noncandidate Tracker",
+      title: "Synthetic Adobe Credit",
       enrollmentState: { state: "not_exposed" },
     });
   });
@@ -288,18 +337,18 @@ describe("Amex private response adapter", () => {
     const result = normalizeBenefits(
       trackerResponseSchema.parse([{ trackers: [
         {
-          benefitName: "Synthetic Uncharacterized Category",
+          benefitName: "Synthetic Adobe Credit",
           category: "credits",
           status: "ACTIVE",
         },
         {
-          benefitName: "Synthetic Missing Unit",
+          benefitName: "Synthetic Airline Fee Credit",
           category: "spend",
           status: "ACTIVE",
           tracker: { spentAmount: "1.00", targetCurrency: "USD" },
         },
         {
-          benefitName: "Synthetic Missing Currency",
+          benefitName: "Synthetic Hilton Credit",
           category: "usage",
           status: "IN_PROGRESS",
           tracker: { spentAmount: "2.00", targetUnit: "MONETARY" },
@@ -319,7 +368,7 @@ describe("Amex private response adapter", () => {
     const result = normalizeBenefits(
       trackerResponseSchema.parse([{ trackers: [] }]),
       catalogResponseSchema.parse({ benefits: {
-        unknown: { sorBenefitId: "unknown-layout-id", benefitTitle: "Synthetic Unknown Layout", layoutType: "FUTURE_LAYOUT" },
+        unknown: { sorBenefitId: "unknown-layout-id", benefitTitle: "Synthetic Adobe Credit", layoutType: "FUTURE_LAYOUT" },
       } }),
     );
     expect(result.benefits).toEqual([]);
@@ -343,7 +392,7 @@ describe("Amex private response adapter", () => {
   it("distinguishes an absent tracker status from a present unknown status", () => {
     const result = normalizeBenefits(
       trackerResponseSchema.parse([{ trackers: [{
-        benefitName: "Synthetic Statusless Progress",
+        benefitName: "Synthetic Wireless Bill Credit",
         category: "spend",
         tracker: { spentAmount: "1", targetUnit: "PASSES" },
       }] }]),
@@ -360,7 +409,7 @@ describe("Amex private response adapter", () => {
     const result = normalizeBenefits(
       trackerResponseSchema.parse([{ trackers: [{
         sorBenefitId: "shared-id",
-        benefitName: "Synthetic Tracker Title",
+        benefitName: "Synthetic Airline Fee Credit",
         category: "spend",
         status: "ACTIVE",
       }] }]),
@@ -372,15 +421,15 @@ describe("Amex private response adapter", () => {
     expect(result.issueCodes).toContain("benefit_identity_conflict");
     expect(result.benefits).toHaveLength(1);
     expect(result.benefits[0]).toMatchObject({
-      title: "Synthetic Tracker Title",
+      title: "Synthetic Airline Fee Credit",
       enrollmentState: { state: "not_exposed" },
     });
   });
 
   it("treats conflicting semantic benefit identities as incomplete without ordinals", () => {
     const result = normalizeBenefits(trackerResponseSchema.parse([{ trackers: [
-      { sorBenefitId: "id-a", benefitName: "Same Benefit", category: "spend", status: "ACTIVE", tracker: { spentAmount: "1", targetUnit: "PASSES" } },
-      { sorBenefitId: "id-b", benefitName: "Same Benefit", category: "spend", status: "ACTIVE", tracker: { spentAmount: "2", targetUnit: "PASSES" } },
+      { sorBenefitId: "id-a", benefitName: "Synthetic Adobe Credit", category: "spend", status: "ACTIVE", tracker: { spentAmount: "1", targetUnit: "PASSES" } },
+      { sorBenefitId: "id-b", benefitName: "Synthetic Adobe Credit", category: "spend", status: "ACTIVE", tracker: { spentAmount: "2", targetUnit: "PASSES" } },
     ] }]), catalogResponseSchema.parse({ benefits: {} }));
     expect(result.benefits).toHaveLength(1);
     expect(result.issueCodes).toContain("benefit_identity_conflict");

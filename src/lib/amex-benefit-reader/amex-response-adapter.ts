@@ -14,6 +14,11 @@ import {
   type QuantityV1,
 } from "./contract";
 import { createBenefitKey } from "./identity";
+import {
+  isSupportedAmexCatalogCard,
+  matchSupportedAmexCardCredit,
+  type SupportedAmexCardCreditMatch,
+} from "./supported-card-credits";
 
 export interface TransientAccountCard {
   rawAccountToken: string;
@@ -318,14 +323,37 @@ function enrollmentField(catalog: CatalogBenefitResponseItem | undefined, issues
   return unrecognized("unknown_status");
 }
 
-function trackerTitle(tracker: BenefitTrackerResponseItem, catalog: CatalogBenefitResponseItem | undefined): string | null {
-  return text(catalog?.benefitTitle, 200) ?? text(tracker.benefitName, 200);
-}
-
 function catalogTitle(catalog: CatalogBenefitResponseItem): string | null {
   return text(catalog.benefitShortTitle, 200)
     ?? text(catalog.benefitTitle, 200)
     ?? text(catalog.benefitName, 200);
+}
+
+interface SupportedTrackerTitle {
+  title: string;
+  match: SupportedAmexCardCreditMatch;
+  catalog: CatalogBenefitResponseItem | undefined;
+}
+
+function supportedTrackerTitle(
+  productName: string,
+  tracker: BenefitTrackerResponseItem,
+  catalog: CatalogBenefitResponseItem | undefined,
+): SupportedTrackerTitle | "conflict" | null {
+  const trackerTitle = text(tracker.benefitName, 200);
+  const catalogBenefitTitle = catalog ? catalogTitle(catalog) : null;
+  const trackerMatch = trackerTitle ? matchSupportedAmexCardCredit(productName, trackerTitle) : null;
+  const catalogMatch = catalogBenefitTitle
+    ? matchSupportedAmexCardCredit(productName, catalogBenefitTitle)
+    : null;
+  if (trackerMatch && catalogMatch && trackerMatch.creditKey !== catalogMatch.creditKey) return "conflict";
+  if (catalogMatch && catalogBenefitTitle) {
+    return { title: catalogBenefitTitle, match: catalogMatch, catalog };
+  }
+  if (trackerMatch && trackerTitle) {
+    return { title: trackerTitle, match: trackerMatch, catalog: undefined };
+  }
+  return null;
 }
 
 function benefitKey(title: string, category: ObservedField<string>, activityKind: ActivityKind): string {
@@ -348,10 +376,37 @@ function sameCatalogObservation(
     && left.isEnrollable === right.isEnrollable;
 }
 
-export function normalizeBenefits(
-  trackerResponse: TrackerResponse,
-  catalogResponse: CatalogResponse,
-): BenefitNormalizationResult {
+function supportedCreditState(benefit: NormalizedBenefitObservationV1): unknown {
+  return {
+    category: benefit.category,
+    activityKind: benefit.activityKind,
+    enrollmentState: benefit.enrollmentState,
+    trackerState: benefit.trackerState,
+    completionState: benefit.completionState,
+    earnedOrUsed: benefit.earnedOrUsed,
+    targetOrLimit: benefit.targetOrLimit,
+    remaining: benefit.remaining,
+    period: benefit.period,
+    confidence: benefit.confidence,
+    issueCodes: benefit.issueCodes,
+  };
+}
+
+function sameSupportedCreditObservation(
+  left: NormalizedBenefitObservationV1,
+  right: NormalizedBenefitObservationV1,
+): boolean {
+  return JSON.stringify(supportedCreditState(left)) === JSON.stringify(supportedCreditState(right));
+}
+
+export function normalizeBenefits(input: {
+  productName: string;
+  trackerResponse: TrackerResponse;
+  catalogResponse: CatalogResponse;
+}): BenefitNormalizationResult {
+  const { productName, trackerResponse, catalogResponse } = input;
+  if (!isSupportedAmexCatalogCard(productName)) return { benefits: [], issueCodes: [] };
+
   const issues = new Set<IssueCode>();
   const catalogByIssuerId = new Map<string, CatalogBenefitResponseItem>();
   const ambiguousCatalogIds = new Set<string>();
@@ -361,7 +416,6 @@ export function normalizeBenefits(
     const existing = catalogByIssuerId.get(issuerId);
     if (existing) {
       if (!sameCatalogObservation(existing, catalog)) {
-        issues.add("benefit_identity_conflict");
         catalogByIssuerId.delete(issuerId);
         ambiguousCatalogIds.add(issuerId);
       }
@@ -371,28 +425,34 @@ export function normalizeBenefits(
   }
 
   const normalized = new Map<string, NormalizedBenefitObservationV1>();
-  const add = (benefit: NormalizedBenefitObservationV1): void => {
-    const existing = normalized.get(benefit.benefitKey);
+  const add = (supportedCreditKey: string, benefit: NormalizedBenefitObservationV1): void => {
+    const validated = normalizedBenefitObservationSchema.parse(benefit);
+    const existing = normalized.get(supportedCreditKey);
     if (!existing) {
-      normalized.set(benefit.benefitKey, normalizedBenefitObservationSchema.parse(benefit));
+      normalized.set(supportedCreditKey, validated);
       return;
     }
-    if (JSON.stringify(existing) !== JSON.stringify(benefit)) issues.add("benefit_identity_conflict");
+    if (!sameSupportedCreditObservation(existing, validated)) issues.add("benefit_identity_conflict");
   };
 
   for (const block of trackerResponse) {
     for (const tracker of block.trackers) {
+      const issuerId = exactString(tracker.sorBenefitId);
+      const catalog = issuerId && !ambiguousCatalogIds.has(issuerId)
+        ? catalogByIssuerId.get(issuerId)
+        : undefined;
+      const supported = supportedTrackerTitle(productName, tracker, catalog);
+      if (!supported) continue;
+      if (supported === "conflict") {
+        issues.add("benefit_identity_conflict");
+        continue;
+      }
+
       const itemIssues = new Set<IssueCode>();
+      if (issuerId && ambiguousCatalogIds.has(issuerId)) itemIssues.add("benefit_identity_conflict");
       const activityKind = activityKindForTracker(tracker, itemIssues);
       if (!activityKind) {
         itemIssues.forEach((issue) => issues.add(issue));
-        continue;
-      }
-      const issuerId = exactString(tracker.sorBenefitId);
-      const catalog = issuerId ? catalogByIssuerId.get(issuerId) : undefined;
-      const title = trackerTitle(tracker, catalog);
-      if (!title) {
-        issues.add("benefit_identity_conflict");
         continue;
       }
       const category = categoryField(tracker.category);
@@ -403,10 +463,10 @@ export function normalizeBenefits(
       const remaining = quantityField(tracker.tracker?.remainingAmount, tracker.tracker, itemIssues);
       const period = periodField(tracker);
       if (period.state === "unrecognized") itemIssues.add(period.issueCode);
-      const enrollmentState = enrollmentField(catalog, itemIssues);
+      const enrollmentState = enrollmentField(supported.catalog, itemIssues);
       const benefit: NormalizedBenefitObservationV1 = {
-        benefitKey: benefitKey(title, category, activityKind),
-        title,
+        benefitKey: benefitKey(supported.title, category, activityKind),
+        title: supported.title,
         category,
         activityKind,
         enrollmentState,
@@ -419,14 +479,21 @@ export function normalizeBenefits(
         confidence: itemIssues.size === 0 ? "high" : "medium",
         issueCodes: Array.from(itemIssues),
       };
-      add(benefit);
+      add(supported.match.creditKey, benefit);
       itemIssues.forEach((issue) => issues.add(issue));
     }
   }
 
   for (const catalog of Object.values(catalogResponse.benefits)) {
+    const title = catalogTitle(catalog);
+    const supported = title ? matchSupportedAmexCardCredit(productName, title) : null;
+    if (!title || !supported) continue;
+
     const issuerId = exactString(catalog.sorBenefitId);
-    if (issuerId && ambiguousCatalogIds.has(issuerId)) continue;
+    if (issuerId && ambiguousCatalogIds.has(issuerId)) {
+      issues.add("benefit_identity_conflict");
+      continue;
+    }
     const layout = exactString(catalog.layoutType)?.toUpperCase();
     if (layout !== "NOTENROLLED" || catalog.isEnrollable !== true) {
       if (
@@ -443,13 +510,8 @@ export function normalizeBenefits(
     const hasJoinedTracker = issuerId && trackerResponse.some((block) =>
       block.trackers.some((tracker) => exactString(tracker.sorBenefitId) === issuerId));
     if (hasJoinedTracker) continue;
-    const title = catalogTitle(catalog);
-    if (!title) {
-      issues.add("benefit_identity_conflict");
-      continue;
-    }
     const category = notExposed<string>();
-    add({
+    add(supported.creditKey, {
       benefitKey: benefitKey(title, category, "enrollment_candidate"),
       title,
       category,

@@ -1,5 +1,6 @@
 import { createInstallationSecret, fingerprintCardToken } from "@/lib/amex-benefit-reader/identity";
 import type { CardIdentityService, PreparedCardIdentity, ResultStore } from "@/lib/amex-benefit-reader/scan-engine";
+import { retainSupportedAmexCardCredits } from "@/lib/amex-benefit-reader/supported-card-credits";
 import {
   IDENTITY_SECRET_KEY,
   STORE_KEY,
@@ -21,9 +22,41 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function retainSupportedStoredCredits(store: StoreEnvelopeV1, projectedAt: string): StoreEnvelopeV1 {
+  let changed = false;
+  const cards: StoreEnvelopeV1["cards"] = {};
+  for (const [localCardId, record] of Object.entries(store.cards)) {
+    if (!record.latest) {
+      cards[localCardId] = record;
+      continue;
+    }
+    const benefits = retainSupportedAmexCardCredits(record.latest.productName, record.latest.benefits);
+    if (benefits === record.latest.benefits) {
+      cards[localCardId] = record;
+      continue;
+    }
+    changed = true;
+    cards[localCardId] = {
+      ...record,
+      latest: { ...record.latest, benefits },
+    };
+  }
+  if (!changed) return store;
+  return {
+    ...store,
+    revision: store.revision + 1,
+    updatedAt: projectedAt,
+    cards,
+  };
+}
+
 export class TampermonkeyResultStore implements ResultStore {
   async load(): Promise<StoreEnvelopeV1> {
-    return loadStoreValue(await GM.getValue(STORE_KEY, null), nowIso());
+    const projectedAt = nowIso();
+    const loaded = loadStoreValue(await GM.getValue(STORE_KEY, null), projectedAt);
+    const projected = retainSupportedStoredCredits(loaded, projectedAt);
+    if (projected !== loaded) await GM.setValue(STORE_KEY, projected);
+    return projected;
   }
 
   async commitCard(result: CardAttemptResult): Promise<StoredCardRecordV1> {

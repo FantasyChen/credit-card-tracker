@@ -3,25 +3,25 @@
   "benefits": {
     "spend-fixture": {
       "sorBenefitId": "invented-spend-id",
-      "benefitTitle": "Synthetic Travel Credit",
+      "benefitTitle": "Synthetic Airline Fee Credit",
       "layoutType": "ENROLLED",
       "isEnrollable": true
     },
     "earned-fixture": {
       "sorBenefitId": "invented-earned-id",
-      "benefitTitle": "Synthetic Earned Credit",
+      "benefitTitle": "Synthetic Hilton Credit",
       "layoutType": "ENROLLED",
       "isEnrollable": true
     },
     "complete-fixture": {
       "sorBenefitId": "invented-complete-id",
-      "benefitTitle": "Synthetic Completed Benefit",
+      "benefitTitle": "Synthetic Dell Technologies Credit",
       "layoutType": "ENROLLED",
       "isEnrollable": true
     },
     "candidate-fixture": {
       "sorBenefitId": "invented-candidate-id",
-      "benefitShortTitle": "Synthetic Enrollment Candidate",
+      "benefitShortTitle": "Synthetic Adobe Credit",
       "layoutType": "NOTENROLLED",
       "isEnrollable": true
     },
