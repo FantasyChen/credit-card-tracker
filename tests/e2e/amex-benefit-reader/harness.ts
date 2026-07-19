@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { access } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { BrowserContext, Page, Route } from "@playwright/test";
+import type { BrowserContext, Page, Request, Route } from "@playwright/test";
 
 export const SYNTHETIC_AMEX_URL = "https://global.americanexpress.com/card-benefits/view-all";
 export const STORE_KEY = "perksReminder.amexBenefitReader.store.v1";
@@ -17,14 +17,17 @@ const PRIMARY_TOKEN = "invented-e2e-primary-token";
 const SUPPLEMENTARY_TOKEN = "invented-e2e-supplementary-token";
 const SYNTHETIC_ORIGIN = "https://global.americanexpress.com";
 
-export type HarnessScenario = "complete" | "catalog_failure";
+export type HarnessScenario = "complete" | "catalog_failure" | "cancellation" | "rescan_tracker_failure";
 export type ApiOperation = "member" | "tracker" | "catalog";
+export type SyntheticCard = "primary" | "supplementary";
 
 export interface SafeRequestRecord {
   method: string;
   origin: string;
   pathname: string;
   operation: ApiOperation | "preflight" | "document" | "blocked";
+  syntheticCard?: SyntheticCard;
+  scanNumber?: number;
 }
 
 interface ScenarioFixture {
@@ -32,6 +35,36 @@ interface ScenarioFixture {
   trackersByToken: Readonly<Record<string, unknown>>;
   catalogsByToken: Readonly<Record<string, unknown>>;
   catalogFailureTokens: ReadonlySet<string>;
+}
+
+class DeferredSignal {
+  private resolvePromise!: () => void;
+  readonly promise = new Promise<void>((resolve) => { this.resolvePromise = resolve; });
+
+  trigger(): void {
+    this.resolvePromise();
+  }
+}
+
+class ExplicitGate {
+  private readonly enteredSignal = new DeferredSignal();
+  private readonly releaseSignal = new DeferredSignal();
+  private readonly finishedSignal = new DeferredSignal();
+  readonly entered = this.enteredSignal.promise;
+  readonly released = this.releaseSignal.promise;
+  readonly finished = this.finishedSignal.promise;
+
+  enter(): void {
+    this.enteredSignal.trigger();
+  }
+
+  release(): void {
+    this.releaseSignal.trigger();
+  }
+
+  finish(): void {
+    this.finishedSignal.trigger();
+  }
 }
 
 const syntheticDocument = `<!doctype html>
@@ -72,6 +105,10 @@ const primaryTrackers = [{
     },
   ],
 }];
+
+const rescannedPrimaryTrackers = structuredClone(primaryTrackers);
+rescannedPrimaryTrackers[0].trackers[0].tracker!.spentAmount = "7.00";
+rescannedPrimaryTrackers[0].trackers[0].tracker!.remainingAmount = "3.00";
 
 const primaryCatalog = {
   benefits: {
@@ -139,12 +176,13 @@ const supplementaryCatalog = {
 };
 
 function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
+  const hasSupplementaryCard = scenario !== "catalog_failure";
   const member = {
     accounts: [{
       account_token: PRIMARY_TOKEN,
       product: { description: "American Express Gold Card" },
       account: { relationship: "BASIC", display_account_number: "1234" },
-      ...(scenario === "complete" ? {
+      ...(hasSupplementaryCard ? {
         supplementary_accounts: [{
           account_token: SUPPLEMENTARY_TOKEN,
           product: { description: "American Express Gold Card" },
@@ -156,14 +194,20 @@ function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
 
   return {
     member,
-    trackersByToken: scenario === "complete"
+    trackersByToken: hasSupplementaryCard
       ? { [PRIMARY_TOKEN]: primaryTrackers, [SUPPLEMENTARY_TOKEN]: supplementaryTrackers }
       : { [PRIMARY_TOKEN]: primaryTrackers },
-    catalogsByToken: scenario === "complete"
+    catalogsByToken: hasSupplementaryCard
       ? { [PRIMARY_TOKEN]: primaryCatalog, [SUPPLEMENTARY_TOKEN]: supplementaryCatalog }
       : { [PRIMARY_TOKEN]: primaryCatalog },
     catalogFailureTokens: scenario === "catalog_failure" ? new Set([PRIMARY_TOKEN]) : new Set(),
   };
+}
+
+function syntheticCardForToken(token: string): SyntheticCard {
+  if (token === PRIMARY_TOKEN) return "primary";
+  if (token === SUPPLEMENTARY_TOKEN) return "supplementary";
+  throw new Error("The request used an unknown synthetic account token.");
 }
 
 function clone<T>(value: T): T {
@@ -210,20 +254,27 @@ export class SyntheticAmexHarness {
   readonly routingErrors: string[] = [];
   readonly runtimeErrors: string[] = [];
   private readonly fixture: ScenarioFixture;
+  private readonly cancellationGate = new ExplicitGate();
+  private readonly cancellationRequestFailed = new DeferredSignal();
   private expectedCatalogHttpErrorLogs: number;
+  private expectedTrackerHttpErrorLogs: number;
+  private expectedCancellationRequest: Request | null = null;
+  private expectedCancellationConsoleErrors = 0;
   private expectedDeniedProbeConsoleError = false;
   private expectedDeniedProbeFailure = false;
   private verifiedDeniedProbeCount = 0;
   private expectedMainFrameNavigation = false;
   private expectedConfirmation: string | null = null;
+  private activeScanNumber = 0;
 
   constructor(
     private readonly context: BrowserContext,
     readonly page: Page,
-    scenario: HarnessScenario = "complete",
+    private readonly scenario: HarnessScenario = "complete",
   ) {
     this.fixture = scenarioFixture(scenario);
     this.expectedCatalogHttpErrorLogs = scenario === "catalog_failure" ? 2 : 0;
+    this.expectedTrackerHttpErrorLogs = scenario === "rescan_tracker_failure" ? 2 : 0;
   }
 
   async installBeforeNavigation(): Promise<void> {
@@ -248,6 +299,23 @@ export class SyntheticAmexHarness {
         this.expectedCatalogHttpErrorLogs -= 1;
         return;
       }
+      if (
+        this.expectedTrackerHttpErrorLogs > 0
+        && message.location().url === TRACKER_URL
+        && /^Failed to load resource: the server responded with a status of 500/.test(message.text())
+      ) {
+        this.expectedTrackerHttpErrorLogs -= 1;
+        return;
+      }
+      if (
+        this.expectedCancellationRequest !== null
+        && this.expectedCancellationConsoleErrors > 0
+        && message.location().url === TRACKER_URL
+        && /^Failed to load resource:.*ERR_ABORTED/.test(message.text())
+      ) {
+        this.expectedCancellationConsoleErrors -= 1;
+        return;
+      }
       this.runtimeErrors.push("The generated bundle emitted an unexpected console error.");
     });
     this.page.on("requestfailed", (request) => {
@@ -257,6 +325,12 @@ export class SyntheticAmexHarness {
         && request.url() === DENIED_PROBE_URL
       ) {
         this.expectedDeniedProbeFailure = false;
+        return;
+      }
+      if (request === this.expectedCancellationRequest) {
+        this.expectedCancellationRequest = null;
+        this.expectedCancellationConsoleErrors = 0;
+        this.cancellationRequestFailed.trigger();
         return;
       }
       const url = new URL(request.url());
@@ -402,6 +476,25 @@ export class SyntheticAmexHarness {
       && (!operation || request.operation === operation));
   }
 
+  apiRequestSequence(): string[] {
+    return this.apiRequests().map((request) =>
+      request.syntheticCard
+        ? `${request.operation}:${request.syntheticCard}:scan-${request.scanNumber}`
+        : `${request.operation}:scan-${request.scanNumber}`);
+  }
+
+  async waitForCancellationRequest(): Promise<void> {
+    assert.equal(this.scenario, "cancellation");
+    await this.cancellationGate.entered;
+  }
+
+  async releaseCancellationRequest(): Promise<void> {
+    assert.equal(this.scenario, "cancellation");
+    this.cancellationGate.release();
+    await this.cancellationGate.finished;
+    await this.cancellationRequestFailed.promise;
+  }
+
   operationRequests(operation: SafeRequestRecord["operation"]): SafeRequestRecord[] {
     return this.requests.filter((request) => request.operation === operation);
   }
@@ -414,6 +507,9 @@ export class SyntheticAmexHarness {
     assert.deepEqual(this.routingErrors, []);
     assert.deepEqual(this.runtimeErrors, []);
     assert.equal(this.expectedCatalogHttpErrorLogs, 0);
+    assert.equal(this.expectedTrackerHttpErrorLogs, 0);
+    assert.equal(this.expectedCancellationRequest, null);
+    assert.equal(this.expectedCancellationConsoleErrors, 0);
     assert.equal(this.expectedDeniedProbeConsoleError, false);
     assert.equal(this.expectedDeniedProbeFailure, false);
     assert.equal(this.expectedMainFrameNavigation, false);
@@ -454,13 +550,21 @@ export class SyntheticAmexHarness {
     await this.page.locator("#perks-reminder-amex-reader").waitFor({ state: "attached" });
   }
 
-  private record(route: Route, operation: SafeRequestRecord["operation"]): void {
+  private record(
+    route: Route,
+    operation: SafeRequestRecord["operation"],
+    syntheticCard?: SyntheticCard,
+  ): void {
     const url = new URL(route.request().url());
     this.requests.push({
       method: route.request().method(),
       origin: url.origin,
       pathname: url.pathname,
       operation,
+      ...(syntheticCard ? { syntheticCard } : {}),
+      ...(operation === "member" || operation === "tracker" || operation === "catalog"
+        ? { scanNumber: this.activeScanNumber }
+        : {}),
     });
   }
 
@@ -492,6 +596,7 @@ export class SyntheticAmexHarness {
     }
 
     if (url === MEMBER_URL && request.method() === "GET") {
+      this.activeScanNumber += 1;
       this.record(route, "member");
       assert.equal(request.postData(), null);
       assert.equal(await request.headerValue("accept"), "application/json");
@@ -501,23 +606,44 @@ export class SyntheticAmexHarness {
     }
 
     if (url === TRACKER_URL) {
-      this.record(route, "tracker");
       const body = JSON.parse(request.postData() ?? "null") as unknown;
       assert.equal(Array.isArray(body), true);
       const accountToken = (body as Array<{ accountToken?: unknown }>)[0]?.accountToken;
       assert.equal(typeof accountToken, "string");
+      const syntheticCard = syntheticCardForToken(accountToken as string);
+      this.record(route, "tracker", syntheticCard);
       await assertExactJsonRequest(route, [{ accountToken, locale: "en-US", limit: "ALL" }], "*/*");
-      const response = this.fixture.trackersByToken[accountToken as string];
-      assert.notEqual(response, undefined);
+
+      if (this.scenario === "cancellation" && syntheticCard === "supplementary" && this.activeScanNumber === 1) {
+        assert.equal(this.expectedCancellationRequest, null);
+        assert.equal(this.expectedCancellationConsoleErrors, 0);
+        this.expectedCancellationRequest = request;
+        this.expectedCancellationConsoleErrors = 1;
+        this.cancellationGate.enter();
+        await this.cancellationGate.released;
+        await route.abort("aborted").catch(() => undefined);
+        this.cancellationGate.finish();
+        return;
+      }
+
       await shortDelay();
+      if (this.scenario === "rescan_tracker_failure" && syntheticCard === "supplementary" && this.activeScanNumber === 2) {
+        await fulfillJson(route, { syntheticError: true }, 500);
+        return;
+      }
+      const response = this.scenario === "rescan_tracker_failure" && syntheticCard === "primary" && this.activeScanNumber === 2
+        ? rescannedPrimaryTrackers
+        : this.fixture.trackersByToken[accountToken as string];
+      assert.notEqual(response, undefined);
       await fulfillJson(route, response);
       return;
     }
 
     if (url === CATALOG_URL) {
-      this.record(route, "catalog");
       const body = JSON.parse(request.postData() ?? "null") as { accountToken?: unknown };
       assert.equal(typeof body.accountToken, "string");
+      const syntheticCard = syntheticCardForToken(body.accountToken as string);
+      this.record(route, "catalog", syntheticCard);
       await assertExactJsonRequest(route, { accountToken: body.accountToken, locale: "en-US" }, "application/json");
       await shortDelay();
       if (this.fixture.catalogFailureTokens.has(body.accountToken as string)) {
