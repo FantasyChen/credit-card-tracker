@@ -55,6 +55,25 @@ interface NormalizedCardObservationV1 {
 }
 ```
 
+Provider-benefit selection is a separate shared-catalog boundary, not a presentation filter:
+
+```ts
+interface SupportedAmexCardCreditMatch {
+  catalogCardName: string;
+  creditKey: string;
+}
+
+function matchSupportedAmexCardCredit(
+  productName: string,
+  benefitTitle: string,
+): SupportedAmexCardCreditMatch | null;
+
+function retainSupportedAmexCardCredits<T extends { title: string }>(
+  productName: string,
+  benefits: T[],
+): T[];
+```
+
 Do not expose a generic `request(url, init)` port to scan orchestration. Add a named method and an exact operation contract for every newly approved read.
 
 ### 3. Contracts
@@ -71,6 +90,11 @@ Do not expose a generic `request(url, init)` port to scan orchestration. Add a n
 10. **Per-card commit and stale preservation**: commit each successful or partial card independently. A failed card preserves its prior observation as stale when one exists; it must not erase good data from an earlier scan.
 11. **No mutation or transport expansion**: browser readers must not enroll, activate, link, redeem, add offers, pay, or change provider state. They must not send observations to Perks Reminder, analytics, or third parties unless a separate task defines and approves that contract.
 12. **Visible-context invariant**: capture a non-sensitive route/display fingerprint before scanning and verify it afterward. Report changed or unavailable context without persisting the visible display string.
+13. **Separate evidence quality from benefit state**: user-facing presentation must not reuse parser completeness/freshness as a benefit status. Labels such as `Partial data`, `Stale data`, and `Could not read` describe the observation; labels such as `Enrollment required`, `In progress`, and `Completed` describe the benefit. Keep issue codes, field availability, confidence, and timestamps secondary to that distinction.
+14. **Scale by physical card identity**: when an account can contain many observations or repeated product names, make the physical card the primary navigation level and include explicit ending digits in the card label. Render one selected card workspace at a time or use an equivalently bounded hierarchy; do not default to one continuous all-card technical list.
+15. **Shared-catalog, card-specific selection**: normalized/persisted benefits must be usable, trackable credits represented by a positive-amount benefit on the matched Perks Reminder card. Product and benefit aliases belong to one browser-safe matcher backed by the shared static catalog; do not maintain a disconnected userscript allowlist or admit a credit represented only on a different card.
+16. **Fail-closed filtering before interpretation**: unknown product names, unreviewed benefit wording, ambiguous matches, and access/protection/insurance/free-night/status/informational/non-credit titles are omitted before provider status, quantity, category, or layout fields are interpreted. Intentional omission is not a parser issue and must not make an otherwise complete card partial.
+17. **Compatible-store projection**: when a parser update narrows the supported-credit set without changing the observation/storage schema, project compatible stored observations through the same matcher before display and future persistence. Preserve observation quality, freshness, timestamps, scan summaries, and redacted errors; increment storage revision and rewrite only when rows are actually removed. Malformed or future-schema stores remain refused, not repaired.
 
 ### 4. Validation & Error Matrix
 
@@ -90,12 +114,25 @@ Do not expose a generic `request(url, init)` port to scan orchestration. Add a n
 | Quantity value, unit, currency, status, or activity vocabulary is uncharacterized | Preserve only safe fields, add an issue code, and mark partial; do not infer |
 | Local envelope fails schema/migration validation | Refuse to scan into malformed state and offer explicit local-data recovery |
 | Visible route/display fingerprint changes or cannot be captured | Finish safe commits, but mark the summary changed or unavailable |
+| Observation is partial/stale while a benefit is complete or in progress | Show both facts independently; never relabel the benefit as incomplete because the observation has data-quality notes |
+| Duplicate products or a high-observation account are restored | Keep every physical card reachable by product plus ending digits without rendering every card's full technical detail at once |
+| Product name has no exact normalized catalog alias | Omit all benefits for that card; do not guess a nearby product or borrow another card's credit rules |
+| Benefit title has no unique reviewed alias for a positive-amount credit on the matched card | Omit the record before interpreting its provider fields; do not add a parser issue or partial marker solely for the omission |
+| Title contains a credit brand plus an explicit non-credit phrase such as access, protection, insurance, free night, or status | Reject the record even when a broader merchant alias also appears |
+| Compatible stored observation contains benefits no longer supported by the current matcher | Remove only those rows, preserve record/scan quality metadata, and rewrite with one revision increment only when the projection changes the store |
+| Stored envelope is malformed or from a future schema | Refuse it unchanged; do not apply the supported-credit projection or overwrite storage |
 
 ### 5. Good / Base / Bad Cases
 
 - **Good**: a manual scan uses named read methods, projects provider JSON into strict schemas, clears each transient token in `finally`, commits every card independently, keeps repeated products distinct through an HMAC fingerprint, and restores only normalized observations after reload.
 - **Base**: an optional catalog read fails after valid tracker data. The reader records the redacted catalog issue, leaves enrollment fields unexposed, and commits the tracker observation as partial.
 - **Bad**: a generic fetch helper accepts arbitrary paths, stores raw JSON for debugging, derives an ending from a full account number or token, defaults a missing amount to zero, or turns a catalog authentication failure into partial success.
+- **Presentation good**: a partial card can still show an observed benefit as `Completed`, while a separate `Partial data` badge and secondary details explain the observation quality.
+- **Presentation bad**: a card-level `Incomplete` badge is used as the primary benefit status, duplicate products are grouped only by name, or all cards and normalized fields are rendered at equal priority.
+- **Selection good**: an exact reviewed product alias and benefit-title alias resolve to one positive-amount credit on that same shared-catalog card; the stable card-scoped credit key owns deduplication.
+- **Selection base**: a provider returns an access-only Resy item, a free-night award, or an otherwise unrepresented tracker. The reader silently omits it before parsing its status fields, while supported credits on the card remain complete.
+- **Selection bad**: a global merchant substring list admits a credit on every card, a broad `Resy`/`Saks` match admits access or protection, or panel-only filtering leaves unsupported rows in local storage.
+- **Compatible-store good**: loading a schema-compatible pre-filter store removes unsupported rows once while preserving freshness, completeness, observation/attempt times, errors, and last-scan summary.
 
 ### 6. Tests Required
 
@@ -114,6 +151,13 @@ For each browser-side provider reader, assert:
 - per-card success replaces the latest observation, failure preserves stale prior data, and summary counts match attempted dispositions;
 - page load restores local normalized state without scanning, and clear-data removes both normalized state and the installation identity secret;
 - visible context is reported as unchanged, changed, or unavailable without persisting its source display value;
+- observation-quality labels remain distinct from benefit action/progress labels, filter state is accessible, and duplicate products remain selectable by ending digits;
+- a synthetic high-scale fixture (currently 16 cards / 130 observations for Amex) keeps every observation reachable while rendering only the selected card's workspace;
+- every positive-amount benefit intended for provider synchronization in the shared card catalog has an exact-card matching fixture, while zero-value/access/protection/insurance/free-night/status/informational records, wrong-card titles, unknown products, and ambiguous wording fail closed;
+- unsupported provider records with malformed or unknown status/category fields are omitted before parsing and do not create partial observations or issue codes;
+- equivalent reviewed wording deduplicates through the same card-scoped credit key, while materially different credit observations do not merge;
+- compatible legacy-store projection preserves schema, quality/freshness metadata, timestamps, errors, and scan summary; rewrites/increments revision only when rows are removed; and refuses malformed/future stores without overwrite;
+- shared-catalog extraction has a website parity assertion so browser-safe reuse cannot silently remove or alter static catalog cards/benefits;
 - the built userscript contains only approved grants and destinations and contains no mutation fragments, privileged transport, background polling, remote update metadata, or website-sync destination.
 
 Run targeted Jest for the reader and userscript surfaces, strict TypeScript, targeted ESLint, the isolated userscript build, artifact/source allowlist audits, a sensitive-data scan, structured-data parsing, and `git diff --check`. Authenticated browser validation requires explicit owner authorization and must capture only sanitized aggregates and URL/method/status metadata—never payloads.
@@ -168,3 +212,141 @@ try {
 ```
 
 The named operation fixes the request tuple, validates the projected response, and makes transient cleanup part of the control flow. The scan engine—not the transport—owns whether an eligible optional-read failure becomes a redacted partial observation.
+
+#### Presentation boundary
+
+```ts
+// Wrong: parser quality overwrites the user-facing benefit state.
+const label = card.completeness === "partial" ? "Incomplete" : benefit.trackerState;
+
+// Correct: derive and display two independent presentation facts.
+const observationLabel = presentObservationQuality(card); // "Partial data"
+const benefitLabel = presentBenefitState(benefit); // "Completed"
+```
+
+This separation prevents data-collection uncertainty from being mistaken for a benefit that still needs user action.
+
+#### Supported-credit boundary
+
+```ts
+// Wrong: a global substring filter admits the merchant on unsupported cards
+// and leaves rejected rows persisted for the panel to hide.
+const visibleBenefits = observation.benefits.filter((benefit) =>
+  ["resy", "saks", "uber"].some((merchant) =>
+    benefit.title.toLowerCase().includes(merchant),
+  ),
+);
+
+// Correct: normalize through the shared-catalog, card-specific matcher before
+// provider fields enter the normalized observation or compatible local store.
+const match = matchSupportedAmexCardCredit(productName, providerBenefit.title);
+if (!match) return null;
+return normalizeSupportedBenefit(providerBenefit, match.creditKey);
+```
+
+The matcher must verify both sides of the contract: the card is a reviewed product alias, and the title resolves uniquely to a positive-amount usable credit represented on that exact shared-catalog card. Broad merchant wording never overrides explicit non-credit phrases.
+
+## Scenario: generated-bundle synthetic browser validation
+
+### 1. Scope / Trigger
+
+Use this contract when routine browser-reader iteration needs real-Chromium evidence without installing the userscript, opening an authenticated profile, or contacting the provider. This supplements unit tests and milestone owner-only validation; it does not claim live provider, cookie/CORS, or Tampermonkey-sandbox compatibility.
+
+### 2. Signatures
+
+The Amex reference commands and harness boundary are:
+
+```bash
+npx playwright install chromium      # one-time browser prerequisite
+npm run test:e2e:amex                # unattended generated-bundle checks
+npm run test:e2e:amex:visual         # optional headed synthetic preview
+```
+
+```ts
+type HarnessScenario = "complete" | "catalog_failure";
+
+class SyntheticAmexHarness {
+  readonly storage: Map<string, unknown>;
+  installBeforeNavigation(): Promise<void>;
+  openAndInject(): Promise<void>;
+  reloadAndInject(): Promise<void>;
+  proveUnexpectedNetworkIsBlocked(): Promise<void>;
+  assertNetworkStayedSynthetic(): void;
+}
+```
+
+The task-scoped Playwright config must point only at the provider-reader E2E directory, use one worker with retries disabled, block service workers, and retain traces/screenshots only for failed or explicit visual runs.
+
+### 3. Contracts
+
+1. **Build and inject the artifact**: the command rebuilds the userscript, verifies the artifact exists, and injects that opaque IIFE. E2E code must not import the production entry, engine, adapter, matcher, or panel to bypass bundle wiring.
+2. **Intercept before navigation**: install a browser-context catch-all route before the first navigation. Fulfill only the invented provider document, exact named read tuples, and exact browser-generated preflights required by those tuples.
+3. **No network fallback**: every unrecognized origin, path, method, header set, or body is aborted and recorded as a routing error. The route must never call `continue`, `fallback`, or another path that can reach live Amex or a third party. Include a denied-origin probe proving this behavior.
+4. **Synthetic extension storage**: install asynchronous `GM.getValue`, `GM.setValue`, and `GM.deleteValue` mocks before bundle evaluation. Keep the map owned by the harness so tests can inspect normalized persistence, while production receives no debug/export interface.
+5. **Exact request evidence**: assert operation origin, path, method, accepted content type, fixed request body, retry count, and zero provider reads before manual start or after restore-only reload.
+6. **Alternate transport denial**: disable or fail on `XMLHttpRequest`, WebSocket, EventSource, `sendBeacon`, popups, unexpected main-frame navigation, service workers, uncaught page errors, unexpected console errors, failed requests, and unexpected dialogs.
+7. **Synthetic-only output**: fixtures, screenshots, traces, and test reports contain invented identifiers/amounts plus public catalog vocabulary only. Generated outputs remain ignored by Git and must never contain live browser/session data.
+8. **Milestone boundary**: live private response shape, authenticated cookie/CORS behavior, Tampermonkey grants/sandbox behavior, and issuer-side no-mutation evidence still require separately authorized owner-only validation.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Built artifact is absent or cannot execute | Fail before asserting UI behavior; do not fall back to source imports |
+| Initial synthetic document request matches exactly | Fulfill invented HTML at the approved provider route |
+| Named member/tracker/catalog request matches its complete tuple | Fulfill the scenario fixture and record only sanitized method/origin/path metadata |
+| Browser emits a preflight for an approved POST | Fulfill only when origin, requested method, requested headers, and path match exactly |
+| Origin/path/method/body/header is unknown or malformed | Abort, record a sanitized routing error, and fail the test; never contact the network |
+| Deliberate denied-origin probe runs | Observe a locally aborted request and no external response |
+| Before the manual scan button is pressed | Zero member, tracker, and catalog operations |
+| Page reload restores local state | Reinject the built artifact, preserve GM state, and perform zero new provider reads |
+| Page error, unexpected console error, dialog, popup, navigation, failed request, WebSocket, or service worker occurs | Record and fail unless the exact event is an explicitly asserted scenario outcome |
+| Serialized synthetic storage contains fixture token/upstream ID or an unsupported benefit | Fail the test |
+| Visual preview passes | Write only an ignored synthetic screenshot and exit normally |
+| Live provider/Tampermonkey behavior is needed | Stop at the harness boundary and use a separately authorized milestone validation |
+
+### 5. Good / Base / Bad Cases
+
+- **Good**: routing is installed before navigation, the rebuilt IIFE runs with preinstalled async GM mocks, exact synthetic operations complete after a click, reload restores without scanning, and a denied-origin probe is locally aborted.
+- **Base**: the synthetic catalog operation returns one retryable `500`; the exact retry occurs once, tracker data remains partial/current, and no unrelated console or network event is accepted.
+- **Bad**: navigate first and add routes later, use `route.continue()` for unknown requests, import source modules instead of the artifact, accept every console/dialog failure, or use a real browser profile to make routine tests pass.
+
+### 6. Tests Required
+
+For each generated-bundle provider harness, assert:
+
+- test discovery is scoped and the unit-test runner excludes browser E2E files;
+- the default command rebuilds the artifact and completes unattended with deterministic one-worker/no-retry isolation;
+- no named provider operation occurs before the explicit scan action;
+- exact complete-flow operation counts, duplicate physical-card reachability, supported/non-credit filtering, card switching, and visible route/display invariance;
+- normalized GM storage excludes raw fixture tokens and upstream identifiers, survives reload without autoscan, and clear-data removes both store and identity keys;
+- at least one deterministic partial/failure path exercises the built artifact and exact retry/error behavior;
+- an unapproved-origin probe is aborted by the catch-all, and every routing/runtime error collection is empty at scenario end;
+- alternate transports, popups, navigations, service workers, page errors, console errors, failed requests, and dialogs cannot pass silently;
+- the visual command is optional, bounded, synthetic-only, and writes to an ignored location;
+- the production artifact remains free of harness bindings, privileged transport, expanded grants/destinations, mutation fragments, and debug storage APIs.
+
+Run this browser suite alongside targeted Jest, strict TypeScript, targeted ESLint, the isolated userscript build and artifact audit, sensitive-data scanning, structured-config validation, and `git diff --check`. Run authenticated provider/Tampermonkey validation only with explicit action-time authorization.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: an unmatched request can escape to the live network.
+await page.goto(providerUrl);
+await context.route("**/*", async (route) => {
+  if (isKnown(route.request())) await route.fulfill(syntheticResponse);
+  else await route.continue();
+});
+
+// Correct: interception exists before navigation and unknown traffic is denied.
+await context.route("**/*", async (route) => {
+  if (isExactSyntheticDocument(route)) return route.fulfill(syntheticDocument);
+  if (isExactNamedRead(route)) return route.fulfill(syntheticResponse);
+  recordSanitizedRoutingError(route);
+  return route.abort("blockedbyclient");
+});
+await page.goto(syntheticProviderUrl);
+await page.addScriptTag({ path: builtUserscriptPath });
+```
+
+The browser URL may resemble the approved provider route so the real entry guard executes, but every byte must come from the preinstalled synthetic router.

@@ -14,11 +14,13 @@ Website-profile synchronization and public distribution are deferred to later ph
 - The user signs in to Amex themselves; the prototype never handles login credentials or MFA.
 - Every scan is user-initiated and attempts all supported cards.
 - Results appear in a clearly labeled side panel on the Amex benefits page.
-- Only trackable benefits are included: enrollment candidates, spend-progress trackers, credits earned, and completed benefits.
+- Only usable card credits represented in the existing Perks Reminder catalog for the conservatively matched Amex card are included. Upstream enrollment candidates, spend-progress trackers, credits earned, and completed records are eligible only after that card-specific support match.
+- Informational benefits, insurance/protection, access-only perks, free-night/status awards, unmatched titles, wrong-card credits, and unknown card products are omitted rather than relabeled as supported. An intentional omission alone does not make the card observation partial.
 - Approved normalized results persist locally without application-level encryption; no result is sent to the website or a third party.
 - The user explicitly approved replacing the rendered-DOM-only boundary with characterized private Amex read endpoints. Requests may use the browser's existing authenticated Amex session, but the script must not read, log, or persist cookie values, authorization material, or credentials.
 - Raw private response objects and raw account tokens may exist only in memory during the user-started scan. They are discarded when the scan completes, is cancelled, or the document unloads; only validated normalized observations and HMAC-derived local identity metadata persist.
 - Read-only Amex exploration was authorized and completed without enrolling, linking, activating, redeeming, dismissing, submitting, or otherwise changing account state. Redacted observations are recorded in `amex-research.md`, and the public reference comparison is recorded under `research/`.
+- Owner feedback after the `0.2.1` end-to-end run is that the panel is super unclear and unintuitive about benefit status. The current implementation presents all cards and benefits in one long list, uses `Incomplete` for card-level data quality, and uses compact normalized labels such as `required`, `in progress`, and `Used/earned` without a clear action hierarchy.
 
 ### Observed Amex surfaces
 
@@ -68,8 +70,10 @@ Website-profile synchronization and public distribution are deferred to later ph
 ### R3 — Trackable benefit normalization
 
 - Validate account, tracker, and catalog response envelopes at the transport boundary; unknown or malformed variants fail safely without persisting raw payloads.
-- Include enrollment candidates, spend-progress trackers, credits earned, and completed benefits.
-- Exclude benefits that are purely informational and expose no user-specific state.
+- Before normalization, conservatively match the Amex product name to an American Express card in the DB-free Perks Reminder static catalog, then retain only upstream titles that match an explicitly supported usable-credit vocabulary for that exact card.
+- Include enrollment candidates, spend-progress trackers, credits earned, and completed observations only when the matched catalog card represents that usable credit with a positive credit amount.
+- Exclude unmatched and wrong-card titles plus purely informational, insurance/protection, access-only, free-night/status, and otherwise non-credit benefits. Do not add a parser issue or partial marker solely because an unsupported upstream item was omitted.
+- Keep card and title wording aliases exact and reviewed after punctuation/trademark normalization; do not use fuzzy product matching or infer support from generic status/category fields.
 - Normalize, when visibly exposed: title, category, activity kind, enrollment state, tracker state, completion state, earned/used amount, target/limit, remaining amount, period, confidence, issue codes, and observation time.
 - Distinguish `observed`, `not_exposed`, and `unrecognized`; do not infer a state from an absent label or invent a quantity.
 - Preserve monetary and non-monetary units without using floating-point arithmetic for persisted decimal values.
@@ -95,6 +99,10 @@ Website-profile synchronization and public distribution are deferred to later ph
 - Emphasize card product/ending digits and each benefit's primary status plus amount/progress.
 - Put category, enrollment, tracker, period, completion, confidence, and field-availability details in a compact secondary view.
 - Display actionable fixed error messages without raw DOM, opaque tokens, account identifiers, or other sensitive diagnostics.
+- Separate benefit action/progress state from observation freshness and parser completeness. A user must not have to interpret card-level `Incomplete` as a benefit that still needs use.
+- Make the most important benefit states understandable without opening technical details. Human-facing copy should distinguish at least enrollment needed, in progress, completed, unavailable/unknown, stale data, and partial scan data.
+- Avoid rendering every card and every technical field at equal visual priority. The default view must remain usable with the validated 16-card / 130-observation account while preserving access to every normalized observation.
+- Keep issue codes, confidence, raw field availability, and parser diagnostics secondary to the user-facing status summary.
 
 ### R6 — Private API and local-data boundary
 
@@ -113,12 +121,21 @@ Website-profile synchronization and public distribution are deferred to later ph
 - Build an installable Tampermonkey artifact with only the minimum grants needed for local storage and the selected first-party request mechanism; do not request broad cross-origin access or page-global access unless owner-only runtime validation proves it is required and the task design is reviewed again.
 - Keep the portable observation free of Tampermonkey-only identity secrets so a future Manifest V3 extension and separately reviewed website transport can reuse it.
 
+### R8 — Bundle-level synthetic Chromium validation
+
+- Provide an unattended real-Chromium harness that builds and injects the generated userscript IIFE at an approved Amex benefits URL; routine end-to-end iteration must not require Tampermonkey installation or an authenticated Amex session.
+- Install interception before the synthetic document is navigated. Fulfill only that invented document, browser CORS preflights for the two exact reviewed cross-origin reads, and the three exact account/tracker/catalog operations; abort every other request without network fallback.
+- Provide a browser-compatible inspectable `GM.getValue`/`setValue`/`deleteValue` mock, using invented fixtures only, so persistence and deletion can be asserted without adding a production debug/export surface.
+- Exercise the panel through its open Shadow DOM as a user, including manual start, progress, duplicate physical cards, supported-credit filtering, card switching, persistence/reload without autoscan, partial read handling, visible-context invariance, and confirmed deletion of both local keys.
+- Keep screenshots, traces, and browser results ignored and synthetic. A separate optional headed visual-preview command may create a synthetic screenshot for developer inspection.
+- Treat this harness as repeatable regression evidence, not as a replacement for milestone owner-only validation of the Tampermonkey sandbox, authenticated session/CORS behavior, current private response compatibility, or absence of issuer mutations on the live site.
+
 ## Acceptance Criteria
 
 - [ ] AC1: Nothing is scanned before the user presses **Scan all cards** on a supported, authenticated Amex benefits page.
 - [ ] AC2: The scan discovers every supported card relationship from the characterized account response, excludes known non-card products, flags unknown variants, and leaves the original visible card/route unchanged.
 - [ ] AC3: Separate physical cards sharing a product name remain distinct, and neither cards nor benefits are duplicated within a scan.
-- [ ] AC4: Each safely scanned card displays only trackable enrollment, progress, earned-credit, and completed items with normalized status and amount fields.
+- [ ] AC4: Each safely scanned card displays only card-specific usable credits represented in the Perks Reminder catalog; unmatched, wrong-card, informational, insurance/protection, access-only, free-night/status, and otherwise non-credit items are absent from normalized/persisted output and therefore from the panel.
 - [ ] AC5: Unknown response shapes/status values, HTTP/auth failures, timeouts, cancellation, and schema mismatches produce explicit partial/interrupted/error states without guessed data.
 - [ ] AC6: Successful/partial cards update independently; failed cards preserve prior observations with stale/error markers and mixed-age warnings.
 - [ ] AC7: The local side panel shows scan progress, simple benefit summaries, freshness/completeness, timestamps, local-only disclosure, cancellation, and confirmed local-data deletion.
@@ -126,6 +143,9 @@ Website-profile synchronization and public distribution are deferred to later ph
 - [ ] AC9: Synthetic redacted JSON fixtures cover four- and five-digit endings, duplicate product names, primary/supplementary relationships, non-card and unknown account variants, enrollment/progress/earned/completed groups, monetary and count units, optional/missing fields, unknown status values, malformed envelopes, and conflicting benefit identities.
 - [ ] AC10: Unit, response-fixture, type-check, bundle, and owner-only browser validation demonstrate the complete read-only flow, confirm raw payloads are scan-scoped only, and confirm no Amex mutation endpoint/control is activated.
 - [ ] AC11: The portable normalized contract and core modules do not depend on Tampermonkey, Next.js, Prisma, or website authentication and can be reused by a future Chrome extension/sync phase.
+- [ ] AC12: The panel uses a card-first single-card workspace, clearly separates benefit state from observation/data quality, provides understandable status labels and compatible-unit progress, and remains usable with 16 cards and 130 observations without a continuous all-card list.
+- [ ] AC13: Synthetic tests prove catalog-backed card/title variants, wrong-card rejection, unknown-card fail-closed behavior, non-credit omission without partial status, supported-credit deduplication, compatible legacy-store filtering, and unchanged storage schema and network allowlist behavior.
+- [x] AC14: Playwright runs the actual generated userscript IIFE in real Chromium against invented responses, proves no private read occurs before manual start, allows only the exact synthetic document/read boundary, exercises complete and partial flows plus reload/clear behavior through Shadow DOM, and persists no raw fixture token or unsupported benefit.
 
 ## Out of Scope
 
@@ -136,3 +156,20 @@ Website-profile synchronization and public distribution are deferred to later ph
 - Historical local snapshots, analytics, background/automatic scans, multiple simultaneous scan tabs, public userscript distribution, localization, or support for other Amex layouts/accounts.
 - Supporting issuers other than American Express.
 - Packaging the Manifest V3 Chrome extension; Phase 1 only preserves the migration boundary.
+- Using the synthetic browser harness to claim that current live Amex schemas, authenticated cookies/CORS, Tampermonkey grants, or issuer-side no-mutation behavior have been revalidated; those remain milestone owner-only checks.
+
+## Open Product Question — UI clarity revision
+
+- **Resolved:** the owner chose a **card-first** hierarchy. The default panel must make physical-card identity the primary navigation level, then explain benefit status within the chosen card. Account-level scan health and data-quality issues remain visually separate from whether an individual benefit needs action.
+- **Resolved by product design:** show one selected card at a time through a compact, accessible native card switcher. Within the selected card, provide compact filters for all benefits, needs action, in progress, and completed. This avoids recreating the current 16-card continuous scroll while retaining access to every normalized observation.
+
+## UI Clarity Revision — Product Direction
+
+- Match the Perks Reminder visual language: neutral card surfaces, rounded borders, subtle shadows, dark primary actions, muted secondary text, amber open/action states, emerald completed states, and compact pill badges.
+- Keep the global header focused on scan control and account-level scan health. Move destructive local-data clearing into a secondary data/privacy area.
+- Show one physical card at a time. The switcher label must include product name and ending digits so duplicate products remain distinguishable.
+- Replace ambiguous card badges such as `Incomplete` with explicit observation labels: `Up to date`, `Partial data`, `Stale data`, or `Could not read`.
+- Replace normalized vocabulary with human-facing benefit labels such as `Enrollment required`, `Link required`, `Not started`, `In progress`, `Credit earned`, `Completed`, and `Status unavailable`.
+- Present benefit title, status, amount/progress, and period as the primary card content. Put category, confidence, raw field availability, parser issue messages, and timestamps behind secondary disclosures.
+- Show a progress bar only when current and target quantities are both observed with compatible units. Never infer missing values or derive a remaining amount.
+- Preserve the manual-start, read-only, local-only, no-autoscan, and no-new-persistence boundaries.

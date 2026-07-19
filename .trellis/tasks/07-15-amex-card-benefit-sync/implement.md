@@ -99,13 +99,62 @@
 
 **Gate:** the generated `.user.js` contains the expected metadata and only the exact reviewed Amex read endpoints; no mutation, website, analytics, update, third-party, or generic-network code is present.
 
+## 5a. Revise the panel for card-first status clarity
+
+- [x] Add pure presentation helpers for observation quality, human benefit status, filter buckets, compatible-unit progress, and concise amount/period copy without changing normalized contracts.
+- [x] Keep transient selected-card and benefit-filter state inside `AmexBenefitReaderPanel`; preserve the selected card across scan progress rerenders and select a deterministic fallback when records change.
+- [x] Replace the all-card continuous list with a labeled native card switcher and one selected-card workspace.
+- [x] Add selected-card summary counts and filters for all, needs action, in progress, and completed using semantic buttons with `aria-pressed`.
+- [x] Restyle the panel to match Perks Reminder: neutral rounded surfaces, subtle borders/shadows, dark primary action, amber open/action state, emerald complete state, muted unknown state, compact badges, and clear typographic hierarchy.
+- [x] Replace ambiguous user-facing labels (`Incomplete`, `Used/earned`, raw enum wording) with explicit observation-quality and benefit-status copy.
+- [x] Render compatible progress bars without deriving or persisting missing values. Retain observed remaining values only when Amex exposed them.
+- [x] Move card issue codes/timestamps and technical normalized fields behind secondary disclosures. Keep local-only/request disclosure visible and move clear-data into a secondary data/privacy disclosure.
+- [x] Add empty-filter, no-benefit, stale, partial, error/no-data, scan progress, cancellation, and reload-required states.
+- [x] Expand panel tests for card switching, duplicate product labels, status mapping, filters/counts, compatible progress, non-inference, accessible pressed/selected state, scale, and legacy safety states.
+- [x] Bump the userscript patch version to `0.2.2` and rebuild the ignored artifact.
+- [x] Update the intended Tampermonkey copy only with explicit action-time approval. The owner completed Tampermonkey's extension-owned confirmation for `0.2.2`; the legacy `0.1.0` copy remained untouched.
+
+**Gate:** targeted panel tests demonstrate that a 16-card / 130-observation store renders one selected card at a time, every observation remains reachable, benefit status is distinct from data quality, and no provider/network/storage contract changes.
+
+**Result:** the synthetic card-first preview was visually checked at the available desktop viewport, including card switching, pressed filter state, benefit details, data-quality notes, panel scrolling, and the privacy disclosure. The 11 panel tests include an explicit 16-card / 130-observation scale case and error/empty-filter states.
+
+## 5b. Restrict normalized output to represented usable card credits
+
+- [x] Add one portable `supported-card-credits.ts` owner for conservative Amex product aliases, catalog-backed usable-credit rules, and card-scoped semantic credit keys.
+- [x] Extract a small DB-free `american-express-card-catalog.ts` source consumed by both the general Perks Reminder static catalog and the userscript matcher; activate a rule only when the matched card exists and a reviewed anchor resolves to a positive-amount catalog benefit.
+- [x] Keep product matching exact after punctuation/trademark normalization; support only reviewed title phrases and omit ambiguous, unmatched, wrong-card, and unknown-card records.
+- [x] Apply support filtering before status/category/quantity interpretation so intentionally unsupported informational, protection, access-only, free-night/status, and other non-credit items do not create false partial markers.
+- [x] Deduplicate equivalent supported wording variants with a card-scoped key while retaining a conflict issue for materially different observations of the same supported credit.
+- [x] Pass the prepared card product into normalization without changing endpoint definitions, response schemas, raw-data lifetime, storage schema, or panel persistence contracts.
+- [x] Project compatible schema-1 stores through the same support matcher on load and rewrite only when legacy unsupported rows were removed, so stale pre-`1.1.0` rows do not remain persisted or visible before a rescan.
+- [x] Add focused matcher/adapter/storage tests for represented credits, intentional product/title variants, wrong-card rejection, unknown cards, non-credit exclusion, no false partial status, deduplication, and legacy-store filtering.
+- [x] Keep the storage schema at version 1, bump parser rules to `amex-api-us/1.1.0`, bump the userscript patch to `0.2.3`, and rebuild only the ignored artifact.
+
+**Gate:** targeted reader tests, strict TypeScript, targeted ESLint, isolated userscript build, and diff checks pass; existing API client and storage tests continue to prove the unchanged network and persistence boundaries.
+
+## 5c. Add generated-bundle Chromium E2E coverage
+
+- [x] Add `@playwright/test`, a task-scoped Chromium config, build-first package commands, and ignored screenshot/trace/result directories without invoking the general production build or a database command.
+- [x] Install fail-closed routing before navigation: fulfill one invented Amex benefits document, exact synthetic member/tracker/catalog reads, and only their necessary CORS preflights; abort every other request without fallback.
+- [x] Assert exact methods, origins, paths, `Accept`/JSON content type, and fixed request-body structures while keeping all fixture tokens, endings, titles, and quantities invented.
+- [x] Install inspectable promise-based `GM.getValue`/`setValue`/`deleteValue` bindings and a receiver-neutral bound-native-fetch facade that models the Tampermonkey sandbox without adding production storage or transport hooks.
+- [x] Build and inject the actual generated `build/amex-benefit-reader.user.js` IIFE, then interact only through the mounted open Shadow DOM.
+- [x] Cover no autoscan, manual progress/completion, primary/supplementary duplicate products, supported-credit inclusion and non-credit/wrong-card omission, card switching, normalized storage, reload restoration without autoscan, visible-context invariance, confirmed two-key deletion, and unexpected-network refusal.
+- [x] Add a deterministic catalog-`500` retry scenario proving tracker observations remain current partial data.
+- [x] Add `npm run test:e2e:amex:visual` for a headed synthetic preview whose screenshot remains below ignored `test-results/`.
+- [x] Record that routine iterations use the harness while milestone releases still need bounded owner-only checks for live schemas, session/CORS, Tampermonkey behavior, and issuer-side no-mutation evidence.
+
+**Gate:** `npm run test:e2e:amex` passes in installed Playwright Chromium with two unattended scenarios and no unexpected request; the optional headed preview passes and writes only a synthetic ignored screenshot.
+
 ## 6. Automated quality checks
 
 Run targeted checks first:
 
 ```bash
 npm test -- --runInBand src/lib/amex-benefit-reader src/userscripts/amex-benefit-reader
-npx tsc --noEmit --pretty false
+npm run test:e2e:amex
+npx tsc --noEmit --pretty false --incremental false
+npx eslint playwright.amex.config.ts tests/e2e/amex-benefit-reader
 npm run build:amex-userscript
 git diff --check
 ```
@@ -134,35 +183,35 @@ Live clear-data behavior was validated earlier in the task and was not repeated 
 
 - [x] Build and manually install/update `build/amex-benefit-reader.user.js` in Tampermonkey.
 - [x] Open a supported benefits page and confirm no scan occurs until **Scan all cards** is pressed.
-- [ ] Confirm the panel loads existing local records and displays the local-only disclosure.
-- [ ] Run one scan and verify:
+- [x] Confirm the panel loads existing local records and displays the local-only disclosure.
+- [x] Run one scan and verify:
   - attempted card count matches supported relationships returned by account discovery;
   - non-card products are excluded;
   - primary/supplementary cards and duplicate product names remain separate;
   - displayed trackable benefit states/amounts match the corresponding visible Amex UI where available;
   - unknown/optional fields are represented without guesses;
   - the original selected card and route remain unchanged.
-- [ ] Confirm no enroll/link/activate/redeem/add-offer/payment control or write endpoint was invoked.
+- [x] Confirm no enroll/link/activate/redeem/add-offer/payment control or write endpoint was invoked.
 - [x] Observe only redacted request metadata and confirm userscript traffic is limited to the exact approved first-party account/tracker/catalog read destinations and methods. Do not capture or save live response bodies, headers, cookies, request bodies, or account tokens.
 - [ ] Inspect Tampermonkey storage structurally and confirm only the two expected keys exist and no raw response, opaque token, header, request body, or forbidden sensitive field is stored; do not export the values.
 - [ ] Confirm raw response objects disappear after completion/cancellation by runtime-owned diagnostics or lifecycle counters, not by exporting payload contents.
-- [ ] Simulate a safe response/card failure using a synthetic fixture or controlled adapter test; confirm the successful cards update while the failed card retains prior data as stale.
-- [ ] Test cancellation and verify already committed cards remain safe and the run is marked interrupted.
+- [x] Simulate a safe response/card failure using a synthetic fixture or controlled adapter test; confirm the successful cards update while the failed card retains prior data as stale.
+- [x] Test cancellation and verify already committed cards remain safe and the run is marked interrupted.
 - [x] Use **Clear local data** and verify both result and identity-secret keys are removed. This was completed earlier in the task and was not repeated after the final `0.2.1` scan.
-- [ ] Do not save or commit authenticated screenshots, live page exports, console dumps, or storage exports.
-- [ ] Run the project `verify` skill for end-to-end observable behavior before any commit.
+- [x] Do not save or commit authenticated screenshots, live page exports, console dumps, or storage exports.
+- [x] Run the available project verification workflow for end-to-end observable behavior before any commit (`trellis-check`; no separate `verify` skill is installed).
 
 **Browser rollback:** cancel the scan, clear local data if desired, disable the userscript, and restore the previous bundle.
 
 ## 8. Final review and documentation
 
-- [ ] Map test and browser evidence to AC1–AC11 in `prd.md`.
-- [ ] Recheck that no Phase 2 website sync/API/database work entered the diff.
-- [ ] Recheck the Chrome-extension migration boundary: portable contract/response/engine modules contain no Tampermonkey/Next/Prisma/website-auth dependencies, and issuer-session transport remains behind the client port.
+- [x] Map test and browser evidence to AC1–AC11 in `prd.md` and the sanitized validation sections of `amex-research.md`.
+- [x] Recheck that no Phase 2 website sync/API/database work entered the diff.
+- [x] Recheck the Chrome-extension migration boundary: portable contract/response/engine modules contain no Tampermonkey/Next/Prisma/website-auth dependencies, and issuer-session transport remains behind the client port.
 - [x] Update `amex-research.md` only with redacted endpoint/schema/parser facts learned during validation; never record live URLs containing identifiers, bodies, headers, tokens, or payload values.
-- [ ] Update project specs only if implementation establishes a reusable project-wide convention.
-- [ ] Run final `trellis-check`, targeted tests, type-check, userscript build, lint, full tests, and `git diff --check`.
-- [ ] Review the diff for secrets and authenticated account data before commit.
+- [x] Update project specs only if implementation establishes a reusable project-wide convention. The browser-read spec now records both the authenticated-read boundary and the reusable presentation rule that observation quality must remain separate from benefit state; the duplicate installed-script observation remains task-local.
+- [x] Run final `trellis-check`, targeted tests, type-check, userscript build, lint, full tests, and `git diff --check`. Full Jest, TypeScript, userscript build, and diff checks pass; repository lint was run and retains eight pre-existing unrelated errors.
+- [x] Review the diff for secrets and authenticated account data before commit.
 
 ## Risk and rollback summary
 

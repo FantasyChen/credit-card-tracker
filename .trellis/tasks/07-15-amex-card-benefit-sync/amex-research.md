@@ -107,3 +107,51 @@ The final owner-only runtime validation was performed after reauthentication and
 - Strict TypeScript and targeted ESLint checks passed.
 - The userscript build, audits, secret scan, JSON and JSONL validation, and diff/whitespace checks passed.
 - The existing Next/SWC version mismatch warning is unrelated to this userscript validation.
+
+## Codex Computer Use revalidation on 2026-07-17
+
+The owner supplied an already authenticated Amex tab for a second end-to-end pass. The pass remained read-only. No login flow, enrollment, linking, activation, redemption, offer, payment, or other Amex mutation control was used. No authenticated Amex screenshot, storage export, response/request body, header, cookie, opaque token, card display value, benefit title, or amount was written to the repository.
+
+### Restored-state and manual-start checks
+
+- The supplied tab began on the Amex member home page. Navigating directly to the allowlisted `/card-benefits/view-all` route mounted one reader panel.
+- Before a new scan, the panel restored all 16 prior card records, displayed the local-only and raw-response-not-saved disclosures, exposed an enabled **Scan all cards** control, and had no active cancellation control.
+- The restored state retained the prior aggregate `partial` classification instead of describing mixed or incomplete data as fully current.
+
+### Fresh live scan
+
+- One manual scan attempted all 16 discovered cards and returned to idle with all 16 observation and attempt timestamps updated on 2026-07-17.
+- Five duplicate-product groups containing 14 physical cards remained represented by separate stored records.
+- The selected visible card matched a stored physical-card record. Of six visible benefit catalog tiles on that card, one exact title also appeared in the trackable stored observation set; the other visible tiles were not assumed to be user-specific trackable activity.
+- The final aggregate remained `partial`. The panel exposed six `unknown_quantity`, two `benefit_identity_conflict`, and three `http_error` issue messages. No signed-out, timeout, content-type, redirect, storage, cancellation, or visible-context issue was exposed.
+- The visible benefits route and selected-card context remained unchanged.
+
+### Reload and persistence behavior
+
+- A real reload restored the same 16 records and the same 130 normalized observations with unchanged observation timestamps.
+- The reader returned to idle with **Scan all cards** enabled and no active **Cancel** control. The reload did not update any observation timestamp, which confirms that the userscript did not auto-start another scan.
+- The stored normalized observations were deliberately left in place. Live clear-data behavior remains covered by the earlier owner validation, and cancellation/raw-lifetime behavior remains covered by the automated scan-engine and storage tests.
+
+### Installed-script caveat
+
+- Tampermonkey currently shows both the intended `0.2.1` userscript and an older `0.1.0` copy enabled.
+- Only one reader panel mounted, and the observed scan behavior matched `0.2.1`; the older copy did not produce a second panel or duplicate scan in this pass.
+- The older copy was not disabled or deleted because the owner did not authorize changing installed-script state. Removing or disabling it is recommended as environment cleanup so a future change in script ordering cannot expose the retired implementation.
+
+### Repeated final quality gate
+
+- Repository Jest: 42 suites passed; 300 tests passed and one test was skipped.
+- Strict TypeScript passed with `--incremental false`.
+- The isolated userscript build and `git diff --check` passed.
+- Repository-wide lint still fails only on the eight pre-existing unused-variable errors outside the Amex task diff.
+- The pre-existing Next.js `15.5.11` versus `@next/swc` `15.5.7` warning remains unrelated.
+
+## Card-first UI revision validation on 2026-07-17
+
+- A synthetic local preview used invented card and benefit data only; it made no provider request and contained no authenticated account information.
+- The panel was visually checked at the available desktop viewport in its default, filtered, card-switched, scrolled, and expanded privacy states. The selected physical card remains the central workspace, ending digits distinguish duplicate products, pressed filter state is visible, and technical/data-quality information remains secondary.
+- Automated panel coverage now includes 11 tests, including an explicit 16-card / 130-observation account, duplicate products, card switching, filter counts, compatible and incompatible quantities, empty filters, error/no-data, partial/stale quality, scan notes, cancellation, and confirmed local-data clearing.
+- The final repository pass completed 42 suites with 304 passing tests and one skipped test; strict TypeScript, targeted ESLint, the isolated userscript build, task/artifact audits, and `git diff --check` passed. Repository-wide lint retains the same eight unrelated baseline errors.
+- The ignored userscript artifact was rebuilt as `0.2.2` and the owner approved its installation. Tampermonkey's extension-owned update confirmation required the owner's manual click because browser automation cannot control that protected page.
+- After sign-in, the supported Amex benefits route mounted exactly one new card-first panel. It restored 16 cards and 130 observations with nine data-note cards, showed the prior partial scan summary, exposed **Scan all cards**, and had no active cancel control. This confirms the installed update restored local state without auto-starting a scan.
+- Verification read only sanitized panel aggregates. No authenticated screenshot, card label, ending digits, benefit title/amount, storage export, response/request data, credentials, or session material was retained.

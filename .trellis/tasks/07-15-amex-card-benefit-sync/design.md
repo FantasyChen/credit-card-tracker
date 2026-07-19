@@ -26,12 +26,14 @@ It does **not** add a Next.js route, Prisma migration, website authentication br
 ## 2. Proposed repository layout
 
 ```text
+src/lib/american-express-card-catalog.ts
 src/lib/amex-benefit-reader/
   contract.ts
   identity.ts
   amex-api-contract.ts
   amex-api-client.ts
   amex-response-adapter.ts
+  supported-card-credits.ts
   scan-engine.ts
   storage-policy.ts
   __fixtures__/
@@ -95,14 +97,24 @@ The build script uses a direct `esbuild` development dependency and emits an ign
 - Returns validated response objects to the engine and retains raw JSON only in local variables scoped to the active request/scan.
 - Supports `AbortSignal`, bounded timeout, and bounded concurrency.
 
+### `american-express-card-catalog.ts` and `supported-card-credits.ts`
+
+- `american-express-card-catalog.ts` is the small DB-free American Express catalog source consumed by both the general website `static-catalog.ts` and the browser-side support matcher. This keeps the userscript from importing unrelated usage-guide content while avoiding a disconnected duplicate catalog.
+- `supported-card-credits.ts` owns the single reusable card/product and usable-credit matching vocabulary used before normalization and when projecting compatible stored observations.
+- A credit rule activates only when the conservatively matched American Express card still contains a positive-amount catalog benefit with the reviewed anchor.
+- The matcher normalizes punctuation, trademark marks, `&`, and `+`, but product matching remains exact against reviewed aliases and title matching remains reviewed phrase containment. It performs no fuzzy matching.
+- It returns a card-scoped semantic credit key for deduplication. Unknown cards, unmatched titles, and ambiguous title matches return no match.
+- Provider aliases remain separate from provider transport, Prisma, Next.js, website authentication, server-only code, and the unrelated benefit usage-guide payload.
+
 ### `amex-response-adapter.ts`
 
 - Classifies supported-card, known-non-card, primary/supplementary, and unknown account relationships from validated JSON.
 - Requires an explicit four- or five-digit display field and never derives ending digits from the opaque token.
-- Normalizes tracker and catalog records into enrollment, spend-progress, earned-credit, and completed observations.
-- Enriches tracker items with catalog title/category/enrollment data without adding informational-only benefits.
-- Preserves decimal strings and explicit unknown/not-exposed states; never defaults missing values to zero or manufactures remainder/period values.
-- Returns explicit parser issues instead of guessing.
+- Filters tracker/catalog records through `supported-card-credits.ts` before interpreting status, quantity, or layout fields, then normalizes matched records into enrollment, spend-progress, earned-credit, and completed observations.
+- Enriches matched tracker items with catalog title/category/enrollment data without adding informational-only benefits.
+- Omits unmatched, wrong-card, informational, insurance/protection, access-only, free-night/status, and otherwise non-credit records without making the card partial solely for the omission.
+- Preserves decimal strings and explicit unknown/not-exposed states for matched credits; never defaults missing values to zero or manufactures remainder/period values.
+- Deduplicates equivalent wording variants by the card-scoped supported-credit key and returns explicit parser issues only for conflicts or unknown fields on a matched credit.
 
 ### `scan-engine.ts`
 
@@ -145,9 +157,21 @@ interface ResultStore {
 
 ### Tampermonkey runtime
 
-- `tampermonkey-storage.ts` adapts `GM.getValue`, `GM.setValue`, and `GM.deleteValue` to `ResultStore`.
+- `tampermonkey-storage.ts` adapts `GM.getValue`, `GM.setValue`, and `GM.deleteValue` to `ResultStore`. On load it applies the same support matcher to compatible schema-1 observations, removes legacy unsupported benefit rows, and rewrites only when that projection changed; this prevents pre-`1.1.0` rows from persisting or reaching the panel without changing the schema.
 - `panel.ts` mounts one fixed host below `document.documentElement`, attaches a Shadow DOM, and renders semantic controls/status without depending on Amex CSS.
 - `amex-benefit-reader.user.ts` validates the route, constructs ports, loads stored results, mounts the panel, and starts a scan only from the button callback.
+
+### Card-first panel presentation revision
+
+- `panel.ts` remains a dependency-free Shadow DOM renderer. The revision changes presentation and transient UI state only; normalized contracts, storage schema, transport, scan orchestration, and provider permissions remain unchanged.
+- The panel keeps a transient `selectedCardId` and benefit filter. Neither is persisted. A native `<select>` lists every physical card as product name plus ending digits and shows one card workspace at a time.
+- Account-level scan status is rendered separately from the selected card's observation quality. Scan labels describe the run (`Ready`, `Scanning`, `Scan finished with data notes`, `Interrupted`, `Failed`); selected-card quality labels describe stored evidence (`Up to date`, `Partial data`, `Stale data`, `Could not read`).
+- The selected card exposes derived benefit counts and four filters: all, needs action, in progress, and completed. Filtering is a pure presentation projection over normalized observations.
+- A presentation helper maps normalized fields to a human status label, tone, filter bucket, amount summary, and optional compatible-unit progress percentage. It must not add provider facts or persist derived values.
+- Benefit rows follow the existing Perks Reminder card language: rounded neutral surface, subtle border/shadow, a colored left status rail, compact status pill, prominent title/amount, and a secondary details disclosure.
+- Card-level issue codes and observation timestamps move into a `Data quality and timestamps` disclosure. Global privacy copy remains visible but compact; **Clear local data** moves into a secondary `Data and privacy` disclosure.
+- Accessibility remains semantic: labeled card select, buttons for filters with `aria-pressed`, live scan status, visible focus rings, minimum 40px primary controls, meaningful empty-filter states, and native disclosures.
+- Responsive width increases modestly while remaining bounded to the viewport. The panel continues to isolate styles from Amex through Shadow DOM.
 
 ## 4. Normalized contracts
 
@@ -271,7 +295,7 @@ Use normalized title + category + activity kind, optionally strengthened by a lo
 
 1. Derive/reconcile the installation-local fingerprint from the raw account token.
 2. Call only the allowlisted benefit-tracker and benefit-catalog read operations for that token.
-3. Strictly validate the response envelopes, normalize tracker/catalog data, and merge trackable records by semantic identity.
+3. Strictly validate the response envelopes, match only catalog-represented usable credits for the prepared card product, normalize those tracker/catalog records, and merge them by the card-scoped supported-credit identity.
 4. Commit the normalized complete/partial observation through storage policy.
 5. Release raw per-card responses and the token reference as soon as the card attempt finishes.
 
@@ -289,7 +313,7 @@ The client does not click the account selector, benefit tabs, or tiles and does 
 - `partial`: safe normalized data exists, but one or more optional records/fields/statuses are unrecognized.
 - `failed`: authentication, endpoint, HTTP, identity, response-schema, deduplication, or safety verification failed.
 
-Recognized optional empty arrays remain complete. Missing required envelopes or unknown response structures do not.
+Recognized optional empty arrays remain complete. A validated but unsupported upstream benefit is intentionally omitted and does not make the observation partial. Missing required envelopes or unknown fields/statuses on a matched supported credit still do.
 
 ### Persistence disposition
 
@@ -372,12 +396,24 @@ Cover:
 - Contract: strict validation and forbidden key rejection.
 - Identity: deterministic HMAC, separate same-name cards, ambiguity rejection, and no raw token serialization.
 - API contract/client: exact endpoint/origin/path/method allowlist, fresh credentialed requests, redirect/auth/HTTP/timeouts, cancellation, and rejection of arbitrary or mutation destinations.
-- Response adapter: account filtering, relationship handling, strict envelope recognition, status/quantity normalization, enrichment, deduplication, and unknown handling.
+- Supported-credit matcher/response adapter: catalog-backed product aliases, represented usable credits, intentional title variants, wrong-card/unmatched/informational/protection/access/non-credit exclusion, unknown-card fail-closed behavior, status/quantity normalization, enrichment, supported-credit deduplication, and omission without false partial status.
 - Engine: all cards attempted, per-card continuation, cancellation, timeout, bounded concurrency, raw-response lifetime, and visible-page invariance.
 - Storage: complete/partial replacement, stale preservation, no-data shell, schema refusal, revision increments, mixed observation times, and rejection of raw response/token fields.
 - Panel: manual start, progress, stale/incomplete labels, accessible controls, details, cancellation, and confirmed deletion.
 
 Mock `fetch` with synthetic Amex responses and assert every request matches the exact read allowlist. Patch `XMLHttpRequest`, `sendBeacon`, and `WebSocket` to throw. Instrument all known mutation endpoint fragments and UI controls to fail if activated. Serialize outputs and assert raw payloads, raw tokens, headers, and disallowed keys are absent.
+
+### Generated-bundle Chromium harness
+
+`playwright.amex.config.ts` owns a task-scoped Chromium runner under `tests/e2e/amex-benefit-reader/`. `npm run test:e2e:amex` first rebuilds `build/amex-benefit-reader.user.js`, then injects that exact generated IIFE into an invented document served at `https://global.americanexpress.com/card-benefits/view-all`. The test does not import or execute the userscript entry, engine, matcher, panel, or storage adapter from source.
+
+The harness installs `context.route("**/*")` before navigation. It fulfills the synthetic document, the exact member `GET`, and the exact tracker/catalog `POST` operations from invented inline fixtures. It also answers only the browser-generated CORS `OPTIONS` preflights for those two reviewed POST paths. Every other request is aborted with no `continue`/`fallback`; route assertion failures are recorded and aborted. Request assertions cover exact URL, method, `Accept`, JSON content type, and fixed body structure. Chromium service workers are blocked. Because Tampermonkey exposes a receiver-neutral `fetch` facade while page-native Chromium `fetch` requires a `Window` receiver, the test init script wraps bound native `fetch` without changing destinations or request options; all resulting native requests still pass through the fail-closed route.
+
+Before bundle injection, Playwright bindings install promise-based `GM.getValue`, `GM.setValue`, and `GM.deleteValue` over a Node-owned in-memory map. Tests may inspect that map, but production receives no storage export/debug interface. Reload recreates the synthetic document and reinjects the built artifact while retaining the harness map, modeling userscript-manager storage without page-origin storage.
+
+The unattended suite covers manual-only initiation, visible progress/completion, primary and supplementary duplicate-product cards, supported-credit filtering, card switching, normalized persistence, reload restoration without autoscan, context invariance, clear confirmation/removal of both keys, and a deterministic catalog `500` retry that retains tracker observations as partial data. Expected UI assertions are explicit rather than computed from the production matcher. `npm run test:e2e:amex:visual` runs an opt-in headed synthetic preview and writes a screenshot below ignored `test-results/`; default runs retain traces/screenshots only on failure.
+
+This harness proves generated-bundle integration and deny-by-default test networking. It cannot prove current private Amex response compatibility, real authenticated cookie/CORS policy, Tampermonkey grant/sandbox behavior beyond the modeled `GM`/fetch facades, or issuer-side no-mutation behavior. Milestone releases still require the bounded owner-only live validation below.
 
 ### Owner-only browser validation
 
