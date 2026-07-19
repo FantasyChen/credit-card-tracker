@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const OBSERVATION_CONTRACT_VERSION = "amex-benefits/1" as const;
 export const STORAGE_SCHEMA_VERSION = 1 as const;
-export const PARSER_VERSION = "amex-api-us/1.0.1" as const;
+export const PARSER_VERSION = "amex-api-us/1.1.0" as const;
 
 export const issueCodeSchema = z.enum([
   "unknown_account_variant",

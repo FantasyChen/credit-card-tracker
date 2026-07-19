@@ -3,7 +3,7 @@
     "trackers": [
       {
         "sorBenefitId": "invented-spend-id",
-        "benefitName": "Synthetic Travel Credit",
+        "benefitName": "Synthetic Airline Fee Credit",
         "category": "spend",
         "status": "ACTIVE",
         "trackerDuration": "2026 calendar year",
@@ -18,7 +18,7 @@
       },
       {
         "sorBenefitId": "invented-earned-id",
-        "benefitName": "Synthetic Earned Credit",
+        "benefitName": "Synthetic Hilton Credit",
         "category": "usage",
         "status": "ACTIVE",
         "periodStartDate": "2026-07-01",
@@ -32,7 +32,7 @@
       },
       {
         "sorBenefitId": "invented-complete-id",
-        "benefitName": "Synthetic Completed Benefit",
+        "benefitName": "Synthetic Dell Technologies Credit",
         "category": "loan",
         "status": "ACHIEVED",
         "tracker": {
@@ -44,7 +44,7 @@
       },
       {
         "benefitId": "invented-count-id",
-        "benefitName": "Synthetic Visit Counter",
+        "benefitName": "Synthetic Wireless Bill Credit",
         "category": "access",
         "status": "ACTIVE",
         "tracker": {

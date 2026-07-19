@@ -9,7 +9,7 @@ const output = resolve(root, "build/amex-benefit-reader.user.js");
 const metadata = `// ==UserScript==
 // @name         Perks Reminder — Amex Benefit Reader
 // @namespace    https://perks-reminder.com/
-// @version      0.2.1
+// @version      0.2.3
 // @description  Locally reads normalized Amex benefit status after a manual first-party read request.
 // @match        https://global.americanexpress.com/card-benefits/*
 // @run-at       document-idle

@@ -1,3 +1,4 @@
+import { storeEnvelopeSchema, type NormalizedBenefitObservationV1 } from "@/lib/amex-benefit-reader/contract";
 import { IDENTITY_SECRET_KEY, STORE_KEY } from "@/lib/amex-benefit-reader/storage-policy";
 import { TampermonkeyResultStore } from "../tampermonkey-storage";
 
@@ -5,6 +6,62 @@ interface FakeGm {
   getValue: jest.Mock<Promise<unknown>, [string, unknown?]>;
   setValue: jest.Mock<Promise<void>, [string, unknown]>;
   deleteValue: jest.Mock<Promise<void>, [string]>;
+}
+
+function storedBenefit(title: string): NormalizedBenefitObservationV1 {
+  return {
+    benefitKey: `legacy-benefit-${title.toLowerCase().replace(/\s+/g, "-")}`,
+    title,
+    category: { state: "not_exposed" },
+    activityKind: "spend_progress",
+    enrollmentState: { state: "not_exposed" },
+    trackerState: { state: "not_exposed" },
+    completionState: { state: "not_exposed" },
+    earnedOrUsed: { state: "not_exposed" },
+    targetOrLimit: { state: "not_exposed" },
+    remaining: { state: "not_exposed" },
+    period: { state: "not_exposed" },
+    confidence: "high",
+    issueCodes: [],
+  };
+}
+
+function legacyUnfilteredStore() {
+  const localCardId = "11111111-1111-4111-8111-111111111111";
+  const observedAt = "2026-07-15T12:00:00.000Z";
+  return storeEnvelopeSchema.parse({
+    schemaVersion: 1,
+    revision: 4,
+    updatedAt: observedAt,
+    cards: {
+      [localCardId]: {
+        localCardId,
+        identity: {
+          sourceFingerprint: "a".repeat(64),
+          productName: "American Express Gold Card",
+          endingDigits: "1234",
+        },
+        latest: {
+          contractVersion: "amex-benefits/1",
+          issuer: "american_express_us",
+          localCardId,
+          productName: "American Express Gold Card",
+          endingDigits: "1234",
+          observedAt,
+          parserVersion: "amex-api-us/1.0.0",
+          completeness: "complete",
+          issueCodes: [],
+          benefits: [storedBenefit("Dining Credit"), storedBenefit("Cell Phone Protection")],
+        },
+        freshness: "current",
+        completeness: "complete",
+        observedAt,
+        lastAttemptAt: observedAt,
+        error: null,
+      },
+    },
+    lastScan: null,
+  });
 }
 
 describe("Tampermonkey storage adapter", () => {
@@ -27,6 +84,54 @@ describe("Tampermonkey storage adapter", () => {
     const store = new TampermonkeyResultStore();
     await expect(store.load()).resolves.toMatchObject({ schemaVersion: 1, revision: 0, cards: {} });
     expect(gm.getValue).toHaveBeenCalledWith(STORE_KEY, null);
+    expect(gm.setValue).not.toHaveBeenCalled();
+  });
+
+  it("removes unsupported benefits from a legacy compatible store before persistence and display", async () => {
+    gm.getValue.mockResolvedValue(legacyUnfilteredStore());
+
+    const loaded = await new TampermonkeyResultStore().load();
+    const record = Object.values(loaded.cards)[0];
+    expect(record.latest?.benefits.map((benefit) => benefit.title)).toEqual(["Dining Credit"]);
+    expect(record).toMatchObject({
+      freshness: "current",
+      completeness: "complete",
+      observedAt: "2026-07-15T12:00:00.000Z",
+      lastAttemptAt: "2026-07-15T12:00:00.000Z",
+      error: null,
+      latest: {
+        parserVersion: "amex-api-us/1.0.0",
+        completeness: "complete",
+        issueCodes: [],
+      },
+    });
+    expect(loaded).toMatchObject({ schemaVersion: 1, revision: 5, lastScan: null });
+    expect(gm.setValue).toHaveBeenCalledTimes(1);
+    expect(gm.setValue).toHaveBeenCalledWith(STORE_KEY, loaded);
+  });
+
+  it("does not rewrite a compatible store when every persisted benefit is still supported", async () => {
+    const compatible = legacyUnfilteredStore();
+    const record = Object.values(compatible.cards)[0];
+    if (!record.latest) throw new Error("Expected a synthetic latest observation.");
+    record.latest.benefits = [storedBenefit("Dining Credit")];
+    gm.getValue.mockResolvedValue(compatible);
+
+    const loaded = await new TampermonkeyResultStore().load();
+    expect(loaded.revision).toBe(4);
+    expect(gm.setValue).not.toHaveBeenCalled();
+  });
+
+  it("refuses malformed local data without overwriting it during projection", async () => {
+    gm.getValue.mockResolvedValue({
+      schemaVersion: 1,
+      revision: 4,
+      updatedAt: "2026-07-15T12:00:00.000Z",
+      cards: "not-a-card-map",
+      lastScan: null,
+    });
+
+    await expect(new TampermonkeyResultStore().load()).rejects.toThrow();
     expect(gm.setValue).not.toHaveBeenCalled();
   });
 
