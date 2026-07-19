@@ -145,7 +145,7 @@ Website-profile synchronization and public distribution are deferred to later ph
 - [ ] AC11: The portable normalized contract and core modules do not depend on Tampermonkey, Next.js, Prisma, or website authentication and can be reused by a future Chrome extension/sync phase.
 - [ ] AC12: The panel uses a card-first single-card workspace, clearly separates benefit state from observation/data quality, provides understandable status labels and compatible-unit progress, and remains usable with 16 cards and 130 observations without a continuous all-card list.
 - [ ] AC13: Synthetic tests prove catalog-backed card/title variants, wrong-card rejection, unknown-card fail-closed behavior, non-credit omission without partial status, supported-credit deduplication, compatible legacy-store filtering, and unchanged storage schema and network allowlist behavior.
-- [x] AC14: Playwright runs the actual generated userscript IIFE in real Chromium against invented responses, proves no private read occurs before manual start, allows only the exact synthetic document/read boundary, exercises complete and partial flows plus reload/clear behavior through Shadow DOM, and persists no raw fixture token or unsupported benefit.
+- [x] AC14: Playwright runs the actual generated userscript IIFE in real Chromium against invented responses, proves no private read occurs before manual start, allows only the exact synthetic document/read boundary, exercises complete, partial, mid-scan cancellation, later-rescan stale-preservation, reload, and clear behavior through Shadow DOM, and persists no raw fixture token or unsupported benefit.
 
 ## Out of Scope
 
