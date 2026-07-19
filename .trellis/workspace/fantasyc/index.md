@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 1
-- **Last Active**: 2026-07-15
+- **Total Sessions**: 2
+- **Last Active**: 2026-07-19
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~39 | Active |
+| `journal-1.md` | ~76 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 2 | 2026-07-19 | Improve Amex reader quality and browser E2E | `1c7716e`, `ec05855`, `17fb09f`, `acd464f`, `93e6ae2` | `feat/amex-benefit-reader-phase-1` |
 | 1 | 2026-07-15 | Initialize Trellis and bootstrap specs | `30e080a` | `main` |
 <!-- @@@/auto:session-history -->
 
