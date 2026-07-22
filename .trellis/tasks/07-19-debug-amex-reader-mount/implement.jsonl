@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Defines the manual-start, exact-operation, visible-context, persistence, and generated-bundle safety contracts that site-wide mounting must preserve."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Defines semantic control, accessible name, aria-expanded, focus, and interaction requirements for the collapsed launcher and panel toggle."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Defines strict TypeScript ownership and boundary rules for the route predicates, nullable context, and panel options."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines colocated behavior tests, accessibility assertions, targeted Jest, strict type-check, and diff validation."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Requires searching and retaining one source of truth for route constants and predicates rather than duplicating match logic."}
+{"file":".trellis/tasks/archive/2026-07/07-15-amex-card-benefit-sync/amex-research.md","reason":"Provides the task-local reviewed Amex integration and privacy evidence that implementation must not broaden or expose."}
