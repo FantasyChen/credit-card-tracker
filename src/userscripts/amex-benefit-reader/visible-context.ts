@@ -1,10 +1,19 @@
 import type { VisibleContextGuard, VisiblePageContext } from "@/lib/amex-benefit-reader/scan-engine";
 
-const ALLOWED_PATHS = new Set(["/card-benefits/view-all", "/card-benefits/activity"]);
+export const AMEX_MEMBER_ORIGIN = "https://global.americanexpress.com";
+const AMEX_BENEFITS_PATHS = new Set(["/card-benefits/view-all", "/card-benefits/activity"]);
 const SELECTED_CARD_DISPLAY = '[data-testid="simple_switcher_combobox"][role="combobox"], [data-testid*="account-selector"] button[aria-expanded], [data-pr-account-selector-trigger]';
 
-export function isSupportedAmexBenefitsRoute(locationValue: Pick<Location, "origin" | "pathname"> = window.location): boolean {
-  return locationValue.origin === "https://global.americanexpress.com" && ALLOWED_PATHS.has(locationValue.pathname);
+export function isSupportedAmexOrigin(
+  locationValue: Pick<Location, "origin"> = window.location,
+): boolean {
+  return locationValue.origin === AMEX_MEMBER_ORIGIN;
+}
+
+export function isPrimaryAmexBenefitsRoute(
+  locationValue: Pick<Location, "origin" | "pathname"> = window.location,
+): boolean {
+  return isSupportedAmexOrigin(locationValue) && AMEX_BENEFITS_PATHS.has(locationValue.pathname);
 }
 
 function displayFingerprint(root: ParentNode): string | null {
@@ -29,18 +38,16 @@ export class AmexVisibleContextGuard implements VisibleContextGuard {
   ) {}
 
   capture(): VisiblePageContext {
-    if (!isSupportedAmexBenefitsRoute(this.locationValue)) throw new Error("Unsupported Amex route.");
-    const selectedCardDisplayFingerprint = displayFingerprint(this.root);
-    if (!selectedCardDisplayFingerprint) throw new Error("The visible card context is unavailable.");
+    if (!isSupportedAmexOrigin(this.locationValue)) throw new Error("Unsupported Amex origin.");
     return {
       route: this.locationValue.pathname,
-      selectedCardDisplayFingerprint,
+      selectedCardDisplayFingerprint: displayFingerprint(this.root),
     };
   }
 
   verifyUnchanged(context: VisiblePageContext): boolean {
-    return isSupportedAmexBenefitsRoute(this.locationValue)
-      && this.locationValue.pathname === context.route
-      && displayFingerprint(this.root) === context.selectedCardDisplayFingerprint;
+    if (!isSupportedAmexOrigin(this.locationValue) || this.locationValue.pathname !== context.route) return false;
+    return context.selectedCardDisplayFingerprint === null
+      || displayFingerprint(this.root) === context.selectedCardDisplayFingerprint;
   }
 }
