@@ -9,10 +9,17 @@ import type {
 import { fixedErrorMessage, hasMixedObservations } from "@/lib/amex-benefit-reader/storage-policy";
 import type { ScanProgress, ScanReporter } from "@/lib/amex-benefit-reader/scan-engine";
 
+export const AMEX_READER_HOST_ID = "perks-reminder-amex-reader";
+
 export interface PanelActions {
   startScan(): Promise<void>;
   cancelScan(): void;
   clearData(): Promise<void>;
+}
+
+export interface PanelOptions {
+  initiallyCollapsed?: boolean;
+  requiresReloadAfterClear?: boolean;
 }
 
 type BenefitFilter = "all" | "action" | "progress" | "complete";
@@ -184,30 +191,38 @@ export class AmexBenefitReaderPanel implements ScanReporter {
   private errorMessage: string | null = null;
   private selectedCardId: string | null = null;
   private benefitFilter: BenefitFilter = "all";
+  private collapsed: boolean;
+  private readonly requiresReloadAfterClear: boolean;
 
   constructor(
     initialStore: StoreEnvelopeV1,
     private readonly actions: PanelActions,
-    private readonly requiresReloadAfterClear = false,
+    options: PanelOptions = {},
   ) {
     this.store = initialStore;
+    this.collapsed = options.initiallyCollapsed ?? false;
+    this.requiresReloadAfterClear = options.requiresReloadAfterClear ?? false;
     this.reconcileSelectedCard();
     this.host = document.createElement("div");
-    this.host.id = "perks-reminder-amex-reader";
+    this.host.id = AMEX_READER_HOST_ID;
     this.root = this.host.attachShadow({ mode: "open" });
     document.documentElement.append(this.host);
     if (initialStore.lastScan) this.progress = scanSummaryText(initialStore.lastScan);
     this.render();
   }
 
-  static mountError(message: string, clearData: () => Promise<void>): AmexBenefitReaderPanel | null {
+  static mountError(
+    message: string,
+    clearData: () => Promise<void>,
+    options: PanelOptions = {},
+  ): AmexBenefitReaderPanel | null {
     const now = new Date().toISOString();
     const empty: StoreEnvelopeV1 = { schemaVersion: 1, revision: 0, updatedAt: now, cards: {}, lastScan: null };
     const panel = new AmexBenefitReaderPanel(empty, {
       startScan: async () => undefined,
       cancelScan: () => undefined,
       clearData,
-    }, true);
+    }, { ...options, requiresReloadAfterClear: true });
     panel.mode = "error";
     panel.errorMessage = message;
     panel.render();
@@ -216,6 +231,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
 
   report(progress: ScanProgress): void {
     if (progress.type === "started") {
+      this.collapsed = false;
       this.mode = "scanning";
       this.progress = "Starting your read-only scan…";
     } else if (progress.type === "discovered") {
@@ -255,9 +271,17 @@ export class AmexBenefitReaderPanel implements ScanReporter {
 
   private async start(): Promise<void> {
     if (this.mode !== "idle") return;
+    this.collapsed = false;
+    this.mode = "scanning";
+    this.progress = "Starting your read-only scan…";
     this.errorMessage = null;
+    this.render();
     try {
       await this.actions.startScan();
+      if (this.mode === "scanning" || this.mode === "cancelling") {
+        this.mode = "idle";
+        this.render();
+      }
     } catch {
       this.mode = "error";
       this.errorMessage = "The scan could not finish safely. Existing local observations were preserved.";
@@ -486,11 +510,14 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     style.textContent = `
       :host { all: initial; --pr-bg: #f8fafc; --pr-card: #ffffff; --pr-text: #1f2937; --pr-muted: #667085; --pr-border: #e4e7ec; --pr-primary: #27313d; --pr-primary-hover: #1f2933; --pr-amber: #d97706; --pr-amber-bg: #fffbeb; --pr-amber-border: #fde68a; --pr-blue: #2563eb; --pr-blue-bg: #eff6ff; --pr-blue-border: #bfdbfe; --pr-green: #059669; --pr-green-bg: #ecfdf5; --pr-green-border: #a7f3d0; --pr-red: #dc2626; --pr-red-bg: #fef2f2; --pr-red-border: #fecaca; }
       * { box-sizing: border-box; }
+      .launcher { position: fixed; z-index: 2147483647; top: 16px; right: 16px; display: grid; width: 48px; min-height: 48px; padding: 0; place-items: center; border: 1px solid #475467; border-radius: 14px; background: var(--pr-primary); color: #fff; box-shadow: 0 8px 24px rgba(15,23,42,.2); font: 800 13px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: .04em; }
+      .launcher:hover { background: var(--pr-primary-hover); }
       .panel { position: fixed; z-index: 2147483647; top: 16px; right: 16px; width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; border: 1px solid var(--pr-border); border-radius: 16px; background: var(--pr-bg); color: var(--pr-text); box-shadow: 0 18px 50px rgba(15,23,42,.18); font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       h2,h3,h4,p { margin: 0; } h2 { font-size: 19px; line-height: 1.2; } h3 { font-size: 16px; line-height: 1.3; } h4 { margin-top: 10px; font-size: 15px; line-height: 1.35; } ul { margin: 0; }
       .top { padding: 18px; border-bottom: 1px solid var(--pr-border); background: var(--pr-card); border-radius: 16px 16px 0 0; }
       .brand-row { display: flex; align-items: center; gap: 10px; }
       .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; background: var(--pr-primary); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+      .collapse-button { min-height: 34px; margin-left: auto; padding: 6px 9px; color: #475467; font-size: 12px; }
       .eyebrow { margin-top: 2px; color: var(--pr-muted); font-size: 12px; }
       .privacy-banner { margin-top: 14px; padding: 10px 12px; border: 1px solid #dbeafe; border-radius: 10px; background: #f0f7ff; color: #334155; font-size: 12px; }
       .privacy-banner strong { display: block; margin-bottom: 2px; color: #1e3a5f; font-size: 13px; }
@@ -558,7 +585,24 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
     `;
 
+    if (this.mode === "scanning" || this.mode === "cancelling") this.collapsed = false;
+    if (this.collapsed) {
+      const launcher = element("button", "PR");
+      launcher.type = "button";
+      launcher.className = "launcher";
+      launcher.setAttribute("aria-label", "Open Perks Reminder Amex benefit reader");
+      launcher.setAttribute("aria-expanded", "false");
+      launcher.setAttribute("aria-controls", "pr-reader-panel");
+      launcher.addEventListener("click", () => {
+        this.collapsed = false;
+        this.render();
+      });
+      this.root.append(style, launcher);
+      return;
+    }
+
     const panel = element("section");
+    panel.id = "pr-reader-panel";
     panel.className = "panel";
     panel.setAttribute("aria-labelledby", "pr-reader-title");
 
@@ -576,6 +620,19 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     brandText.append(title, element("p", "Perks Reminder local reader"));
     brandText.lastElementChild!.className = "eyebrow";
     brand.append(brandText);
+    if (this.mode !== "scanning" && this.mode !== "cancelling") {
+      const collapse = element("button", "Collapse");
+      collapse.type = "button";
+      collapse.className = "collapse-button";
+      collapse.setAttribute("aria-label", "Collapse Perks Reminder Amex benefit reader");
+      collapse.setAttribute("aria-expanded", "true");
+      collapse.setAttribute("aria-controls", "pr-reader-panel");
+      collapse.addEventListener("click", () => {
+        this.collapsed = true;
+        this.render();
+      });
+      brand.append(collapse);
+    }
     top.append(brand);
 
     const disclosure = element("div");

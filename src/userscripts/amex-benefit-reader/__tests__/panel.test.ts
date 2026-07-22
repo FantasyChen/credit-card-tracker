@@ -96,6 +96,77 @@ describe("Amex reader side panel", () => {
     expect(button("Scan all cards")).toBeEnabled();
   });
 
+  it("uses a transient accessible launcher off primary routes without starting work", () => {
+    const startScan = jest.fn(async () => undefined);
+    const cancelScan = jest.fn();
+    const clearData = jest.fn(async () => undefined);
+    const store = addCard(createEmptyStore(now), {
+      localCardId: cardOneId,
+      productName: "Synthetic Card",
+      endingDigits: "1234",
+      benefits: [benefit()],
+    });
+    new AmexBenefitReaderPanel(store, { startScan, cancelScan, clearData }, { initiallyCollapsed: true });
+
+    const launcher = button("PR");
+    expect(launcher).toHaveAccessibleName("Open Perks Reminder Amex benefit reader");
+    expect(launcher).toHaveAttribute("aria-expanded", "false");
+    expect(shadow().querySelector("#pr-reader-panel")).toBeNull();
+    expect(button("Scan all cards")).toBeUndefined();
+    expect(startScan).not.toHaveBeenCalled();
+
+    fireEvent.click(launcher);
+    expect(shadow().querySelector("#pr-reader-panel")).not.toBeNull();
+    expect(button("Collapse")).toHaveAccessibleName("Collapse Perks Reminder Amex benefit reader");
+    expect(button("Collapse")).toHaveAttribute("aria-expanded", "true");
+    expect(button("Scan all cards")).toBeEnabled();
+    expect(shadow().textContent).toContain("Synthetic Card •••• 1234");
+    expect(startScan).not.toHaveBeenCalled();
+
+    fireEvent.click(button("Collapse"));
+    expect(button("PR")).toHaveAttribute("aria-expanded", "false");
+    expect(startScan).not.toHaveBeenCalled();
+    expect(cancelScan).not.toHaveBeenCalled();
+    expect(clearData).not.toHaveBeenCalled();
+  });
+
+  it("keeps the complete panel expanded while scanning and cancelling", async () => {
+    let release!: () => void;
+    const startScan = jest.fn(() => new Promise<void>((resolve) => { release = resolve; }));
+    const cancelScan = jest.fn();
+    new AmexBenefitReaderPanel(createEmptyStore(now), {
+      startScan,
+      cancelScan,
+      clearData: jest.fn(async () => undefined),
+    }, { initiallyCollapsed: true });
+
+    fireEvent.click(button("PR"));
+    fireEvent.click(button("Scan all cards"));
+    await waitFor(() => expect(startScan).toHaveBeenCalledTimes(1));
+    expect(button("PR")).toBeUndefined();
+    expect(button("Collapse")).toBeUndefined();
+    expect(button("Cancel")).toBeEnabled();
+
+    fireEvent.click(button("Cancel"));
+    expect(cancelScan).toHaveBeenCalledTimes(1);
+    expect(button("PR")).toBeUndefined();
+    expect(shadow().textContent).toContain("Cancelling");
+    release();
+    await waitFor(() => expect(button("Scan all cards")).toBeEnabled());
+  });
+
+  it("lets a collapsed recovery panel reveal its local-data action without scanning", () => {
+    const clearData = jest.fn(async () => undefined);
+    AmexBenefitReaderPanel.mountError("Synthetic local data error.", clearData, { initiallyCollapsed: true });
+
+    expect(button("PR")).toHaveAccessibleName("Open Perks Reminder Amex benefit reader");
+    fireEvent.click(button("PR"));
+    expect(shadow().textContent).toContain("Synthetic local data error");
+    expect(button("Scan all cards")).toBeDisabled();
+    expect(button("Clear local data")).toBeEnabled();
+    expect(clearData).not.toHaveBeenCalled();
+  });
+
   it("shows a persisted interruption without resuming automatically", () => {
     const startScan = jest.fn(async () => undefined);
     const interrupted = mergeScanSummary(createEmptyStore(now), {
