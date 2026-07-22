@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   IDENTITY_SECRET_KEY,
   STORE_KEY,
+  SYNTHETIC_AMEX_NON_BENEFITS_URL,
   SYNTHETIC_AMEX_URL,
   SyntheticAmexHarness,
 } from "./harness";
@@ -67,6 +68,9 @@ test("runs the built userscript manually, restores normalized data, and clears b
   await harness.installBeforeNavigation();
   await harness.openAndInject();
 
+  const readerHost = page.locator("#perks-reminder-amex-reader");
+  await expect(readerHost).toHaveCount(1);
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.2.5");
   const scanButton = page.getByRole("button", { name: "Scan all cards" });
   const scanStatus = page.getByRole("status");
   const visibleCard = page.locator('[data-testid="simple_switcher_combobox"]');
@@ -147,6 +151,8 @@ test("runs the built userscript manually, restores normalized data, and clears b
   const apiRequestCountBeforeReload = harness.apiRequests().length;
   const preflightCountBeforeReload = harness.operationRequests("preflight").length;
   await harness.reloadAndInject();
+  await expect(readerHost).toHaveCount(1);
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.2.5");
   await expect(page.getByRole("status")).toHaveText("Scan complete. 2 cards updated.");
   await expect(page.getByRole("button", { name: "Scan all cards" })).toBeEnabled();
   await expect(page.getByLabel("Choose a card to review").locator("option")).toHaveCount(2);
@@ -165,6 +171,56 @@ test("runs the built userscript manually, restores normalized data, and clears b
   expect(harness.storage.has(STORE_KEY)).toBe(false);
   expect(harness.storage.has(IDENTITY_SECRET_KEY)).toBe(false);
   expect(harness.apiRequests()).toHaveLength(apiRequestCountBeforeReload);
+
+  await harness.proveUnexpectedNetworkIsBlocked();
+  harness.assertNetworkStayedSynthetic();
+});
+
+test("mounts once and scans manually from a selector-free non-benefits route", async ({ context, page }) => {
+  const harness = new SyntheticAmexHarness(context, page, "complete");
+  await harness.installBeforeNavigation();
+  await harness.openAndInjectConcurrentCopies(SYNTHETIC_AMEX_NON_BENEFITS_URL);
+
+  const readerHost = page.locator("#perks-reminder-amex-reader");
+  await expect(readerHost).toHaveCount(1);
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.2.5");
+  await expect(page.locator('[data-testid="simple_switcher_combobox"]')).toHaveCount(0);
+  const launcher = page.getByRole("button", { name: "Open Perks Reminder Amex benefit reader" });
+  await expect(launcher).toBeVisible();
+  await expect(launcher).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("button", { name: "Scan all cards" })).toHaveCount(0);
+  expect(harness.apiRequests()).toHaveLength(0);
+  expect(harness.storage.size).toBe(0);
+  expect(page.url()).toBe(SYNTHETIC_AMEX_NON_BENEFITS_URL);
+
+  await launcher.click();
+  await expect(page.getByRole("button", { name: "Collapse Perks Reminder Amex benefit reader" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  const scanButton = page.getByRole("button", { name: "Scan all cards" });
+  await expect(scanButton).toBeEnabled();
+  await expect(page.getByRole("status")).toContainText("Nothing is scanned until you start");
+  expect(harness.apiRequests()).toHaveLength(0);
+  expect(harness.storage.size).toBe(0);
+
+  await scanButton.click();
+  await expect(page.getByRole("button", { name: "Collapse Perks Reminder Amex benefit reader" })).toHaveCount(0);
+  await expect(page.getByRole("status")).toHaveText("Scan complete. 2 cards updated.", { timeout: 10_000 });
+  expect(page.url()).toBe(SYNTHETIC_AMEX_NON_BENEFITS_URL);
+  expect(harness.apiRequests("member")).toHaveLength(1);
+  expect(harness.apiRequests("tracker")).toHaveLength(2);
+  expect(harness.apiRequests("catalog")).toHaveLength(2);
+
+  const stored = persistedEnvelope(harness);
+  expect(stored.lastScan).toMatchObject({
+    status: "complete",
+    discoveredCardCount: 2,
+    attemptedCardCount: 2,
+    visibleContext: "unchanged",
+  });
+  expect(Object.values(stored.cards)).toHaveLength(2);
+  expectNoRawSyntheticIdentity(harness);
 
   await harness.proveUnexpectedNetworkIsBlocked();
   harness.assertNetworkStayedSynthetic();
