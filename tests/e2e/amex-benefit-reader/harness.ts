@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import type { BrowserContext, Page, Request, Route } from "@playwright/test";
 
 export const SYNTHETIC_AMEX_URL = "https://global.americanexpress.com/card-benefits/view-all";
+export const SYNTHETIC_AMEX_NON_BENEFITS_URL = "https://global.americanexpress.com/account-overview";
+export type SyntheticAmexDocumentUrl = typeof SYNTHETIC_AMEX_URL | typeof SYNTHETIC_AMEX_NON_BENEFITS_URL;
 export const STORE_KEY = "perksReminder.amexBenefitReader.store.v1";
 export const IDENTITY_SECRET_KEY = "perksReminder.amexBenefitReader.identitySecret.v1";
 
@@ -67,7 +69,7 @@ class ExplicitGate {
   }
 }
 
-const syntheticDocument = `<!doctype html>
+const syntheticBenefitsDocument = `<!doctype html>
 <html lang="en">
   <head><meta charset="utf-8"><title>Synthetic Amex benefits harness</title></head>
   <body>
@@ -80,6 +82,22 @@ const syntheticDocument = `<!doctype html>
     </main>
   </body>
 </html>`;
+
+const syntheticNonBenefitsDocument = `<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Synthetic Amex account harness</title></head>
+  <body>
+    <main>
+      <h1>Synthetic American Express account page</h1>
+      <p>This selector-free document contains invented test data only.</p>
+    </main>
+  </body>
+</html>`;
+
+const syntheticDocuments = new Map<SyntheticAmexDocumentUrl, string>([
+  [SYNTHETIC_AMEX_URL, syntheticBenefitsDocument],
+  [SYNTHETIC_AMEX_NON_BENEFITS_URL, syntheticNonBenefitsDocument],
+]);
 
 const primaryTrackers = [{
   trackers: [
@@ -263,7 +281,8 @@ export class SyntheticAmexHarness {
   private expectedDeniedProbeConsoleError = false;
   private expectedDeniedProbeFailure = false;
   private verifiedDeniedProbeCount = 0;
-  private expectedMainFrameNavigation = false;
+  private expectedMainFrameNavigationUrl: SyntheticAmexDocumentUrl | null = null;
+  private currentDocumentUrl: SyntheticAmexDocumentUrl = SYNTHETIC_AMEX_URL;
   private expectedConfirmation: string | null = null;
   private activeScanNumber = 0;
 
@@ -349,8 +368,8 @@ export class SyntheticAmexHarness {
     this.page.on("framenavigated", (frame) => {
       if (frame !== this.page.mainFrame()) return;
       const url = new URL(frame.url());
-      if (this.expectedMainFrameNavigation && frame.url() === SYNTHETIC_AMEX_URL) {
-        this.expectedMainFrameNavigation = false;
+      if (this.expectedMainFrameNavigationUrl === frame.url()) {
+        this.expectedMainFrameNavigationUrl = null;
         return;
       }
       this.runtimeErrors.push(`The main frame navigated unexpectedly to ${url.origin}${url.pathname}.`);
@@ -435,14 +454,18 @@ export class SyntheticAmexHarness {
     });
   }
 
-  async openAndInject(): Promise<void> {
-    await access(BUNDLE_PATH);
-    await this.runExpectedNavigation(() => this.page.goto(SYNTHETIC_AMEX_URL, { waitUntil: "domcontentloaded" }));
+  async openAndInject(documentUrl: SyntheticAmexDocumentUrl = SYNTHETIC_AMEX_URL): Promise<void> {
+    await this.openDocument(documentUrl);
     await this.injectBundle();
   }
 
+  async openAndInjectConcurrentCopies(documentUrl: SyntheticAmexDocumentUrl): Promise<void> {
+    await this.openDocument(documentUrl);
+    await Promise.all([this.injectBundle(), this.injectBundle()]);
+  }
+
   async reloadAndInject(): Promise<void> {
-    await this.runExpectedNavigation(() => this.page.reload({ waitUntil: "domcontentloaded" }));
+    await this.runExpectedNavigation(this.currentDocumentUrl, () => this.page.reload({ waitUntil: "domcontentloaded" }));
     await this.injectBundle();
   }
 
@@ -512,11 +535,14 @@ export class SyntheticAmexHarness {
     assert.equal(this.expectedCancellationConsoleErrors, 0);
     assert.equal(this.expectedDeniedProbeConsoleError, false);
     assert.equal(this.expectedDeniedProbeFailure, false);
-    assert.equal(this.expectedMainFrameNavigation, false);
+    assert.equal(this.expectedMainFrameNavigationUrl, null);
     assert.equal(this.expectedConfirmation, null);
     assert.equal(this.operationRequests("blocked").length, this.verifiedDeniedProbeCount);
     const allowedByOperation = new Map<SafeRequestRecord["operation"], ReadonlySet<string>>([
-      ["document", new Set([`GET ${new URL(SYNTHETIC_AMEX_URL).origin}${new URL(SYNTHETIC_AMEX_URL).pathname}`])],
+      ["document", new Set(Array.from(syntheticDocuments.keys(), (documentUrl) => {
+        const url = new URL(documentUrl);
+        return `GET ${url.origin}${url.pathname}`;
+      }))],
       ["preflight", new Set([
         `OPTIONS ${new URL(TRACKER_URL).origin}${new URL(TRACKER_URL).pathname}`,
         `OPTIONS ${new URL(CATALOG_URL).origin}${new URL(CATALOG_URL).pathname}`,
@@ -532,15 +558,25 @@ export class SyntheticAmexHarness {
     }
   }
 
-  private async runExpectedNavigation(navigate: () => Promise<unknown>): Promise<void> {
-    assert.equal(this.expectedMainFrameNavigation, false);
-    this.expectedMainFrameNavigation = true;
+  private async openDocument(documentUrl: SyntheticAmexDocumentUrl): Promise<void> {
+    await access(BUNDLE_PATH);
+    assert.equal(syntheticDocuments.has(documentUrl), true);
+    this.currentDocumentUrl = documentUrl;
+    await this.runExpectedNavigation(documentUrl, () => this.page.goto(documentUrl, { waitUntil: "domcontentloaded" }));
+  }
+
+  private async runExpectedNavigation(
+    documentUrl: SyntheticAmexDocumentUrl,
+    navigate: () => Promise<unknown>,
+  ): Promise<void> {
+    assert.equal(this.expectedMainFrameNavigationUrl, null);
+    this.expectedMainFrameNavigationUrl = documentUrl;
     try {
       await navigate();
     } finally {
-      if (this.expectedMainFrameNavigation) {
+      if (this.expectedMainFrameNavigationUrl !== null) {
         this.runtimeErrors.push("An expected synthetic main-frame navigation did not complete.");
-        this.expectedMainFrameNavigation = false;
+        this.expectedMainFrameNavigationUrl = null;
       }
     }
   }
@@ -572,7 +608,8 @@ export class SyntheticAmexHarness {
     const request = route.request();
     const url = request.url();
 
-    if (url === SYNTHETIC_AMEX_URL && request.method() === "GET" && request.resourceType() === "document") {
+    const syntheticDocument = syntheticDocuments.get(url as SyntheticAmexDocumentUrl);
+    if (syntheticDocument && request.method() === "GET" && request.resourceType() === "document") {
       this.record(route, "document");
       await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: syntheticDocument });
       return;
