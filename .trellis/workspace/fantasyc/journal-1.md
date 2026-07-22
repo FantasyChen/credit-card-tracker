@@ -74,3 +74,38 @@ Restricted Amex observations to Perks Reminder-supported card credits, improved 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Complete site-wide Amex reader rollout
+
+**Date**: 2026-07-21
+**Task**: Complete site-wide Amex reader rollout
+**Branch**: `feat/amex-benefit-reader-phase-1`
+
+### Summary
+
+Mounted the Amex reader across the exact member origin with a collapsed off-route launcher, selector-free manual scanning support, duplicate-mount protection, generated-bundle coverage, an authorized Tampermonkey 0.2.6 update, sanitized no-scan live validation, and reusable update-automation contracts.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8d277ee` | (see git log) |
+| `645e6ef` | (see git log) |
+| `e512dd1` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
