@@ -109,3 +109,38 @@ Mounted the Amex reader across the exact member origin with a collapsed off-rout
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Refine AMEX pre-sync benefit review
+
+**Date**: 2026-07-26
+**Task**: Refine AMEX pre-sync benefit review
+**Branch**: `feat/amex-benefit-reader-phase-1`
+
+### Summary
+
+Refined the account-wide AMEX benefit review UI, truthful usage presentation, inert provider title formatting, and bounded ephemeral conflict diagnostics; added full unit and generated-bundle coverage and updated browser-reader contracts.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6697fc6` | (see git log) |
+| `79c51d7` | (see git log) |
+| `ad26634` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

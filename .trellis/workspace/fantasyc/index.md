@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 3
-- **Last Active**: 2026-07-21
+- **Total Sessions**: 4
+- **Last Active**: 2026-07-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~111 | Active |
+| `journal-1.md` | ~146 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 4 | 2026-07-26 | Refine AMEX pre-sync benefit review | `6697fc6`, `79c51d7`, `ad26634` | `feat/amex-benefit-reader-phase-1` |
 | 3 | 2026-07-21 | Complete site-wide Amex reader rollout | `8d277ee`, `645e6ef`, `e512dd1` | `feat/amex-benefit-reader-phase-1` |
 | 2 | 2026-07-19 | Improve Amex reader quality and browser E2E | `1c7716e`, `ec05855`, `17fb09f`, `acd464f`, `93e6ae2` | `feat/amex-benefit-reader-phase-1` |
 | 1 | 2026-07-15 | Initialize Trellis and bootstrap specs | `30e080a` | `main` |
