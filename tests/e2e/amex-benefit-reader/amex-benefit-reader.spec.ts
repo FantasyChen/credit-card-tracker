@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import { digestAmexSyncEnvelope, parseAmexSyncEnvelope } from "../../../src/lib/amex-benefit-reader/sync-contract";
 import {
   IDENTITY_SECRET_KEY,
+  PRIMARY_ONLY_COMPATIBILITY_KEY,
+  PRIMARY_ONLY_COMPATIBILITY_VALUE,
   STORE_KEY,
   SYNC_MAILBOX_KEY,
   SYNTHETIC_AMEX_NON_BENEFITS_URL,
@@ -36,11 +38,17 @@ interface PersistedCardRecord {
 
 interface PersistedEnvelope {
   schemaVersion: number;
+  revision: number;
+  updatedAt: string;
   cards: Record<string, PersistedCardRecord>;
   lastScan: null | {
+    scanId?: string;
+    startedAt: string;
+    finishedAt: string;
     status: string;
     discoveredCardCount: number;
     attemptedCardCount: number;
+    unknownAccountVariantCount: number;
     visibleContext: string;
     cards: Array<{ localCardId: string | null; result: string; issueCode: string | null }>;
   };
@@ -58,10 +66,51 @@ function cardEnding(envelope: PersistedEnvelope, endingDigits: string): Persiste
   return record!;
 }
 
+function legacyRoleUnverifiedStore(): PersistedEnvelope {
+  const localCardId = "11111111-1111-4111-8111-111111111111";
+  const attemptedAt = "2026-07-15T12:00:00.000Z";
+  return {
+    schemaVersion: 1,
+    revision: 4,
+    updatedAt: attemptedAt,
+    cards: {
+      [localCardId]: {
+        localCardId,
+        identity: {
+          productName: "American Express Gold Card",
+          endingDigits: "1234",
+          sourceFingerprint: "a".repeat(64),
+        },
+        freshness: "error_no_data",
+        completeness: "failed",
+        observedAt: null,
+        lastAttemptAt: attemptedAt,
+        error: {
+          code: "network_error",
+          message: "The first-party Amex read request did not complete.",
+        },
+        latest: null,
+      },
+    },
+    lastScan: {
+      scanId: "22222222-2222-4222-8222-222222222222",
+      startedAt: "2026-07-15T11:59:00.000Z",
+      finishedAt: attemptedAt,
+      status: "failed",
+      discoveredCardCount: 1,
+      attemptedCardCount: 1,
+      unknownAccountVariantCount: 0,
+      cards: [{ localCardId, result: "failed", issueCode: "network_error" }],
+      visibleContext: "unchanged",
+    },
+  };
+}
+
 function expectNoRawSyntheticIdentity(harness: SyntheticAmexHarness): void {
   const serializedStore = JSON.stringify(harness.storageSnapshot());
   expect(serializedStore).not.toContain("invented-e2e-primary-token");
-  expect(serializedStore).not.toContain("invented-e2e-supplementary-token");
+  expect(serializedStore).not.toContain("invented-e2e-secondary-primary-token");
+  expect(serializedStore).not.toContain("invented-e2e-excluded-supplementary-token");
   expect(serializedStore).not.toContain("invented-e2e-empty-benefits-token");
   expect(serializedStore).not.toContain("invented-e2e-scale-token");
   expect(serializedStore).not.toContain("invented-scale-");
@@ -69,14 +118,49 @@ function expectNoRawSyntheticIdentity(harness: SyntheticAmexHarness): void {
   expect(serializedStore).not.toContain("sorBenefitId");
 }
 
-test("runs the built userscript manually, restores normalized data, and clears both local keys", async ({ context, page }) => {
+test("invalidates one role-unverified snapshot and pending mailbox without rotating identity or reading Amex", async ({ context, page }) => {
+  const harness = new SyntheticAmexHarness(context, page, "complete");
+  const identitySecret = "f".repeat(64);
+  harness.storage.set(STORE_KEY, legacyRoleUnverifiedStore());
+  harness.storage.set(IDENTITY_SECRET_KEY, identitySecret);
+  harness.storage.set(SYNC_MAILBOX_KEY, { syntheticPendingMailbox: true });
+
+  await harness.installBeforeNavigation();
+  await harness.openAndInject();
+
+  await expect(page.locator("#perks-reminder-amex-reader")).toHaveCount(1);
+  await expect(page.getByText("No local card observations yet")).toBeVisible();
+  expect(persistedEnvelope(harness)).toMatchObject({
+    schemaVersion: 1,
+    revision: 5,
+    cards: {},
+    lastScan: null,
+  });
+  expect(harness.storage.get(IDENTITY_SECRET_KEY)).toBe(identitySecret);
+  expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(false);
+  expect(harness.storage.get(PRIMARY_ONLY_COMPATIBILITY_KEY)).toBe(PRIMARY_ONLY_COMPATIBILITY_VALUE);
+  expect(harness.apiRequests()).toHaveLength(0);
+
+  const migratedSnapshot = harness.storageSnapshot();
+  await harness.reloadAndInject();
+
+  await expect(page.locator("#perks-reminder-amex-reader")).toHaveCount(1);
+  expect(harness.storageSnapshot()).toEqual(migratedSnapshot);
+  expect(persistedEnvelope(harness).revision).toBe(5);
+  expect(harness.storage.get(IDENTITY_SECRET_KEY)).toBe(identitySecret);
+  expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(false);
+  expect(harness.apiRequests()).toHaveLength(0);
+  harness.assertNetworkStayedSynthetic();
+});
+
+test("runs the built userscript manually, restores normalized data, and clears all local keys", async ({ context, page }) => {
   const harness = new SyntheticAmexHarness(context, page, "complete");
   await harness.installBeforeNavigation();
   await harness.openAndInject();
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
   await expect(readerHost).toHaveCount(1);
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.1");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.2");
   const scanButton = page.getByRole("button", { name: "Scan all cards" });
   const scanStatus = page.getByRole("status");
   const visibleCard = page.locator('[data-testid="simple_switcher_combobox"]');
@@ -84,7 +168,7 @@ test("runs the built userscript manually, restores normalized data, and clears b
   await expect(scanButton).toBeEnabled();
   await expect(scanStatus).toContainText("Nothing is scanned until you start");
   expect(harness.apiRequests()).toHaveLength(0);
-  expect(harness.storage.size).toBe(0);
+  expect(Array.from(harness.storage.keys())).toEqual([PRIMARY_ONLY_COMPATIBILITY_KEY]);
   await expect(visibleCard).toHaveText(/Synthetic visible card ending 0000/);
   expect(page.url()).toBe(SYNTHETIC_AMEX_URL);
 
@@ -105,9 +189,9 @@ test("runs the built userscript manually, restores normalized data, and clears b
   await expect(page.getByText("Local unless you choose Sync reviewed")).toBeVisible();
 
   await expect(page.getByLabel("Choose a card to review")).toHaveCount(0);
-  await expect(page.locator(".card-group")).toHaveCount(2);
+  await expect(page.locator(".card-group")).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "American Express Gold Card •••• 1234" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "American Express Gold Card •••• 56789" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "American Express Gold Card •••• 56789" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Remaining 2" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("heading", { name: "Synthetic $12 Monthly Dining Credit Statement Credit" })).toBeVisible();
   await expect(page.locator(".benefit-card h4", { hasText: "&#36;" })).toHaveCount(0);
@@ -156,10 +240,15 @@ test("runs the built userscript manually, restores normalized data, and clears b
     "Synthetic Dining Credit ‡",
     "Synthetic Uber Cash<sup>‡</sup>",
   ]);
-  expect(Array.from(harness.storage.keys()).sort()).toEqual([IDENTITY_SECRET_KEY, STORE_KEY].sort());
+  expect(Array.from(harness.storage.keys()).sort()).toEqual([
+    IDENTITY_SECRET_KEY,
+    PRIMARY_ONLY_COMPATIBILITY_KEY,
+    STORE_KEY,
+  ].sort());
   const serializedStore = JSON.stringify(harness.storageSnapshot());
   expect(serializedStore).not.toContain("invented-e2e-primary-token");
-  expect(serializedStore).not.toContain("invented-e2e-supplementary-token");
+  expect(serializedStore).not.toContain("invented-e2e-secondary-primary-token");
+  expect(serializedStore).not.toContain("invented-e2e-excluded-supplementary-token");
   expect(serializedStore).not.toContain("invented-e2e-empty-benefits-token");
   expect(serializedStore).not.toContain("invented-e2e-scale-token");
   expect(serializedStore).not.toContain("invented-scale-");
@@ -173,10 +262,10 @@ test("runs the built userscript manually, restores normalized data, and clears b
   const preflightCountBeforeReload = harness.operationRequests("preflight").length;
   await harness.reloadAndInject();
   await expect(readerHost).toHaveCount(1);
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.1");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.2");
   await expect(page.getByRole("status")).toHaveText("Scan complete. 2 cards updated.");
   await expect(page.getByRole("button", { name: "Scan all cards" })).toBeEnabled();
-  await expect(page.locator(".card-group")).toHaveCount(2);
+  await expect(page.locator(".card-group")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Remaining 2" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("heading", { name: "Synthetic $12 Monthly Dining Credit Statement Credit" })).toBeVisible();
   expect(harness.apiRequests()).toHaveLength(apiRequestCountBeforeReload);
@@ -193,13 +282,15 @@ test("runs the built userscript manually, restores normalized data, and clears b
   expect(harness.storage.size).toBe(0);
   expect(harness.storage.has(STORE_KEY)).toBe(false);
   expect(harness.storage.has(IDENTITY_SECRET_KEY)).toBe(false);
+  expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(false);
+  expect(harness.storage.has(PRIMARY_ONLY_COMPATIBILITY_KEY)).toBe(false);
   expect(harness.apiRequests()).toHaveLength(apiRequestCountBeforeReload);
 
   await harness.proveUnexpectedNetworkIsBlocked();
   harness.assertNetworkStayedSynthetic();
 });
 
-test("keeps catalog-unavailable empty cards visible as unresolved", async ({ context, page }) => {
+test("omits catalog-unavailable empty groups while retaining unresolved quality counts", async ({ context, page }) => {
   const harness = new SyntheticAmexHarness(context, page, "benefit_empty");
   await harness.installBeforeNavigation();
   await harness.openAndInject();
@@ -211,9 +302,11 @@ test("keeps catalog-unavailable empty cards visible as unresolved", async ({ con
     { timeout: 10_000 },
   );
 
-  await expect(page.locator(".card-group")).toHaveCount(3);
-  await expect(page.getByRole("heading", { name: /9999/ })).toBeVisible();
-  await expect(page.getByText("The benefit catalog was unavailable, so this card is not confirmed to have no trackable benefits.")).toBeVisible();
+  await expect(page.locator(".card-group")).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: /9999/ })).toHaveCount(0);
+  await expect(page.getByText(/1 latest-scan record unresolved/)).toBeVisible();
+  await page.getByText("Scan notes (1)", { exact: true }).click();
+  await expect(page.getByText(/counts remain included in Data notes/)).toBeVisible();
   await expect(page.getByText(/confirmed to have no trackable benefits and/)).toHaveCount(0);
   await expect(page.locator(".metric", { hasText: "Cards with benefits" }).locator("strong")).toHaveText("2");
   await expect(page.locator(".metric", { hasText: "Eligible benefits" }).locator("strong")).toHaveText("3");
@@ -240,9 +333,9 @@ test("keeps catalog-unavailable empty cards visible as unresolved", async ({ con
   const apiRequestCountBeforeReload = harness.apiRequests().length;
   await harness.reloadAndInject();
   await expect(page.getByRole("status")).toHaveText("Scan finished with data notes. 3 cards checked.");
-  await expect(page.locator(".card-group")).toHaveCount(3);
-  await expect(page.getByRole("heading", { name: /9999/ })).toBeVisible();
-  await expect(page.getByText("The benefit catalog was unavailable, so this card is not confirmed to have no trackable benefits.")).toBeVisible();
+  await expect(page.locator(".card-group")).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: /9999/ })).toHaveCount(0);
+  await expect(page.getByText(/1 latest-scan record unresolved/)).toBeVisible();
   await expect(page.locator(".metric", { hasText: "Cards with benefits" }).locator("strong")).toHaveText("2");
   expect(harness.apiRequests()).toHaveLength(apiRequestCountBeforeReload);
 
@@ -473,12 +566,11 @@ test("renders a bounded 16-card, 130-benefit grouped master list from the built 
 
   const requestCount = harness.apiRequests().length;
   await page.getByRole("button", { name: "Used 0" }).click();
-  await expect(page.locator(".card-group")).toHaveCount(16);
-  await expect(page.locator(".card-group-compact")).toHaveCount(16);
-  await expect(page.locator(".card-group-compact .card-summary", { hasText: "0 used benefits" })).toHaveCount(16);
+  await expect(page.locator(".card-group")).toHaveCount(0);
   await expect(page.locator(".benefit-card")).toHaveCount(0);
-  await expect(page.locator(".empty-state")).toHaveCount(0);
-  await expect(page.getByText("No used benefits for this card.")).toHaveCount(0);
+  await expect(page.locator(".account-empty-state")).toHaveText(
+    "No used benefit rows are available. 130 remaining benefits are available under Remaining.",
+  );
   expect(harness.apiRequests()).toHaveLength(requestCount);
   expectNoRawSyntheticIdentity(harness);
   harness.assertNetworkStayedSynthetic();
@@ -491,14 +583,14 @@ test("mounts once and scans manually from a selector-free non-benefits route", a
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
   await expect(readerHost).toHaveCount(1);
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.1");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.2");
   await expect(page.locator('[data-testid="simple_switcher_combobox"]')).toHaveCount(0);
   const launcher = page.getByRole("button", { name: "Open Perks Reminder Amex benefit reader" });
   await expect(launcher).toBeVisible();
   await expect(launcher).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByRole("button", { name: "Scan all cards" })).toHaveCount(0);
   expect(harness.apiRequests()).toHaveLength(0);
-  expect(harness.storage.size).toBe(0);
+  expect(Array.from(harness.storage.keys())).toEqual([PRIMARY_ONLY_COMPATIBILITY_KEY]);
   expect(page.url()).toBe(SYNTHETIC_AMEX_NON_BENEFITS_URL);
 
   await launcher.click();
@@ -510,7 +602,7 @@ test("mounts once and scans manually from a selector-free non-benefits route", a
   await expect(scanButton).toBeEnabled();
   await expect(page.getByRole("status")).toContainText("Nothing is scanned until you start");
   expect(harness.apiRequests()).toHaveLength(0);
-  expect(harness.storage.size).toBe(0);
+  expect(Array.from(harness.storage.keys())).toEqual([PRIMARY_ONLY_COMPATIBILITY_KEY]);
 
   await scanButton.click();
   await expect(page.getByRole("button", { name: "Collapse Perks Reminder Amex benefit reader" })).toHaveCount(0);
@@ -580,7 +672,7 @@ test("cancels the built userscript with a later physical-card read in flight", a
   const scanStatus = page.getByRole("status");
   const visibleCard = page.locator('[data-testid="simple_switcher_combobox"]');
   expect(harness.apiRequests()).toHaveLength(0);
-  expect(harness.storage.size).toBe(0);
+  expect(Array.from(harness.storage.keys())).toEqual([PRIMARY_ONLY_COMPATIBILITY_KEY]);
 
   await scanButton.click();
   await harness.waitForCancellationRequest();
@@ -615,7 +707,7 @@ test("cancels the built userscript with a later physical-card read in flight", a
     "member:scan-1",
     "tracker:primary:scan-1",
     "catalog:primary:scan-1",
-    "tracker:supplementary:scan-1",
+    "tracker:secondary:scan-1",
   ]);
   expect(harness.apiRequests("member")).toHaveLength(1);
   expect(harness.apiRequests("tracker")).toHaveLength(2);
@@ -653,9 +745,9 @@ test("preserves stale data when one physical card fails on a later manual rescan
   await expect(scanStatus).toHaveText("Scan complete. 2 cards updated.", { timeout: 10_000 });
   const firstScan = persistedEnvelope(harness);
   const firstPrimary = structuredClone(cardEnding(firstScan, "1234"));
-  const firstSupplementary = structuredClone(cardEnding(firstScan, "56789"));
+  const firstSecondaryPrimary = structuredClone(cardEnding(firstScan, "56789"));
   expect(firstPrimary.latest?.benefits[0]?.earnedOrUsed.value?.value).toBe("4.00");
-  expect(firstSupplementary.freshness).toBe("current");
+  expect(firstSecondaryPrimary.freshness).toBe("current");
   const firstScanRequestCount = harness.apiRequests().length;
   expect(firstScanRequestCount).toBe(5);
   await expect(scanButton).toBeEnabled();
@@ -667,13 +759,13 @@ test("preserves stale data when one physical card fails on a later manual rescan
     "member:scan-1",
     "tracker:primary:scan-1",
     "catalog:primary:scan-1",
-    "tracker:supplementary:scan-1",
-    "catalog:supplementary:scan-1",
+    "tracker:secondary:scan-1",
+    "catalog:secondary:scan-1",
     "member:scan-2",
     "tracker:primary:scan-2",
     "catalog:primary:scan-2",
-    "tracker:supplementary:scan-2",
-    "tracker:supplementary:scan-2",
+    "tracker:secondary:scan-2",
+    "tracker:secondary:scan-2",
   ]);
   expect(harness.apiRequests("member")).toHaveLength(2);
   expect(harness.apiRequests("tracker")).toHaveLength(5);
@@ -681,7 +773,7 @@ test("preserves stale data when one physical card fails on a later manual rescan
 
   const rescanned = persistedEnvelope(harness);
   const currentPrimary = cardEnding(rescanned, "1234");
-  const staleSupplementary = cardEnding(rescanned, "56789");
+  const staleSecondaryPrimary = cardEnding(rescanned, "56789");
   expect(rescanned.lastScan).toMatchObject({
     status: "partial",
     discoveredCardCount: 2,
@@ -701,35 +793,34 @@ test("preserves stale data when one physical card fails on a later manual rescan
   await expect(page.getByText("$7.00 of $10.00")).toBeVisible();
   await page.getByText("Scan notes (1)", { exact: true }).click();
   await expect(page.getByText(
-    "Some cards have partial, stale, failed, or differently timed observations. Review each card's data-quality label.",
+    "Some stored cards have partial, stale, failed, or differently timed observations. Their counts remain included in Data notes.",
   )).toBeVisible();
 
-  expect(staleSupplementary).toMatchObject({
+  expect(staleSecondaryPrimary).toMatchObject({
     freshness: "stale_error",
     completeness: "failed",
-    observedAt: firstSupplementary.observedAt,
+    observedAt: firstSecondaryPrimary.observedAt,
     error: { code: "http_error", message: "A first-party Amex read request returned an unexpected response." },
   });
-  expect(staleSupplementary.localCardId).toBe(firstSupplementary.localCardId);
-  expect(staleSupplementary.identity).toEqual(firstSupplementary.identity);
-  expect(staleSupplementary.latest).toEqual(firstSupplementary.latest);
-  expect(staleSupplementary.lastAttemptAt).not.toBe(firstSupplementary.lastAttemptAt);
-  expect(Date.parse(staleSupplementary.lastAttemptAt)).toBeGreaterThan(Date.parse(firstSupplementary.lastAttemptAt));
+  expect(staleSecondaryPrimary.localCardId).toBe(firstSecondaryPrimary.localCardId);
+  expect(staleSecondaryPrimary.identity).toEqual(firstSecondaryPrimary.identity);
+  expect(staleSecondaryPrimary.latest).toEqual(firstSecondaryPrimary.latest);
+  expect(staleSecondaryPrimary.lastAttemptAt).not.toBe(firstSecondaryPrimary.lastAttemptAt);
+  expect(Date.parse(staleSecondaryPrimary.lastAttemptAt)).toBeGreaterThan(Date.parse(firstSecondaryPrimary.lastAttemptAt));
 
   const staleQuality = page.locator('.quality-pill[aria-label="Data quality: Stale data"]');
+  await expect(staleQuality).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Synthetic Dining Credit", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Used 1" }).click();
+  await expect(page.getByRole("heading", { name: "Synthetic Dining Credit", exact: true })).toBeVisible();
   await expect(staleQuality).toHaveCount(1);
   await expect(staleQuality).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Synthetic Dining Credit", exact: true })).toHaveCount(0);
-  const compactStaleGroup = page.locator(".card-group-compact", { hasText: "Stale data" });
-  await expect(compactStaleGroup).toHaveCount(1);
-  await expect(compactStaleGroup.locator(".card-summary")).toHaveText("0 remaining benefits");
-  await compactStaleGroup.getByText("Data quality and timestamps", { exact: true }).click();
-  await expect(compactStaleGroup.getByText(
+  const staleGroup = page.locator(".card-group", { hasText: "Stale data" });
+  await staleGroup.getByText("Data quality and timestamps", { exact: true }).click();
+  await expect(staleGroup.getByText(
     "A first-party Amex read request returned an unexpected response.",
     { exact: true },
   )).toBeVisible();
-  await page.getByRole("button", { name: "Used 1" }).click();
-  await expect(page.getByRole("heading", { name: "Synthetic Dining Credit", exact: true })).toBeVisible();
   await expect(page.locator(".row-quality")).toHaveCount(0);
   await expect(page.locator(".benefit-card")).not.toContainText("Stale data");
   expectNoRawSyntheticIdentity(harness);
@@ -752,7 +843,7 @@ test("bridges one strict storage-only mailbox on the exact first-party handoff b
       productKey: "american-express-platinum-card",
       endingDigits: "1234",
       observedAt: now.toISOString(),
-      parserVersion: "fixture/2",
+      parserVersion: "amex-api-us/2.0.2",
       rows: [{
         creditFamilyKey: "american-express-platinum-card:resy",
         sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },

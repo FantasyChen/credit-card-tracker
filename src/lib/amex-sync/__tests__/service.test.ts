@@ -39,7 +39,7 @@ const envelope = parseAmexSyncEnvelope({
     productKey: "american-express-platinum-card",
     endingDigits: "1234",
     observedAt: "2026-07-15T11:59:00.000Z",
-    parserVersion: "fixture/2",
+    parserVersion: "amex-api-us/2.0.2",
     rows: [{
       creditFamilyKey: "american-express-platinum-card:resy",
       sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },

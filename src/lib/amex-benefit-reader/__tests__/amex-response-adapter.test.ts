@@ -15,31 +15,59 @@ function normalizeBenefits(
 }
 
 describe("Amex private response adapter", () => {
-  it("flattens only characterized BASIC and SUPP cards with explicit endings", () => {
+  it("emits only characterized top-level BASIC cards and silently excludes nested SUPP cards", () => {
     const discovery = parseAccountDiscovery(memberResponseSchema.parse(accountsFixture));
     expect(discovery.cards).toEqual([
       {
         rawAccountToken: "invented-primary-token-a",
         productName: "Synthetic Rewards Card",
         endingDigits: "12345",
-        relationship: "BASIC",
-      },
-      {
-        rawAccountToken: "invented-supp-token-b",
-        productName: "Synthetic Rewards Card",
-        endingDigits: "54321",
-        relationship: "SUPP",
       },
       {
         rawAccountToken: "invented-primary-token-c",
         productName: "Synthetic Rewards Card",
         endingDigits: "9876",
-        relationship: "BASIC",
       },
     ]);
     expect(discovery.knownNonCardCount).toBe(0);
     expect(discovery.unknownVariantCount).toBe(2);
     expect(discovery.issueCodes).toContain("unknown_account_variant");
+    expect(JSON.stringify(discovery)).not.toContain("invented-supp-token-b");
+  });
+
+  it("uses exact relationship placement rather than Additional or Companion product names", () => {
+    const discovery = parseAccountDiscovery(memberResponseSchema.parse({
+      accounts: [
+        {
+          account_token: "additional-named-basic-token",
+          relationship: "BASIC",
+          product: { description: "Additional Gold Card" },
+          display_account_number: "1234",
+        },
+        {
+          account_token: "platinum-basic-token",
+          relationship: "BASIC",
+          product: { description: "American Express Platinum Card" },
+          display_account_number: "5678",
+          supplementary_accounts: [{
+            account_token: "companion-named-supp-token",
+            relationship: "SUPP",
+            product: { description: "Companion Platinum Card" },
+            display_account_number: "9999",
+          }],
+        },
+      ],
+    }));
+
+    expect(discovery.cards).toEqual([
+      expect.objectContaining({
+        rawAccountToken: "additional-named-basic-token",
+        productName: "Additional Gold Card",
+      }),
+      expect.objectContaining({ rawAccountToken: "platinum-basic-token" }),
+    ]);
+    expect(discovery.unknownVariantCount).toBe(0);
+    expect(JSON.stringify(discovery)).not.toContain("companion-named-supp-token");
   });
 
   it("resolves top-level and nested account identity conservatively for explicit four- and five-digit endings", () => {
@@ -74,8 +102,8 @@ describe("Amex private response adapter", () => {
     }));
 
     expect(discovery.cards).toEqual([
-      expect.objectContaining({ rawAccountToken: "nested-four-token", endingDigits: "1234", relationship: "BASIC" }),
-      expect.objectContaining({ rawAccountToken: "matching-five-token", endingDigits: "54321", relationship: "BASIC" }),
+      expect.objectContaining({ rawAccountToken: "nested-four-token", endingDigits: "1234" }),
+      expect.objectContaining({ rawAccountToken: "matching-five-token", endingDigits: "54321" }),
     ]);
     expect(discovery.unknownVariantCount).toBe(2);
   });
@@ -103,7 +131,7 @@ describe("Amex private response adapter", () => {
     expect(JSON.stringify(discovery)).not.toMatch(/4111111111117777|5555555555558888/);
   });
 
-  it("rejects conflicting alternate card identity fields instead of choosing one", () => {
+  it("rejects conflicting primary identity while excluding SUPP identity fields before inspection", () => {
     const discovery = parseAccountDiscovery(memberResponseSchema.parse({
       accounts: [
         {
@@ -134,7 +162,38 @@ describe("Amex private response adapter", () => {
       ],
     }));
     expect(discovery.cards).toEqual([expect.objectContaining({ rawAccountToken: "token-parent" })]);
-    expect(discovery.unknownVariantCount).toBe(3);
+    expect(discovery.unknownVariantCount).toBe(2);
+    expect(JSON.stringify(discovery)).not.toMatch(/token-supp-a|token-supp-b/);
+  });
+
+  it("keeps unknown or contradictory nested relationships fail closed", () => {
+    const discovery = parseAccountDiscovery(memberResponseSchema.parse({
+      accounts: [{
+        account_token: "primary-token",
+        relationship: "BASIC",
+        product: { description: "American Express Platinum Card" },
+        display_account_number: "1234",
+        supplementary_accounts: [
+          { account_token: "missing-role-token", display_account_number: "1111" },
+          {
+            account_token: "conflicting-role-token",
+            relationship: "SUPP",
+            display_account_number: "2222",
+            account: { relationship: "BASIC" },
+          },
+          {
+            account_token: "ignored-malformed-supp-token",
+            relationship: "SUPP",
+            account_number: "4111111111113333",
+          },
+        ],
+      }],
+    }));
+
+    expect(discovery.cards).toEqual([expect.objectContaining({ rawAccountToken: "primary-token" })]);
+    expect(discovery.unknownVariantCount).toBe(2);
+    expect(discovery.issueCodes).toEqual(["unknown_account_variant"]);
+    expect(JSON.stringify(discovery)).not.toContain("ignored-malformed-supp-token");
   });
 
   it("keeps duplicate product names separate and rejects duplicate token identity", () => {

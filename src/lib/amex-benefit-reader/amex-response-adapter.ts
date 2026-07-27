@@ -27,7 +27,6 @@ export interface TransientAccountCard {
   rawAccountToken: string;
   productName: string;
   endingDigits: string;
-  relationship: "BASIC" | "SUPP";
 }
 
 export interface AccountDiscovery {
@@ -168,23 +167,6 @@ function resolvedRelationship(...values: unknown[]): string | null {
   return extracted.state === "valid" ? extracted.value.toUpperCase() : null;
 }
 
-function resolvedSupplementaryProduct(
-  supplementaryProduct: unknown,
-  nestedProduct: unknown,
-  parentProduct: unknown,
-): string | null {
-  const supplementary = productDescription(supplementaryProduct);
-  const nested = productDescription(nestedProduct);
-  if (supplementary.state === "invalid" || nested.state === "invalid") return null;
-  if (supplementary.state === "valid" && nested.state === "valid") {
-    return supplementary.value === nested.value ? supplementary.value : null;
-  }
-  if (supplementary.state === "valid") return supplementary.value;
-  if (nested.state === "valid") return nested.value;
-  const parent = productDescription(parentProduct);
-  return parent.state === "valid" ? parent.value : null;
-}
-
 function resolvedLayeredEnding(
   outer: Parameters<typeof endingDigitsFromFields>[0],
   nested: Parameters<typeof endingDigitsFromFields>[0] | undefined,
@@ -233,7 +215,6 @@ export function parseAccountDiscovery(response: MemberResponse): AccountDiscover
             rawAccountToken: rawAccountToken.value,
             productName: productName.value,
             endingDigits,
-            relationship: "BASIC",
           }
         : null);
     } else {
@@ -248,23 +229,13 @@ export function parseAccountDiscovery(response: MemberResponse): AccountDiscover
         supplementary.account?.relationship,
         supplementary.relationship,
       );
-      if (supplementaryRelationship !== "SUPP") {
-        unknownVariantCount += 1;
+      if (supplementaryRelationship === "SUPP") {
+        // Nested supplementary cards are an understood policy exclusion. Do not
+        // inspect their identity fields or let inherited product text turn them
+        // into primary-card scan work.
         continue;
       }
-      const rawAccountToken = uniqueText([
-        supplementary.account_token,
-        supplementary.account?.account_token,
-      ], 4096);
-      const productName = resolvedSupplementaryProduct(
-        supplementary.product,
-        supplementary.account?.product,
-        account.product,
-      );
-      const endingDigits = resolvedLayeredEnding(supplementary, supplementary.account);
-      addCard(rawAccountToken.state === "valid" && productName && endingDigits
-        ? { rawAccountToken: rawAccountToken.value, productName, endingDigits, relationship: "SUPP" }
-        : null);
+      unknownVariantCount += 1;
     }
   }
 

@@ -24,7 +24,7 @@ function envelope(): AmexSyncEnvelope {
       productKey: "american-express-platinum-card",
       endingDigits: "1234",
       observedAt: "2026-07-15T11:59:00.000Z",
-      parserVersion: "fixture/2",
+      parserVersion: "amex-api-us/2.0.2",
       rows: [{
         creditFamilyKey: "american-express-platinum-card:resy",
         sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },
@@ -47,7 +47,7 @@ function v2Store(): StoreEnvelopeV1 {
     productKey: "american-express-platinum-card" as const,
     endingDigits: "1234",
     observedAt: "2026-07-15T11:59:00.000Z",
-    parserVersion: "fixture/2",
+    parserVersion: "amex-api-us/2.0.2",
     scanId,
     completeness: "complete" as const,
     issueCodes: [],
@@ -120,7 +120,7 @@ describe("Amex sync transport contract", () => {
     expect(() => parseAmexSyncEnvelope(huge)).toThrow();
   });
 
-  it("projects only the latest complete V2 scan and never upgrades V1", () => {
+  it("projects only the latest complete current-parser V2 scan and never upgrades older data", () => {
     const projected = projectLatestV2SyncEnvelope(v2Store());
     expect(projected.reason).toBe("ready");
     expect(projected.envelope?.cards[0]).toMatchObject({
@@ -144,6 +144,14 @@ describe("Amex sync transport contract", () => {
       benefits: [],
     };
     expect(projectLatestV2SyncEnvelope(v1)).toEqual({ envelope: null, reason: "no_complete_cards" });
+
+    const outdated = v2Store();
+    outdated.cards[cardId].latest!.parserVersion = "amex-api-us/2.0.1";
+    expect(projectLatestV2SyncEnvelope(outdated)).toEqual({ envelope: null, reason: "no_complete_cards" });
+    expect(() => parseAmexSyncEnvelope({
+      ...envelope(),
+      cards: [{ ...envelope().cards[0], parserVersion: "amex-api-us/2.0.1" }],
+    })).toThrow();
   });
 
   it("reapplies supported-credit retention before sync projection without relaxing complete-card gates", () => {
