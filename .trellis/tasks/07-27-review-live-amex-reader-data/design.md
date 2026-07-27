@@ -2,16 +2,18 @@
 
 ## Scope and boundaries
 
-This change corrects three reviewed false-conflict mechanisms and the confirmed panel presentation defects found in the redacted live-data review.
+This change corrects three reviewed false-conflict mechanisms, excludes supplementary relationships from the primary-card reader, and fixes the confirmed panel presentation defects found in the redacted live-data reviews.
 
-It changes only local reader normalization, compatibility filtering, sync-envelope defense-in-depth, panel projection, tests, and userscript/parser version markers. It does not change AMEX request tuples, grants, response schemas, mailbox behavior, server synchronization authority, database schema, migrations, or deployment configuration.
+It changes only local account discovery, reader normalization, compatibility invalidation/filtering, sync-envelope defense-in-depth, panel projection, tests, and userscript/parser version markers. It does not change AMEX request tuples, grants, response schemas, mailbox behavior, server synchronization authority, database schema, migrations, or deployment configuration.
 
 No live scan, Sync action, mailbox handoff, confirmation, account mutation, database write, browser installation, or production rollout is part of implementation or validation. A future manual scan requires separate explicit authorization.
 
 ## Data flow
 
 ```text
-bounded AMEX tracker/catalog responses
+bounded AMEX member response
+  -> admit top-level BASIC; exclude nested SUPP
+  -> primary-card identity and tracker/catalog reads
   -> reviewed raw-source exclusions
   -> existing supported-card/credit matching
   -> normalized V2 observations
@@ -20,7 +22,20 @@ bounded AMEX tracker/catalog responses
   -> complete-card-only sync-envelope projection
 ```
 
-The integrity boundary remains normalization and shared compatibility policy. The panel must not be the first place an ignored record disappears.
+The ownership boundary is account discovery; the benefit integrity boundary remains normalization and shared compatibility policy. The panel must not be the first place an ignored relationship or benefit record disappears.
+
+## Primary-card discovery policy
+
+The bounded member response already distinguishes characterized roles through both structure and relationship:
+
+- top-level `accounts[]` with exact resolved relationship `BASIC` are eligible primary cards;
+- nested `supplementary_accounts[]` with exact resolved relationship `SUPP` are understood policy exclusions.
+
+`parseAccountDiscovery` excludes exact `SUPP` before `addCard`. These records do not reach identity-secret loading, token fingerprinting, tracker/catalog requests, discovered/attempted counts, normalization, persistence, panel projection, or synchronization consideration. A known excluded `SUPP` relationship does not count as an unknown account variant or make a clean scan partial. Unknown, missing, or contradictory relationship shapes keep existing fail-closed unknown-variant behavior.
+
+Role/structure is authoritative; display product phrases are not. A supplementary entry can inherit its parent product description and look like an ordinary supported Platinum card, so matching `Additional` or `Companion` names is insufficient.
+
+The persistent normalized contracts do not gain a role field. Existing v0.3.1 snapshots cannot reliably reconstruct ownership, so a one-time local compatibility marker invalidates all pre-primary-only cards and `lastScan`, deletes any pending mailbox derived from that snapshot, and preserves the installation identity secret. Validation happens before mutation; malformed/future stores are refused unchanged; the marker is written only after successful invalidation; later loads are idempotent.
 
 ## Reviewed source-selection policy
 
@@ -96,23 +111,17 @@ The panel derives four card groups from the store and latest scan summary:
 3. **Latest-scan unresolved** — card belongs to the latest scan but is partial, failed, stale after failure, or otherwise not conclusively complete.
 4. **Older retained** — stored card is not represented in the latest scan summary.
 
-Only confirmed-empty cards are hidden and counted as having no trackable benefits. Empty unresolved and older-retained cards render as card groups so their quality/error state is visible.
+Coverage remains the account-quality projection, but active-filter rendering is a separate projection. Account metrics still include all coverage entries; a card group renders only when it contains at least one row in the selected filter:
 
-The account summary must reconcile:
+- `Remaining` renders cards with at least one conservatively classified non-used row;
+- `Used` renders cards with at least one used row;
+- zero-benefit partial, failed, stale, and older-retained records render no card group;
+- an all-used card renders no compact group under `Remaining`, but appears with rows and quality warnings under `Used`;
+- partial/stale cards with actual rows remain visible in the corresponding filter with their quality disclosure.
 
-- `attemptedCardCount` as cards checked in the latest scan;
-- stored card-record count;
-- number of older retained records.
+The account summary must reconcile latest attempted count, stored count, confirmed-empty count, older-retained count, and omitted quality-problem records. Scan failures remain visible as aggregate data notes rather than empty card shells. Filter-specific empty states explain whether the other filter contains rows. The compact zero-row card-group path is removed.
 
-For the reviewed live shape, the expected presentation is equivalent to:
-
-- 15 cards checked in the latest scan;
-- 16 stored card records;
-- 1 older retained card;
-- 7 cards confirmed to have no trackable benefits and hidden;
-- 4 zero-benefit cards unresolved after catalog HTTP errors, rendered rather than hidden.
-
-The account-wide “no trackable benefits” state is allowed only when every relevant latest-scan card is conclusively empty and there are no unresolved or older-retained records requiring attention.
+For the reviewed v0.3.1 shape, the existing projection explains nine groups while only four contain benefits. Under the corrected `Remaining` projection, only cards with remaining rows render; the five zero-benefit unresolved/retained groups do not. After primary-only migration and a separately authorized fresh scan, supplementary relationships are absent from both counts and storage.
 
 ## Benefit presentation
 
@@ -141,12 +150,14 @@ When a valid structured period exists, raw provider duration tokens such as `Cal
 
 ## Compatibility and versioning
 
-No contract or store schema version changes.
+No normalized contract or store schema version changes.
 
-Because normalization and display behavior change:
+Because ownership authority and display behavior change:
 
-- bump parser marker from `amex-api-us/2.0.0` to `amex-api-us/2.0.1`;
-- bump userscript version from `0.3.0` to `0.3.1`;
+- bump parser marker from `amex-api-us/2.0.1` to `amex-api-us/2.0.2`;
+- bump userscript version from `0.3.1` to `0.3.2`;
+- add a non-sensitive fixed compatibility marker for one-time role-unverified snapshot invalidation;
+- require current-parser observations at sync-envelope projection/validation so pre-primary-only V2 data fails closed pending a fresh scan;
 - update generated-bundle assertions.
 
 Building the userscript is allowed as local validation. Installing it into Tampermonkey or performing a live scan is a separate outward-facing step and requires explicit authorization after implementation review.
@@ -179,9 +190,13 @@ Prove compatibility loading removes ignored normalized rows, increments revision
 
 Prove sync projection reapplies the shared retention policy while preserving all current V2/current/latest-scan/complete-card gates.
 
-### Panel
+### Discovery, compatibility, and panel
 
-Prove the reviewed 16-stored/15-attempted shape reconciles correctly, hides only seven confirmed-empty cards, renders four catalog-error empty cards and one older retained card truthfully, and does not show account-wide conclusive-empty copy.
+Prove top-level exact `BASIC` is the only emitted card; nested exact `SUPP`, including inherited-parent product shapes, causes no identity or benefit requests and does not count unknown. Prove unknown/conflicting relationships remain fail closed.
+
+Prove the one-time compatibility migration invalidates every role-unverified card and pending mailbox, preserves the identity secret, refuses malformed/future data unchanged, and is idempotent.
+
+Prove the reviewed mixed-quality shape retains reconciled counts but renders only cards with rows in the active filter. Zero-benefit unresolved/stale/retained groups and all-used compact groups are absent from `Remaining`; used cards appear under `Used`; partial/stale cards with actual rows retain quality warnings.
 
 Prove compact period formatting for annual, monthly, quarterly, half-year, irregular, cross-year, and fallback cases, including absence of raw provider tokens when `sourcePeriod` is observed.
 
@@ -193,4 +208,4 @@ Use only the local synthetic harness. Cover the three reviewed exclusions, one g
 
 The source rollback is limited to parser/matcher/panel changes and version markers. No schema or database rollback is needed.
 
-If compatibility filtering is found too broad before release, revert the shared normalized-observation predicate and parser version bump. Existing stores are not promoted or rewritten during source-only implementation; any later installed userscript may have removed ignored rows but cannot reconstruct missing rows without another scan, which is already required for completeness verification.
+If compatibility invalidation or primary-only filtering is found incorrect before release, revert the compatibility marker, parser gate, and discovery change before installation. Once an installed v0.3.2 invalidates a role-unverified snapshot, observations cannot be reconstructed without another scan; that fresh authenticated scan is already required to establish primary-only completeness and remains separately authorized.

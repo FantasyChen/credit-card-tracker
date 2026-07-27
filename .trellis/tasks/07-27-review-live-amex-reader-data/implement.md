@@ -1,4 +1,14 @@
-# Implementation plan: resolve AMEX reader conflicts and panel quality
+# Implementation plan: enforce primary-only AMEX reader scope and useful panel rows
+
+## 0. Enforce primary-only discovery and invalidate role-unverified state
+
+- Update `parseAccountDiscovery` in `src/lib/amex-benefit-reader/amex-response-adapter.ts` to emit only top-level exact `BASIC` cards.
+- Treat nested exact `SUPP` entries as understood policy exclusions before identity preparation or tracker/catalog reads; do not count them unknown or let them degrade scan completeness.
+- Keep unknown, missing, or contradictory relationship shapes fail closed.
+- Remove downstream reliance on transient relationship values once every emitted card is primary.
+- Add adapter/scan tests for explicit Additional/Companion names and a SUPP entry that inherits a supported parent product; assert no SUPP token reaches identity preparation or any card-specific request and counts include primary cards only.
+- Add a fixed non-sensitive compatibility marker in Tampermonkey storage. On first load under the primary-only policy, validate and then invalidate all role-unverified cards and `lastScan`, delete any pending mailbox, preserve the installation identity secret, and write the marker only after success.
+- Prove malformed/future stores are unchanged and unmarked, migration revision changes at most once, subsequent loads are idempotent, and clear removes the marker.
 
 ## 1. Add reviewed source-selection rules
 
@@ -27,16 +37,16 @@
 - Add storage tests proving one-time revision increment, second-load idempotency, unchanged quality metadata, and retained legacy conflict state.
 - Add sync-contract tests proving ignored rows never project and partial/conflicted cards remain excluded.
 
-## 4. Correct panel card coverage and summaries
+## 4. Make panel card groups filter-aware
 
-- Update `src/userscripts/amex-benefit-reader/panel.ts`.
-- Introduce a pure coverage projection that classifies benefit-bearing, confirmed-empty, latest-scan-unresolved, and older-retained records using latest-scan membership/disposition plus record/observation quality.
-- Hide and count only confirmed-empty cards.
-- Render zero-benefit unresolved and older-retained cards with truthful quality/error explanations.
-- Reconcile latest attempted count, stored count, and retained-record count in account copy.
-- Prevent account-wide “no trackable benefits” copy while unresolved or retained records exist.
-- Ensure data-note counts include quality problems on empty cards rather than inspecting benefit-bearing cards only.
-- Add panel tests reproducing the redacted 16-stored/15-attempted live shape.
+- Update `src/userscripts/amex-benefit-reader/panel.ts` while retaining the pure coverage projection for account-quality metrics.
+- Compute row membership with the existing conservative `Remaining`/`Used` presentation classifier, then render a card group only when it has at least one row in the active filter.
+- Remove the compact zero-row card-group path.
+- Under `Remaining`, omit zero-benefit unresolved/stale/older-retained groups and all-used groups. Under `Used`, render only groups with used rows.
+- Preserve quality badges and explanations on partial/stale cards when they have rows in the selected filter.
+- Reconcile latest attempted count, stored count, retained-record count, confirmed-empty count, and omitted quality-problem count in account copy without instructing users to inspect hidden card disclosures.
+- Add filter-specific empty states and preserve account-wide filter counts.
+- Replace panel tests that require every benefit-bearing card under both filters; reproduce the latest mixed-quality shape and assert only row-bearing groups render.
 
 ## 5. Render compact structured periods
 
@@ -45,12 +55,14 @@
 - Fall back to bounded raw `period` only for V1 or unavailable structured V2 periods.
 - Add panel tests for aligned, irregular, cross-year, fallback, and raw-token suppression cases.
 
-## 6. Update versions and synthetic browser fixtures
+## 6. Gate sync on the primary-only parser and update versions
 
-- Bump `PARSER_VERSION` in `src/lib/amex-benefit-reader/contract.ts` to `amex-api-us/2.0.1`.
-- Bump `userscriptVersion` in `scripts/build-amex-benefit-reader.mjs` to `0.3.1`.
-- Update `tests/e2e/amex-benefit-reader/harness.ts` with synthetic exclusion/coverage cases.
-- Update `tests/e2e/amex-benefit-reader/amex-benefit-reader.spec.ts` for version assertions, reviewed exclusions, genuine-conflict control, unresolved empty cards, compact periods, and sanitized storage.
+- Bump `PARSER_VERSION` in `src/lib/amex-benefit-reader/contract.ts` to `amex-api-us/2.0.2`.
+- Require current-parser observations in sync-envelope projection/validation so v2.0.1 role-unverified stores and mailboxes fail closed pending a fresh scan; preserve all existing complete/current/latest-scan gates.
+- Bump `userscriptVersion` in `scripts/build-amex-benefit-reader.mjs` to `0.3.2`.
+- Update `tests/e2e/amex-benefit-reader/harness.ts` so ordinary multi-card cases use top-level BASIC cards; add nested SUPP only to prove zero identity/request work.
+- Add synthetic one-time legacy-store/mailbox invalidation and filter-aware card-group coverage.
+- Update `tests/e2e/amex-benefit-reader/amex-benefit-reader.spec.ts` for version assertions, primary-only discovery, reviewed exclusions, genuine-conflict control, hidden zero-row groups, Used-filter behavior, compact periods, and sanitized storage.
 - Do not install the resulting script or contact live AMEX/Perks Reminder pages.
 
 ## 7. Validate
@@ -61,7 +73,10 @@ Run focused unit tests:
 npm test -- --runInBand \
   src/lib/amex-benefit-reader/__tests__/supported-card-credits.test.ts \
   src/lib/amex-benefit-reader/__tests__/amex-response-adapter.test.ts \
+  src/lib/amex-benefit-reader/__tests__/scan-engine.test.ts \
+  src/lib/amex-benefit-reader/__tests__/storage-policy.test.ts \
   src/lib/amex-benefit-reader/__tests__/sync-contract.test.ts \
+  src/lib/amex-benefit-reader/__tests__/sync-mailbox.test.ts \
   src/userscripts/amex-benefit-reader/__tests__/tampermonkey-storage.test.ts \
   src/userscripts/amex-benefit-reader/__tests__/panel.test.ts
 ```
@@ -82,7 +97,10 @@ npx eslint \
   src/userscripts/amex-benefit-reader/panel.ts \
   src/lib/amex-benefit-reader/__tests__/supported-card-credits.test.ts \
   src/lib/amex-benefit-reader/__tests__/amex-response-adapter.test.ts \
+  src/lib/amex-benefit-reader/__tests__/scan-engine.test.ts \
+  src/lib/amex-benefit-reader/__tests__/storage-policy.test.ts \
   src/lib/amex-benefit-reader/__tests__/sync-contract.test.ts \
+  src/lib/amex-benefit-reader/__tests__/sync-mailbox.test.ts \
   src/userscripts/amex-benefit-reader/__tests__/tampermonkey-storage.test.ts \
   src/userscripts/amex-benefit-reader/__tests__/panel.test.ts
 ```
@@ -120,12 +138,13 @@ After implementation and checks:
 
 - Do not perform a live scan, click Sync, create a mailbox, install/update Tampermonkey, apply a migration, deploy, or write to a database.
 - Present source/test results for review.
-- If the user wants manual verification, separately confirm installation of version `0.3.1`, then separately confirm a new manual scan because it issues authenticated first-party AMEX reads.
+- If the user wants manual verification, separately confirm installation of version `0.3.2`, then separately confirm a new manual scan because it issues authenticated first-party AMEX reads.
 - Keep synchronization blocked until a new scan produces complete eligible observations and the user separately authorizes any handoff.
 
 ## Rollback points
 
 - If reviewed raw filtering changes unrelated ambiguity behavior, revert step 2 and retain existing fail-closed grouping.
 - If normalized compatibility filtering is broader than approved, revert the shared predicate before installation; do not invent or restore missing observations.
-- If panel coverage cannot classify a record conclusively, classify it unresolved rather than confirmed empty.
-- No database or schema rollback is required.
+- If ownership compatibility invalidation is unsafe, stop before installation; do not fall back to product-name ownership heuristics.
+- If panel coverage cannot classify a record conclusively, retain its quality count but do not manufacture an empty card group in the active filter.
+- No database or normalized-contract schema rollback is required.
