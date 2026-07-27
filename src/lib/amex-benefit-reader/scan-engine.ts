@@ -1,6 +1,12 @@
 import type { CatalogResponse, MemberResponse, TrackerResponse } from "./amex-api-contract";
 import { AmexApiError } from "./amex-api-client";
-import { parseAccountDiscovery, normalizeBenefits, type AccountDiscovery } from "./amex-response-adapter";
+import {
+  parseAccountDiscovery,
+  normalizeBenefits,
+  type AccountDiscovery,
+  type BenefitIdentityConflictDiagnostic,
+  type BenefitIdentityConflictDetailSet,
+} from "./amex-response-adapter";
 import {
   OBSERVATION_CONTRACT_VERSION,
   PARSER_VERSION,
@@ -46,7 +52,12 @@ export type ScanProgress =
   | { type: "started" }
   | { type: "discovered"; cardCount: number; unknownEntryCount: number }
   | { type: "card"; cardIndex: number; cardCount: number; productName: string; endingDigits: string; phase: CardReadPhase }
-  | { type: "card_committed"; record: StoredCardRecordV1 }
+  | {
+      type: "card_committed";
+      record: StoredCardRecordV1;
+      conflictDiagnostics: BenefitIdentityConflictDiagnostic[];
+      conflictDetails: BenefitIdentityConflictDetailSet;
+    }
   | { type: "verifying_context" }
   | { type: "finished"; summary: ScanSummaryV1 };
 
@@ -273,7 +284,12 @@ export class AmexBenefitScanEngine {
             attemptedAt: observedAt,
             observation,
           });
-          this.reporter.report({ type: "card_committed", record });
+          this.reporter.report({
+            type: "card_committed",
+            record,
+            conflictDiagnostics: normalized.conflictDiagnostics,
+            conflictDetails: normalized.conflictDetails,
+          });
           dispositions.push({ localCardId, result: disposition, issueCode: issueCodes[0] ?? null });
         } catch (error) {
           const code = issueFromError(error);
@@ -288,7 +304,7 @@ export class AmexBenefitScanEngine {
             attemptedAt,
             errorCode: code,
           });
-          this.reporter.report({ type: "card_committed", record });
+          this.reporter.report({ type: "card_committed", record, conflictDiagnostics: [], conflictDetails: { details: [], totalCount: 0, truncated: false } });
           dispositions.push({ localCardId, result: "failed", issueCode: code });
         } finally {
           trackerResponse = null;
@@ -313,7 +329,7 @@ export class AmexBenefitScanEngine {
           attemptedAt,
           errorCode: "identity_ambiguous",
         });
-        this.reporter.report({ type: "card_committed", record: staleRecord });
+        this.reporter.report({ type: "card_committed", record: staleRecord, conflictDiagnostics: [], conflictDetails: { details: [], totalCount: 0, truncated: false } });
       }
     } catch (error) {
       const code = issueFromError(error);
