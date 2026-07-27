@@ -3,7 +3,7 @@
   "name": "plan-amex-benefit-sync",
   "title": "Plan AMEX BenefitSync experience",
   "description": "",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": "integration",
   "scope": "Cross-milestone acceptance trace for the committed AMEX pre-sync review and confirmed synchronization implementation",
   "package": "perks-reminder",
@@ -11,7 +11,7 @@
   "creator": "fantasyc",
   "assignee": "fantasyc",
   "createdAt": "2026-07-22",
-  "completedAt": null,
+  "completedAt": "2026-07-27",
   "branch": "feat/amex-benefit-reader-phase-1",
   "base_branch": "feat/amex-benefit-reader-phase-1",
   "worktree_path": null,
@@ -36,8 +36,20 @@
   "notes": "Both child tasks are archived and their implementation commits are ordered on this branch. Parent acceptance is code-complete with synchronization defaulting to off; migration apply/backfill, deployment, userscript installation, live synchronization-build scan, authenticated preview, and real write remain separate operational gates.",
   "meta": {
     "integrationReviewDate": "2026-07-26",
-    "preSyncCommits": ["6697fc6", "79c51d7", "ad26634", "1ce40cd"],
-    "syncCommits": ["02204a6", "0ca2c4a", "2d2dc96", "64a14c1", "04d83aa", "b9d76e6"],
+    "preSyncCommits": [
+      "6697fc6",
+      "79c51d7",
+      "ad26634",
+      "1ce40cd"
+    ],
+    "syncCommits": [
+      "02204a6",
+      "0ca2c4a",
+      "2d2dc96",
+      "64a14c1",
+      "04d83aa",
+      "b9d76e6"
+    ],
     "codeComplete": true,
     "defaultSyncMode": "off",
     "operationallyEnabled": false
