@@ -6,8 +6,17 @@ import type {
   StoreEnvelopeV1,
   StoredCardRecordV1,
 } from "@/lib/amex-benefit-reader/contract";
-import { fixedErrorMessage, hasMixedObservations } from "@/lib/amex-benefit-reader/storage-policy";
+import {
+  BENEFIT_IDENTITY_CONFLICT_DIAGNOSTICS,
+  type BenefitIdentityConflictCandidateDetail,
+  type BenefitIdentityConflictDetail,
+  type BenefitIdentityConflictDetailSet,
+  type BenefitIdentityConflictDiagnostic,
+  type ConflictDiagnosticField,
+} from "@/lib/amex-benefit-reader/amex-response-adapter";
+import { fixedErrorMessage } from "@/lib/amex-benefit-reader/storage-policy";
 import type { ScanProgress, ScanReporter } from "@/lib/amex-benefit-reader/scan-engine";
+import { formatAmexBenefitTitle } from "./provider-text";
 
 export const AMEX_READER_HOST_ID = "perks-reminder-amex-reader";
 
@@ -22,18 +31,26 @@ export interface PanelOptions {
   requiresReloadAfterClear?: boolean;
 }
 
-type BenefitFilter = "all" | "action" | "progress" | "complete";
-type BenefitBucket = Exclude<BenefitFilter, "all"> | "other";
+type BenefitFilter = "remaining" | "used";
 type BenefitTone = "amber" | "blue" | "green" | "muted";
 type QualityTone = "good" | "note" | "warning" | "error";
 
-interface BenefitPresentation {
-  label: string;
+export type BenefitUsageLabel =
+  | "Not used"
+  | "Partially used"
+  | "Used"
+  | "Enrollment required"
+  | "Link required"
+  | "Status unavailable";
+
+export interface BenefitUsagePresentation {
+  label: BenefitUsageLabel;
   tone: BenefitTone;
-  bucket: BenefitBucket;
+  filter: BenefitFilter;
+}
+
+interface BenefitPresentation extends BenefitUsagePresentation {
   amount: string | null;
-  remaining: string | null;
-  progress: number | null;
   period: string | null;
 }
 
@@ -48,20 +65,10 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string): 
   return result;
 }
 
-function titleCase(value: string): string {
-  const normalized = value.replace(/_/g, " ");
-  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
-}
-
 function formatDate(value: string | null): string {
   if (!value) return "No observation";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
-}
-
-function fieldText<T>(field: ObservedField<T>, format: (value: T) => string = String): string {
-  if (field.state === "observed") return format(field.value);
-  return field.state === "not_exposed" ? "Not provided by Amex" : "Could not interpret safely";
 }
 
 function quantityText(quantity: QuantityV1): string {
@@ -72,89 +79,127 @@ function quantityText(quantity: QuantityV1): string {
   return quantity.value;
 }
 
-function compatibleProgress(current: QuantityV1, target: QuantityV1): number | null {
-  if (current.unit !== target.unit || current.currency !== target.currency) return null;
-  const currentValue = Number(current.value);
-  const targetValue = Number(target.value);
-  if (!Number.isFinite(currentValue) || !Number.isFinite(targetValue) || currentValue < 0 || targetValue <= 0) return null;
-  return Math.min(100, Math.max(0, (currentValue / targetValue) * 100));
-}
-
 function observedValue<T>(field: ObservedField<T>): T | null {
   return field.state === "observed" ? field.value : null;
+}
+
+function quantitiesAreCompatible(left: QuantityV1, right: QuantityV1): boolean {
+  return left.unit !== "unknown"
+    && right.unit !== "unknown"
+    && left.unit === right.unit
+    && left.currency === right.currency;
+}
+
+interface DecimalParts {
+  integer: string;
+  fraction: string;
+}
+
+function nonnegativeDecimalParts(value: string): DecimalParts | null {
+  const match = /^(\d+)(?:\.(\d+))?$/.exec(value);
+  if (!match) return null;
+  return {
+    integer: match[1].replace(/^0+(?=\d)/, ""),
+    fraction: (match[2] ?? "").replace(/0+$/, ""),
+  };
+}
+
+function compareNonnegativeDecimals(left: string, right: string): -1 | 0 | 1 | null {
+  const leftParts = nonnegativeDecimalParts(left);
+  const rightParts = nonnegativeDecimalParts(right);
+  if (!leftParts || !rightParts) return null;
+  if (leftParts.integer.length !== rightParts.integer.length) {
+    return leftParts.integer.length < rightParts.integer.length ? -1 : 1;
+  }
+  if (leftParts.integer !== rightParts.integer) return leftParts.integer < rightParts.integer ? -1 : 1;
+  const fractionLength = Math.max(leftParts.fraction.length, rightParts.fraction.length);
+  const leftFraction = leftParts.fraction.padEnd(fractionLength, "0");
+  const rightFraction = rightParts.fraction.padEnd(fractionLength, "0");
+  if (leftFraction === rightFraction) return 0;
+  return leftFraction < rightFraction ? -1 : 1;
+}
+
+function compareUsageToPositiveTarget(current: QuantityV1 | null, target: QuantityV1 | null): -1 | 0 | 1 | null {
+  if (!current || !target || !quantitiesAreCompatible(current, target)) return null;
+  const targetVsZero = compareNonnegativeDecimals(target.value, "0");
+  if (targetVsZero !== 1) return null;
+  return compareNonnegativeDecimals(current.value, target.value);
+}
+
+function isObservedZero(quantity: QuantityV1 | null): boolean {
+  return quantity !== null && compareNonnegativeDecimals(quantity.value, "0") === 0;
 }
 
 function observationQuality(record: StoredCardRecordV1): QualityPresentation {
   if (record.freshness === "error_no_data") return { label: "Could not read", tone: "error" };
   if (record.freshness === "stale_error") return { label: "Stale data", tone: "warning" };
   if (record.completeness === "partial") return { label: "Partial data", tone: "note" };
-  return { label: "Up to date", tone: "good" };
+  return { label: "Current", tone: "good" };
 }
 
-function benefitState(benefit: NormalizedBenefitObservationV1): Pick<BenefitPresentation, "label" | "tone" | "bucket"> {
+function confidenceSummary(benefits: NormalizedBenefitObservationV1[]): string {
+  if (!benefits.length) return "No benefit observations";
+  const counts = { high: 0, medium: 0, low: 0 };
+  benefits.forEach((benefit) => {
+    counts[benefit.confidence] += 1;
+  });
+  return (["high", "medium", "low"] as const)
+    .filter((confidence) => counts[confidence] > 0)
+    .map((confidence) => `${counts[confidence]} ${confidence}`)
+    .join(", ");
+}
+
+export function deriveBenefitUsageState(benefit: NormalizedBenefitObservationV1): BenefitUsagePresentation {
   const completion = observedValue(benefit.completionState);
   const tracker = observedValue(benefit.trackerState);
   const enrollment = observedValue(benefit.enrollmentState);
+  const current = observedValue(benefit.earnedOrUsed);
+  const target = observedValue(benefit.targetOrLimit);
+  const quantityComparison = compareUsageToPositiveTarget(current, target);
 
-  if (completion === "complete" || tracker === "completed" || benefit.activityKind === "completed") {
-    return { label: "Completed", tone: "green", bucket: "complete" };
+  if (enrollment === "required") return { label: "Enrollment required", tone: "amber", filter: "remaining" };
+  if (enrollment === "linking_required") return { label: "Link required", tone: "amber", filter: "remaining" };
+  if (
+    completion === "complete"
+    || tracker === "earned"
+    || tracker === "completed"
+    || benefit.activityKind === "credit_earned"
+    || benefit.activityKind === "completed"
+    || quantityComparison === 0
+    || quantityComparison === 1
+  ) {
+    return { label: "Used", tone: "green", filter: "used" };
   }
-  if (tracker === "earned" || benefit.activityKind === "credit_earned") {
-    return { label: "Credit earned", tone: "green", bucket: "complete" };
+  if (quantityComparison === -1 && isObservedZero(current)) {
+    return { label: "Not used", tone: "amber", filter: "remaining" };
   }
-  if (enrollment === "linking_required") {
-    return { label: "Link required", tone: "amber", bucket: "action" };
-  }
-  if (enrollment === "required") {
-    return { label: "Enrollment required", tone: "amber", bucket: "action" };
-  }
-  if (tracker === "in_progress") {
-    return { label: "In progress", tone: "blue", bucket: "progress" };
+  if (tracker === "in_progress" || quantityComparison === -1) {
+    return { label: "Partially used", tone: "blue", filter: "remaining" };
   }
   if (tracker === "not_started") {
-    return { label: "Not started", tone: "amber", bucket: "action" };
+    return { label: "Not used", tone: "amber", filter: "remaining" };
   }
-  if (benefit.activityKind === "enrollment_candidate") {
-    return { label: "Check enrollment", tone: "amber", bucket: "action" };
-  }
-  if (benefit.activityKind === "spend_progress" && observedValue(benefit.earnedOrUsed)) {
-    return { label: "In progress", tone: "blue", bucket: "progress" };
-  }
-  if (completion === "incomplete") {
-    return { label: "Not completed", tone: "amber", bucket: "action" };
-  }
-  return { label: "Status unavailable", tone: "muted", bucket: "other" };
+  return { label: "Status unavailable", tone: "muted", filter: "remaining" };
 }
 
 function benefitPresentation(benefit: NormalizedBenefitObservationV1): BenefitPresentation {
-  const state = benefitState(benefit);
+  const state = deriveBenefitUsageState(benefit);
   const current = observedValue(benefit.earnedOrUsed);
   const target = observedValue(benefit.targetOrLimit);
-  const remaining = observedValue(benefit.remaining);
-  const period = observedValue(benefit.period);
   let amount: string | null = null;
 
-  if (current && target) {
-    amount = current.unit === target.unit && current.currency === target.currency
-      ? `${quantityText(current)} of ${quantityText(target)}`
-      : `Current ${quantityText(current)} · Goal ${quantityText(target)}`;
-  } else if (current) {
-    const prefix = benefit.activityKind === "credit_earned"
-      ? "Earned"
-      : benefit.activityKind === "spend_progress"
-        ? "Progress"
-        : "Recorded";
-    amount = `${prefix} ${quantityText(current)}`;
-  } else if (target) {
-    amount = `Goal ${quantityText(target)}`;
+  if (current && target && quantitiesAreCompatible(current, target)) {
+    amount = `${quantityText(current)} of ${quantityText(target)}`;
+  } else if (current && !target && current.unit !== "unknown") {
+    amount = `Used ${quantityText(current)}`;
+  } else if (!current && target && target.unit !== "unknown") {
+    amount = `Total ${quantityText(target)}`;
   }
 
   return {
     ...state,
     amount,
-    remaining: remaining ? `${quantityText(remaining)} remaining` : null,
-    progress: current && target ? compatibleProgress(current, target) : null,
-    period,
+    period: observedValue(benefit.period),
   };
 }
 
@@ -176,10 +221,69 @@ function sortedCards(store: StoreEnvelopeV1): StoredCardRecordV1[] {
 }
 
 function filterLabel(filter: BenefitFilter): string {
-  if (filter === "action") return "Needs action";
-  if (filter === "progress") return "In progress";
-  if (filter === "complete") return "Completed";
-  return "All";
+  return filter === "remaining" ? "Remaining" : "Used";
+}
+
+const CONFLICT_DIAGNOSTIC_LABELS: Record<BenefitIdentityConflictDiagnostic, string> = {
+  tracker_state_collision: "Conflicting tracker states",
+  tracker_catalog_key_mismatch: "Tracker and benefit details matched different credits",
+  ambiguous_catalog_join: "Benefit details could not be joined safely",
+  tracker_catalog_candidate_collision: "Tracker and enrollment details conflicted",
+};
+
+const CONFLICT_SOURCE_LABELS: Record<BenefitIdentityConflictCandidateDetail["sourceRole"], string> = {
+  tracker: "Tracker",
+  joined_catalog: "Joined benefit details",
+  catalog_enrollment_candidate: "Enrollment candidate",
+};
+
+interface PanelConflictState {
+  diagnostics: BenefitIdentityConflictDiagnostic[];
+  detailSet: BenefitIdentityConflictDetailSet;
+}
+
+function creditFamilyLabel(creditKey: string): string {
+  return creditKey.slice(creditKey.lastIndexOf(":") + 1);
+}
+
+function diagnosticFieldText<T>(
+  field: ConflictDiagnosticField<T>,
+  format: (value: T) => string = (value) => String(value),
+): string {
+  if (field.state === "not_exposed") return "Not exposed";
+  if (field.state === "unrecognized") return "Unrecognized";
+  return format(field.value);
+}
+
+function appendDiagnosticField<T>(
+  list: HTMLDListElement,
+  label: string,
+  fieldName: string,
+  field: ConflictDiagnosticField<T>,
+  format?: (value: T) => string,
+): void {
+  const value = element("dd", diagnosticFieldText(field, format));
+  value.dataset.amexConflictField = fieldName;
+  value.dataset.fieldState = field.state;
+  if (field.state === "observed") value.dataset.fieldValue = String(field.value);
+  list.append(element("dt", label), value);
+}
+
+function appendDiagnosticQuantity(
+  list: HTMLDListElement,
+  label: string,
+  fieldName: string,
+  field: ConflictDiagnosticField<QuantityV1>,
+): void {
+  const value = element("dd", diagnosticFieldText(field, quantityText));
+  value.dataset.amexConflictField = fieldName;
+  value.dataset.fieldState = field.state;
+  if (field.state === "observed") {
+    value.dataset.quantityValue = field.value.value;
+    value.dataset.quantityUnit = field.value.unit;
+    value.dataset.quantityCurrency = field.value.currency ?? "none";
+  }
+  list.append(element("dt", label), value);
 }
 
 export class AmexBenefitReaderPanel implements ScanReporter {
@@ -189,8 +293,8 @@ export class AmexBenefitReaderPanel implements ScanReporter {
   private mode: "idle" | "scanning" | "cancelling" | "error" = "idle";
   private progress = "Ready. Nothing is scanned until you start.";
   private errorMessage: string | null = null;
-  private selectedCardId: string | null = null;
-  private benefitFilter: BenefitFilter = "all";
+  private benefitFilter: BenefitFilter = "remaining";
+  private readonly conflictsByCard = new Map<string, PanelConflictState>();
   private collapsed: boolean;
   private readonly requiresReloadAfterClear: boolean;
 
@@ -202,7 +306,6 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     this.store = initialStore;
     this.collapsed = options.initiallyCollapsed ?? false;
     this.requiresReloadAfterClear = options.requiresReloadAfterClear ?? false;
-    this.reconcileSelectedCard();
     this.host = document.createElement("div");
     this.host.id = AMEX_READER_HOST_ID;
     this.root = this.host.attachShadow({ mode: "open" });
@@ -232,6 +335,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
   report(progress: ScanProgress): void {
     if (progress.type === "started") {
       this.collapsed = false;
+      this.conflictsByCard.clear();
       this.mode = "scanning";
       this.progress = "Starting your read-only scan…";
     } else if (progress.type === "discovered") {
@@ -245,7 +349,16 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       this.progress = `Card ${progress.cardIndex} of ${progress.cardCount}: ${phase} for ${progress.productName} ending ${progress.endingDigits}.`;
     } else if (progress.type === "card_committed") {
       this.store = { ...this.store, cards: { ...this.store.cards, [progress.record.localCardId]: progress.record } };
-      this.reconcileSelectedCard();
+      const diagnostics = BENEFIT_IDENTITY_CONFLICT_DIAGNOSTICS.filter((diagnostic) =>
+        progress.conflictDiagnostics.includes(diagnostic));
+      if (diagnostics.length || progress.conflictDetails.details.length) {
+        this.conflictsByCard.set(progress.record.localCardId, {
+          diagnostics,
+          detailSet: progress.conflictDetails,
+        });
+      } else {
+        this.conflictsByCard.delete(progress.record.localCardId);
+      }
     } else if (progress.type === "verifying_context") {
       this.progress = "Finishing the scan and checking that the visible Amex page did not change…";
     } else {
@@ -256,22 +369,10 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     this.render();
   }
 
-  private reconcileSelectedCard(): void {
-    const cards = sortedCards(this.store);
-    if (!cards.length) {
-      this.selectedCardId = null;
-      this.benefitFilter = "all";
-      return;
-    }
-    if (!this.selectedCardId || !cards.some((record) => record.localCardId === this.selectedCardId)) {
-      this.selectedCardId = cards[0].localCardId;
-      this.benefitFilter = "all";
-    }
-  }
-
   private async start(): Promise<void> {
     if (this.mode !== "idle") return;
     this.collapsed = false;
+    this.conflictsByCard.clear();
     this.mode = "scanning";
     this.progress = "Starting your read-only scan…";
     this.errorMessage = null;
@@ -299,11 +400,11 @@ export class AmexBenefitReaderPanel implements ScanReporter {
 
   private async clear(): Promise<void> {
     if (!window.confirm("Clear all local Amex benefit observations and the local identity secret?")) return;
+    this.conflictsByCard.clear();
     try {
       await this.actions.clearData();
       this.store = { schemaVersion: 1, revision: 0, updatedAt: new Date().toISOString(), cards: {}, lastScan: null };
-      this.selectedCardId = null;
-      this.benefitFilter = "all";
+      this.benefitFilter = "remaining";
       this.mode = this.requiresReloadAfterClear ? "error" : "idle";
       this.errorMessage = this.requiresReloadAfterClear ? "Local data was cleared. Reload this Amex page before scanning." : null;
       this.progress = this.requiresReloadAfterClear
@@ -320,172 +421,230 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     const presentation = benefitPresentation(benefit);
     const item = element("li");
     item.className = `benefit-card tone-${presentation.tone}`;
-    item.dataset.bucket = presentation.bucket;
+    item.dataset.filter = presentation.filter;
 
     const top = element("div");
     top.className = "benefit-top";
+    const heading = element("h4", formatAmexBenefitTitle(benefit.title));
     const badge = element("span", presentation.label);
     badge.className = `status-pill tone-${presentation.tone}`;
-    top.append(badge);
+    top.append(heading, badge);
+    item.append(top);
+
+    const essentials = element("div");
+    essentials.className = "benefit-essentials";
+    if (presentation.amount) {
+      const amount = element("span", presentation.amount);
+      amount.className = "amount";
+      essentials.append(amount);
+    }
     if (presentation.period) {
       const period = element("span", presentation.period);
       period.className = "period";
-      top.append(period);
+      essentials.append(period);
     }
-    item.append(top);
+    if (essentials.childElementCount) item.append(essentials);
 
-    const heading = element("h4", benefit.title);
-    item.append(heading);
-    if (presentation.amount) {
-      const amount = element("p", presentation.amount);
-      amount.className = "amount";
-      item.append(amount);
-    }
-    if (presentation.progress != null) {
-      const track = element("div");
-      track.className = "progress-track";
-      track.setAttribute("role", "progressbar");
-      track.setAttribute("aria-label", `${benefit.title} progress`);
-      track.setAttribute("aria-valuemin", "0");
-      track.setAttribute("aria-valuemax", "100");
-      track.setAttribute("aria-valuenow", String(Math.round(presentation.progress)));
-      const fill = element("div");
-      fill.className = "progress-fill";
-      fill.style.width = `${presentation.progress}%`;
-      track.append(fill);
-      item.append(track);
-    }
-    if (presentation.remaining) {
-      const remaining = element("p", presentation.remaining);
-      remaining.className = "remaining";
-      item.append(remaining);
-    }
-
-    const details = element("details");
-    details.className = "data-details";
-    details.append(element("summary", "Data details"));
-    const list = element("dl");
-    const rows: Array<[string, string]> = [
-      ["Category", fieldText(benefit.category)],
-      ["Activity type", titleCase(benefit.activityKind)],
-      ["Enrollment", fieldText(benefit.enrollmentState, titleCase)],
-      ["Tracker", fieldText(benefit.trackerState, titleCase)],
-      ["Period", fieldText(benefit.period)],
-      ["Completion", fieldText(benefit.completionState, titleCase)],
-      ["Confidence", titleCase(benefit.confidence)],
-      ["Current amount", fieldText(benefit.earnedOrUsed, quantityText)],
-      ["Goal or limit", fieldText(benefit.targetOrLimit, quantityText)],
-      ["Remaining", fieldText(benefit.remaining, quantityText)],
-    ];
-    for (const [term, description] of rows) list.append(element("dt", term), element("dd", description));
-    details.append(list);
-    if (benefit.issueCodes.length) {
-      const notes = element("ul");
-      notes.className = "detail-notes";
-      Array.from(new Set(benefit.issueCodes)).forEach((code) => notes.append(element("li", fixedErrorMessage(code))));
-      details.append(notes);
-    }
-    item.append(details);
     return item;
   }
 
-  private renderSelectedCard(record: StoredCardRecordV1): HTMLElement {
+  private renderConflictCandidate(candidate: BenefitIdentityConflictCandidateDetail): HTMLElement {
+    const item = element("li");
+    item.className = "conflict-candidate";
+    item.dataset.amexConflictCandidate = "true";
+    item.dataset.candidateIndex = String(candidate.candidateIndex);
+    item.dataset.sourceRole = candidate.sourceRole;
+
+    const heading = element("h5", `Candidate ${candidate.candidateIndex}: ${CONFLICT_SOURCE_LABELS[candidate.sourceRole]}`);
+    item.append(heading);
+    const title = element(
+      "p",
+      candidate.displayTitle ? formatAmexBenefitTitle(candidate.displayTitle) : "No display title exposed",
+    );
+    title.className = "conflict-candidate-title";
+    title.dataset.amexConflictField = "display-title";
+    title.dataset.fieldState = candidate.displayTitle ? "observed" : "not_exposed";
+    item.append(title);
+
+    const fields = element("dl");
+    fields.className = "conflict-candidate-fields";
+    const key = element("dd", candidate.supportedCreditKey ?? "No reviewed credit match");
+    key.dataset.amexConflictField = "supported-credit-key";
+    key.dataset.fieldState = candidate.supportedCreditKey ? "observed" : "not_exposed";
+    if (candidate.supportedCreditKey) key.dataset.fieldValue = candidate.supportedCreditKey;
+    const family = element("dd", candidate.supportedCreditFamily ?? "No reviewed credit family");
+    family.dataset.amexConflictField = "supported-credit-family";
+    family.dataset.fieldState = candidate.supportedCreditFamily ? "observed" : "not_exposed";
+    if (candidate.supportedCreditFamily) family.dataset.fieldValue = candidate.supportedCreditFamily;
+    fields.append(
+      element("dt", "Reviewed credit"), key,
+      element("dt", "Reviewed credit family"), family,
+    );
+    appendDiagnosticField(fields, "Category", "category", candidate.category);
+    appendDiagnosticField(fields, "Activity", "activity-kind", candidate.activityKind);
+    appendDiagnosticField(fields, "Enrollment", "enrollment-state", candidate.enrollmentState);
+    appendDiagnosticField(fields, "Tracker", "tracker-state", candidate.trackerState);
+    appendDiagnosticField(fields, "Completion", "completion-state", candidate.completionState);
+    appendDiagnosticQuantity(fields, "Earned or used", "earned-or-used", candidate.earnedOrUsed);
+    appendDiagnosticQuantity(fields, "Target or limit", "target-or-limit", candidate.targetOrLimit);
+    appendDiagnosticQuantity(fields, "Remaining", "remaining", candidate.remaining);
+    appendDiagnosticField(fields, "Period", "period", candidate.period);
+    appendDiagnosticField(fields, "Catalog layout", "catalog-layout", candidate.catalogLayout);
+    appendDiagnosticField(fields, "Catalog enrollable", "catalog-enrollable", candidate.catalogEnrollable, (value) => value ? "Yes" : "No");
+    item.append(fields);
+    return item;
+  }
+
+  private renderConflictDetail(detail: BenefitIdentityConflictDetail): HTMLElement {
+    const article = element("article");
+    article.className = "conflict-detail";
+    article.dataset.amexConflict = "true";
+    article.dataset.conflictKey = detail.conflictKey;
+    article.dataset.conflictCategory = detail.category;
+    article.dataset.candidateCount = String(detail.candidateCount);
+    article.dataset.candidatesTruncated = String(detail.candidatesTruncated);
+
+    const heading = element("h4", CONFLICT_DIAGNOSTIC_LABELS[detail.category]);
+    heading.className = "conflict-detail-title";
+    article.append(heading);
+    const keyList = element("ul");
+    keyList.className = "conflict-credit-keys";
+    detail.reviewedCreditKeys.forEach((key) => {
+      const item = element("li", `${creditFamilyLabel(key)} (${key})`);
+      item.dataset.amexReviewedCreditKey = key;
+      item.dataset.creditFamily = creditFamilyLabel(key);
+      keyList.append(item);
+    });
+    article.append(keyList);
+
+    const candidates = element("ol");
+    candidates.className = "conflict-candidates";
+    detail.candidates.forEach((candidate) => candidates.append(this.renderConflictCandidate(candidate)));
+    article.append(candidates);
+    if (detail.candidatesTruncated) {
+      article.append(element("p", `Showing ${detail.candidates.length} of ${detail.candidateCount} parsed candidates.`));
+    }
+
+    const relations = element("dl");
+    relations.className = "conflict-relations";
+    ([
+      ["Same join", "same-join-id", detail.relations.sameJoinId],
+      ["Period comparison", "period", detail.relations.period],
+      ["Amount comparison", "amount", detail.relations.amount],
+      ["State comparison", "state", detail.relations.state],
+    ] as const).forEach(([label, relation, value]) => {
+      const result = element("dd", value === "unavailable" ? "Unavailable" : value === "same" ? "Same" : "Different");
+      result.dataset.amexConflictRelation = relation;
+      result.dataset.relationValue = value;
+      relations.append(element("dt", label), result);
+    });
+    article.append(relations);
+    return article;
+  }
+
+  private renderCardGroup(record: StoredCardRecordV1): HTMLElement {
     const section = element("section");
-    section.className = "card-workspace";
-    section.setAttribute("aria-labelledby", "pr-selected-card-title");
+    const headingId = `pr-card-${record.localCardId}`;
     const quality = observationQuality(record);
     const benefits = record.latest?.benefits ?? [];
-    const presentations = benefits.map((benefit) => ({ benefit, presentation: benefitPresentation(benefit) }));
-    const counts: Record<BenefitFilter, number> = {
-      all: presentations.length,
-      action: presentations.filter(({ presentation }) => presentation.bucket === "action").length,
-      progress: presentations.filter(({ presentation }) => presentation.bucket === "progress").length,
-      complete: presentations.filter(({ presentation }) => presentation.bucket === "complete").length,
-    };
+    const filtered = benefits.filter((benefit) => benefitPresentation(benefit).filter === this.benefitFilter);
+    const isCompact = benefits.length > 0 && filtered.length === 0;
+    section.className = isCompact ? "card-group card-group-compact" : "card-group";
+    section.dataset.amexReaderCardGroup = "true";
+    section.dataset.cardProduct = record.identity.productName;
+    section.dataset.cardEnding = record.identity.endingDigits;
 
     const headingRow = element("div");
     headingRow.className = "card-heading";
     const headingCopy = element("div");
-    headingCopy.append(element("p", "Selected card"));
     const heading = element("h3", `${record.identity.productName} •••• ${record.identity.endingDigits}`);
-    heading.id = "pr-selected-card-title";
+    heading.id = headingId;
     headingCopy.append(heading);
+    const visibleLabel = filterLabel(this.benefitFilter).toLowerCase();
+    const summaryId = `${headingId}-summary`;
+    const summary = element(
+      "p",
+      `${filtered.length} ${visibleLabel} benefit${filtered.length === 1 ? "" : "s"}`,
+    );
+    summary.id = summaryId;
+    summary.className = "card-summary";
+    headingCopy.append(summary);
+    section.setAttribute("aria-labelledby", `${headingId} ${summaryId}`);
     const qualityBadge = element("span", quality.label);
+    qualityBadge.id = `${headingId}-quality`;
     qualityBadge.className = `quality-pill quality-${quality.tone}`;
+    qualityBadge.setAttribute("aria-label", `Data quality: ${quality.label}`);
+    heading.setAttribute("aria-describedby", qualityBadge.id);
     headingRow.append(headingCopy, qualityBadge);
     section.append(headingRow);
 
-    const summary = element("p", `${benefits.length} trackable benefit${benefits.length === 1 ? "" : "s"}`);
-    summary.className = "card-summary";
-    section.append(summary);
-
-    if (record.error) {
-      const error = element("p", record.error.message);
-      error.className = "notice notice-warning";
-      section.append(error);
-    }
-
-    if (benefits.length) {
-      const filters = element("div");
-      filters.className = "filters";
-      filters.setAttribute("role", "group");
-      filters.setAttribute("aria-label", "Filter benefits for selected card");
-      (["all", "action", "progress", "complete"] as BenefitFilter[]).forEach((filter) => {
-        const control = element("button", `${filterLabel(filter)} ${counts[filter]}`);
-        control.type = "button";
-        control.className = "filter-button";
-        control.dataset.filter = filter;
-        control.setAttribute("aria-pressed", String(this.benefitFilter === filter));
-        control.addEventListener("click", () => {
-          this.benefitFilter = filter;
-          this.render();
-        });
-        filters.append(control);
-      });
-      section.append(filters);
-
-      const filtered = presentations.filter(({ presentation }) =>
-        this.benefitFilter === "all" || presentation.bucket === this.benefitFilter);
-      if (!filtered.length) {
-        const empty = element("p", `No ${filterLabel(this.benefitFilter).toLowerCase()} benefits on this card.`);
-        empty.className = "empty-state";
-        section.append(empty);
-      } else {
-        const list = element("ul");
-        list.className = "benefit-list";
-        filtered.forEach(({ benefit }) => list.append(this.renderBenefit(benefit)));
-        section.append(list);
-      }
-    } else {
-      const empty = element("p", record.latest
-        ? "No trackable benefit activity was exposed for this card."
-        : "No safe benefit observation is available for this card yet.");
+    if (filtered.length) {
+      const list = element("ul");
+      list.className = "benefit-list";
+      filtered.forEach((benefit) => list.append(this.renderBenefit(benefit)));
+      section.append(list);
+    } else if (!record.latest) {
+      const empty = element("p", "No safe benefit observation is available for this card yet.");
       empty.className = "empty-state";
       section.append(empty);
     }
 
     const dataQuality = element("details");
-    dataQuality.className = "secondary-panel";
+    dataQuality.className = "secondary-panel data-quality";
     dataQuality.append(element("summary", "Data quality and timestamps"));
     const timeList = element("dl");
     timeList.append(
       element("dt", "Observed"), element("dd", formatDate(record.observedAt)),
       element("dt", "Last attempt"), element("dd", formatDate(record.lastAttemptAt)),
+      element("dt", "Parser"), element("dd", record.latest?.parserVersion ?? "No observation"),
+      element("dt", "Benefit confidence"), element("dd", confidenceSummary(benefits)),
     );
     dataQuality.append(timeList);
-    if (record.latest?.issueCodes.length) {
+    const qualityReasons = new Set<string>();
+    if (record.error) qualityReasons.add(record.error.message);
+    record.latest?.issueCodes.forEach((code) => qualityReasons.add(fixedErrorMessage(code)));
+    if (qualityReasons.size) {
       const issues = element("ul");
       issues.className = "detail-notes";
-      Array.from(new Set(record.latest.issueCodes)).forEach((code) => issues.append(element("li", fixedErrorMessage(code))));
+      qualityReasons.forEach((message) => issues.append(element("li", message)));
       dataQuality.append(issues);
+    }
+    const conflictState = this.conflictsByCard.get(record.localCardId);
+    if (conflictState) {
+      dataQuality.append(element("p", "Benefit matching notes from this scan"));
+      if (conflictState.diagnostics.length) {
+        const diagnostics = element("ul");
+        diagnostics.className = "detail-notes conflict-diagnostics";
+        conflictState.diagnostics.forEach((diagnostic) => {
+          diagnostics.append(element("li", CONFLICT_DIAGNOSTIC_LABELS[diagnostic]));
+        });
+        dataQuality.append(diagnostics);
+      }
+      if (conflictState.detailSet.details.length) {
+        const detailSection = element("section");
+        detailSection.className = "conflict-detail-section";
+        detailSection.dataset.amexConflictDetails = "true";
+        detailSection.dataset.conflictCount = String(conflictState.detailSet.totalCount);
+        detailSection.dataset.conflictsTruncated = String(conflictState.detailSet.truncated);
+        detailSection.setAttribute("aria-label", "Structured benefit matching ambiguities from this scan");
+        conflictState.detailSet.details.forEach((detail) => detailSection.append(this.renderConflictDetail(detail)));
+        if (conflictState.detailSet.truncated) {
+          detailSection.append(element("p", `Showing ${conflictState.detailSet.details.length} of ${conflictState.detailSet.totalCount} matching ambiguities.`));
+        }
+        dataQuality.append(detailSection);
+      }
     }
     section.append(dataQuality);
     return section;
   }
 
-  private renderAccountNotes(): HTMLElement | null {
+  private renderAccountNotes(benefitCards: StoredCardRecordV1[]): HTMLElement | null {
     const messages: string[] = [];
-    if (hasMixedObservations(this.store)) {
+    const observationTimes = new Set(benefitCards.map((record) => record.observedAt).filter(Boolean));
+    if (
+      observationTimes.size > 1
+      || benefitCards.some((record) => observationQuality(record).tone !== "good")
+    ) {
       messages.push("Some cards have partial, stale, failed, or differently timed observations. Review each card's data-quality label.");
     }
     if (this.store.lastScan?.unknownAccountVariantCount) {
@@ -513,7 +672,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       .launcher { position: fixed; z-index: 2147483647; top: 16px; right: 16px; display: grid; width: 48px; min-height: 48px; padding: 0; place-items: center; border: 1px solid #475467; border-radius: 14px; background: var(--pr-primary); color: #fff; box-shadow: 0 8px 24px rgba(15,23,42,.2); font: 800 13px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: .04em; }
       .launcher:hover { background: var(--pr-primary-hover); }
       .panel { position: fixed; z-index: 2147483647; top: 16px; right: 16px; width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; border: 1px solid var(--pr-border); border-radius: 16px; background: var(--pr-bg); color: var(--pr-text); box-shadow: 0 18px 50px rgba(15,23,42,.18); font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      h2,h3,h4,p { margin: 0; } h2 { font-size: 19px; line-height: 1.2; } h3 { font-size: 16px; line-height: 1.3; } h4 { margin-top: 10px; font-size: 15px; line-height: 1.35; } ul { margin: 0; }
+      h2,h3,h4,p { margin: 0; } h2 { font-size: 19px; line-height: 1.2; } h3 { font-size: 16px; line-height: 1.3; } h4 { font-size: 14px; line-height: 1.35; } ul { margin: 0; }
       .top { padding: 18px; border-bottom: 1px solid var(--pr-border); background: var(--pr-card); border-radius: 16px 16px 0 0; }
       .brand-row { display: flex; align-items: center; gap: 10px; }
       .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; background: var(--pr-primary); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
@@ -522,12 +681,12 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       .privacy-banner { margin-top: 14px; padding: 10px 12px; border: 1px solid #dbeafe; border-radius: 10px; background: #f0f7ff; color: #334155; font-size: 12px; }
       .privacy-banner strong { display: block; margin-bottom: 2px; color: #1e3a5f; font-size: 13px; }
       .controls { display: flex; gap: 8px; margin-top: 14px; }
-      button, select { min-height: 40px; border-radius: 9px; font: inherit; }
+      button { min-height: 40px; border-radius: 9px; font: inherit; }
       button { border: 1px solid var(--pr-border); background: var(--pr-card); color: var(--pr-text); font-weight: 650; cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .15s ease; }
       button:active { transform: translateY(1px); }
       button.primary { flex: 1; border-color: var(--pr-primary); background: var(--pr-primary); color: #fff; box-shadow: 0 2px 5px rgba(15,23,42,.12); }
       button.primary:hover { background: var(--pr-primary-hover); }
-      button:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid rgba(71,85,105,.28); outline-offset: 2px; }
+      button:focus-visible, summary:focus-visible { outline: 3px solid rgba(71,85,105,.28); outline-offset: 2px; }
       button:disabled { opacity: .52; cursor: default; transform: none; }
       .scan-status { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--pr-border); border-radius: 10px; background: #f8fafc; color: #475467; font-size: 13px; }
       .notice { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
@@ -537,46 +696,53 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       .metric { padding: 10px; border: 1px solid var(--pr-border); border-radius: 10px; background: var(--pr-card); }
       .metric strong { display: block; font-size: 17px; line-height: 1.2; }
       .metric span { display: block; margin-top: 3px; color: var(--pr-muted); font-size: 11px; }
-      .card-picker { display: block; margin-bottom: 14px; }
-      .card-picker > span { display: block; margin-bottom: 6px; color: #475467; font-size: 12px; font-weight: 700; }
-      select { width: 100%; padding: 0 36px 0 12px; border: 1px solid #cfd4dc; background: var(--pr-card); color: var(--pr-text); font-weight: 650; }
-      .card-workspace { padding: 16px; border: 1px solid var(--pr-border); border-radius: 14px; background: var(--pr-card); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+      .card-groups { display: grid; gap: 12px; margin-top: 14px; }
+      .card-group { padding: 14px; border: 1px solid var(--pr-border); border-radius: 14px; background: var(--pr-card); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+      .card-group-compact { padding: 10px 14px; box-shadow: none; }
+      .card-group-compact .card-heading { align-items: center; }
       .card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-      .card-heading p { margin-bottom: 3px; color: var(--pr-muted); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
-      .card-summary { margin-top: 7px; color: var(--pr-muted); font-size: 12px; }
+      .card-summary { margin-top: 4px; color: var(--pr-muted); font-size: 12px; }
       .quality-pill, .status-pill { display: inline-flex; align-items: center; flex: 0 0 auto; border: 1px solid; border-radius: 999px; font-size: 11px; font-weight: 750; white-space: nowrap; }
       .quality-pill { padding: 4px 8px; }
       .quality-good { border-color: var(--pr-green-border); background: var(--pr-green-bg); color: #047857; }
       .quality-note { border-color: var(--pr-blue-border); background: var(--pr-blue-bg); color: #1d4ed8; }
       .quality-warning { border-color: var(--pr-amber-border); background: var(--pr-amber-bg); color: #92400e; }
       .quality-error { border-color: var(--pr-red-border); background: var(--pr-red-bg); color: #b91c1c; }
-      .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 14px; }
-      .filter-button { min-height: 34px; padding: 6px 8px; color: #475467; font-size: 12px; }
+      .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+      .filter-button { min-height: 40px; padding: 7px 10px; color: #475467; font-size: 13px; }
       .filter-button[aria-pressed="true"] { border-color: #94a3b8; background: #eef2f6; color: #1f2937; box-shadow: inset 0 0 0 1px rgba(71,85,105,.08); }
       .benefit-list { display: grid; gap: 10px; padding: 0; margin-top: 12px; list-style: none; }
       .benefit-card { position: relative; overflow: hidden; padding: 13px 13px 12px 16px; border: 1px solid var(--pr-border); border-radius: 11px; background: var(--pr-card); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
       .benefit-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: #94a3b8; }
       .benefit-card.tone-amber::before { background: #f59e0b; } .benefit-card.tone-blue::before { background: #3b82f6; } .benefit-card.tone-green::before { background: #10b981; }
-      .benefit-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .benefit-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
       .status-pill { padding: 3px 7px; }
       .status-pill.tone-amber { border-color: var(--pr-amber-border); background: var(--pr-amber-bg); color: #92400e; }
       .status-pill.tone-blue { border-color: var(--pr-blue-border); background: var(--pr-blue-bg); color: #1d4ed8; }
       .status-pill.tone-green { border-color: var(--pr-green-border); background: var(--pr-green-bg); color: #047857; }
       .status-pill.tone-muted { border-color: var(--pr-border); background: #f8fafc; color: #667085; }
-      .period { overflow: hidden; color: var(--pr-muted); font-size: 11px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
-      .amount { margin-top: 6px; color: #111827; font-size: 17px; font-weight: 750; font-variant-numeric: tabular-nums; }
-      .remaining { margin-top: 5px; color: var(--pr-muted); font-size: 12px; }
-      .progress-track { height: 7px; margin-top: 9px; overflow: hidden; border-radius: 999px; background: #e5e7eb; }
-      .progress-fill { height: 100%; border-radius: inherit; background: #3b82f6; }
-      .tone-green .progress-fill { background: #10b981; } .tone-amber .progress-fill { background: #f59e0b; }
+      .benefit-essentials { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; margin-top: 7px; }
+      .amount { color: #111827; font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; }
+      .period { color: var(--pr-muted); font-size: 12px; }
       details { margin-top: 10px; }
       summary { color: #475467; font-size: 12px; font-weight: 700; cursor: pointer; }
       dl { display: grid; grid-template-columns: minmax(100px, auto) 1fr; gap: 5px 10px; margin: 10px 0 0; font-size: 12px; }
       dt { color: #475467; font-weight: 700; } dd { margin: 0; overflow-wrap: anywhere; color: var(--pr-muted); }
       .detail-notes { margin-top: 10px; padding-left: 18px; color: #92400e; font-size: 12px; }
+      .conflict-detail-section { display: grid; gap: 10px; margin-top: 10px; }
+      .conflict-detail { padding: 10px; border: 1px solid var(--pr-amber-border); border-radius: 9px; background: var(--pr-amber-bg); }
+      .conflict-detail-title { color: #78350f; font-size: 13px; }
+      .conflict-credit-keys { margin-top: 6px; padding-left: 18px; color: #92400e; font: 600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+      .conflict-candidates { display: grid; gap: 8px; margin-top: 8px; padding-left: 20px; }
+      .conflict-candidate { padding: 8px; border: 1px solid #f3d28f; border-radius: 8px; background: #fff; }
+      .conflict-candidate h5 { margin: 0; color: #78350f; font-size: 12px; }
+      .conflict-candidate-title { margin-top: 4px; font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+      .conflict-candidate-fields, .conflict-relations { grid-template-columns: minmax(105px, auto) 1fr; margin-top: 7px; }
+      .conflict-relations { padding-top: 7px; border-top: 1px solid #f3d28f; }
       .secondary-panel { padding: 10px 12px; border: 1px solid var(--pr-border); border-radius: 10px; background: #f8fafc; }
       .account-notes { margin: 12px 0 0; }
       .account-notes ul { margin-top: 9px; padding-left: 18px; color: #475467; font-size: 12px; }
+      .hidden-cards-note { margin: -4px 0 12px; color: var(--pr-muted); font-size: 12px; }
       .empty-state { margin-top: 12px; padding: 18px 12px; border: 1px dashed #cbd5e1; border-radius: 10px; color: var(--pr-muted); text-align: center; }
       .footer { padding: 0 16px 16px; }
       .privacy-details p { margin-top: 8px; color: var(--pr-muted); font-size: 12px; }
@@ -674,14 +840,17 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     panel.append(top);
 
     const cards = sortedCards(this.store);
+    const benefitCards = cards.filter((record) => (record.latest?.benefits.length ?? 0) > 0);
+    const globallyEmptyCards = cards.filter((record) => record.latest?.benefits.length === 0);
+    const reviewCards = cards.filter((record) => record.latest === null || record.latest.benefits.length > 0);
     const content = element("div");
     content.className = "content";
     if (cards.length) {
-      const totalBenefits = cards.reduce((sum, record) => sum + (record.latest?.benefits.length ?? 0), 0);
-      const dataNoteCards = cards.filter((record) => observationQuality(record).tone !== "good").length;
+      const totalBenefits = benefitCards.reduce((sum, record) => sum + (record.latest?.benefits.length ?? 0), 0);
+      const dataNoteCards = benefitCards.filter((record) => observationQuality(record).tone !== "good").length;
       const metrics = element("div");
       metrics.className = "account-summary";
-      ([[String(cards.length), "Cards"], [String(totalBenefits), "Benefits"], [String(dataNoteCards), "Data notes"]] as Array<[string,string]>).forEach(([value, label]) => {
+      ([[String(benefitCards.length), "Cards with benefits"], [String(totalBenefits), "Eligible benefits"], [String(dataNoteCards), "Data notes"]] as Array<[string,string]>).forEach(([value, label]) => {
         const metric = element("div");
         metric.className = "metric";
         metric.append(element("strong", value), element("span", label));
@@ -689,33 +858,60 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       });
       content.append(metrics);
 
-      const picker = element("label");
-      picker.className = "card-picker";
-      picker.append(element("span", "Choose a card"));
-      const select = element("select");
-      select.setAttribute("aria-label", "Choose a card to review");
-      cards.forEach((record) => {
-        const option = element("option", `${record.identity.productName} •••• ${record.identity.endingDigits}`);
-        option.value = record.localCardId;
-        option.selected = record.localCardId === this.selectedCardId;
-        select.append(option);
-      });
-      select.addEventListener("change", () => {
-        this.selectedCardId = select.value;
-        this.benefitFilter = "all";
-        this.render();
-      });
-      picker.append(select);
-      content.append(picker);
+      if (globallyEmptyCards.length) {
+        const count = globallyEmptyCards.length;
+        const hiddenNote = element(
+          "p",
+          count === 1
+            ? "1 reviewed card had no trackable benefits and is hidden."
+            : `${count} reviewed cards had no trackable benefits and are hidden.`,
+        );
+        hiddenNote.className = "hidden-cards-note";
+        content.append(hiddenNote);
+      }
 
-      const selected = cards.find((record) => record.localCardId === this.selectedCardId) ?? cards[0];
-      content.append(this.renderSelectedCard(selected));
+      if (benefitCards.length) {
+        const filterCounts: Record<BenefitFilter, number> = { remaining: 0, used: 0 };
+        benefitCards.forEach((record) => {
+          record.latest?.benefits.forEach((benefit) => {
+            filterCounts[benefitPresentation(benefit).filter] += 1;
+          });
+        });
+        const filters = element("div");
+        filters.className = "filters";
+        filters.setAttribute("role", "group");
+        filters.setAttribute("aria-label", "Filter account benefits");
+        (["remaining", "used"] as BenefitFilter[]).forEach((filter) => {
+          const control = element("button", `${filterLabel(filter)} ${filterCounts[filter]}`);
+          control.type = "button";
+          control.className = "filter-button";
+          control.dataset.filter = filter;
+          control.setAttribute("aria-pressed", String(this.benefitFilter === filter));
+          control.addEventListener("click", () => {
+            this.benefitFilter = filter;
+            this.render();
+          });
+          filters.append(control);
+        });
+        content.append(filters);
+      }
+
+      if (reviewCards.length) {
+        const groups = element("div");
+        groups.className = "card-groups";
+        reviewCards.forEach((record) => groups.append(this.renderCardGroup(record)));
+        content.append(groups);
+      } else {
+        const empty = element("p", "No trackable benefits are available in the reviewed card observations.");
+        empty.className = "empty-state account-empty-state";
+        content.append(empty);
+      }
     } else {
       const empty = element("p", "No local card observations yet. Start a scan when you are ready.");
       empty.className = "empty-state";
       content.append(empty);
     }
-    const accountNotes = this.renderAccountNotes();
+    const accountNotes = this.renderAccountNotes(benefitCards);
     if (accountNotes) content.append(accountNotes);
     panel.append(content);
 
