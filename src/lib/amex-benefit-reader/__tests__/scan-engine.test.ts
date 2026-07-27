@@ -127,6 +127,57 @@ describe("API Amex scan engine", () => {
     expect(serialized).not.toMatch(/accountToken|rawResponse|requestBody|authorization|cookie/i);
   });
 
+  it("reports fixed per-card conflict diagnostics ephemerally without serializing them", async () => {
+    const collisionTrackers = trackerResponseSchema.parse([{ trackers: [
+      { benefitName: "Synthetic Adobe Credit", category: "spend", status: "ACTIVE", tracker: { spentAmount: "1", targetUnit: "PASSES" } },
+      { benefitName: "Synthetic Adobe Credit", category: "spend", status: "ACTIVE", tracker: { spentAmount: "2", targetUnit: "PASSES" } },
+    ] }]);
+    const client: AmexReadClient = {
+      discoverAccounts: async () => memberResponse,
+      readBenefitTrackers: async () => collisionTrackers,
+      readBenefitCatalog: async () => catalog,
+    };
+    const store = makeStore();
+    const events: ScanProgress[] = [];
+
+    const summary = await new AmexBenefitScanEngine(
+      client,
+      visible(),
+      store,
+      identity,
+      { report: (event) => events.push(event) },
+      { now: () => new Date(times[2]) },
+    ).scanAllCards();
+
+    const committed = events.filter((event) => event.type === "card_committed");
+    expect(committed).toHaveLength(2);
+    expect(committed.map((event) => event.conflictDiagnostics)).toEqual([
+      ["tracker_state_collision"],
+      ["tracker_state_collision"],
+    ]);
+    expect(committed.map((event) => event.conflictDetails)).toEqual([
+      expect.objectContaining({
+        totalCount: 1,
+        truncated: false,
+        details: [expect.objectContaining({
+          conflictKey: "tracker_state_collision:adobe:01",
+          reviewedCreditFamilies: ["adobe"],
+          candidateCount: 2,
+        })],
+      }),
+      expect.objectContaining({ totalCount: 1 }),
+    ]);
+    expect(summary.status).toBe("partial");
+    expect(store.attempts.every((attempt) =>
+      attempt.disposition !== "failed"
+      && attempt.observation.issueCodes.includes("benefit_identity_conflict"))).toBe(true);
+    const serialized = JSON.stringify(store.value);
+    expect(serialized).toContain("benefit_identity_conflict");
+    expect(serialized).not.toContain("tracker_state_collision");
+    expect(serialized).not.toContain("conflictDiagnostics");
+    expect(serialized).not.toMatch(/conflictDetails|candidateIndex|sourceRole|sameJoinId/);
+  });
+
   it("marks an unmatched prior card stale without counting it as a current attempt disposition", async () => {
     const { client } = setupClient();
     const store = makeStore();

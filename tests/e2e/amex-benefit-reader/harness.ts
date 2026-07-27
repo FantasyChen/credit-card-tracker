@@ -17,11 +17,12 @@ const BUNDLE_PATH = resolve(process.cwd(), "build/amex-benefit-reader.user.js");
 
 const PRIMARY_TOKEN = "invented-e2e-primary-token";
 const SUPPLEMENTARY_TOKEN = "invented-e2e-supplementary-token";
+const EMPTY_BENEFITS_TOKEN = "invented-e2e-empty-benefits-token";
 const SYNTHETIC_ORIGIN = "https://global.americanexpress.com";
 
-export type HarnessScenario = "complete" | "catalog_failure" | "cancellation" | "rescan_tracker_failure";
+export type HarnessScenario = "complete" | "benefit_empty" | "all_benefit_empty" | "conflict_diagnostics" | "catalog_failure" | "cancellation" | "rescan_tracker_failure" | "high_scale";
 export type ApiOperation = "member" | "tracker" | "catalog";
-export type SyntheticCard = "primary" | "supplementary";
+export type SyntheticCard = "primary" | "supplementary" | "empty" | `scale-${number}`;
 
 export interface SafeRequestRecord {
   method: string;
@@ -103,7 +104,7 @@ const primaryTrackers = [{
   trackers: [
     {
       sorBenefitId: "invented-dining-primary",
-      benefitName: "Synthetic Monthly Dining Credit",
+      benefitName: "Synthetic &#36;12 Monthly Dining Credit &#x3C;sup&#x3E;&#174;&#x3C;/sup&#x3E; Statement Credit",
       category: "spend",
       status: "IN_PROGRESS",
       trackerDuration: "Synthetic monthly period",
@@ -132,13 +133,13 @@ const primaryCatalog = {
   benefits: {
     dining: {
       sorBenefitId: "invented-dining-primary",
-      benefitTitle: "Synthetic Monthly Dining Credit",
+      benefitTitle: "Synthetic &#36;12 Monthly Dining Credit &#x3C;sup&#x3E;&#174;&#x3C;/sup&#x3E; Statement Credit",
       layoutType: "ENROLLED",
       isEnrollable: true,
     },
     uber: {
       sorBenefitId: "invented-uber-primary",
-      benefitShortTitle: "Synthetic Uber Cash",
+      benefitShortTitle: "Synthetic Uber Cash<sup>‡</sup>",
       layoutType: "NOTENROLLED",
       isEnrollable: true,
     },
@@ -151,11 +152,29 @@ const primaryCatalog = {
   },
 };
 
+const zeroUsagePrimaryTrackers = structuredClone(primaryTrackers);
+zeroUsagePrimaryTrackers[0].trackers.push({
+  sorBenefitId: "invented-uber-primary",
+  benefitName: "Synthetic Uber Cash",
+  category: "spend",
+  status: "IN_PROGRESS",
+  trackerDuration: "Synthetic monthly period",
+  tracker: {
+    spentAmount: "0.00",
+    targetAmount: "15.00",
+    remainingAmount: "15.00",
+    targetCurrency: "USD",
+    targetUnit: "MONETARY",
+  },
+});
+const zeroUsagePrimaryCatalog = structuredClone(primaryCatalog);
+zeroUsagePrimaryCatalog.benefits.uber.layoutType = "ENROLLED";
+
 const supplementaryTrackers = [{
   trackers: [
     {
       sorBenefitId: "invented-dining-supplementary",
-      benefitName: "Synthetic Dining Credit",
+      benefitName: "Synthetic Dining Credit ‡",
       category: "spend",
       status: "ACHIEVED",
       trackerDuration: "Synthetic monthly period",
@@ -180,7 +199,7 @@ const supplementaryCatalog = {
   benefits: {
     dining: {
       sorBenefitId: "invented-dining-supplementary",
-      benefitTitle: "Synthetic Dining Credit",
+      benefitTitle: "Synthetic Dining Credit ‡",
       layoutType: "ENROLLED",
       isEnrollable: true,
     },
@@ -193,38 +212,207 @@ const supplementaryCatalog = {
   },
 };
 
-function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
-  const hasSupplementaryCard = scenario !== "catalog_failure";
-  const member = {
-    accounts: [{
-      account_token: PRIMARY_TOKEN,
-      product: { description: "American Express Gold Card" },
-      account: { relationship: "BASIC", display_account_number: "1234" },
-      ...(hasSupplementaryCard ? {
-        supplementary_accounts: [{
-          account_token: SUPPLEMENTARY_TOKEN,
-          product: { description: "American Express Gold Card" },
-          account: { relationship: "SUPP", display_account_number: "56789" },
-        }],
-      } : {}),
-    }],
+const emptyBenefitTrackers = [{
+  trackers: [{
+    sorBenefitId: "invented-protection-empty",
+    benefitName: "Synthetic Cell Phone Protection",
+    category: "usage",
+    status: "ACTIVE",
+  }],
+}];
+
+const conflictDiagnosticTrackers = [{
+  trackers: [
+    {
+      sorBenefitId: "invented-adobe-state-a",
+      benefitName: "Synthetic Adobe Credit",
+      category: "spend",
+      status: "ACTIVE",
+      tracker: { spentAmount: "1", targetUnit: "PASSES" },
+    },
+    {
+      sorBenefitId: "invented-adobe-state-b",
+      benefitName: "Synthetic Adobe Credit",
+      category: "spend",
+      status: "ACTIVE",
+      tracker: { spentAmount: "2", targetUnit: "PASSES" },
+    },
+    {
+      sorBenefitId: "invented-key-mismatch",
+      benefitName: "Synthetic Adobe Credit",
+      category: "spend",
+      status: "ACTIVE",
+    },
+    {
+      sorBenefitId: "invented-ambiguous-wireless",
+      benefitName: "Synthetic Wireless Bill Credit",
+      category: "spend",
+      status: "ACTIVE",
+    },
+    {
+      sorBenefitId: "invented-indeed-tracker",
+      benefitName: "Synthetic Indeed Credit",
+      category: "spend",
+      status: "ACTIVE",
+    },
+  ],
+}];
+
+const conflictDiagnosticCatalog = {
+  benefits: {
+    mismatch: {
+      sorBenefitId: "invented-key-mismatch",
+      benefitTitle: "Synthetic Hilton Credit",
+      layoutType: "ENROLLED",
+      isEnrollable: true,
+    },
+    ambiguousOne: {
+      sorBenefitId: "invented-ambiguous-wireless",
+      benefitTitle: "Synthetic Wireless Bill Credit",
+      layoutType: "ENROLLED",
+      isEnrollable: true,
+    },
+    ambiguousTwo: {
+      sorBenefitId: "invented-ambiguous-wireless",
+      benefitTitle: "Synthetic Wireless Statement Credit",
+      layoutType: "NOTENROLLED",
+      isEnrollable: true,
+    },
+    candidate: {
+      sorBenefitId: "invented-indeed-candidate",
+      benefitTitle: "Synthetic Indeed Statement Credit",
+      layoutType: "NOTENROLLED",
+      isEnrollable: true,
+    },
+  },
+};
+
+const scaleBenefitTitles = [
+  "Synthetic Airline Fee Credit",
+  "Synthetic Uber Cash",
+  "Synthetic Saks Credit",
+  "Synthetic Resy Credit",
+  "Synthetic Lululemon Credit",
+  "Synthetic Hotel Credit",
+  "Synthetic Digital Entertainment Credit",
+  "Synthetic Uber One Credit",
+  "Synthetic Oura Ring Credit",
+] as const;
+
+function highScaleFixture(): ScenarioFixture {
+  const accounts: unknown[] = [];
+  const trackersByToken: Record<string, unknown> = {};
+  const catalogsByToken: Record<string, unknown> = {};
+  for (let cardIndex = 1; cardIndex <= 16; cardIndex += 1) {
+    const token = `invented-e2e-scale-token-${cardIndex}`;
+    const benefitCount = cardIndex <= 2 ? 9 : 8;
+    accounts.push({
+      account_token: token,
+      product: { description: "American Express Platinum Card" },
+      account: { relationship: "BASIC", display_account_number: String(3000 + cardIndex) },
+    });
+    trackersByToken[token] = [{
+      trackers: scaleBenefitTitles.slice(0, benefitCount).map((benefitName, benefitIndex) => ({
+        sorBenefitId: `invented-scale-${cardIndex}-${benefitIndex}`,
+        benefitName,
+        category: "spend",
+        status: "IN_PROGRESS",
+        trackerDuration: "Synthetic annual period",
+        tracker: {
+          spentAmount: "1.00",
+          targetAmount: "10.00",
+          remainingAmount: "9.00",
+          targetCurrency: "USD",
+          targetUnit: "MONETARY",
+        },
+      })),
+    }];
+    catalogsByToken[token] = { benefits: {} };
+  }
+  return {
+    member: { accounts },
+    trackersByToken,
+    catalogsByToken,
+    catalogFailureTokens: new Set(),
   };
+}
+
+function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
+  if (scenario === "high_scale") return highScaleFixture();
+  if (scenario === "all_benefit_empty") {
+    return {
+      member: {
+        accounts: [{
+          account_token: PRIMARY_TOKEN,
+          product: { description: "American Express Gold Card" },
+          account: { relationship: "BASIC", display_account_number: "1234" },
+        }],
+      },
+      trackersByToken: { [PRIMARY_TOKEN]: emptyBenefitTrackers },
+      catalogsByToken: { [PRIMARY_TOKEN]: { benefits: {} } },
+      catalogFailureTokens: new Set(),
+    };
+  }
+  if (scenario === "conflict_diagnostics") {
+    return {
+      member: {
+        accounts: [{
+          account_token: PRIMARY_TOKEN,
+          product: { description: "American Express Business Platinum Card" },
+          account: { relationship: "BASIC", display_account_number: "1234" },
+        }],
+      },
+      trackersByToken: { [PRIMARY_TOKEN]: conflictDiagnosticTrackers },
+      catalogsByToken: { [PRIMARY_TOKEN]: conflictDiagnosticCatalog },
+      catalogFailureTokens: new Set(),
+    };
+  }
+  const hasSupplementaryCard = scenario !== "catalog_failure";
+  const accounts: unknown[] = [{
+    account_token: PRIMARY_TOKEN,
+    product: { description: "American Express Gold Card" },
+    account: { relationship: "BASIC", display_account_number: "1234" },
+    ...(hasSupplementaryCard ? {
+      supplementary_accounts: [{
+        account_token: SUPPLEMENTARY_TOKEN,
+        product: { description: "American Express Gold Card" },
+        account: { relationship: "SUPP", display_account_number: "56789" },
+      }],
+    } : {}),
+  }];
+  if (scenario === "benefit_empty") {
+    accounts.push({
+      account_token: EMPTY_BENEFITS_TOKEN,
+      product: { description: "American Express Gold Card" },
+      account: { relationship: "BASIC", display_account_number: "9999" },
+    });
+  }
 
   return {
-    member,
-    trackersByToken: hasSupplementaryCard
-      ? { [PRIMARY_TOKEN]: primaryTrackers, [SUPPLEMENTARY_TOKEN]: supplementaryTrackers }
-      : { [PRIMARY_TOKEN]: primaryTrackers },
-    catalogsByToken: hasSupplementaryCard
-      ? { [PRIMARY_TOKEN]: primaryCatalog, [SUPPLEMENTARY_TOKEN]: supplementaryCatalog }
-      : { [PRIMARY_TOKEN]: primaryCatalog },
-    catalogFailureTokens: scenario === "catalog_failure" ? new Set([PRIMARY_TOKEN]) : new Set(),
+    member: { accounts },
+    trackersByToken: {
+      [PRIMARY_TOKEN]: scenario === "benefit_empty" ? zeroUsagePrimaryTrackers : primaryTrackers,
+      ...(hasSupplementaryCard ? { [SUPPLEMENTARY_TOKEN]: supplementaryTrackers } : {}),
+      ...(scenario === "benefit_empty" ? { [EMPTY_BENEFITS_TOKEN]: emptyBenefitTrackers } : {}),
+    },
+    catalogsByToken: {
+      [PRIMARY_TOKEN]: scenario === "benefit_empty" ? zeroUsagePrimaryCatalog : primaryCatalog,
+      ...(hasSupplementaryCard ? { [SUPPLEMENTARY_TOKEN]: supplementaryCatalog } : {}),
+    },
+    catalogFailureTokens: scenario === "catalog_failure"
+      ? new Set([PRIMARY_TOKEN])
+      : scenario === "benefit_empty"
+        ? new Set([EMPTY_BENEFITS_TOKEN])
+        : new Set(),
   };
 }
 
 function syntheticCardForToken(token: string): SyntheticCard {
   if (token === PRIMARY_TOKEN) return "primary";
   if (token === SUPPLEMENTARY_TOKEN) return "supplementary";
+  if (token === EMPTY_BENEFITS_TOKEN) return "empty";
+  const scaleMatch = /^invented-e2e-scale-token-(\d+)$/.exec(token);
+  if (scaleMatch) return `scale-${Number(scaleMatch[1])}`;
   throw new Error("The request used an unknown synthetic account token.");
 }
 
@@ -292,7 +480,7 @@ export class SyntheticAmexHarness {
     private readonly scenario: HarnessScenario = "complete",
   ) {
     this.fixture = scenarioFixture(scenario);
-    this.expectedCatalogHttpErrorLogs = scenario === "catalog_failure" ? 2 : 0;
+    this.expectedCatalogHttpErrorLogs = scenario === "catalog_failure" || scenario === "benefit_empty" ? 2 : 0;
     this.expectedTrackerHttpErrorLogs = scenario === "rescan_tracker_failure" ? 2 : 0;
   }
 
