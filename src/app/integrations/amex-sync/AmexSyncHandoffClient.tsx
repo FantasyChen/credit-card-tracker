@@ -6,15 +6,21 @@ import {
   ExclamationTriangleIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
+import { z } from "zod";
 import {
   AMEX_SYNC_HANDOFF_ORIGIN,
   AMEX_SYNC_HANDOFF_PATH,
   handoffPayloadMessageSchema,
 } from "@/lib/amex-benefit-reader/sync-mailbox";
 import {
+  AMEX_SYNC_MAX_ROWS,
   digestAmexSyncEnvelope,
   type AmexSyncEnvelope,
 } from "@/lib/amex-benefit-reader/sync-contract";
+import {
+  amexProductKeySchema,
+  creditFamilyKeySchema,
+} from "@/lib/amex-benefit-reader/contract";
 import type { AmexSyncMode } from "@/lib/amex-sync/mode";
 import { Button } from "@/components/ui/button";
 
@@ -23,45 +29,129 @@ interface MappingSelection {
   destinationCardId: string;
 }
 
-interface StatusProjection {
-  usedAmount: number;
-  isCompleted: boolean;
-  completedAt: string | null;
-  isNotUsable: boolean;
-}
+const statusProjectionSchema = z.object({
+  usedAmount: z.number().finite().nonnegative(),
+  isCompleted: z.boolean(),
+  completedAt: z.string().datetime({ offset: true }).nullable(),
+  isNotUsable: z.boolean(),
+}).strict();
 
-interface SyncRowResult {
-  sourceRowIdentity: string;
-  sourceLocalCardId: string;
-  productKey: string;
-  creditFamilyKey: string;
-  disposition: "proposed" | "updated" | "unchanged" | "skipped" | "failed";
-  reason: string;
-  destinationCardId: string | null;
-  before: StatusProjection | null;
-  after: StatusProjection | null;
-  changes: {
-    amountDecrease: boolean;
-    amountIncrease: boolean;
-    completionSet: boolean;
-    completionCleared: boolean;
-  };
-}
+const nonAppliedReasonSchema = z.enum([
+  "stale_replay",
+  "source_conflict",
+  "scan_expired",
+  "product_not_allowlisted",
+  "credit_family_not_allowlisted",
+  "manual_mapping_required",
+  "ambiguous_card",
+  "mapping_invalid",
+  "destination_key_missing",
+  "destination_benefit_missing",
+  "destination_benefit_ambiguous",
+  "destination_status_missing",
+  "destination_status_ambiguous",
+  "period_not_structured",
+  "period_not_current",
+  "period_key_mismatch",
+  "enrollment_required",
+  "linking_required",
+  "status_unavailable",
+  "amount_incompatible",
+  "completion_conflict",
+  "destination_not_usable",
+]);
 
-interface PreviewResponse {
-  mode: "preview" | "write";
-  rows: SyncRowResult[];
-  proposalToken: string;
-  proposalExpiresAt: string;
-  mappingOptions: Array<{ id: string; productKey: string; label: string }>;
-}
+const syncRowResultFields = {
+  sourceRowIdentity: z.string().regex(/^[a-f0-9]{64}$/),
+  sourceLocalCardId: z.string().uuid(),
+  productKey: amexProductKeySchema,
+  creditFamilyKey: creditFamilyKeySchema,
+  destinationCardId: z.string().min(1).max(128).nullable(),
+  before: statusProjectionSchema.nullable(),
+  after: statusProjectionSchema.nullable(),
+  changes: z.object({
+    amountDecrease: z.boolean(),
+    amountIncrease: z.boolean(),
+    completionSet: z.boolean(),
+    completionCleared: z.boolean(),
+  }).strict(),
+};
 
-interface ConfirmationResponse {
-  attemptId: string;
-  replayed: boolean;
-  rows: SyncRowResult[];
-  updatedCount: number;
-}
+const previewSyncRowResultSchema = z.discriminatedUnion("disposition", [
+  z.object({
+    ...syncRowResultFields,
+    disposition: z.literal("proposed"),
+    reason: z.literal("proposed_update"),
+  }).strict(),
+  z.object({
+    ...syncRowResultFields,
+    disposition: z.literal("unchanged"),
+    reason: z.enum(["already_current", "unchanged_replay"]),
+  }).strict(),
+  z.object({
+    ...syncRowResultFields,
+    disposition: z.literal("skipped"),
+    reason: nonAppliedReasonSchema,
+  }).strict(),
+]);
+
+const confirmationSyncRowResultSchema = z.discriminatedUnion("disposition", [
+  z.object({
+    ...syncRowResultFields,
+    disposition: z.literal("updated"),
+    reason: z.literal("proposed_update"),
+  }).strict(),
+  z.object({
+    ...syncRowResultFields,
+    disposition: z.literal("unchanged"),
+    reason: z.enum(["already_current", "unchanged_replay"]),
+  }).strict(),
+  z.object({
+    ...syncRowResultFields,
+    disposition: z.literal("skipped"),
+    reason: nonAppliedReasonSchema,
+  }).strict(),
+  z.object({
+    ...syncRowResultFields,
+    disposition: z.literal("failed"),
+    reason: z.enum(["conflict_repreview_required", "persistence_failed"]),
+  }).strict(),
+]);
+
+type SyncRowResult =
+  | z.infer<typeof previewSyncRowResultSchema>
+  | z.infer<typeof confirmationSyncRowResultSchema>;
+type StatusProjection = z.infer<typeof statusProjectionSchema>;
+
+const previewResponseSchema = z.object({
+  mode: z.enum(["preview", "write"]),
+  rows: z.array(previewSyncRowResultSchema).max(AMEX_SYNC_MAX_ROWS),
+  proposalToken: z.string().min(1).max(16_384),
+  proposalExpiresAt: z.string().datetime({ offset: true }),
+  mappingOptions: z.array(z.object({
+    id: z.string().min(1).max(128),
+    productKey: amexProductKeySchema,
+    label: z.string().min(1).max(200),
+  }).strict()).max(AMEX_SYNC_MAX_ROWS),
+}).strict();
+type PreviewResponse = z.infer<typeof previewResponseSchema>;
+
+const confirmationResponseSchema = z.object({
+  attemptId: z.string().min(1).max(128),
+  replayed: z.boolean(),
+  rows: z.array(confirmationSyncRowResultSchema).max(AMEX_SYNC_MAX_ROWS),
+  updatedCount: z.number().int().nonnegative().max(AMEX_SYNC_MAX_ROWS),
+}).strict().superRefine((response, context) => {
+  const actualUpdatedCount = response.rows.filter((row) => row.disposition === "updated").length;
+  if (response.updatedCount !== actualUpdatedCount) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["updatedCount"],
+      message: "Updated count must match the final row dispositions.",
+    });
+  }
+});
+type ConfirmationResponse = z.infer<typeof confirmationResponseSchema>;
 
 type HandoffState =
   | "waiting"
@@ -73,25 +163,6 @@ type HandoffState =
   | "invalid";
 
 const MAPPING_REASONS = new Set(["manual_mapping_required", "ambiguous_card", "mapping_invalid"]);
-
-function isPreviewResponse(value: unknown): value is PreviewResponse {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<PreviewResponse>;
-  return (candidate.mode === "preview" || candidate.mode === "write")
-    && Array.isArray(candidate.rows)
-    && typeof candidate.proposalToken === "string"
-    && typeof candidate.proposalExpiresAt === "string"
-    && Array.isArray(candidate.mappingOptions);
-}
-
-function isConfirmationResponse(value: unknown): value is ConfirmationResponse {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<ConfirmationResponse>;
-  return typeof candidate.attemptId === "string"
-    && typeof candidate.replayed === "boolean"
-    && Array.isArray(candidate.rows)
-    && typeof candidate.updatedCount === "number";
-}
 
 function reasonText(reason: string): string {
   const labels: Record<string, string> = {
@@ -217,16 +288,17 @@ export function AmexSyncHandoffClient({
     setState("previewing");
     setMessage("Checking exact card, benefit, and period matches…");
     const response = await postJson("/api/integrations/amex-sync/preview", { envelope: nextEnvelope, manualMappings: mappings });
-    if (!response.ok || !isPreviewResponse(response.value)) {
+    const parsed = previewResponseSchema.safeParse(response.value);
+    if (!response.ok || !parsed.success) {
       setState("invalid");
       setMessage(response.status === 503
         ? "Amex sync is currently turned off. No data was changed."
         : "The reviewed handoff could not be previewed. Return to Amex, scan again, and retry.");
       return false;
     }
-    setPreview(response.value);
+    setPreview(parsed.data);
     setResult(null);
-    const requiresMapping = response.value.rows.some((row) => MAPPING_REASONS.has(row.reason));
+    const requiresMapping = parsed.data.rows.some((row) => MAPPING_REASONS.has(row.reason));
     setState(requiresMapping ? "mapping" : "preview");
     setMessage(requiresMapping
       ? "Choose a destination card, then create a new preview."
@@ -326,16 +398,17 @@ export function AmexSyncHandoffClient({
       await runPreview(envelope, manualMappings);
       return;
     }
-    if (!response.ok || !isConfirmationResponse(response.value)) {
+    const parsed = confirmationResponseSchema.safeParse(response.value);
+    if (!response.ok || !parsed.success) {
       setState("preview");
       setMessage("Confirmation failed safely. No unreported row is assumed to be updated.");
       return;
     }
-    setResult(response.value);
+    setResult(parsed.data);
     setState("result");
-    setMessage(response.value.replayed
+    setMessage(parsed.data.replayed
       ? "This exact confirmation was already processed. The recorded result is shown below."
-      : `Sync finished. ${response.value.updatedCount} row${response.value.updatedCount === 1 ? "" : "s"} updated.`);
+      : `Sync finished. ${parsed.data.updatedCount} row${parsed.data.updatedCount === 1 ? "" : "s"} updated.`);
   };
 
   const rows = result?.rows ?? preview?.rows ?? [];
