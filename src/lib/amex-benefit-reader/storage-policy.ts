@@ -5,7 +5,7 @@ import {
   scanSummarySchema,
   storeEnvelopeSchema,
   type IssueCode,
-  type NormalizedCardObservationV1,
+  type NormalizedCardObservation,
   type ScanSummaryV1,
   type StoreEnvelopeV1,
   type StoredCardRecordV1,
@@ -26,7 +26,7 @@ export type CardAttemptResult =
       disposition: "complete" | "partial";
       identity: CardIdentityMetadata;
       attemptedAt: string;
-      observation: NormalizedCardObservationV1;
+      observation: NormalizedCardObservation;
     }
   | {
       disposition: "failed";

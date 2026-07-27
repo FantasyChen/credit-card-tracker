@@ -1,8 +1,9 @@
 import { z } from "zod";
 
 export const OBSERVATION_CONTRACT_VERSION = "amex-benefits/1" as const;
+export const OBSERVATION_CONTRACT_VERSION_V2 = "amex-benefits/2" as const;
 export const STORAGE_SCHEMA_VERSION = 1 as const;
-export const PARSER_VERSION = "amex-api-us/1.1.0" as const;
+export const PARSER_VERSION = "amex-api-us/2.0.0" as const;
 
 export const issueCodeSchema = z.enum([
   "unknown_account_variant",
@@ -69,7 +70,7 @@ export const activityKindSchema = z.enum([
 ]);
 export type ActivityKind = z.infer<typeof activityKindSchema>;
 
-export const normalizedBenefitObservationSchema = z.object({
+const benefitObservationFields = {
   benefitKey: z.string().min(16).max(128),
   title: approvedVisibleText(200),
   category: observedFieldSchema(approvedVisibleText(100)),
@@ -93,21 +94,69 @@ export const normalizedBenefitObservationSchema = z.object({
   period: observedFieldSchema(approvedVisibleText(160)),
   confidence: z.enum(["high", "medium", "low"]),
   issueCodes: z.array(issueCodeSchema).max(20),
-}).strict();
+};
+
+export const normalizedBenefitObservationSchema = z.object(benefitObservationFields).strict();
 export type NormalizedBenefitObservationV1 = z.infer<typeof normalizedBenefitObservationSchema>;
 
-export const normalizedCardObservationSchema = z.object({
-  contractVersion: z.literal(OBSERVATION_CONTRACT_VERSION),
-  issuer: z.literal("american_express_us"),
-  localCardId: z.string().uuid(),
-  productName: approvedVisibleText(160),
-  endingDigits: z.string().regex(/^\d{4,5}$/),
-  observedAt: z.string().datetime({ offset: true }),
-  parserVersion: z.string().min(1).max(80),
-  completeness: z.enum(["complete", "partial"]),
-  issueCodes: z.array(issueCodeSchema).max(30),
-  benefits: z.array(normalizedBenefitObservationSchema).max(300),
-}).strict().superRefine((observation, context) => {
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+function isRealDateOnly(value: string): boolean {
+  if (!DATE_ONLY.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day;
+}
+
+export const utcDateOnlySchema = z.string().refine(isRealDateOnly, "Expected a real UTC calendar date in YYYY-MM-DD form.");
+
+export const sourcePeriodV2Schema = z.object({
+  kind: z.literal("calendar_date_range"),
+  startDate: utcDateOnlySchema,
+  endDate: utcDateOnlySchema,
+  timeZone: z.literal("UTC"),
+}).strict().superRefine((period, context) => {
+  if (period.startDate > period.endDate) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["endDate"], message: "The period end must not precede its start." });
+  }
+});
+export type SourcePeriodV2 = z.infer<typeof sourcePeriodV2Schema>;
+
+export const amexProductKeySchema = z.enum([
+  "american-express-gold-card",
+  "american-express-platinum-card",
+  "american-express-business-platinum-card",
+  "american-express-business-gold-card",
+  "hilton-honors-american-express-aspire-card",
+  "hilton-honors-american-express-surpass-card",
+  "hilton-honors-american-express-business-card",
+  "delta-skymiles-gold-american-express-card",
+  "delta-skymiles-platinum-american-express-card",
+  "delta-skymiles-reserve-american-express-card",
+  "marriott-bonvoy-brilliant-american-express-card",
+  "marriott-bonvoy-business-american-express-card",
+]);
+export type AmexProductKey = z.infer<typeof amexProductKeySchema>;
+
+export const creditFamilyKeySchema = z.string()
+  .min(8)
+  .max(120)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)$/);
+
+export const normalizedBenefitObservationV2Schema = z.object({
+  ...benefitObservationFields,
+  creditFamilyKey: creditFamilyKeySchema,
+  sourcePeriod: observedFieldSchema(sourcePeriodV2Schema),
+}).strict();
+export type NormalizedBenefitObservationV2 = z.infer<typeof normalizedBenefitObservationV2Schema>;
+export type NormalizedBenefitObservation = NormalizedBenefitObservationV1 | NormalizedBenefitObservationV2;
+
+function requireUniqueBenefitKeys(
+  observation: { benefits: Array<{ benefitKey: string }> },
+  context: z.RefinementCtx,
+): void {
   const keys = new Set<string>();
   observation.benefits.forEach((benefit, index) => {
     if (keys.has(benefit.benefitKey)) {
@@ -119,8 +168,40 @@ export const normalizedCardObservationSchema = z.object({
     }
     keys.add(benefit.benefitKey);
   });
-});
+}
+
+const cardObservationFields = {
+  issuer: z.literal("american_express_us"),
+  localCardId: z.string().uuid(),
+  productName: approvedVisibleText(160),
+  endingDigits: z.string().regex(/^\d{4,5}$/),
+  observedAt: z.string().datetime({ offset: true }),
+  parserVersion: z.string().min(1).max(80),
+  completeness: z.enum(["complete", "partial"]),
+  issueCodes: z.array(issueCodeSchema).max(30),
+};
+
+export const normalizedCardObservationSchema = z.object({
+  contractVersion: z.literal(OBSERVATION_CONTRACT_VERSION),
+  ...cardObservationFields,
+  benefits: z.array(normalizedBenefitObservationSchema).max(300),
+}).strict().superRefine(requireUniqueBenefitKeys);
 export type NormalizedCardObservationV1 = z.infer<typeof normalizedCardObservationSchema>;
+
+export const normalizedCardObservationV2Schema = z.object({
+  contractVersion: z.literal(OBSERVATION_CONTRACT_VERSION_V2),
+  ...cardObservationFields,
+  scanId: z.string().uuid(),
+  productKey: amexProductKeySchema,
+  benefits: z.array(normalizedBenefitObservationV2Schema).max(300),
+}).strict().superRefine(requireUniqueBenefitKeys);
+export type NormalizedCardObservationV2 = z.infer<typeof normalizedCardObservationV2Schema>;
+export type NormalizedCardObservation = NormalizedCardObservationV1 | NormalizedCardObservationV2;
+
+export const normalizedCardObservationAnySchema = z.union([
+  normalizedCardObservationSchema,
+  normalizedCardObservationV2Schema,
+]);
 
 export const redactedErrorSchema = z.object({
   code: issueCodeSchema,
@@ -135,7 +216,7 @@ export const storedCardRecordSchema = z.object({
     productName: approvedVisibleText(160),
     endingDigits: z.string().regex(/^\d{4,5}$/),
   }).strict(),
-  latest: normalizedCardObservationSchema.nullable(),
+  latest: normalizedCardObservationAnySchema.nullable(),
   freshness: z.enum(["current", "stale_error", "error_no_data"]),
   completeness: z.enum(["complete", "partial", "failed"]),
   observedAt: z.string().datetime({ offset: true }).nullable(),
@@ -147,9 +228,7 @@ export const storedCardRecordSchema = z.object({
       && record.latest.productName === record.identity.productName
       && record.latest.endingDigits === record.identity.endingDigits
       && record.latest.observedAt === record.observedAt;
-    if (!consistent) {
-      context.addIssue({ code: z.ZodIssueCode.custom, message: "Stored card identity and observation are inconsistent." });
-    }
+    if (!consistent) context.addIssue({ code: z.ZodIssueCode.custom, message: "Stored card identity and observation are inconsistent." });
   } else if (record.observedAt !== null) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["observedAt"], message: "A card without an observation cannot have an observation time." });
   }
@@ -158,9 +237,7 @@ export const storedCardRecordSchema = z.object({
     : record.freshness === "stale_error"
       ? Boolean(record.latest && record.error && record.completeness === "failed")
       : Boolean(!record.latest && record.error && record.completeness === "failed");
-  if (!validState) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: "Stored card freshness, completeness, data, and error state are inconsistent." });
-  }
+  if (!validState) context.addIssue({ code: z.ZodIssueCode.custom, message: "Stored card freshness, completeness, data, and error state are inconsistent." });
 });
 export type StoredCardRecordV1 = z.infer<typeof storedCardRecordSchema>;
 
@@ -171,13 +248,14 @@ export const scanCardDispositionSchema = z.object({
 }).strict();
 
 export const scanSummarySchema = z.object({
+  scanId: z.string().uuid().optional(),
   startedAt: z.string().datetime({ offset: true }),
   finishedAt: z.string().datetime({ offset: true }),
   status: z.enum(["complete", "partial", "interrupted", "failed"]),
   discoveredCardCount: z.number().int().nonnegative(),
   attemptedCardCount: z.number().int().nonnegative(),
   unknownAccountVariantCount: z.number().int().nonnegative(),
-  cards: z.array(scanCardDispositionSchema),
+  cards: z.array(scanCardDispositionSchema).max(300),
   visibleContext: z.enum(["unchanged", "changed", "unavailable"]),
 }).strict();
 export type ScanSummaryV1 = z.infer<typeof scanSummarySchema>;

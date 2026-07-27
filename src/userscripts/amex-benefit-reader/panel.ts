@@ -1,5 +1,5 @@
 import type {
-  NormalizedBenefitObservationV1,
+  NormalizedBenefitObservation,
   ObservedField,
   QuantityV1,
   ScanSummaryV1,
@@ -23,6 +23,7 @@ export const AMEX_READER_HOST_ID = "perks-reminder-amex-reader";
 export interface PanelActions {
   startScan(): Promise<void>;
   cancelScan(): void;
+  syncReviewed?(): Promise<void>;
   clearData(): Promise<void>;
 }
 
@@ -137,7 +138,7 @@ function observationQuality(record: StoredCardRecordV1): QualityPresentation {
   return { label: "Current", tone: "good" };
 }
 
-function confidenceSummary(benefits: NormalizedBenefitObservationV1[]): string {
+function confidenceSummary(benefits: NormalizedBenefitObservation[]): string {
   if (!benefits.length) return "No benefit observations";
   const counts = { high: 0, medium: 0, low: 0 };
   benefits.forEach((benefit) => {
@@ -149,7 +150,7 @@ function confidenceSummary(benefits: NormalizedBenefitObservationV1[]): string {
     .join(", ");
 }
 
-export function deriveBenefitUsageState(benefit: NormalizedBenefitObservationV1): BenefitUsagePresentation {
+export function deriveBenefitUsageState(benefit: NormalizedBenefitObservation): BenefitUsagePresentation {
   const completion = observedValue(benefit.completionState);
   const tracker = observedValue(benefit.trackerState);
   const enrollment = observedValue(benefit.enrollmentState);
@@ -182,7 +183,7 @@ export function deriveBenefitUsageState(benefit: NormalizedBenefitObservationV1)
   return { label: "Status unavailable", tone: "muted", filter: "remaining" };
 }
 
-function benefitPresentation(benefit: NormalizedBenefitObservationV1): BenefitPresentation {
+function benefitPresentation(benefit: NormalizedBenefitObservation): BenefitPresentation {
   const state = deriveBenefitUsageState(benefit);
   const current = observedValue(benefit.earnedOrUsed);
   const target = observedValue(benefit.targetOrLimit);
@@ -290,7 +291,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
   private readonly host: HTMLDivElement;
   private readonly root: ShadowRoot;
   private store: StoreEnvelopeV1;
-  private mode: "idle" | "scanning" | "cancelling" | "error" = "idle";
+  private mode: "idle" | "scanning" | "cancelling" | "syncing" | "error" = "idle";
   private progress = "Ready. Nothing is scanned until you start.";
   private errorMessage: string | null = null;
   private benefitFilter: BenefitFilter = "remaining";
@@ -324,6 +325,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     const panel = new AmexBenefitReaderPanel(empty, {
       startScan: async () => undefined,
       cancelScan: () => undefined,
+      syncReviewed: async () => undefined,
       clearData,
     }, { ...options, requiresReloadAfterClear: true });
     panel.mode = "error";
@@ -398,6 +400,24 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     this.render();
   }
 
+  private async syncReviewed(): Promise<void> {
+    if (this.mode !== "idle" || !this.store.lastScan || !this.actions.syncReviewed) return;
+    this.mode = "syncing";
+    this.errorMessage = null;
+    this.progress = "Preparing a private one-time handoff…";
+    this.render();
+    try {
+      await this.actions.syncReviewed();
+      this.progress = "Sync review opened in a new tab. Confirm separately there; nothing is written from Amex.";
+    } catch (error) {
+      this.errorMessage = error instanceof Error ? error.message : "A sync handoff could not be prepared.";
+      this.progress = "No data was sent and no benefit was changed.";
+    } finally {
+      this.mode = "idle";
+      this.render();
+    }
+  }
+
   private async clear(): Promise<void> {
     if (!window.confirm("Clear all local Amex benefit observations and the local identity secret?")) return;
     this.conflictsByCard.clear();
@@ -417,7 +437,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     this.render();
   }
 
-  private renderBenefit(benefit: NormalizedBenefitObservationV1): HTMLElement {
+  private renderBenefit(benefit: NormalizedBenefitObservation): HTMLElement {
     const presentation = benefitPresentation(benefit);
     const item = element("li");
     item.className = `benefit-card tone-${presentation.tone}`;
@@ -804,8 +824,8 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     const disclosure = element("div");
     disclosure.className = "privacy-banner";
     disclosure.append(
-      element("strong", "Local only — not sent to Perks Reminder"),
-      element("span", "A manual scan uses your signed-in Amex session for first-party read requests. Raw responses are not saved."),
+      element("strong", "Local unless you choose Sync reviewed"),
+      element("span", "A manual scan uses your signed-in Amex session for first-party read requests. Raw responses are not saved. Sync sends only the reviewed normalized handoff."),
     );
     top.append(disclosure);
 
@@ -817,6 +837,14 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     scan.disabled = this.mode !== "idle";
     scan.addEventListener("click", () => void this.start());
     controls.append(scan);
+    if (this.store.lastScan && this.actions.syncReviewed && this.mode !== "scanning" && this.mode !== "cancelling") {
+      const sync = element("button", "Sync reviewed");
+      sync.type = "button";
+      sync.dataset.amexSyncAction = "true";
+      sync.disabled = this.mode !== "idle";
+      sync.addEventListener("click", () => void this.syncReviewed());
+      controls.append(sync);
+    }
     if (this.mode === "scanning" || this.mode === "cancelling") {
       const cancel = element("button", this.mode === "cancelling" ? "Cancelling…" : "Cancel");
       cancel.type = "button";
@@ -924,7 +952,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     const clear = element("button", "Clear local data");
     clear.type = "button";
     clear.className = "clear-button";
-    clear.disabled = this.mode === "scanning" || this.mode === "cancelling";
+    clear.disabled = this.mode === "scanning" || this.mode === "cancelling" || this.mode === "syncing";
     clear.addEventListener("click", () => void this.clear());
     privacy.append(clear);
     footer.append(privacy);

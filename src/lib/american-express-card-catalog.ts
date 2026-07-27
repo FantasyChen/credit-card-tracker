@@ -2,6 +2,9 @@ export type AmericanExpressCatalogFrequency = "WEEKLY" | "MONTHLY" | "QUARTERLY"
 export type AmericanExpressCatalogCycleAlignment = "CARD_ANNIVERSARY" | "CALENDAR_FIXED";
 
 interface AmericanExpressCatalogBenefit {
+  productKey?: string;
+  creditFamilyKey?: string;
+  periodKey?: string;
   category: string;
   description: string;
   percentage: number;
@@ -14,6 +17,7 @@ interface AmericanExpressCatalogBenefit {
 }
 
 interface AmericanExpressCatalogCard {
+  productKey?: string;
   name: string;
   issuer: "American Express";
   annualFee: number;
@@ -74,6 +78,7 @@ export const americanExpressCardCatalog = {
       ],
     },
   "American Express Platinum Card": {
+      productKey: 'american-express-platinum-card',
       name: 'American Express Platinum Card',
       issuer: 'American Express',
       annualFee: 895,
@@ -129,6 +134,9 @@ export const americanExpressCardCatalog = {
         },
         // NEW 2025 BENEFITS - Quarterly benefits split by quarter
         {
+          productKey: 'american-express-platinum-card',
+          creditFamilyKey: 'american-express-platinum-card:resy',
+          periodKey: 'calendar-quarter-q1',
           description: '$100 Quarterly Resy Dining Credit (Q1: Jan-Mar)',
           category: 'Dining',
           maxAmount: 100,
@@ -139,6 +147,9 @@ export const americanExpressCardCatalog = {
           fixedCycleDurationMonths: 3, // Q1: Jan-Mar
         },
         {
+          productKey: 'american-express-platinum-card',
+          creditFamilyKey: 'american-express-platinum-card:resy',
+          periodKey: 'calendar-quarter-q2',
           description: '$100 Quarterly Resy Dining Credit (Q2: Apr-Jun)',
           category: 'Dining',
           maxAmount: 100,
@@ -149,6 +160,9 @@ export const americanExpressCardCatalog = {
           fixedCycleDurationMonths: 3, // Q2: Apr-Jun
         },
         {
+          productKey: 'american-express-platinum-card',
+          creditFamilyKey: 'american-express-platinum-card:resy',
+          periodKey: 'calendar-quarter-q3',
           description: '$100 Quarterly Resy Dining Credit (Q3: Jul-Sep)',
           category: 'Dining',
           maxAmount: 100,
@@ -159,6 +173,9 @@ export const americanExpressCardCatalog = {
           fixedCycleDurationMonths: 3, // Q3: Jul-Sep
         },
         {
+          productKey: 'american-express-platinum-card',
+          creditFamilyKey: 'american-express-platinum-card:resy',
+          periodKey: 'calendar-quarter-q4',
           description: '$100 Quarterly Resy Dining Credit (Q4: Oct-Dec)',
           category: 'Dining',
           maxAmount: 100,
@@ -169,6 +186,9 @@ export const americanExpressCardCatalog = {
           fixedCycleDurationMonths: 3, // Q4: Oct-Dec
         },
         {
+          productKey: 'american-express-platinum-card',
+          creditFamilyKey: 'american-express-platinum-card:lululemon',
+          periodKey: 'calendar-quarter-q1',
           description: '$75 Quarterly Lululemon Credit (Q1: Jan-Mar)',
           category: 'Shopping',
           maxAmount: 75,
@@ -179,6 +199,9 @@ export const americanExpressCardCatalog = {
           fixedCycleDurationMonths: 3, // Q1: Jan-Mar
         },
         {
+          productKey: 'american-express-platinum-card',
+          creditFamilyKey: 'american-express-platinum-card:lululemon',
+          periodKey: 'calendar-quarter-q2',
           description: '$75 Quarterly Lululemon Credit (Q2: Apr-Jun)',
           category: 'Shopping',
           maxAmount: 75,
@@ -189,6 +212,9 @@ export const americanExpressCardCatalog = {
           fixedCycleDurationMonths: 3, // Q2: Apr-Jun
         },
         {
+          productKey: 'american-express-platinum-card',
+          creditFamilyKey: 'american-express-platinum-card:lululemon',
+          periodKey: 'calendar-quarter-q3',
           description: '$75 Quarterly Lululemon Credit (Q3: Jul-Sep)',
           category: 'Shopping',
           maxAmount: 75,
@@ -199,6 +225,9 @@ export const americanExpressCardCatalog = {
           fixedCycleDurationMonths: 3, // Q3: Jul-Sep
         },
         {
+          productKey: 'american-express-platinum-card',
+          creditFamilyKey: 'american-express-platinum-card:lululemon',
+          periodKey: 'calendar-quarter-q4',
           description: '$75 Quarterly Lululemon Credit (Q4: Oct-Dec)',
           category: 'Shopping',
           maxAmount: 75,

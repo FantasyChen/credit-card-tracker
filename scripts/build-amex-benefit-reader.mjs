@@ -5,7 +5,7 @@ import { build } from "esbuild";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const output = resolve(root, "build/amex-benefit-reader.user.js");
-const userscriptVersion = "0.2.13";
+const userscriptVersion = "0.3.0";
 
 const metadata = `// ==UserScript==
 // @name         Perks Reminder — Amex Benefit Reader
@@ -13,6 +13,7 @@ const metadata = `// ==UserScript==
 // @version      ${userscriptVersion}
 // @description  Locally reads normalized Amex benefit status after a manual first-party read request.
 // @match        https://global.americanexpress.com/*
+// @match        https://www.perks-reminder.com/integrations/amex-sync
 // @run-at       document-idle
 // @noframes
 // @grant        GM.getValue

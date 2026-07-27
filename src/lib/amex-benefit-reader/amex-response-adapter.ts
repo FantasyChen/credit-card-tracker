@@ -6,12 +6,14 @@ import type {
   TrackerResponse,
 } from "./amex-api-contract";
 import {
-  normalizedBenefitObservationSchema,
+  normalizedBenefitObservationV2Schema,
+  sourcePeriodV2Schema,
   type ActivityKind,
   type IssueCode,
-  type NormalizedBenefitObservationV1,
+  type NormalizedBenefitObservationV2,
   type ObservedField,
   type QuantityV1,
+  type SourcePeriodV2,
 } from "./contract";
 import { createBenefitKey } from "./identity";
 import {
@@ -104,7 +106,7 @@ export interface BenefitIdentityConflictDetailSet {
 }
 
 export interface BenefitNormalizationResult {
-  benefits: NormalizedBenefitObservationV1[];
+  benefits: NormalizedBenefitObservationV2[];
   issueCodes: IssueCode[];
   conflictDiagnostics: BenefitIdentityConflictDiagnostic[];
   conflictDetails: BenefitIdentityConflictDetailSet;
@@ -345,9 +347,23 @@ function periodField(tracker: BenefitTrackerResponseItem): ObservedField<string>
   return notExposed();
 }
 
+function sourcePeriodField(tracker: BenefitTrackerResponseItem): ObservedField<SourcePeriodV2> {
+  const start = tracker.periodStartDate;
+  const end = tracker.periodEndDate;
+  if (start == null && end == null) return notExposed();
+  if (typeof start !== "string" || typeof end !== "string") return unrecognized("unknown_status");
+  const parsed = sourcePeriodV2Schema.safeParse({
+    kind: "calendar_date_range",
+    startDate: start,
+    endDate: end,
+    timeZone: "UTC",
+  });
+  return parsed.success ? observed(parsed.data) : unrecognized("unknown_status");
+}
+
 function trackerStatusFields(statusValue: unknown, activityKind: ActivityKind, issues: Set<IssueCode>): {
-  trackerState: NormalizedBenefitObservationV1["trackerState"];
-  completionState: NormalizedBenefitObservationV1["completionState"];
+  trackerState: NormalizedBenefitObservationV2["trackerState"];
+  completionState: NormalizedBenefitObservationV2["completionState"];
 } {
   if (statusValue == null) {
     return { trackerState: notExposed(), completionState: notExposed() };
@@ -381,7 +397,7 @@ function activityKindForTracker(tracker: BenefitTrackerResponseItem, issues: Set
   return null;
 }
 
-function enrollmentField(catalog: CatalogBenefitResponseItem | undefined, issues: Set<IssueCode>): NormalizedBenefitObservationV1["enrollmentState"] {
+function enrollmentField(catalog: CatalogBenefitResponseItem | undefined, issues: Set<IssueCode>): NormalizedBenefitObservationV2["enrollmentState"] {
   if (!catalog) return notExposed();
   const layout = exactString(catalog.layoutType)?.toUpperCase();
   if (layout === "ENROLLED") return observed("enrolled");
@@ -493,7 +509,7 @@ function catalogDiagnosticCandidate(
 
 function normalizedDiagnosticCandidate(
   sourceRole: "tracker" | "catalog_enrollment_candidate",
-  benefit: NormalizedBenefitObservationV1,
+  benefit: NormalizedBenefitObservationV2,
   supportedCreditKey: string,
   joinId: string | null,
 ): ConflictCandidateDraft {
@@ -590,7 +606,7 @@ function sameCatalogObservation(
     && left.isEnrollable === right.isEnrollable;
 }
 
-function supportedCreditState(benefit: NormalizedBenefitObservationV1): unknown {
+function supportedCreditState(benefit: NormalizedBenefitObservationV2): unknown {
   return {
     category: benefit.category,
     activityKind: benefit.activityKind,
@@ -601,14 +617,16 @@ function supportedCreditState(benefit: NormalizedBenefitObservationV1): unknown 
     targetOrLimit: benefit.targetOrLimit,
     remaining: benefit.remaining,
     period: benefit.period,
+    creditFamilyKey: benefit.creditFamilyKey,
+    sourcePeriod: benefit.sourcePeriod,
     confidence: benefit.confidence,
     issueCodes: benefit.issueCodes,
   };
 }
 
 function sameSupportedCreditObservation(
-  left: NormalizedBenefitObservationV1,
-  right: NormalizedBenefitObservationV1,
+  left: NormalizedBenefitObservationV2,
+  right: NormalizedBenefitObservationV2,
 ): boolean {
   return JSON.stringify(supportedCreditState(left)) === JSON.stringify(supportedCreditState(right));
 }
@@ -616,7 +634,7 @@ function sameSupportedCreditObservation(
 type SupportedCreditCandidateSource = "tracker" | "catalog_candidate";
 
 interface SupportedCreditCandidate {
-  benefit: NormalizedBenefitObservationV1;
+  benefit: NormalizedBenefitObservationV2;
   source: SupportedCreditCandidateSource;
   diagnosticCandidate: ConflictCandidateDraft;
 }
@@ -882,12 +900,12 @@ export function normalizeBenefits(input: {
   const normalized = new Map<string, SupportedCreditCandidate>();
   const add = (
     supportedCreditKey: string,
-    benefit: NormalizedBenefitObservationV1,
+    benefit: NormalizedBenefitObservationV2,
     source: SupportedCreditCandidateSource,
     joinId: string | null,
     diagnosticOverride?: ConflictCandidateDraft,
   ): void => {
-    const validated = normalizedBenefitObservationSchema.parse(benefit);
+    const validated = normalizedBenefitObservationV2Schema.parse(benefit);
     const diagnosticCandidate = diagnosticOverride ?? normalizedDiagnosticCandidate(
       source === "tracker" ? "tracker" : "catalog_enrollment_candidate",
       validated,
@@ -954,9 +972,13 @@ export function normalizeBenefits(input: {
       const remaining = quantityField(tracker.tracker?.remainingAmount, tracker.tracker, itemIssues);
       const period = periodField(tracker);
       if (period.state === "unrecognized") itemIssues.add(period.issueCode);
+      const sourcePeriod = sourcePeriodField(tracker);
+      if (sourcePeriod.state === "unrecognized") itemIssues.add(sourcePeriod.issueCode);
       const enrollmentState = enrollmentField(supported.catalog, itemIssues);
-      const benefit: NormalizedBenefitObservationV1 = {
+      const benefit: NormalizedBenefitObservationV2 = {
         benefitKey: benefitKey(supported.title, category, activityKind),
+        creditFamilyKey: supported.match.creditKey,
+        sourcePeriod,
         title: supported.title,
         category,
         activityKind,
@@ -1011,6 +1033,8 @@ export function normalizeBenefits(input: {
     const category = notExposed<string>();
     add(supported.creditKey, {
       benefitKey: benefitKey(title, category, "enrollment_candidate"),
+      creditFamilyKey: supported.creditKey,
+      sourcePeriod: notExposed(),
       title,
       category,
       activityKind: "enrollment_candidate",

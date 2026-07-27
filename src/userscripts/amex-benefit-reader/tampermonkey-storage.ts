@@ -11,6 +11,10 @@ import {
   type CardAttemptResult,
 } from "@/lib/amex-benefit-reader/storage-policy";
 import type { ScanSummaryV1, StoreEnvelopeV1, StoredCardRecordV1 } from "@/lib/amex-benefit-reader/contract";
+import {
+  AMEX_SYNC_MAILBOX_KEY,
+  type MailboxStorage,
+} from "@/lib/amex-benefit-reader/sync-mailbox";
 
 declare const GM: {
   getValue(key: string, defaultValue?: unknown): Promise<unknown>;
@@ -30,16 +34,23 @@ function retainSupportedStoredCredits(store: StoreEnvelopeV1, projectedAt: strin
       cards[localCardId] = record;
       continue;
     }
-    const benefits = retainSupportedAmexCardCredits(record.latest.productName, record.latest.benefits);
-    if (benefits === record.latest.benefits) {
-      cards[localCardId] = record;
-      continue;
+    if (record.latest.contractVersion === "amex-benefits/2") {
+      const benefits = retainSupportedAmexCardCredits(record.latest.productName, record.latest.benefits);
+      if (benefits === record.latest.benefits) {
+        cards[localCardId] = record;
+        continue;
+      }
+      changed = true;
+      cards[localCardId] = { ...record, latest: { ...record.latest, benefits } };
+    } else {
+      const benefits = retainSupportedAmexCardCredits(record.latest.productName, record.latest.benefits);
+      if (benefits === record.latest.benefits) {
+        cards[localCardId] = record;
+        continue;
+      }
+      changed = true;
+      cards[localCardId] = { ...record, latest: { ...record.latest, benefits } };
     }
-    changed = true;
-    cards[localCardId] = {
-      ...record,
-      latest: { ...record.latest, benefits },
-    };
   }
   if (!changed) return store;
   return {
@@ -72,12 +83,30 @@ export class TampermonkeyResultStore implements ResultStore {
   }
 
   async clear(): Promise<void> {
-    await Promise.all([GM.deleteValue(STORE_KEY), GM.deleteValue(IDENTITY_SECRET_KEY)]);
+    await Promise.all([
+      GM.deleteValue(STORE_KEY),
+      GM.deleteValue(IDENTITY_SECRET_KEY),
+      GM.deleteValue(AMEX_SYNC_MAILBOX_KEY),
+    ]);
   }
 
   async initializeIfNeeded(): Promise<void> {
     const value = await GM.getValue(STORE_KEY, null);
     if (value == null) await GM.setValue(STORE_KEY, createEmptyStore(nowIso()));
+  }
+}
+
+export class TampermonkeyMailboxStorage implements MailboxStorage {
+  getValue(key: string, defaultValue?: unknown): Promise<unknown> {
+    return GM.getValue(key, defaultValue);
+  }
+
+  setValue(key: string, value: unknown): Promise<void> {
+    return GM.setValue(key, value);
+  }
+
+  deleteValue(key: string): Promise<void> {
+    return GM.deleteValue(key);
   }
 }
 
