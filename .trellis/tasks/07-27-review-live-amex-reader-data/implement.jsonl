@@ -1,0 +1,4 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Defines the normalized browser-reader boundary, supported-credit filtering, compatible-store projection, panel quality states, conflict diagnostics, privacy limits, and fail-closed behavior changed by this task."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Requires strict TypeScript boundaries and concrete normalized projection types for the new selection and card-coverage helpers."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Provides colocated Jest, accessible UI assertion, targeted lint/type-check, and diff-check conventions for panel and normalization changes."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Constrains validation to safe targeted checks and requires explicit classification of browser, provider, build, database, and other conditional operations."}

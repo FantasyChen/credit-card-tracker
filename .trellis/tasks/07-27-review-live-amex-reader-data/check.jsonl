@@ -1,0 +1,3 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Check that reviewed exclusions happen before interpretation/conflict creation, compatible storage and sync reuse the same policy, genuine conflicts remain partial, and no sensitive/raw provider data is introduced."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check user-visible empty/error/quality states, semantic assertions, targeted test coverage, strict type-checking, focused lint, and git diff hygiene."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Check the full diff and untracked paths, scan for secrets/browser data, report every command truthfully, and avoid unauthorized live provider, database, deployment, or installation actions."}
