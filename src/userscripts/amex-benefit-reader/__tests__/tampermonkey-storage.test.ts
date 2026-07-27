@@ -1,5 +1,6 @@
 import { storeEnvelopeSchema, type NormalizedBenefitObservationV1 } from "@/lib/amex-benefit-reader/contract";
 import { IDENTITY_SECRET_KEY, STORE_KEY } from "@/lib/amex-benefit-reader/storage-policy";
+import { AMEX_SYNC_MAILBOX_KEY } from "@/lib/amex-benefit-reader/sync-mailbox";
 import { TampermonkeyResultStore } from "../tampermonkey-storage";
 
 interface FakeGm {
@@ -135,9 +136,10 @@ describe("Tampermonkey storage adapter", () => {
     expect(gm.setValue).not.toHaveBeenCalled();
   });
 
-  it("clears exactly the normalized store and local identity secret", async () => {
+  it("clears the normalized store, local identity secret, and pending sync mailbox", async () => {
     await new TampermonkeyResultStore().clear();
     expect(gm.deleteValue.mock.calls.map(([key]) => key).sort()).toEqual([
+      AMEX_SYNC_MAILBOX_KEY,
       IDENTITY_SECRET_KEY,
       STORE_KEY,
     ].sort());

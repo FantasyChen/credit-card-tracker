@@ -1,4 +1,9 @@
 import '@testing-library/jest-dom';
+import { webcrypto } from 'node:crypto';
+import { TextDecoder, TextEncoder } from 'node:util';
+
+Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+Object.assign(globalThis, { TextDecoder, TextEncoder });
 
 // Mock NextAuth adapter that's causing ESM issues
 jest.mock('@auth/prisma-adapter', () => ({

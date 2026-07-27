@@ -11,6 +11,7 @@ describe("supported Amex card credit vocabulary", () => {
       "Up to $200 Airline Fee Credit",
     )).toEqual({
       catalogCardName: "American Express Platinum Card",
+      productKey: "american-express-platinum-card",
       creditKey: "american-express-platinum-card:airline-fee",
     });
     expect(matchSupportedAmexCardCredit(
@@ -18,6 +19,7 @@ describe("supported Amex card credit vocabulary", () => {
       "Hilton Resort Statement Credit",
     )).toEqual({
       catalogCardName: "Hilton Honors American Express Aspire Card",
+      productKey: "hilton-honors-american-express-aspire-card",
       creditKey: "hilton-honors-american-express-aspire-card:hilton-resort",
     });
     expect(matchSupportedAmexCardCredit(
@@ -25,6 +27,7 @@ describe("supported Amex card credit vocabulary", () => {
       "Your Monthly Rideshare Credit",
     )).toEqual({
       catalogCardName: "Delta SkyMiles Platinum American Express Card",
+      productKey: "delta-skymiles-platinum-american-express-card",
       creditKey: "delta-skymiles-platinum-american-express-card:rideshare",
     });
   });
