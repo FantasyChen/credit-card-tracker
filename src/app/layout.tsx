@@ -6,7 +6,7 @@ import Navbar from "@/components/Navbar";
 import Providers from "@/components/Providers"; // Reinstate original Providers
 import Footer from "@/components/Footer";
 import SkipLink from "@/components/ui/SkipLink";
-import { Analytics } from '@vercel/analytics/next';
+import PathAwareTelemetry from "@/components/PathAwareTelemetry";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { ErrorBoundary } from "@/lib/monitoring/errorBoundary";
@@ -147,30 +147,7 @@ export default async function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
-        
-        {/* Google Analytics */}
-        {process.env.GOOGLE_ANALYTICS_ID && (
-          <>
-            <script
-              async
-              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.GOOGLE_ANALYTICS_ID}`}
-            />
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `
-                  window.dataLayer = window.dataLayer || [];
-                  function gtag(){dataLayer.push(arguments);}
-                  gtag('js', new Date());
-                  gtag('config', '${process.env.GOOGLE_ANALYTICS_ID}', {
-                    page_title: document.title,
-                    page_location: window.location.href,
-                  });
-                `,
-              }}
-            />
-          </>
-        )}
-        
+
         {/* Google Search Console Verification */}
         {process.env.GOOGLE_SEARCH_CONSOLE_VERIFICATION && (
           <meta name="google-site-verification" content={process.env.GOOGLE_SEARCH_CONSOLE_VERIFICATION} />
@@ -197,7 +174,7 @@ export default async function RootLayout({
                 {children}
               </main>
               <Footer />
-              <Analytics />
+              <PathAwareTelemetry googleAnalyticsId={process.env.GOOGLE_ANALYTICS_ID} />
             </div>
             <IosInstallPrompt />
           </ErrorBoundary>

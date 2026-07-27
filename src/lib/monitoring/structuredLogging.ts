@@ -210,20 +210,14 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Res
     // Extract useful request info
     const url = new URL(request.url);
     const method = request.method;
-    const userAgent = request.headers.get('user-agent') || 'unknown';
-    
+
     logger.setContext({
       requestId,
       action: method,
       resource: url.pathname,
     });
 
-    logger.info(`${method} ${url.pathname}`, {
-      metadata: {
-        userAgent: userAgent.substring(0, 100), // Limit length
-        query: url.search,
-      }
-    });
+    logger.info(`${method} ${url.pathname}`);
 
     try {
       const response = await handler(request, ...args);

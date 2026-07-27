@@ -84,6 +84,9 @@ self.addEventListener('fetch', (event) => {
   // Skip non-HTTP requests
   if (!url.protocol.startsWith('http')) return;
 
+  // Never intercept or cache the private Amex handoff page or its API calls.
+  if (url.pathname === '/integrations/amex-sync' || url.pathname.startsWith('/api/integrations/amex-sync/')) return;
+
   // API requests - network first with fallback
   if (NETWORK_FIRST_ROUTES.some(route => url.pathname.startsWith(route))) {
     event.respondWith(networkFirstStrategy(request));

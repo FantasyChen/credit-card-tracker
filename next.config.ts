@@ -71,6 +71,17 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Keep this after the catch-all so the stricter referrer policy wins.
+      {
+        source: '/integrations/amex-sync',
+        headers: [
+          { key: 'Cache-Control', value: 'private, no-store, max-age=0' },
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+        ],
+      },
     ];
   },
   
