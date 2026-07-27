@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { digestAmexSyncEnvelope, parseAmexSyncEnvelope } from "@/lib/amex-benefit-reader/sync-contract";
+import {
+  AMEX_SYNC_MAX_ROWS,
+  digestAmexSyncEnvelope,
+  parseAmexSyncEnvelope,
+} from "@/lib/amex-benefit-reader/sync-contract";
 import { AmexSyncHandoffClient } from "../AmexSyncHandoffClient";
 
 const transferId = "a".repeat(32);
@@ -108,6 +112,75 @@ describe("Amex sync handoff client", () => {
     view.unmount();
   });
 
+  it("rejects an incomplete 2xx confirmation result instead of reporting success", async () => {
+    (global.fetch as jest.Mock)
+      .mockReturnValueOnce(response({
+        mode: "write",
+        rows: [row],
+        proposalToken: "proposal-token".repeat(4),
+        proposalExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+        mappingOptions: [],
+      }))
+      .mockReturnValueOnce(response({
+        attemptId: "attempt-1",
+        replayed: false,
+        rows: [{ ...row, disposition: "updated", changes: undefined }],
+        updatedCount: 1,
+      }));
+    const view = render(<AmexSyncHandoffClient transferId={transferId} initialMode="write" />);
+    await deliverPayload();
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm proposed updates" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Confirmation failed safely"));
+    expect(screen.queryByText("Confirmation recorded")).not.toBeInTheDocument();
+    view.unmount();
+  });
+
+  it("rejects a non-final confirmation disposition instead of reporting success", async () => {
+    (global.fetch as jest.Mock)
+      .mockReturnValueOnce(response({
+        mode: "write",
+        rows: [row],
+        proposalToken: "proposal-token".repeat(4),
+        proposalExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+        mappingOptions: [],
+      }))
+      .mockReturnValueOnce(response({
+        attemptId: "attempt-1",
+        replayed: false,
+        rows: [row],
+        updatedCount: 0,
+      }));
+    const view = render(<AmexSyncHandoffClient transferId={transferId} initialMode="write" />);
+    await deliverPayload();
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm proposed updates" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Confirmation failed safely"));
+    expect(screen.queryByText("Confirmation recorded")).not.toBeInTheDocument();
+    view.unmount();
+  });
+
+  it("rejects a confirmation count that disagrees with final row dispositions", async () => {
+    (global.fetch as jest.Mock)
+      .mockReturnValueOnce(response({
+        mode: "write",
+        rows: [row],
+        proposalToken: "proposal-token".repeat(4),
+        proposalExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+        mappingOptions: [],
+      }))
+      .mockReturnValueOnce(response({
+        attemptId: "attempt-1",
+        replayed: false,
+        rows: [{ ...row, disposition: "updated" }],
+        updatedCount: 0,
+      }));
+    const view = render(<AmexSyncHandoffClient transferId={transferId} initialMode="write" />);
+    await deliverPayload();
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm proposed updates" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Confirmation failed safely"));
+    expect(screen.queryByText("Confirmation recorded")).not.toBeInTheDocument();
+    view.unmount();
+  });
+
   it("allows a separately confirmed compatible mapping even when no status update is proposed", async () => {
     const mappingRequired = {
       ...row,
@@ -170,6 +243,82 @@ describe("Amex sync handoff client", () => {
 
   it("acknowledges the mailbox only after preview accepts the envelope", async () => {
     (global.fetch as jest.Mock).mockReturnValue(response({ error: "request_invalid" }, false, 400));
+    const view = render(<AmexSyncHandoffClient transferId={transferId} initialMode="preview" />);
+    await deliverPayload();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("could not be previewed"));
+    expect(window.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "perks-reminder:amex-sync-accepted" }), "https://www.perks-reminder.com");
+    view.unmount();
+  });
+
+  it("rejects an incomplete 2xx preview row without acknowledging the mailbox", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(response({
+      mode: "preview",
+      rows: [{ ...row, changes: undefined }],
+      proposalToken: "proposal-token".repeat(4),
+      proposalExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+      mappingOptions: [],
+    }));
+    const view = render(<AmexSyncHandoffClient transferId={transferId} initialMode="preview" />);
+    await deliverPayload();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("could not be previewed"));
+    expect(window.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "perks-reminder:amex-sync-accepted" }), "https://www.perks-reminder.com");
+    view.unmount();
+  });
+
+  it("rejects unknown preview response fields without acknowledging the mailbox", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(response({
+      mode: "preview",
+      rows: [row],
+      proposalToken: "proposal-token".repeat(4),
+      proposalExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+      mappingOptions: [],
+      unexpected: true,
+    }));
+    const view = render(<AmexSyncHandoffClient transferId={transferId} initialMode="preview" />);
+    await deliverPayload();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("could not be previewed"));
+    expect(window.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "perks-reminder:amex-sync-accepted" }), "https://www.perks-reminder.com");
+    view.unmount();
+  });
+
+  it("rejects an over-limit preview response without acknowledging the mailbox", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(response({
+      mode: "preview",
+      rows: Array.from({ length: AMEX_SYNC_MAX_ROWS + 1 }, () => row),
+      proposalToken: "proposal-token".repeat(4),
+      proposalExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+      mappingOptions: [],
+    }));
+    const view = render(<AmexSyncHandoffClient transferId={transferId} initialMode="preview" />);
+    await deliverPayload();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("could not be previewed"));
+    expect(window.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "perks-reminder:amex-sync-accepted" }), "https://www.perks-reminder.com");
+    view.unmount();
+  });
+
+  it("rejects a final-only disposition in a preview without acknowledging the mailbox", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(response({
+      mode: "preview",
+      rows: [{ ...row, disposition: "updated" }],
+      proposalToken: "proposal-token".repeat(4),
+      proposalExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+      mappingOptions: [],
+    }));
+    const view = render(<AmexSyncHandoffClient transferId={transferId} initialMode="preview" />);
+    await deliverPayload();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("could not be previewed"));
+    expect(window.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "perks-reminder:amex-sync-accepted" }), "https://www.perks-reminder.com");
+    view.unmount();
+  });
+
+  it("rejects an invalid preview disposition and reason combination", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(response({
+      mode: "preview",
+      rows: [{ ...row, disposition: "skipped" }],
+      proposalToken: "proposal-token".repeat(4),
+      proposalExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+      mappingOptions: [],
+    }));
     const view = render(<AmexSyncHandoffClient transferId={transferId} initialMode="preview" />);
     await deliverPayload();
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("could not be previewed"));
