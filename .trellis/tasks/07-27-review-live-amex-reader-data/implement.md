@@ -43,29 +43,37 @@
 - Compute row membership with the existing conservative `Remaining`/`Used` presentation classifier, then render a card group only when it has at least one row in the active filter.
 - Remove the compact zero-row card-group path.
 - Under `Remaining`, omit zero-benefit unresolved/stale/older-retained groups and all-used groups. Under `Used`, render only groups with used rows.
-- Preserve quality badges and explanations on partial/stale cards when they have rows in the selected filter.
-- Reconcile latest attempted count, stored count, retained-record count, confirmed-empty count, and omitted quality-problem count in account copy without instructing users to inspect hidden card disclosures.
-- Add filter-specific empty states and preserve account-wide filter counts.
+- Do not expose quality badges, explanations, coverage reconciliation, or data-note counts; preserve their underlying classifications only for filter-aware rendering and internal contracts.
+- Add filter-specific empty states and preserve account-wide filter counts without showing scan/quality summaries.
 - Replace panel tests that require every benefit-bearing card under both filters; reproduce the latest mixed-quality shape and assert only row-bearing groups render.
 
-## 5. Render compact structured periods
+## 5. Isolate active-scan presentation and remove user-facing diagnostics
+
+- Update `src/userscripts/amex-benefit-reader/panel.ts` so `scanning` and `cancelling` render only a non-collapsible, accessible in-progress workspace with minimal status text, a determinate native progress element once discovery identifies the card count, and the Cancel control.
+- Derive completed/current values from existing `ScanProgress` `discovered` and `card` events; retain committed records in panel memory but render no results until `finished`.
+- Remove all user-facing scan notes, coverage/data-quality metrics, quality pills, per-card issue/coverage explanations, parser/confidence/timestamp details, and authorized conflict diagnostic/detail rendering. Do not remove the underlying normalized diagnostic fields, scan engine events, or fail-closed/sync behavior.
+- After `finished`, restore the ordinary manual-scan control and filter-aware card/benefit presentation, excluding the removed internal-debug UI. Preserve existing no-autoscan, no-auto-sync, primary-only, and privacy behavior.
+- Update focused panel tests for the scanning-only workspace, deterministic progress attributes, hidden stale/incrementally committed data, terminal result restoration, and absence of diagnostic/timestamp/scan-note text.
+- Update generated-bundle synthetic checks to verify the running panel contains no persisted result card/sync/data-quality content, emits real card progress, and restores only the reduced final presentation after completion.
+
+## 6. Render compact structured periods
 
 - Add a deterministic UTC formatter in `panel.ts` for observed V2 `sourcePeriod`.
 - Render `2026`, `Jul 2026`, `Jul–Sep 2026`, and `Jul–Dec 2026` for aligned ranges; use compact explicit dates for irregular/cross-year ranges.
 - Fall back to bounded raw `period` only for V1 or unavailable structured V2 periods.
 - Add panel tests for aligned, irregular, cross-year, fallback, and raw-token suppression cases.
 
-## 6. Gate sync on the primary-only parser and update versions
+## 7. Gate sync on the primary-only parser and update versions
 
 - Bump `PARSER_VERSION` in `src/lib/amex-benefit-reader/contract.ts` to `amex-api-us/2.0.2`.
 - Require current-parser observations in sync-envelope projection/validation so v2.0.1 role-unverified stores and mailboxes fail closed pending a fresh scan; preserve all existing complete/current/latest-scan gates.
-- Bump `userscriptVersion` in `scripts/build-amex-benefit-reader.mjs` to `0.3.2`.
+- Bump `userscriptVersion` in `scripts/build-amex-benefit-reader.mjs` to `0.3.3`.
 - Update `tests/e2e/amex-benefit-reader/harness.ts` so ordinary multi-card cases use top-level BASIC cards; add nested SUPP only to prove zero identity/request work.
 - Add synthetic one-time legacy-store/mailbox invalidation and filter-aware card-group coverage.
 - Update `tests/e2e/amex-benefit-reader/amex-benefit-reader.spec.ts` for version assertions, primary-only discovery, reviewed exclusions, genuine-conflict control, hidden zero-row groups, Used-filter behavior, compact periods, and sanitized storage.
 - Do not install the resulting script or contact live AMEX/Perks Reminder pages.
 
-## 7. Validate
+## 8. Validate
 
 Run focused unit tests:
 
@@ -138,7 +146,7 @@ After implementation and checks:
 
 - Do not perform a live scan, click Sync, create a mailbox, install/update Tampermonkey, apply a migration, deploy, or write to a database.
 - Present source/test results for review.
-- If the user wants manual verification, separately confirm installation of version `0.3.2`, then separately confirm a new manual scan because it issues authenticated first-party AMEX reads.
+- If the user wants manual verification, separately confirm installation of version `0.3.3`, then separately confirm a new manual scan because it issues authenticated first-party AMEX reads.
 - Keep synchronization blocked until a new scan produces complete eligible observations and the user separately authorizes any handoff.
 
 ## Rollback points
