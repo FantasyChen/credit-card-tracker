@@ -1,4 +1,7 @@
-import { parseAmexSyncEnvelope } from "@/lib/amex-benefit-reader/sync-contract";
+import {
+  AMEX_SYNC_MAX_ROWS,
+  parseAmexSyncEnvelope,
+} from "@/lib/amex-benefit-reader/sync-contract";
 import {
   applyAmexSyncRow,
   completeAmexSyncAttempt,
@@ -112,6 +115,32 @@ describe("Amex sync service orchestration", () => {
     expect(applyRow).not.toHaveBeenCalled();
     expect(saveConfirmedManualMappings).not.toHaveBeenCalled();
     expect(completeAmexSyncAttempt).not.toHaveBeenCalled();
+  });
+
+  it("bounds mapping options to client-compatible source products and labels", async () => {
+    const destinationContext = context();
+    const baseCard = destinationContext.cards[0];
+    destinationContext.cards = [
+      ...Array.from({ length: AMEX_SYNC_MAX_ROWS + 5 }, (_, index) => ({
+        ...baseCard,
+        id: `card-${String(index).padStart(3, "0")}`,
+        displayName: `Synthetic ${"x".repeat(220)}`,
+      })),
+      {
+        ...baseCard,
+        id: "irrelevant-gold-card",
+        productKey: "american-express-gold-card",
+      },
+    ];
+    loadContext.mockResolvedValue(destinationContext);
+
+    const preview = await previewAmexSync({ userId: "user-1", envelope, manualMappings: [], mode: "write", hmacKey: key, now });
+
+    expect(preview.mappingOptions).toHaveLength(AMEX_SYNC_MAX_ROWS);
+    expect(preview.mappingOptions[0].id).toBe("card-000");
+    expect(preview.mappingOptions.at(-1)?.id).toBe("card-299");
+    expect(preview.mappingOptions.every((option) => option.productKey === "american-express-platinum-card")).toBe(true);
+    expect(preview.mappingOptions.every((option) => option.label.length <= 200 && option.label.endsWith(" ending 1234"))).toBe(true);
   });
 
   it("requires the signed exact preview state before creating an attempt", async () => {
