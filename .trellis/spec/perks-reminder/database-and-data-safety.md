@@ -18,9 +18,21 @@
 
 `npm run build` is not a harmless compile check: it runs `prisma generate`, attempts `prisma migrate deploy`, and then runs Next build. Do not use it without authorization and a verified database target.
 
+### Schema-dependent deployment completeness
+
+A feature is not deployment-ready merely because `schema.prisma`, TypeScript, `prisma validate`, or `prisma generate` succeeds. Before application code reads new columns, relations, enums, or models:
+
+1. generate the additive migration only under separate authorization against a verified development target;
+2. review and check in its SQL, including null compatibility, existing-data constraints, indexes, cascades, and destructive/table-rewrite behavior;
+3. separately authorize and validate Prisma client generation;
+4. verify the intended target's migration status and apply only under target-specific authorization; and
+5. keep the feature's server capability `off` until every prerequisite has evidence.
+
+`prisma generate` creates no database object. A generated client plus a schema diff without a checked-in migration leaves deployment blocked. Likewise, this repository's build can continue after `prisma migrate deploy` fails because that command is followed by `|| echo`; a completed build is therefore not proof that a migration was applied. Report generation, SQL review, client validation, target verification, and deployment as distinct passed/failed/skipped gates.
+
 ## Migration-history caveat
 
-The checked-in migration history does not currently replay cleanly on an empty database because three January 2025 migrations sort before the initial schema migration while assuming its tables exist. `docs/supabase-fallback.md` is the authoritative emergency procedure. Do not improvise with reset/force-reset or treat the fallback procedure as preservation of existing user data.
+The checked-in migration history does not currently replay cleanly on an empty database: three January 2025 migrations sort before the initial schema migration, and the first two try to create indexes on tables that have not yet been created. The third is defensive cleanup, but its position does not repair the earlier failure. `docs/supabase-fallback.md` is the authoritative emergency procedure. Do not improvise with reset/force-reset or treat the fallback procedure as preservation of existing user data.
 
 ## Recovery and rollback
 

@@ -16,8 +16,8 @@ These specifications are the durable project context for Perks Reminder, a Next.
 ## Topics
 
 - [Architecture and Domain Invariants](architecture-and-domain.md) — package layout, business-logic owners, public DB-free behavior, auth/PWA constraints, and free-product rules.
-- [Browser-Side Authenticated Read Integrations](browser-read-integrations.md) — manual session-bound reads, exact operation allowlists, transient raw-data handling, conservative normalization, and partial/stale behavior.
-- [Database and Data Safety](database-and-data-safety.md) — target verification, forbidden commands, migration/seed policy, fallback caveats, and rollback.
+- [Browser-Side Authenticated Read Integrations](browser-read-integrations.md) — manual session-bound reads, conservative normalization, private first-party handoff, confirmed synchronization, replay safety, and synthetic browser validation.
+- [Database and Data Safety](database-and-data-safety.md) — target verification, forbidden commands, migration/seed policy, schema-dependent deployment completeness, fallback caveats, and rollback.
 - [Catalog and Benefit Updates](catalog-and-benefit-updates.md) — verified sources, template validation, existing-user migration, status materialization, and usage-guide coverage.
 - [Deployment and External Effects](deployment-and-external-effects.md) — automatic production deployment, build side effects, cron limits, email safety, domains, and secrets.
 - [Verification](verification.md) — safe check matrix and truthful reporting requirements.
