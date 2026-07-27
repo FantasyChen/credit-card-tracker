@@ -75,6 +75,9 @@ function benefitStatus(
       fixedCycleDurationMonths: null,
       fixedCycleStartMonth: null,
       occurrencesInCycle: 1,
+      productKey: null,
+      creditFamilyKey: null,
+      periodKey: null,
       creditCard: {
         id: 'card-1',
         name: 'Test Travel Card',
@@ -96,6 +99,7 @@ function benefitStatus(
         productChangedFrom: null,
         productChangedTo: null,
         lifecycleNotes: null,
+        productKey: null,
         displayName: 'Test Travel Card',
         ...cardOverride,
       },

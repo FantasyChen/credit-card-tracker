@@ -124,7 +124,7 @@ describe("Amex reader side panel", () => {
 
     expect(shadow().textContent).toContain("Amex benefits");
     expect(shadow().textContent).toContain("Perks Reminder local reader");
-    expect(shadow().textContent).toContain("Local only — not sent to Perks Reminder");
+    expect(shadow().textContent).toContain("Local unless you choose Sync reviewed");
     expect(shadow().textContent).toContain("first-party read requests");
     expect(shadow().textContent).toContain("Raw responses are not saved");
     expect(shadow().textContent).toContain("Nothing is scanned until you start");
@@ -912,6 +912,37 @@ describe("Amex reader side panel", () => {
     });
     expect(shadow().textContent).toContain("2 account items were not recognized and not scanned");
     expect(shadow().textContent).toContain("visible Amex card or route changed");
+  });
+
+  it("renders one global reviewed Sync action only after a scan and invokes it explicitly", async () => {
+    const store = mergeScanSummary(createEmptyStore(now), {
+      scanId: "99999999-9999-4999-8999-999999999999",
+      startedAt: now,
+      finishedAt: "2026-07-15T12:01:00.000Z",
+      status: "complete",
+      discoveredCardCount: 0,
+      attemptedCardCount: 0,
+      unknownAccountVariantCount: 0,
+      cards: [],
+      visibleContext: "unchanged",
+    });
+    let finishSync!: () => void;
+    const syncReviewed = jest.fn(() => new Promise<void>((resolve) => { finishSync = resolve; }));
+    new AmexBenefitReaderPanel(store, {
+      startScan: jest.fn(async () => undefined),
+      cancelScan: jest.fn(),
+      syncReviewed,
+      clearData: jest.fn(async () => undefined),
+    });
+    expect(shadow().querySelectorAll('[data-amex-sync-action="true"]')).toHaveLength(1);
+    expect(syncReviewed).not.toHaveBeenCalled();
+    fireEvent.click(button("Sync reviewed"));
+    expect(button("Sync reviewed")).toBeDisabled();
+    fireEvent.click(button("Sync reviewed"));
+    expect(syncReviewed).toHaveBeenCalledTimes(1);
+    finishSync();
+    await waitFor(() => expect(shadow().textContent).toContain("Confirm separately there"));
+    expect(button("Sync reviewed")).toBeEnabled();
   });
 
   it("requires confirmation before clearing local observations and identity data", async () => {

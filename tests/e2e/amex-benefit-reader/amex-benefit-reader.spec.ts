@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { digestAmexSyncEnvelope, parseAmexSyncEnvelope } from "../../../src/lib/amex-benefit-reader/sync-contract";
 import {
   IDENTITY_SECRET_KEY,
   STORE_KEY,
+  SYNC_MAILBOX_KEY,
   SYNTHETIC_AMEX_NON_BENEFITS_URL,
   SYNTHETIC_AMEX_URL,
+  SYNTHETIC_HANDOFF_TRANSFER_ID,
   SyntheticAmexHarness,
 } from "./harness";
 
@@ -73,7 +76,7 @@ test("runs the built userscript manually, restores normalized data, and clears b
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
   await expect(readerHost).toHaveCount(1);
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.2.13");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.0");
   const scanButton = page.getByRole("button", { name: "Scan all cards" });
   const scanStatus = page.getByRole("status");
   const visibleCard = page.locator('[data-testid="simple_switcher_combobox"]');
@@ -99,7 +102,7 @@ test("runs the built userscript manually, restores normalized data, and clears b
   expect(harness.apiRequests("member")).toHaveLength(1);
   expect(harness.apiRequests("tracker")).toHaveLength(2);
   expect(harness.apiRequests("catalog")).toHaveLength(2);
-  await expect(page.getByText("Local only — not sent to Perks Reminder")).toBeVisible();
+  await expect(page.getByText("Local unless you choose Sync reviewed")).toBeVisible();
 
   await expect(page.getByLabel("Choose a card to review")).toHaveCount(0);
   await expect(page.locator(".card-group")).toHaveCount(2);
@@ -166,7 +169,7 @@ test("runs the built userscript manually, restores normalized data, and clears b
   const preflightCountBeforeReload = harness.operationRequests("preflight").length;
   await harness.reloadAndInject();
   await expect(readerHost).toHaveCount(1);
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.2.13");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.0");
   await expect(page.getByRole("status")).toHaveText("Scan complete. 2 cards updated.");
   await expect(page.getByRole("button", { name: "Scan all cards" })).toBeEnabled();
   await expect(page.locator(".card-group")).toHaveCount(2);
@@ -454,7 +457,7 @@ test("mounts once and scans manually from a selector-free non-benefits route", a
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
   await expect(readerHost).toHaveCount(1);
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.2.13");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.0");
   await expect(page.locator('[data-testid="simple_switcher_combobox"]')).toHaveCount(0);
   const launcher = page.getByRole("button", { name: "Open Perks Reminder Amex benefit reader" });
   await expect(launcher).toBeVisible();
@@ -698,6 +701,66 @@ test("preserves stale data when one physical card fails on a later manual rescan
   expectNoRawSyntheticIdentity(harness);
   expect(page.url()).toBe(SYNTHETIC_AMEX_URL);
   await expect(visibleCard).toHaveText(/Synthetic visible card ending 0000/);
+  harness.assertNetworkStayedSynthetic();
+});
+
+test("bridges one strict storage-only mailbox on the exact first-party handoff branch", async ({ context, page }) => {
+  const harness = new SyntheticAmexHarness(context, page, "complete");
+  await harness.installBeforeNavigation();
+  const now = new Date();
+  const envelope = parseAmexSyncEnvelope({
+    envelopeVersion: "amex-sync-envelope/1",
+    observationContractVersion: "amex-benefits/2",
+    scanId: "22222222-2222-4222-8222-222222222222",
+    scanFinishedAt: now.toISOString(),
+    cards: [{
+      sourceLocalCardId: "11111111-1111-4111-8111-111111111111",
+      productKey: "american-express-platinum-card",
+      endingDigits: "1234",
+      observedAt: now.toISOString(),
+      parserVersion: "fixture/2",
+      rows: [{
+        creditFamilyKey: "american-express-platinum-card:resy",
+        sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },
+        enrollmentState: "enrolled",
+        completionState: "incomplete",
+        earnedOrUsed: { value: "25.00", unit: "USD", currency: "USD" },
+        targetOrLimit: { value: "100.00", unit: "USD", currency: "USD" },
+      }],
+    }],
+    exclusions: [],
+  });
+  const mailbox = {
+    mailboxVersion: "amex-sync-mailbox/1",
+    transferId: SYNTHETIC_HANDOFF_TRANSFER_ID,
+    nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    createdAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
+    digest: await digestAmexSyncEnvelope(envelope),
+    envelope,
+  };
+
+  await harness.openHandoffAndInject(mailbox);
+  await expect(page.locator("body")).toHaveAttribute("data-handoff-state", "accepted");
+  expect(page.url()).toBe("https://www.perks-reminder.com/integrations/amex-sync");
+  expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(false);
+  await expect(page.locator("#perks-reminder-amex-reader")).toHaveCount(0);
+  expect(harness.apiRequests()).toHaveLength(0);
+  const payload = await page.evaluate(() => {
+    const value = (window as unknown as { __syntheticHandoffPayload?: unknown }).__syntheticHandoffPayload;
+    return JSON.parse(JSON.stringify(value));
+  });
+  expect(payload).toMatchObject({
+    type: "perks-reminder:amex-sync-payload",
+    transferId: SYNTHETIC_HANDOFF_TRANSFER_ID,
+    nonce: mailbox.nonce,
+    digest: mailbox.digest,
+    envelope: { envelopeVersion: "amex-sync-envelope/1", observationContractVersion: "amex-benefits/2" },
+  });
+  const serialized = JSON.stringify(payload);
+  expect(serialized).not.toContain("sourceFingerprint");
+  expect(serialized).not.toContain("accountToken");
+  expect(serialized).not.toContain("cookie");
   harness.assertNetworkStayedSynthetic();
 });
 

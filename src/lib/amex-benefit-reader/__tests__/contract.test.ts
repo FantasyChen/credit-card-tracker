@@ -1,7 +1,10 @@
 import {
   OBSERVATION_CONTRACT_VERSION,
+  OBSERVATION_CONTRACT_VERSION_V2,
   normalizedCardObservationSchema,
+  normalizedCardObservationV2Schema,
   parseStoreEnvelope,
+  sourcePeriodV2Schema,
 } from "../contract";
 
 const card = {
@@ -29,6 +32,68 @@ describe("portable Amex observation contract", () => {
   it("rejects unknown portable fields and possible full card numbers in approved text", () => {
     expect(() => normalizedCardObservationSchema.parse({ ...card, balance: "$500" })).toThrow();
     expect(() => normalizedCardObservationSchema.parse({ ...card, productName: "Synthetic 4111 1111 1111 1111" })).toThrow("disallowed long number");
+  });
+
+  it("accepts only exact real ordered UTC date ranges", () => {
+    expect(sourcePeriodV2Schema.parse({
+      kind: "calendar_date_range",
+      startDate: "2026-07-01",
+      endDate: "2026-09-30",
+      timeZone: "UTC",
+    })).toMatchObject({ startDate: "2026-07-01", endDate: "2026-09-30" });
+    expect(() => sourcePeriodV2Schema.parse({
+      kind: "calendar_date_range",
+      startDate: "2026-02-30",
+      endDate: "2026-03-31",
+      timeZone: "UTC",
+    })).toThrow();
+    expect(() => sourcePeriodV2Schema.parse({
+      kind: "calendar_date_range",
+      startDate: "2026-10-01",
+      endDate: "2026-09-30",
+      timeZone: "UTC",
+    })).toThrow();
+    expect(() => sourcePeriodV2Schema.parse({
+      kind: "calendar_date_range",
+      startDate: "Q3 2026",
+      endDate: "2026-09-30",
+      timeZone: "UTC",
+    })).toThrow();
+  });
+
+  it("requires V2 scan/product/family/period identity and rejects unknown fields", () => {
+    const v2 = {
+      ...card,
+      contractVersion: OBSERVATION_CONTRACT_VERSION_V2,
+      scanId: "22222222-2222-4222-8222-222222222222",
+      productKey: "american-express-platinum-card",
+      benefits: [{
+        benefitKey: "benefit-1234567890abcdef",
+        title: "Synthetic Resy credit",
+        category: { state: "observed", value: "spend" },
+        activityKind: "spend_progress",
+        enrollmentState: { state: "observed", value: "enrolled" },
+        trackerState: { state: "observed", value: "in_progress" },
+        completionState: { state: "observed", value: "incomplete" },
+        earnedOrUsed: { state: "observed", value: { value: "25.00", unit: "USD", currency: "USD" } },
+        targetOrLimit: { state: "observed", value: { value: "100.00", unit: "USD", currency: "USD" } },
+        remaining: { state: "observed", value: { value: "75.00", unit: "USD", currency: "USD" } },
+        period: { state: "observed", value: "Synthetic quarter" },
+        confidence: "high",
+        issueCodes: [],
+        creditFamilyKey: "american-express-platinum-card:resy",
+        sourcePeriod: { state: "observed", value: {
+          kind: "calendar_date_range",
+          startDate: "2026-07-01",
+          endDate: "2026-09-30",
+          timeZone: "UTC",
+        } },
+      }],
+    };
+    expect(normalizedCardObservationV2Schema.parse(v2).contractVersion).toBe("amex-benefits/2");
+    expect(() => normalizedCardObservationV2Schema.parse({ ...v2, rawResponse: {} })).toThrow();
+    expect(() => normalizedCardObservationV2Schema.parse({ ...v2, productKey: "invented-card" })).toThrow();
+    expect(() => normalizedCardObservationV2Schema.parse({ ...v2, scanId: undefined })).toThrow();
   });
 
   it("rejects forbidden sensitive field names anywhere in storage", () => {
