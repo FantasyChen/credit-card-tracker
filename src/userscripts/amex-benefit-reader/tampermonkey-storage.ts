@@ -22,6 +22,9 @@ declare const GM: {
   deleteValue(key: string): Promise<void>;
 };
 
+export const PRIMARY_ONLY_COMPATIBILITY_KEY = "perksReminder.amexBenefitReader.compat.primaryOnly.v1" as const;
+export const PRIMARY_ONLY_COMPATIBILITY_VALUE = "primary-only/1" as const;
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -64,7 +67,30 @@ function retainSupportedStoredCredits(store: StoreEnvelopeV1, projectedAt: strin
 export class TampermonkeyResultStore implements ResultStore {
   async load(): Promise<StoreEnvelopeV1> {
     const projectedAt = nowIso();
-    const loaded = loadStoreValue(await GM.getValue(STORE_KEY, null), projectedAt);
+    // Read the marker before the store so a concurrent load that observes a
+    // completed migration cannot retain an older pre-migration store snapshot.
+    const compatibility = await GM.getValue(PRIMARY_ONLY_COMPATIBILITY_KEY, null);
+    const rawStore = await GM.getValue(STORE_KEY, null);
+    // Validate before any mutation so malformed and future-schema stores remain
+    // untouched and cannot be marked as compatible.
+    const loaded = loadStoreValue(rawStore, projectedAt);
+    if (compatibility !== PRIMARY_ONLY_COMPATIBILITY_VALUE) {
+      const requiresInvalidation = Object.keys(loaded.cards).length > 0 || loaded.lastScan !== null;
+      const invalidated: StoreEnvelopeV1 = requiresInvalidation
+        ? {
+            ...loaded,
+            revision: loaded.revision + 1,
+            updatedAt: projectedAt,
+            cards: {},
+            lastScan: null,
+          }
+        : loaded;
+      await GM.deleteValue(AMEX_SYNC_MAILBOX_KEY);
+      if (invalidated !== loaded) await GM.setValue(STORE_KEY, invalidated);
+      await GM.setValue(PRIMARY_ONLY_COMPATIBILITY_KEY, PRIMARY_ONLY_COMPATIBILITY_VALUE);
+      return invalidated;
+    }
+
     const projected = retainSupportedStoredCredits(loaded, projectedAt);
     if (projected !== loaded) await GM.setValue(STORE_KEY, projected);
     return projected;
@@ -87,6 +113,7 @@ export class TampermonkeyResultStore implements ResultStore {
       GM.deleteValue(STORE_KEY),
       GM.deleteValue(IDENTITY_SECRET_KEY),
       GM.deleteValue(AMEX_SYNC_MAILBOX_KEY),
+      GM.deleteValue(PRIMARY_ONLY_COMPATIBILITY_KEY),
     ]);
   }
 

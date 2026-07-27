@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   OBSERVATION_CONTRACT_VERSION_V2,
+  PARSER_VERSION,
   amexProductKeySchema,
   assertNoForbiddenFieldNames,
   creditFamilyKeySchema,
@@ -50,7 +51,7 @@ export const amexSyncCardSchema = z.object({
   productKey: amexProductKeySchema,
   endingDigits: z.string().regex(/^\d{4,5}$/),
   observedAt: z.string().datetime({ offset: true }),
-  parserVersion: z.string().min(1).max(80),
+  parserVersion: z.literal(PARSER_VERSION),
   rows: z.array(amexSyncRowSchema).max(AMEX_SYNC_MAX_ROWS),
 }).strict();
 export type AmexSyncCard = z.infer<typeof amexSyncCardSchema>;
@@ -175,6 +176,10 @@ export function projectLatestV2SyncEnvelope(store: StoreEnvelopeV1): SyncEnvelop
       continue;
     }
     if (latest.contractVersion !== OBSERVATION_CONTRACT_VERSION_V2) {
+      exclude("v1_only", latest.benefits.length || 1);
+      continue;
+    }
+    if (latest.parserVersion !== PARSER_VERSION) {
       exclude("v1_only", latest.benefits.length || 1);
       continue;
     }

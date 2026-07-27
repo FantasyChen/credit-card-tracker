@@ -664,8 +664,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     const quality = observationQuality(record);
     const benefits = record.latest?.benefits ?? [];
     const filtered = benefits.filter((benefit) => benefitPresentation(benefit).filter === this.benefitFilter);
-    const isCompact = benefits.length > 0 && filtered.length === 0;
-    section.className = isCompact ? "card-group card-group-compact" : "card-group";
+    section.className = "card-group";
     section.dataset.amexReaderCardGroup = "true";
     section.dataset.cardProduct = record.identity.productName;
     section.dataset.cardEnding = record.identity.endingDigits;
@@ -715,16 +714,10 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       section.append(notice);
     }
 
-    if (filtered.length) {
-      const list = element("ul");
-      list.className = "benefit-list";
-      filtered.forEach((benefit) => list.append(this.renderBenefit(benefit)));
-      section.append(list);
-    } else if (!record.latest) {
-      const empty = element("p", "No safe benefit observation is available for this card yet.");
-      empty.className = "empty-state";
-      section.append(empty);
-    }
+    const list = element("ul");
+    list.className = "benefit-list";
+    filtered.forEach((benefit) => list.append(this.renderBenefit(benefit)));
+    section.append(list);
 
     const dataQuality = element("details");
     dataQuality.className = "secondary-panel data-quality";
@@ -782,7 +775,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       observationTimes.size > 1
       || benefitCards.some((record) => observationQuality(record).tone !== "good")
     ) {
-      messages.push("Some cards have partial, stale, failed, or differently timed observations. Review each card's data-quality label.");
+      messages.push("Some stored cards have partial, stale, failed, or differently timed observations. Their counts remain included in Data notes.");
     }
     if (this.store.lastScan?.unknownAccountVariantCount) {
       const count = this.store.lastScan.unknownAccountVariantCount;
@@ -835,8 +828,6 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       .metric span { display: block; margin-top: 3px; color: var(--pr-muted); font-size: 11px; }
       .card-groups { display: grid; gap: 12px; margin-top: 14px; }
       .card-group { padding: 14px; border: 1px solid var(--pr-border); border-radius: 14px; background: var(--pr-card); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
-      .card-group-compact { padding: 10px 14px; box-shadow: none; }
-      .card-group-compact .card-heading { align-items: center; }
       .card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
       .card-summary { margin-top: 4px; color: var(--pr-muted); font-size: 12px; }
       .card-coverage-note { margin: 8px 0 0; color: var(--pr-muted); font-size: 12px; }
@@ -990,13 +981,23 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     const cards = coverage.map(({ record }) => record);
     const benefitCards = cards.filter((record) => (record.latest?.benefits.length ?? 0) > 0);
     const confirmedEmptyCards = coverage.filter(({ kind }) => kind === "confirmed_empty");
+    const unresolvedCards = coverage.filter(({ kind }) => kind === "latest_scan_unresolved");
     const reviewEntries = coverage.filter(({ kind }) => kind !== "confirmed_empty");
     const reviewCards = reviewEntries.map(({ record }) => record);
     const olderRetainedCards = coverage.filter(({ kind }) => kind === "older_retained");
+    const filterCounts: Record<BenefitFilter, number> = { remaining: 0, used: 0 };
+    benefitCards.forEach((record) => {
+      record.latest?.benefits.forEach((benefit) => {
+        filterCounts[benefitPresentation(benefit).filter] += 1;
+      });
+    });
+    const renderedEntries = reviewEntries.filter(({ record }) =>
+      record.latest?.benefits.some((benefit) =>
+        benefitPresentation(benefit).filter === this.benefitFilter));
     const content = element("div");
     content.className = "content";
     if (cards.length) {
-      const totalBenefits = benefitCards.reduce((sum, record) => sum + (record.latest?.benefits.length ?? 0), 0);
+      const totalBenefits = filterCounts.remaining + filterCounts.used;
       const dataNoteCards = reviewEntries.filter(({ record, kind }) =>
         kind === "latest_scan_unresolved"
         || kind === "older_retained"
@@ -1013,11 +1014,14 @@ export class AmexBenefitReaderPanel implements ScanReporter {
 
       if (this.store.lastScan) {
         const attempted = this.store.lastScan.attemptedCardCount;
+        const confirmed = confirmedEmptyCards.length;
+        const unresolved = unresolvedCards.length;
         const older = olderRetainedCards.length;
         const coverageSummary = element(
           "p",
           `${attempted} card${attempted === 1 ? "" : "s"} checked in the latest scan; `
             + `${cards.length} stored card record${cards.length === 1 ? "" : "s"}; `
+            + `${confirmed} confirmed empty; ${unresolved} latest-scan record${unresolved === 1 ? "" : "s"} unresolved; `
             + `${older} older stored card${older === 1 ? " remains" : "s remain"} retained for review.`,
         );
         coverageSummary.className = "coverage-summary";
@@ -1037,12 +1041,6 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       }
 
       if (benefitCards.length) {
-        const filterCounts: Record<BenefitFilter, number> = { remaining: 0, used: 0 };
-        benefitCards.forEach((record) => {
-          record.latest?.benefits.forEach((benefit) => {
-            filterCounts[benefitPresentation(benefit).filter] += 1;
-          });
-        });
         const filters = element("div");
         filters.className = "filters";
         filters.setAttribute("role", "group");
@@ -1062,13 +1060,27 @@ export class AmexBenefitReaderPanel implements ScanReporter {
         content.append(filters);
       }
 
-      if (reviewEntries.length) {
+      if (renderedEntries.length) {
         const groups = element("div");
         groups.className = "card-groups";
-        reviewEntries.forEach(({ record, kind }) => groups.append(this.renderCardGroup(record, kind)));
+        renderedEntries.forEach(({ record, kind }) => groups.append(this.renderCardGroup(record, kind)));
         content.append(groups);
       } else {
-        const empty = element("p", "No trackable benefits are available in the reviewed card observations.");
+        let message: string;
+        const allCardsConclusivelyEmpty = totalBenefits === 0
+          && confirmedEmptyCards.length === cards.length
+          && this.store.lastScan?.status === "complete";
+        if (allCardsConclusivelyEmpty) {
+          message = "No trackable benefits are available in the reviewed card observations.";
+        } else if (totalBenefits === 0) {
+          message = "No benefit rows are available in the reviewed observations. Unresolved records, older retained data, and other latest-scan quality notes remain reflected in the account summary and Data notes.";
+        } else {
+          const otherFilter: BenefitFilter = this.benefitFilter === "remaining" ? "used" : "remaining";
+          const otherCount = filterCounts[otherFilter];
+          message = `No ${filterLabel(this.benefitFilter).toLowerCase()} benefit rows are available. `
+            + `${otherCount} ${filterLabel(otherFilter).toLowerCase()} benefit${otherCount === 1 ? " is" : "s are"} available under ${filterLabel(otherFilter)}.`;
+        }
+        const empty = element("p", message);
         empty.className = "empty-state account-empty-state";
         content.append(empty);
       }

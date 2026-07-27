@@ -34,7 +34,7 @@ function source(overrides: Record<string, unknown> = {}): AmexSyncEnvelope {
       productKey: "american-express-platinum-card",
       endingDigits: "1234",
       observedAt,
-      parserVersion: "fixture/2",
+      parserVersion: "amex-api-us/2.0.2",
       rows: [baseRow],
     }],
     exclusions: [],

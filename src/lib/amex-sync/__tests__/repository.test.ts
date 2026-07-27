@@ -42,7 +42,7 @@ const row: AmexSyncPlanRow = {
   productKey: "american-express-platinum-card",
   creditFamilyKey: "american-express-platinum-card:resy",
   observedAt: "2026-07-15T11:59:00.000Z",
-  parserVersion: "fixture/2",
+  parserVersion: "amex-api-us/2.0.2",
   periodKey: "calendar-quarter-q3",
   sourcePeriodStartDate: "2026-07-01",
   sourcePeriodEndDate: "2026-09-30",

@@ -12,6 +12,8 @@ export type SyntheticDocumentUrl = SyntheticAmexDocumentUrl | typeof SYNTHETIC_H
 export const STORE_KEY = "perksReminder.amexBenefitReader.store.v1";
 export const IDENTITY_SECRET_KEY = "perksReminder.amexBenefitReader.identitySecret.v1";
 export const SYNC_MAILBOX_KEY = "perksReminder.amexBenefitReader.syncMailbox.v1";
+export const PRIMARY_ONLY_COMPATIBILITY_KEY = "perksReminder.amexBenefitReader.compat.primaryOnly.v1";
+export const PRIMARY_ONLY_COMPATIBILITY_VALUE = "primary-only/1";
 
 const MEMBER_URL = "https://global.americanexpress.com/api/servicing/v1/member";
 const TRACKER_URL = "https://functions.americanexpress.com/ReadBestLoyaltyBenefitsTrackers.v1";
@@ -20,13 +22,14 @@ const DENIED_PROBE_URL = "https://unapproved.invalid/blocked-by-synthetic-harnes
 const BUNDLE_PATH = resolve(process.cwd(), "build/amex-benefit-reader.user.js");
 
 const PRIMARY_TOKEN = "invented-e2e-primary-token";
-const SUPPLEMENTARY_TOKEN = "invented-e2e-supplementary-token";
+const SECONDARY_TOKEN = "invented-e2e-secondary-primary-token";
+const EXCLUDED_SUPPLEMENTARY_TOKEN = "invented-e2e-excluded-supplementary-token";
 const EMPTY_BENEFITS_TOKEN = "invented-e2e-empty-benefits-token";
 const SYNTHETIC_ORIGIN = "https://global.americanexpress.com";
 
 export type HarnessScenario = "complete" | "benefit_empty" | "all_benefit_empty" | "reviewed_exclusions" | "conflict_diagnostics" | "catalog_failure" | "cancellation" | "rescan_tracker_failure" | "high_scale";
 export type ApiOperation = "member" | "tracker" | "catalog";
-export type SyntheticCard = "primary" | "supplementary" | "empty" | `scale-${number}`;
+export type SyntheticCard = "primary" | "secondary" | "empty" | `scale-${number}`;
 
 export interface SafeRequestRecord {
   method: string;
@@ -207,10 +210,10 @@ zeroUsagePrimaryTrackers[0].trackers.push({
 const zeroUsagePrimaryCatalog = structuredClone(primaryCatalog);
 zeroUsagePrimaryCatalog.benefits.uber.layoutType = "ENROLLED";
 
-const supplementaryTrackers = [{
+const secondaryTrackers = [{
   trackers: [
     {
-      sorBenefitId: "invented-dining-supplementary",
+      sorBenefitId: "invented-dining-secondary-primary",
       benefitName: "Synthetic Dining Credit ‡",
       category: "usage",
       status: "ACHIEVED",
@@ -226,7 +229,7 @@ const supplementaryTrackers = [{
       },
     },
     {
-      sorBenefitId: "invented-lounge-supplementary",
+      sorBenefitId: "invented-lounge-secondary-primary",
       benefitName: "Synthetic Centurion Lounge Access",
       category: "access",
       status: "ACTIVE",
@@ -234,16 +237,16 @@ const supplementaryTrackers = [{
   ],
 }];
 
-const supplementaryCatalog = {
+const secondaryCatalog = {
   benefits: {
     dining: {
-      sorBenefitId: "invented-dining-supplementary",
+      sorBenefitId: "invented-dining-secondary-primary",
       benefitTitle: "Synthetic Dining Credit ‡",
       layoutType: "ENROLLED",
       isEnrollable: true,
     },
     wrongCard: {
-      sorBenefitId: "invented-saks-supplementary",
+      sorBenefitId: "invented-saks-secondary-primary",
       benefitTitle: "Synthetic Saks Fifth Avenue Credit",
       layoutType: "NOTENROLLED",
       isEnrollable: true,
@@ -483,9 +486,13 @@ function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
             account_token: PRIMARY_TOKEN,
             product: { description: "American Express Business Platinum Card" },
             account: { relationship: "BASIC", display_account_number: "1234" },
+            supplementary_accounts: [{
+              account_token: EXCLUDED_SUPPLEMENTARY_TOKEN,
+              account: { relationship: "SUPP", display_account_number: "7777" },
+            }],
           },
           {
-            account_token: SUPPLEMENTARY_TOKEN,
+            account_token: SECONDARY_TOKEN,
             product: { description: "American Express Platinum Card" },
             account: { relationship: "BASIC", display_account_number: "56789" },
           },
@@ -493,11 +500,11 @@ function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
       },
       trackersByToken: {
         [PRIMARY_TOKEN]: reviewedExclusionTrackers,
-        [SUPPLEMENTARY_TOKEN]: reviewedResyTrackers,
+        [SECONDARY_TOKEN]: reviewedResyTrackers,
       },
       catalogsByToken: {
         [PRIMARY_TOKEN]: reviewedExclusionCatalog,
-        [SUPPLEMENTARY_TOKEN]: reviewedResyCatalog,
+        [SECONDARY_TOKEN]: reviewedResyCatalog,
       },
       catalogFailureTokens: new Set(),
     };
@@ -516,19 +523,25 @@ function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
       catalogFailureTokens: new Set(),
     };
   }
-  const hasSupplementaryCard = scenario !== "catalog_failure";
+  const hasSecondPrimaryCard = scenario !== "catalog_failure";
   const accounts: unknown[] = [{
     account_token: PRIMARY_TOKEN,
     product: { description: "American Express Gold Card" },
     account: { relationship: "BASIC", display_account_number: "1234" },
-    ...(hasSupplementaryCard ? {
-      supplementary_accounts: [{
-        account_token: SUPPLEMENTARY_TOKEN,
-        product: { description: "American Express Gold Card" },
-        account: { relationship: "SUPP", display_account_number: "56789" },
-      }],
-    } : {}),
+    supplementary_accounts: [{
+      account_token: EXCLUDED_SUPPLEMENTARY_TOKEN,
+      // Omit product text deliberately: a SUPP record may inherit its primary
+      // parent's supported product name and still must never become scan work.
+      account: { relationship: "SUPP", display_account_number: "7777" },
+    }],
   }];
+  if (hasSecondPrimaryCard) {
+    accounts.push({
+      account_token: SECONDARY_TOKEN,
+      product: { description: "American Express Gold Card" },
+      account: { relationship: "BASIC", display_account_number: "56789" },
+    });
+  }
   if (scenario === "benefit_empty") {
     accounts.push({
       account_token: EMPTY_BENEFITS_TOKEN,
@@ -541,12 +554,12 @@ function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
     member: { accounts },
     trackersByToken: {
       [PRIMARY_TOKEN]: scenario === "benefit_empty" ? zeroUsagePrimaryTrackers : primaryTrackers,
-      ...(hasSupplementaryCard ? { [SUPPLEMENTARY_TOKEN]: supplementaryTrackers } : {}),
+      ...(hasSecondPrimaryCard ? { [SECONDARY_TOKEN]: secondaryTrackers } : {}),
       ...(scenario === "benefit_empty" ? { [EMPTY_BENEFITS_TOKEN]: emptyBenefitTrackers } : {}),
     },
     catalogsByToken: {
       [PRIMARY_TOKEN]: scenario === "benefit_empty" ? zeroUsagePrimaryCatalog : primaryCatalog,
-      ...(hasSupplementaryCard ? { [SUPPLEMENTARY_TOKEN]: supplementaryCatalog } : {}),
+      ...(hasSecondPrimaryCard ? { [SECONDARY_TOKEN]: secondaryCatalog } : {}),
     },
     catalogFailureTokens: scenario === "catalog_failure"
       ? new Set([PRIMARY_TOKEN])
@@ -558,7 +571,7 @@ function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
 
 function syntheticCardForToken(token: string): SyntheticCard {
   if (token === PRIMARY_TOKEN) return "primary";
-  if (token === SUPPLEMENTARY_TOKEN) return "supplementary";
+  if (token === SECONDARY_TOKEN) return "secondary";
   if (token === EMPTY_BENEFITS_TOKEN) return "empty";
   const scaleMatch = /^invented-e2e-scale-token-(\d+)$/.exec(token);
   if (scaleMatch) return `scale-${Number(scaleMatch[1])}`;
@@ -1012,7 +1025,7 @@ export class SyntheticAmexHarness {
       this.record(route, "tracker", syntheticCard);
       await assertExactJsonRequest(route, [{ accountToken, locale: "en-US", limit: "ALL" }], "*/*");
 
-      if (this.scenario === "cancellation" && syntheticCard === "supplementary" && this.activeScanNumber === 1) {
+      if (this.scenario === "cancellation" && syntheticCard === "secondary" && this.activeScanNumber === 1) {
         assert.equal(this.expectedCancellationRequest, null);
         assert.equal(this.expectedCancellationConsoleErrors, 0);
         this.expectedCancellationRequest = request;
@@ -1025,7 +1038,7 @@ export class SyntheticAmexHarness {
       }
 
       await shortDelay();
-      if (this.scenario === "rescan_tracker_failure" && syntheticCard === "supplementary" && this.activeScanNumber === 2) {
+      if (this.scenario === "rescan_tracker_failure" && syntheticCard === "secondary" && this.activeScanNumber === 2) {
         await fulfillJson(route, { syntheticError: true }, 500);
         return;
       }

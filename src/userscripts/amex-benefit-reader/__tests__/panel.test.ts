@@ -479,7 +479,7 @@ describe("Amex reader side panel", () => {
     expect(shadow().textContent).toContain("HalfYear");
   });
 
-  it("renders unresolved empty cards instead of claiming they have no trackable benefits", () => {
+  it("omits unresolved empty groups while retaining their account-level quality counts", () => {
     const firstBenefit = benefit({ title: "First card benefit" });
     const secondBenefit = benefit({ benefitKey: "benefit-abcdef1234567890", title: "Second card benefit" });
     let store = addCard(createEmptyStore(now), {
@@ -512,13 +512,14 @@ describe("Amex reader side panel", () => {
 
     expect(shadow().querySelector('select[aria-label="Choose a card to review"]')).toBeNull();
     expect(Array.from(shadow().querySelectorAll(".card-group h3")).map((heading) => heading.textContent)).toEqual([
-      "Hidden Synthetic Card •••• 9999",
       "Synthetic Platinum •••• 1234",
       "Synthetic Platinum •••• 56789",
     ]);
     expect(shadow().textContent).toContain("First card benefit");
     expect(shadow().textContent).toContain("Second card benefit");
-    expect(shadow().textContent).toContain("latest scan did not conclusively establish");
+    expect(shadow().textContent).not.toContain("Hidden Synthetic Card •••• 9999");
+    expect(shadow().textContent).toContain("1 latest-scan record unresolved");
+    expect(shadow().textContent).toContain("counts remain included in Data notes");
     expect(shadow().textContent).not.toContain("confirmed to have no trackable benefits");
     expect(Array.from(shadow().querySelectorAll(".account-summary strong")).map((item) => item.textContent)).toEqual([
       "2",
@@ -584,11 +585,12 @@ describe("Amex reader side panel", () => {
       clearData: jest.fn(async () => undefined),
     });
 
-    expect(shadow().querySelectorAll(".card-group")).toHaveLength(9);
-    expect(shadow().textContent).toContain("15 cards checked in the latest scan; 16 stored card records; 1 older stored card remains retained for review.");
+    expect(shadow().querySelectorAll(".card-group")).toHaveLength(4);
+    expect(shadow().textContent).toContain("15 cards checked in the latest scan; 16 stored card records; 7 confirmed empty; 4 latest-scan records unresolved; 1 older stored card remains retained for review.");
     expect(shadow().textContent).toContain("7 cards were confirmed to have no trackable benefits and are hidden.");
-    expect(shadow().textContent).toContain("The benefit catalog was unavailable, so this card is not confirmed to have no trackable benefits.");
-    expect(shadow().textContent).toContain("This older stored card was not checked in the latest scan; its stale data remains for review.");
+    expect(shadow().textContent).toContain("counts remain included in Data notes");
+    expect(shadow().textContent).not.toContain("The benefit catalog was unavailable, so this card is not confirmed to have no trackable benefits.");
+    expect(shadow().textContent).not.toContain("This older stored card was not checked in the latest scan; its stale data remains for review.");
     expect(shadow().textContent).not.toContain("No trackable benefits are available in the reviewed card observations.");
     expect(Array.from(shadow().querySelectorAll(".account-summary strong"), (item) => item.textContent)).toEqual([
       "4",
@@ -623,6 +625,38 @@ describe("Amex reader side panel", () => {
     expect(shadow().textContent).toContain("2 cards were confirmed to have no trackable benefits and are hidden.");
     expect(shadow().textContent).not.toContain("Hidden Synthetic Card One");
     expect(shadow().textContent).not.toContain("Hidden Synthetic Card Two");
+  });
+
+  it("does not claim an account is conclusively empty when the latest scan has unknown variants", () => {
+    let store = addCard(createEmptyStore(now), {
+      localCardId: cardOneId,
+      productName: "Confirmed Empty Synthetic Card",
+      endingDigits: "1234",
+      benefits: [],
+    });
+    store = mergeScanSummary(store, {
+      startedAt: now,
+      finishedAt: "2026-07-15T12:01:00.000Z",
+      status: "partial",
+      discoveredCardCount: 1,
+      attemptedCardCount: 1,
+      unknownAccountVariantCount: 1,
+      cards: [{ localCardId: cardOneId, result: "complete", issueCode: null }],
+      visibleContext: "unchanged",
+    });
+
+    new AmexBenefitReaderPanel(store, {
+      startScan: jest.fn(async () => undefined),
+      cancelScan: jest.fn(),
+      clearData: jest.fn(async () => undefined),
+    });
+
+    expect(shadow().querySelectorAll(".card-group")).toHaveLength(0);
+    expect(shadow().textContent).not.toContain("No trackable benefits are available in the reviewed card observations.");
+    expect(shadow().querySelector(".account-empty-state")).toHaveTextContent(
+      "other latest-scan quality notes remain reflected in the account summary and Data notes",
+    );
+    expect(shadow().textContent).toContain("1 account item was not recognized and not scanned");
   });
 
   it("keeps a 16-card, 130-observation grouped account reachable in the bounded panel", () => {
@@ -807,7 +841,7 @@ describe("Amex reader side panel", () => {
     expect(shadow().querySelector(".data-quality")?.textContent).toContain("Benefit confidence2 high");
   });
 
-  it("keeps filter-empty benefit-bearing cards as compact accessible groups", () => {
+  it("omits card groups without rows in the active filter and points to the other filter", () => {
     const actionOnly = addCard(createEmptyStore(now), {
       localCardId: cardOneId,
       productName: "Synthetic Card",
@@ -821,18 +855,15 @@ describe("Amex reader side panel", () => {
     });
     fireEvent.click(button("Used 0"));
 
-    const group = shadow().querySelector(".card-group");
-    expect(group).toHaveClass("card-group-compact");
-    expect(group).toHaveAccessibleName("Synthetic Card •••• 1234 0 used benefits");
-    expect(group?.querySelector("h3")).toHaveTextContent("Synthetic Card •••• 1234");
-    expect(group?.querySelector(".card-summary")).toHaveTextContent("0 used benefits");
-    expect(group?.querySelector(".benefit-list")).toBeNull();
-    expect(group?.querySelector(".empty-state")).toBeNull();
-    expect(group?.querySelector(".data-quality")).toHaveTextContent("Data quality and timestamps");
-    expect(shadow().textContent).not.toContain("No used benefits for this card");
+    expect(shadow().querySelector(".card-group")).toBeNull();
+    expect(shadow().textContent).not.toContain("Synthetic Card •••• 1234");
+    expect(shadow().querySelector(".account-empty-state")).toHaveTextContent(
+      "No used benefit rows are available. 1 remaining benefit is available under Remaining.",
+    );
+    expect(button("Remaining 1")).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("keeps an explicit error state when no safe observation exists", () => {
+  it("keeps failed no-data cards in account-level notes without rendering an empty group", () => {
     const failed = mergeCardAttempt(createEmptyStore(now), {
       disposition: "failed",
       identity: {
@@ -849,8 +880,10 @@ describe("Amex reader side panel", () => {
       cancelScan: jest.fn(),
       clearData: jest.fn(async () => undefined),
     });
-    expect(shadow().textContent).toContain("Could not read");
-    expect(shadow().textContent).toContain("No safe benefit observation is available for this card yet");
+    expect(shadow().querySelector(".card-group")).toBeNull();
+    expect(shadow().textContent).toContain("No benefit rows are available in the reviewed observations");
+    expect(shadow().textContent).toContain("1");
+    expect(shadow().textContent).toContain("Data notes");
   });
 
   it("shows card-level partial and stale quality once without relabeling benefit rows", () => {
@@ -902,9 +935,10 @@ describe("Amex reader side panel", () => {
     expect(shadow().querySelectorAll(".row-quality")).toHaveLength(0);
     expect(shadow().textContent).toContain("read request timed out");
     fireEvent.click(button("Used 0"));
-    const compactStaleGroup = shadow().querySelector(".card-group-compact");
-    expect(compactStaleGroup).not.toBeNull();
-    expect(compactStaleGroup?.querySelector(".data-quality")).toHaveTextContent("read request timed out");
+    expect(shadow().querySelector(".card-group")).toBeNull();
+    expect(shadow().querySelector(".account-empty-state")).toHaveTextContent(
+      "No used benefit rows are available. 2 remaining benefits are available under Remaining.",
+    );
     expect(shadow().textContent).toContain("Scan notes");
   });
 
@@ -993,8 +1027,11 @@ describe("Amex reader side panel", () => {
     expect(secondCardGroup?.querySelectorAll(".conflict-diagnostics li")).toHaveLength(0);
 
     fireEvent.click(button("Used 0"));
-    expect(shadow().querySelectorAll(".conflict-diagnostics li")).toHaveLength(4);
+    expect(shadow().querySelectorAll(".card-group")).toHaveLength(0);
+    expect(shadow().querySelectorAll(".conflict-diagnostics li")).toHaveLength(0);
     expect(JSON.stringify(store)).not.toMatch(/tracker_state_collision|conflictDiagnostics/);
+    fireEvent.click(button("Remaining 2"));
+    expect(shadow().querySelectorAll(".conflict-diagnostics li")).toHaveLength(4);
 
     panel.report({
       type: "card_committed",

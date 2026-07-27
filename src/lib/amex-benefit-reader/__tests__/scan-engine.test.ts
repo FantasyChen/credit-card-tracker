@@ -127,6 +127,57 @@ describe("API Amex scan engine", () => {
     expect(serialized).not.toMatch(/accountToken|rawResponse|requestBody|authorization|cookie/i);
   });
 
+  it("does no identity or benefit work for nested exact SUPP cards", async () => {
+    const excludedToken = "invented-excluded-supp-token";
+    const discoveryResponse = memberResponseSchema.parse({ accounts: [{
+      account_token: "invented-primary-token-a",
+      relationship: "BASIC",
+      product: { description: "American Express Business Platinum Card" },
+      display_account_number: "1234",
+      supplementary_accounts: [{
+        account_token: excludedToken,
+        relationship: "SUPP",
+        product: { description: "Companion Platinum Card" },
+        display_account_number: "56789",
+      }],
+    }] });
+    const calls: string[] = [];
+    const prepareCard = jest.fn(async (card: { rawAccountToken: string; productName: string; endingDigits: string }) => ({
+      productName: card.productName,
+      endingDigits: card.endingDigits,
+      sourceFingerprint: "a".repeat(64),
+    }));
+    const client: AmexReadClient = {
+      discoverAccounts: async () => discoveryResponse,
+      readBenefitTrackers: async (token) => { calls.push(`trackers:${token}`); return trackers; },
+      readBenefitCatalog: async (token) => { calls.push(`catalog:${token}`); return catalog; },
+    };
+    const store = new MemoryStore(createEmptyStore(times[0]));
+
+    const summary = await new AmexBenefitScanEngine(
+      client,
+      visible(),
+      store,
+      { prepareCard },
+      { report: () => undefined },
+      { now: () => new Date(times[2]) },
+    ).scanAllCards();
+
+    expect(summary).toMatchObject({
+      status: "complete",
+      discoveredCardCount: 1,
+      attemptedCardCount: 1,
+      unknownAccountVariantCount: 0,
+    });
+    expect(prepareCard).toHaveBeenCalledTimes(1);
+    expect(prepareCard).toHaveBeenCalledWith(expect.objectContaining({ rawAccountToken: "invented-primary-token-a" }));
+    expect(calls).toEqual([
+      "trackers:invented-primary-token-a",
+      "catalog:invented-primary-token-a",
+    ]);
+    expect(JSON.stringify({ calls, attempts: store.attempts })).not.toContain(excludedToken);
+  });
+
   it("reports fixed per-card conflict diagnostics ephemerally without serializing them", async () => {
     const collisionTrackers = trackerResponseSchema.parse([{ trackers: [
       { benefitName: "Synthetic Adobe Credit", category: "usage", status: "ACTIVE", tracker: { spentAmount: "1", targetUnit: "PASSES" } },
