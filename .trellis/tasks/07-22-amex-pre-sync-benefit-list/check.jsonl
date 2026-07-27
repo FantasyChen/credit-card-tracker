@@ -1,0 +1,5 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Audit the diff against the exact read-only, privacy, presentation, generated-bundle, and live-validation contracts."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check component semantics, accessibility, hierarchy, and interaction consistency."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check required UI states, assertions, and focused verification coverage."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Select and interpret safe checks truthfully before completion."}
+{"file":".trellis/tasks/archive/2026-07/07-15-amex-card-benefit-sync/amex-research.md","reason":"Compare scale and live-data behavior without introducing raw provider evidence."}
