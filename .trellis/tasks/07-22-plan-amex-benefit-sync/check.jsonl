@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Controls truthful reporting of safe automated checks versus unapplied migration, live browser, and production operational gates."}
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Provides the executable acceptance matrix for the complete scan-review-handoff-preview-confirm flow and its privacy boundaries."}
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Checks session-derived ownership, exact cycle mapping, scoped writes, idempotency, and cross-layer consistency."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Checks migration completeness, additive safety, pending-target status, and absence of unauthorized deployment or data mutation."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Checks the final list and handoff UI for accessibility, component behavior, test coverage, and strict frontend quality."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Checks V2 envelopes, mailbox messages, route DTOs, Prisma boundaries, and untrusted data narrowing across both milestones."}

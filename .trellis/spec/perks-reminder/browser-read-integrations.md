@@ -420,6 +420,70 @@ type HandoffMessage =
       nonce: string;
     };
 
+interface SyncStatusProjection {
+  usedAmount: number;
+  isCompleted: boolean;
+  completedAt: string | null;
+  isNotUsable: boolean;
+}
+
+interface SyncResponseRowBase {
+  sourceRowIdentity: string; // 64 lowercase hexadecimal characters
+  sourceLocalCardId: string; // UUID
+  productKey: AmexProductKey;
+  creditFamilyKey: CreditFamilyKey;
+  destinationCardId: string | null;
+  before: SyncStatusProjection | null;
+  after: SyncStatusProjection | null;
+  changes: {
+    amountDecrease: boolean;
+    amountIncrease: boolean;
+    completionSet: boolean;
+    completionCleared: boolean;
+  };
+}
+
+type PreviewSyncRow = SyncResponseRowBase & (
+  | { disposition: "proposed"; reason: "proposed_update" }
+  | {
+      disposition: "unchanged";
+      reason: "already_current" | "unchanged_replay";
+    }
+  | { disposition: "skipped"; reason: NonAppliedAmexSyncReason }
+);
+
+type ConfirmationSyncRow = SyncResponseRowBase & (
+  | { disposition: "updated"; reason: "proposed_update" }
+  | {
+      disposition: "unchanged";
+      reason: "already_current" | "unchanged_replay";
+    }
+  | { disposition: "skipped"; reason: NonAppliedAmexSyncReason }
+  | {
+      disposition: "failed";
+      reason: "conflict_repreview_required" | "persistence_failed";
+    }
+);
+
+interface PreviewResponse {
+  mode: "preview" | "write";
+  rows: PreviewSyncRow[]; // at most AMEX_SYNC_MAX_ROWS
+  proposalToken: string; // 1..16,384 characters
+  proposalExpiresAt: string;
+  mappingOptions: Array<{
+    id: string; // 1..128 characters
+    productKey: AmexProductKey;
+    label: string; // 1..200 characters
+  }>;
+}
+
+interface ConfirmationResponse {
+  attemptId: string; // 1..128 characters
+  replayed: boolean;
+  rows: ConfirmationSyncRow[]; // at most AMEX_SYNC_MAX_ROWS
+  updatedCount: number; // integer equal to rows with disposition "updated"
+}
+
 function previewAmexSync(input: {
   userId: string;
   envelope: AmexSyncEnvelope;
@@ -447,7 +511,7 @@ The first-party API consists only of `POST /api/integrations/amex-sync/preview` 
 2. **One private mailbox**: a direct global Sync gesture creates at most one bounded `amex-sync-mailbox/1` value under the fixed GM key. Its ten-minute lifetime may not exceed the source scan deadline. The top-level handoff URL contains only the opaque transfer ID. No payload, nonce, digest, proposal, card ending, title, or amount belongs in a URL, page storage, DOM attribute, clipboard, or wildcard message.
 3. **Acknowledge server acceptance, not local acquisition**: the handoff validates exact origin/source/type/transfer/nonce, schema, digest, size, creation time, expiry, and scan deadline; safely acquires the envelope into memory; strips the locator with `history.replaceState`; calls preview; validates the complete typed preview response; and only then sends `perks-reminder:amex-sync-accepted`. `off`, HTTP failure, malformed response, unmount, or client exception sends no acceptance. The userscript deletes the mailbox only after the exact accepted message or terminal cancellation, clear, expiry, malformed content, replay, or timeout.
 4. **Early branch isolation**: the userscript entry rejects frames and selects the exact first-party handoff branch before dynamically importing provider client, scan engine, panel, or reader runtime. The handoff branch receives mailbox read/delete capability only and must not construct provider transport. Every unrelated origin/path returns without side effects.
-5. **Authenticated read-only preview and confirmed write**: both routes authenticate first, derive `userId` only from the server session, require exact first-party Origin and same-origin Fetch Metadata, accept strict bounded JSON only, and emit no CORS response. Preview performs no Prisma create/update/upsert/delete/transaction, mapping save, attempt/audit/provenance write, status materialization, or revalidation. Confirmation re-authenticates and requires `write` mode plus a valid short-lived HMAC proposal bound to purpose, user, effective mode, envelope digest, manual mappings, ordered row identities, before state, transition time, and expiry.
+5. **Authenticated read-only preview and confirmed write**: both routes authenticate first, derive `userId` only from the server session, require exact first-party Origin and same-origin Fetch Metadata, accept strict bounded JSON only, and emit no CORS response. Preview performs no Prisma create/update/upsert/delete/transaction, mapping save, attempt/audit/provenance write, status materialization, or revalidation. Confirmation re-authenticates and requires `write` mode plus a valid short-lived HMAC proposal bound to purpose, user, effective mode, envelope digest, manual mappings, ordered row identities, before state, transition time, and expiry. The client strictly validates every successful response as a closed complete DTO, including nested status/change objects and disposition/reason compatibility: preview permits only proposed/unchanged/skipped rows, confirmation permits only updated/unchanged/skipped/failed rows, and `updatedCount` must equal the final updated-row count. Mapping options are limited to active user-owned cards whose finite product key is represented in the source envelope, sorted deterministically, capped at `AMEX_SYNC_MAX_ROWS`, and labeled with at most 200 characters while preserving ending digits.
 6. **Exact transaction-time authority**: preview-time planning and HMAC binding are necessary but insufficient. Each applied or newer-already-current row runs in a serializable transaction that revalidates user ownership, active card lifecycle, exact non-null product/family/period keys, destination card/benefit/status IDs, cycle start/end, occurrence, before-state values, and current source provenance. Applied rows use a scoped compare-and-set; a count other than one is `conflict_repreview_required`. Confirmed manual mappings independently re-read ownership, lifecycle, and product compatibility inside their transaction.
 7. **Advance provenance for newer no-op observations**: `unchanged_replay` means equal source time and digest and advances nothing. `already_current` means a newer accepted source derives destination values already present; it performs no status update but transactionally advances `BenefitStatusSourceProvenance` and records an `UNCHANGED` audit. Both already-current and applied paths reject an older observation or an equal-time conflicting digest inside the transaction so provenance cannot move backward.
 8. **Resumable attempts and monotonic audits**: `COMPLETED` attempts replay stored results. `PROCESSING` and `PARTIAL_FAILED` attempts resume the same attempt ID. Existing `UPDATED`, `UNCHANGED`, or `SKIPPED` audits are terminal and are replayed; `FAILED` may retry and promote to any successful terminal disposition, including audit-only skipped or unchanged rows. A concurrent failure must never downgrade a successful result. One row failure does not stop unrelated rows, and final attempt counts/state come from durable row results.
@@ -461,6 +525,9 @@ The first-party API consists only of `POST /api/integrations/amex-sync/preview` 
 | Valid mailbox payload while server mode is `off` | Strip the locator only after safe acquisition; do not preview, acknowledge, confirm, or write; preserve the mailbox until terminal cleanup |
 | Preview returns non-2xx or a malformed response | Do not acknowledge; show a generic local failure; expose no confirm state |
 | Typed preview response succeeds | Acknowledge exactly once with the matching transfer ID and nonce; the bridge deletes only that mailbox |
+| Successful preview/confirmation response has missing or unknown fields, oversized arrays/strings, an impossible disposition/reason pair, or an incomplete nested state/change object | Reject the response locally; do not acknowledge a preview, enable confirmation, or report confirmation success |
+| Confirmation `updatedCount` differs from the number of `updated` rows | Reject the complete response and show no success state |
+| Mapping options include an inactive/unowned card, a product absent from the source envelope, duplicate/unsorted overflow, or a label over 200 characters | The server omits, sorts/caps, or bounds the option before response validation; the client rejects any nonconforming DTO |
 | Message origin/source/type/transfer/nonce is wrong | Ignore it; do not preview, acknowledge, or clear another mailbox |
 | Source is older than latest provenance | Return `stale_replay`; change no status, provenance, or success audit |
 | Source time and digest equal latest provenance | Return `unchanged_replay`; do not advance provenance |
@@ -477,7 +544,9 @@ The first-party API consists only of `POST /api/integrations/amex-sync/preview` 
 ### 5. Good / Base / Bad Cases
 
 - **Good**: a newer complete Resy observation derives the same values already stored. Confirmation rechecks exact ownership, card, benefit, current cycle, before state, and provenance in one serializable transaction, performs no status update, advances provenance, and records `UNCHANGED`.
+- **Good response boundary**: the server returns deterministically sorted, bounded mapping options plus complete phase-specific rows; the client accepts the closed DTO, verifies the confirmation count invariant, and only then advances UI/mailbox state.
 - **Base**: one row updates while another row's audit write fails. The first remains durable, the attempt becomes `PARTIAL_FAILED`, and the same idempotency key later retries only the failed row and may promote its audit.
+- **Bad response boundary**: a 2xx response with a partial row, unknown field, preview-only `updated` disposition, invalid reason pair, oversized mapping options, or inconsistent `updatedCount` is cast and rendered without full validation.
 - **Bad**: delete the mailbox immediately after receiving its payload, before a typed server preview accepts it.
 - **Bad**: trust preview-time mapping, update a status by ID alone, or upsert provenance without transaction-local ordering and compare-and-set authority.
 - **Bad**: statically import provider transport before selecting the exact userscript branch, or enable synchronization because `prisma generate` passed without a reviewed migration.
@@ -487,6 +556,7 @@ The first-party API consists only of `POST /api/integrations/amex-sync/preview` 
 For every reviewed browser-to-first-party synchronization:
 
 - assert no acknowledgement in `off`, after preview HTTP failure, or after a malformed preview body; assert exactly one matching acknowledgement only after typed preview success and mailbox deletion only after acceptance or terminal cleanup;
+- assert successful preview/confirmation responses reject missing and unknown fields, incomplete nested state/change objects, oversized arrays/strings, impossible phase dispositions, invalid disposition/reason combinations, and inconsistent `updatedCount`; assert mapping options are active, owned, limited to source-envelope product keys, deterministically sorted, capped, and labeled within 200 characters;
 - assert exact two userscript match scopes, storage-only grants, `@noframes`, top-frame checks, no provider runtime on the handoff, and no side effects on unrelated origins/paths;
 - assert V1 remains review-only, V2 candidate selection is latest/current/complete/fresh, the finite product/family allowlist is exact, and structured source ranges resolve exactly one current cycle/occurrence;
 - assert older, equal-identical, equal-conflicting, newer-applied, and newer-already-current provenance ordering;
@@ -510,6 +580,21 @@ await runPreview(payload.envelope, []);
 setEnvelope(payload.envelope);
 const accepted = await runPreview(payload.envelope, []);
 if (accepted) postAccepted(payload);
+```
+
+#### Successful response validation
+
+```ts
+// Wrong: a 2xx and top-level array are treated as a trustworthy result.
+const preview = await response.json() as PreviewResponse;
+setPreview(preview);
+postAccepted(payload);
+
+// Correct: the complete closed, bounded, phase-specific DTO must validate.
+const preview = previewResponseSchema.safeParse(await response.json());
+if (!preview.success) return showGenericPreviewFailure();
+setPreview(preview.data);
+postAccepted(payload);
 ```
 
 #### Durable row application
