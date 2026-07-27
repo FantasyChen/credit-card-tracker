@@ -15,7 +15,7 @@ const memberResponse = memberResponseSchema.parse({ accounts: [
 ] });
 const trackers = trackerResponseSchema.parse([{ trackers: [{
   benefitName: "Synthetic Wireless Bill Credit",
-  category: "spend",
+  category: "usage",
   status: "ACTIVE",
   tracker: { spentAmount: "1", targetAmount: "5", targetUnit: "PASSES" },
 }] }]);
@@ -129,8 +129,8 @@ describe("API Amex scan engine", () => {
 
   it("reports fixed per-card conflict diagnostics ephemerally without serializing them", async () => {
     const collisionTrackers = trackerResponseSchema.parse([{ trackers: [
-      { benefitName: "Synthetic Adobe Credit", category: "spend", status: "ACTIVE", tracker: { spentAmount: "1", targetUnit: "PASSES" } },
-      { benefitName: "Synthetic Adobe Credit", category: "spend", status: "ACTIVE", tracker: { spentAmount: "2", targetUnit: "PASSES" } },
+      { benefitName: "Synthetic Adobe Credit", category: "usage", status: "ACTIVE", tracker: { spentAmount: "1", targetUnit: "PASSES" } },
+      { benefitName: "Synthetic Adobe Credit", category: "usage", status: "ACTIVE", tracker: { spentAmount: "2", targetUnit: "PASSES" } },
     ] }]);
     const client: AmexReadClient = {
       discoverAccounts: async () => memberResponse,

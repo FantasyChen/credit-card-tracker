@@ -54,7 +54,7 @@ function v2Store(): StoreEnvelopeV1 {
     benefits: [{
       benefitKey: "benefit-1234567890abcdef",
       title: "Synthetic Resy credit",
-      category: { state: "observed" as const, value: "spend" },
+      category: { state: "observed" as const, value: "usage" },
       activityKind: "spend_progress" as const,
       enrollmentState: { state: "observed" as const, value: "enrolled" as const },
       trackerState: { state: "observed" as const, value: "in_progress" as const },
@@ -144,6 +144,39 @@ describe("Amex sync transport contract", () => {
       benefits: [],
     };
     expect(projectLatestV2SyncEnvelope(v1)).toEqual({ envelope: null, reason: "no_complete_cards" });
+  });
+
+  it("reapplies supported-credit retention before sync projection without relaxing complete-card gates", () => {
+    const store = v2Store();
+    const latest = store.cards[cardId].latest;
+    if (!latest || latest.contractVersion !== "amex-benefits/2") throw new Error("Expected a V2 fixture.");
+    const retained = latest.benefits[0];
+    latest.benefits = [
+      retained,
+      {
+        ...retained,
+        benefitKey: "benefit-spend-1234567890abcdef",
+        title: "Resy Dining Credit",
+        category: { state: "observed", value: "spend" },
+      },
+      {
+        ...retained,
+        benefitKey: "benefit-profile-1234567890abcdef",
+        title: "Link Your Resy Profile",
+      },
+    ];
+
+    const projected = projectLatestV2SyncEnvelope(store);
+    expect(projected.reason).toBe("ready");
+    expect(projected.envelope?.cards[0].rows).toEqual([
+      expect.objectContaining({ creditFamilyKey: "american-express-platinum-card:resy" }),
+    ]);
+
+    latest.completeness = "partial";
+    latest.issueCodes = ["benefit_identity_conflict"];
+    store.cards[cardId].completeness = "partial";
+    store.lastScan!.cards[0] = { localCardId: cardId, result: "partial", issueCode: "benefit_identity_conflict" };
+    expect(projectLatestV2SyncEnvelope(store)).toEqual({ envelope: null, reason: "no_complete_cards" });
   });
 
   it("uses the injected time for the exact 30-minute freshness boundary", () => {

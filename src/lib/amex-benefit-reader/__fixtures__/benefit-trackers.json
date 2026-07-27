@@ -4,7 +4,7 @@
       {
         "sorBenefitId": "invented-spend-id",
         "benefitName": "Synthetic Airline Fee Credit",
-        "category": "spend",
+        "category": "usage",
         "status": "ACTIVE",
         "trackerDuration": "2026 calendar year",
         "tracker": {

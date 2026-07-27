@@ -9,11 +9,14 @@ interface FakeGm {
   deleteValue: jest.Mock<Promise<void>, [string]>;
 }
 
-function storedBenefit(title: string): NormalizedBenefitObservationV1 {
+function storedBenefit(
+  title: string,
+  category: NormalizedBenefitObservationV1["category"] = { state: "not_exposed" },
+): NormalizedBenefitObservationV1 {
   return {
     benefitKey: `legacy-benefit-${title.toLowerCase().replace(/\s+/g, "-")}`,
     title,
-    category: { state: "not_exposed" },
+    category,
     activityKind: "spend_progress",
     enrollmentState: { state: "not_exposed" },
     trackerState: { state: "not_exposed" },
@@ -52,7 +55,12 @@ function legacyUnfilteredStore() {
           parserVersion: "amex-api-us/1.0.0",
           completeness: "complete",
           issueCodes: [],
-          benefits: [storedBenefit("Dining Credit"), storedBenefit("Cell Phone Protection")],
+          benefits: [
+            storedBenefit("Dining Credit", { state: "observed", value: "usage" }),
+            storedBenefit("Monthly Dining Credit", { state: "observed", value: "spend" }),
+            storedBenefit("Link Your Resy Profile", { state: "not_exposed" }),
+            storedBenefit("Cell Phone Protection"),
+          ],
         },
         freshness: "current",
         completeness: "complete",
@@ -109,6 +117,37 @@ describe("Tampermonkey storage adapter", () => {
     expect(loaded).toMatchObject({ schemaVersion: 1, revision: 5, lastScan: null });
     expect(gm.setValue).toHaveBeenCalledTimes(1);
     expect(gm.setValue).toHaveBeenCalledWith(STORE_KEY, loaded);
+  });
+
+  it("projects ignored rows only once without promoting legacy partial conflict state", async () => {
+    let persisted = legacyUnfilteredStore();
+    const record = Object.values(persisted.cards)[0];
+    if (!record.latest) throw new Error("Expected a synthetic latest observation.");
+    record.latest.completeness = "partial";
+    record.latest.issueCodes = ["benefit_identity_conflict"];
+    record.completeness = "partial";
+    gm.getValue.mockImplementation(async () => persisted);
+    gm.setValue.mockImplementation(async (_key, value) => {
+      persisted = value as typeof persisted;
+    });
+
+    const store = new TampermonkeyResultStore();
+    const first = await store.load();
+    const second = await store.load();
+    const projected = Object.values(second.cards)[0];
+
+    expect(first.revision).toBe(5);
+    expect(second.revision).toBe(5);
+    expect(projected).toMatchObject({
+      freshness: "current",
+      completeness: "partial",
+      latest: {
+        completeness: "partial",
+        issueCodes: ["benefit_identity_conflict"],
+        benefits: [{ title: "Dining Credit" }],
+      },
+    });
+    expect(gm.setValue).toHaveBeenCalledTimes(1);
   });
 
   it("does not rewrite a compatible store when every persisted benefit is still supported", async () => {

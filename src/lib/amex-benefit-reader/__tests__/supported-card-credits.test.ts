@@ -1,7 +1,9 @@
 import { americanExpressCardCatalog } from "@/lib/american-express-card-catalog";
 import {
+  isIgnoredAmexCatalogBenefitTitle,
   isSupportedAmexCatalogCard,
   matchSupportedAmexCardCredit,
+  retainSupportedAmexCardCredits,
 } from "../supported-card-credits";
 
 describe("supported Amex card credit vocabulary", () => {
@@ -59,6 +61,33 @@ describe("supported Amex card credit vocabulary", () => {
         }
       }
     }
+  });
+
+  it("rejects the two reviewed non-credit catalog titles while retaining their credit families", () => {
+    const platinum = "American Express Platinum Card";
+    expect(isIgnoredAmexCatalogBenefitTitle("35% Airline Bonus")).toBe(true);
+    expect(isIgnoredAmexCatalogBenefitTitle("Link Your Resy Profile")).toBe(true);
+    expect(isIgnoredAmexCatalogBenefitTitle("$200 Airline Fee Credit")).toBe(false);
+    expect(isIgnoredAmexCatalogBenefitTitle("Resy Credit")).toBe(false);
+    expect(matchSupportedAmexCardCredit(platinum, "35% Airline Bonus")).toBeNull();
+    expect(matchSupportedAmexCardCredit(platinum, "Link Your Resy Profile")).toBeNull();
+    expect(matchSupportedAmexCardCredit(platinum, "$200 Airline Fee Credit")?.creditKey).toBe(
+      "american-express-platinum-card:airline-fee",
+    );
+    expect(matchSupportedAmexCardCredit(platinum, "Resy Credit")?.creditKey).toBe(
+      "american-express-platinum-card:resy",
+    );
+  });
+
+  it("filters normalized spend requirements independent of title while retaining usage and no-op identity", () => {
+    const product = "American Express Business Platinum Card";
+    const usage = { title: "Dell Technologies Credit", category: { state: "observed", value: "usage" } };
+    const spend = { title: "Adobe Credit", category: { state: "observed", value: "spend" } };
+    const unexposed = { title: "Wireless Bill Credit", category: { state: "not_exposed" } };
+    const benefits = [usage, spend, unexposed];
+    expect(retainSupportedAmexCardCredits(product, benefits)).toEqual([usage, unexposed]);
+    const retained = [usage, unexposed];
+    expect(retainSupportedAmexCardCredits(product, retained)).toBe(retained);
   });
 
   it("requires the credit to be represented on the matched card", () => {

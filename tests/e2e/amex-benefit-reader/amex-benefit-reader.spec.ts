@@ -76,7 +76,7 @@ test("runs the built userscript manually, restores normalized data, and clears b
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
   await expect(readerHost).toHaveCount(1);
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.0");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.1");
   const scanButton = page.getByRole("button", { name: "Scan all cards" });
   const scanStatus = page.getByRole("status");
   const visibleCard = page.locator('[data-testid="simple_switcher_combobox"]');
@@ -117,6 +117,8 @@ test("runs the built userscript manually, restores normalized data, and clears b
   await expect(page.getByRole("heading", { name: "Synthetic Uber Cash" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Synthetic Dining Credit", exact: true })).toHaveCount(0);
   await expect(page.getByText("$4.00 of $10.00")).toBeVisible();
+  await expect(page.getByText("Jul 2026", { exact: true })).toBeVisible();
+  await expect(page.getByText("CalenderYear", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Partially used", { exact: true })).toBeVisible();
   await expect(page.getByText("Enrollment required", { exact: true })).toBeVisible();
   await expect(page.getByText("Synthetic Cell Phone Protection")).toHaveCount(0);
@@ -125,6 +127,8 @@ test("runs the built userscript manually, restores normalized data, and clears b
   await page.getByRole("button", { name: "Used 1" }).click();
   await expect(page.getByRole("heading", { name: "Synthetic Dining Credit", exact: true })).toBeVisible();
   await expect(page.locator(".status-pill", { hasText: "Used" })).toBeVisible();
+  await expect(page.getByText("Jul–Sep 2026", { exact: true })).toBeVisible();
+  await expect(page.getByText("QuarterYear", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Synthetic $12 Monthly Dining Credit Statement Credit" })).toHaveCount(0);
   await expect(page.getByText("Synthetic Centurion Lounge Access")).toHaveCount(0);
   await expect(page.getByText("Synthetic Saks Fifth Avenue Credit")).toHaveCount(0);
@@ -169,7 +173,7 @@ test("runs the built userscript manually, restores normalized data, and clears b
   const preflightCountBeforeReload = harness.operationRequests("preflight").length;
   await harness.reloadAndInject();
   await expect(readerHost).toHaveCount(1);
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.0");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.1");
   await expect(page.getByRole("status")).toHaveText("Scan complete. 2 cards updated.");
   await expect(page.getByRole("button", { name: "Scan all cards" })).toBeEnabled();
   await expect(page.locator(".card-group")).toHaveCount(2);
@@ -195,7 +199,7 @@ test("runs the built userscript manually, restores normalized data, and clears b
   harness.assertNetworkStayedSynthetic();
 });
 
-test("hides globally benefit-empty cards while preserving storage and visible-surface metrics", async ({ context, page }) => {
+test("keeps catalog-unavailable empty cards visible as unresolved", async ({ context, page }) => {
   const harness = new SyntheticAmexHarness(context, page, "benefit_empty");
   await harness.installBeforeNavigation();
   await harness.openAndInject();
@@ -207,13 +211,13 @@ test("hides globally benefit-empty cards while preserving storage and visible-su
     { timeout: 10_000 },
   );
 
-  await expect(page.locator(".card-group")).toHaveCount(2);
-  await expect(page.getByRole("heading", { name: /9999/ })).toHaveCount(0);
-  await expect(page.getByText("1 reviewed card had no trackable benefits and is hidden.")).toBeVisible();
-  await expect(page.getByText("No trackable benefit activity was exposed for this card.")).toHaveCount(0);
+  await expect(page.locator(".card-group")).toHaveCount(3);
+  await expect(page.getByRole("heading", { name: /9999/ })).toBeVisible();
+  await expect(page.getByText("The benefit catalog was unavailable, so this card is not confirmed to have no trackable benefits.")).toBeVisible();
+  await expect(page.getByText(/confirmed to have no trackable benefits and/)).toHaveCount(0);
   await expect(page.locator(".metric", { hasText: "Cards with benefits" }).locator("strong")).toHaveText("2");
   await expect(page.locator(".metric", { hasText: "Eligible benefits" }).locator("strong")).toHaveText("3");
-  await expect(page.locator(".metric", { hasText: "Data notes" }).locator("strong")).toHaveText("0");
+  await expect(page.locator(".metric", { hasText: "Data notes" }).locator("strong")).toHaveText("1");
   await expect(page.getByRole("button", { name: "Remaining 2" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Used 1" })).toHaveAttribute("aria-pressed", "false");
   const zeroUsageBenefit = page.locator(".benefit-card", {
@@ -236,9 +240,9 @@ test("hides globally benefit-empty cards while preserving storage and visible-su
   const apiRequestCountBeforeReload = harness.apiRequests().length;
   await harness.reloadAndInject();
   await expect(page.getByRole("status")).toHaveText("Scan finished with data notes. 3 cards checked.");
-  await expect(page.locator(".card-group")).toHaveCount(2);
-  await expect(page.getByRole("heading", { name: /9999/ })).toHaveCount(0);
-  await expect(page.getByText("1 reviewed card had no trackable benefits and is hidden.")).toBeVisible();
+  await expect(page.locator(".card-group")).toHaveCount(3);
+  await expect(page.getByRole("heading", { name: /9999/ })).toBeVisible();
+  await expect(page.getByText("The benefit catalog was unavailable, so this card is not confirmed to have no trackable benefits.")).toBeVisible();
   await expect(page.locator(".metric", { hasText: "Cards with benefits" }).locator("strong")).toHaveText("2");
   expect(harness.apiRequests()).toHaveLength(apiRequestCountBeforeReload);
 
@@ -258,7 +262,7 @@ test("shows one non-identifying account state when every reviewed card is benefi
   await expect(page.locator(".card-group")).toHaveCount(0);
   await expect(page.locator(".filters")).toHaveCount(0);
   await expect(page.getByText("No trackable benefits are available in the reviewed card observations.")).toBeVisible();
-  await expect(page.getByText("1 reviewed card had no trackable benefits and is hidden.")).toBeVisible();
+  await expect(page.getByText("1 card was confirmed to have no trackable benefits and is hidden.")).toBeVisible();
   await expect(page.getByText(/American Express Gold Card/)).toHaveCount(0);
   await expect(page.getByText(/1234/)).toHaveCount(0);
   await expect(page.locator(".metric", { hasText: "Cards with benefits" }).locator("strong")).toHaveText("0");
@@ -275,6 +279,36 @@ test("shows one non-identifying account state when every reviewed card is benefi
     completeness: "complete",
     latest: { benefits: [] },
   });
+  expectNoRawSyntheticIdentity(harness);
+  harness.assertNetworkStayedSynthetic();
+});
+
+test("applies reviewed spend, airline-bonus, and Resy-profile exclusions before conflicts", async ({ context, page }) => {
+  const harness = new SyntheticAmexHarness(context, page, "reviewed_exclusions");
+  await harness.installBeforeNavigation();
+  await harness.openAndInject();
+
+  expect(harness.apiRequests()).toHaveLength(0);
+  await page.getByRole("button", { name: "Scan all cards" }).click();
+  await expect(page.getByRole("status")).toHaveText("Scan complete. 2 cards updated.", { timeout: 10_000 });
+  await expect(page.locator(".card-group")).toHaveCount(2);
+  await expect(page.locator(".benefit-card")).toHaveCount(3);
+  await expect(page.getByRole("heading", { name: "Dell Technologies Credit" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "$200 Airline Fee Credit" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Resy Credit", exact: true })).toBeVisible();
+  await expect(page.getByText("Jul–Dec 2026", { exact: true })).toBeVisible();
+  await expect(page.getByText("HalfYear", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("35% Airline Bonus", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Link Your Resy Profile", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Benefit matching notes from this scan", { exact: true })).toHaveCount(0);
+  await expect(page.locator('.quality-pill[aria-label="Data quality: Current"]')).toHaveCount(2);
+
+  const serializedStore = JSON.stringify(harness.storageSnapshot());
+  expect(serializedStore).not.toContain("35% Airline Bonus");
+  expect(serializedStore).not.toContain("Link Your Resy Profile");
+  expect(serializedStore).not.toContain("600.00");
+  expect(serializedStore).not.toContain("benefit_identity_conflict");
+  expect(serializedStore).toContain('"value":"usage"');
   expectNoRawSyntheticIdentity(harness);
   harness.assertNetworkStayedSynthetic();
 });
@@ -457,7 +491,7 @@ test("mounts once and scans manually from a selector-free non-benefits route", a
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
   await expect(readerHost).toHaveCount(1);
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.0");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.1");
   await expect(page.locator('[data-testid="simple_switcher_combobox"]')).toHaveCount(0);
   const launcher = page.getByRole("button", { name: "Open Perks Reminder Amex benefit reader" });
   await expect(launcher).toBeVisible();
@@ -771,7 +805,7 @@ test("@visual writes a synthetic grouped-list preview from the built artifact", 
   await harness.openAndInject();
   await page.getByRole("button", { name: "Scan all cards" }).click();
   await expect(page.getByRole("status")).toHaveText("Scan finished with data notes. 3 cards checked.", { timeout: 10_000 });
-  await expect(page.getByText("1 reviewed card had no trackable benefits and is hidden.")).toBeVisible();
+  await expect(page.getByText("The benefit catalog was unavailable, so this card is not confirmed to have no trackable benefits.")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("synthetic-amex-reader-desktop.png"), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator(".panel")).toBeVisible();

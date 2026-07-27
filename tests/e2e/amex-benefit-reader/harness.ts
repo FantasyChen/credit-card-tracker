@@ -24,7 +24,7 @@ const SUPPLEMENTARY_TOKEN = "invented-e2e-supplementary-token";
 const EMPTY_BENEFITS_TOKEN = "invented-e2e-empty-benefits-token";
 const SYNTHETIC_ORIGIN = "https://global.americanexpress.com";
 
-export type HarnessScenario = "complete" | "benefit_empty" | "all_benefit_empty" | "conflict_diagnostics" | "catalog_failure" | "cancellation" | "rescan_tracker_failure" | "high_scale";
+export type HarnessScenario = "complete" | "benefit_empty" | "all_benefit_empty" | "reviewed_exclusions" | "conflict_diagnostics" | "catalog_failure" | "cancellation" | "rescan_tracker_failure" | "high_scale";
 export type ApiOperation = "member" | "tracker" | "catalog";
 export type SyntheticCard = "primary" | "supplementary" | "empty" | `scale-${number}`;
 
@@ -138,9 +138,11 @@ const primaryTrackers = [{
     {
       sorBenefitId: "invented-dining-primary",
       benefitName: "Synthetic &#36;12 Monthly Dining Credit &#x3C;sup&#x3E;&#174;&#x3C;/sup&#x3E; Statement Credit",
-      category: "spend",
+      category: "usage",
       status: "IN_PROGRESS",
-      trackerDuration: "Synthetic monthly period",
+      trackerDuration: "CalenderYear",
+      periodStartDate: "2026-07-01",
+      periodEndDate: "2026-07-31",
       tracker: {
         spentAmount: "4.00",
         targetAmount: "10.00",
@@ -189,9 +191,11 @@ const zeroUsagePrimaryTrackers = structuredClone(primaryTrackers);
 zeroUsagePrimaryTrackers[0].trackers.push({
   sorBenefitId: "invented-uber-primary",
   benefitName: "Synthetic Uber Cash",
-  category: "spend",
+  category: "usage",
   status: "IN_PROGRESS",
   trackerDuration: "Synthetic monthly period",
+  periodStartDate: "2026-07-01",
+  periodEndDate: "2026-07-31",
   tracker: {
     spentAmount: "0.00",
     targetAmount: "15.00",
@@ -208,9 +212,11 @@ const supplementaryTrackers = [{
     {
       sorBenefitId: "invented-dining-supplementary",
       benefitName: "Synthetic Dining Credit ‡",
-      category: "spend",
+      category: "usage",
       status: "ACHIEVED",
-      trackerDuration: "Synthetic monthly period",
+      trackerDuration: "QuarterYear",
+      periodStartDate: "2026-07-01",
+      periodEndDate: "2026-09-30",
       tracker: {
         spentAmount: "10.00",
         targetAmount: "10.00",
@@ -259,33 +265,33 @@ const conflictDiagnosticTrackers = [{
     {
       sorBenefitId: "invented-adobe-state-a",
       benefitName: "Synthetic Adobe Credit",
-      category: "spend",
+      category: "usage",
       status: "ACTIVE",
       tracker: { spentAmount: "1", targetUnit: "PASSES" },
     },
     {
       sorBenefitId: "invented-adobe-state-b",
       benefitName: "Synthetic Adobe Credit",
-      category: "spend",
+      category: "usage",
       status: "ACTIVE",
       tracker: { spentAmount: "2", targetUnit: "PASSES" },
     },
     {
       sorBenefitId: "invented-key-mismatch",
       benefitName: "Synthetic Adobe Credit",
-      category: "spend",
+      category: "usage",
       status: "ACTIVE",
     },
     {
       sorBenefitId: "invented-ambiguous-wireless",
       benefitName: "Synthetic Wireless Bill Credit",
-      category: "spend",
+      category: "usage",
       status: "ACTIVE",
     },
     {
       sorBenefitId: "invented-indeed-tracker",
       benefitName: "Synthetic Indeed Credit",
-      category: "spend",
+      category: "usage",
       status: "ACTIVE",
     },
   ],
@@ -320,6 +326,89 @@ const conflictDiagnosticCatalog = {
   },
 };
 
+const reviewedExclusionTrackers = [{
+  trackers: [
+    {
+      sorBenefitId: "invented-dell-spend-requirement",
+      benefitName: "Dell Technologies Credit",
+      category: "spend",
+      status: "ACHIEVED",
+      tracker: {
+        spentAmount: "600.00",
+        targetAmount: "600.00",
+        targetCurrency: "USD",
+        targetUnit: "MONETARY",
+      },
+    },
+    {
+      sorBenefitId: "invented-dell-usage-credit",
+      benefitName: "Dell Technologies Credit",
+      category: "usage",
+      status: "IN_PROGRESS",
+      trackerDuration: "HalfYear",
+      periodStartDate: "2026-07-01",
+      periodEndDate: "2026-12-31",
+      tracker: {
+        spentAmount: "1.00",
+        targetAmount: "150.00",
+        targetCurrency: "USD",
+        targetUnit: "MONETARY",
+      },
+    },
+    {
+      sorBenefitId: "invented-airline-reviewed-join",
+      benefitName: "$200 Airline Fee Credit",
+      category: "usage",
+      status: "IN_PROGRESS",
+    },
+  ],
+}];
+
+const reviewedExclusionCatalog = {
+  benefits: {
+    airlineFee: {
+      sorBenefitId: "invented-airline-reviewed-join",
+      benefitTitle: "$200 Airline Fee Credit",
+      layoutType: "ENROLLED",
+      isEnrollable: true,
+    },
+    airlineBonus: {
+      sorBenefitId: "invented-airline-reviewed-join",
+      benefitShortTitle: "Airline benefit",
+      benefitTitle: "35% Airline Bonus",
+      layoutType: "NOTENROLLED",
+      isEnrollable: true,
+    },
+  },
+};
+
+const reviewedResyTrackers = [{
+  trackers: [{
+    sorBenefitId: "invented-resy-reviewed-join",
+    benefitName: "Resy Credit",
+    category: "usage",
+    status: "IN_PROGRESS",
+  }],
+}];
+
+const reviewedResyCatalog = {
+  benefits: {
+    resyCredit: {
+      sorBenefitId: "invented-resy-reviewed-join",
+      benefitTitle: "Resy Credit",
+      layoutType: "ENROLLED",
+      isEnrollable: true,
+    },
+    resyProfile: {
+      sorBenefitId: "invented-resy-profile-candidate",
+      benefitShortTitle: "Resy",
+      benefitTitle: "Link Your Resy Profile",
+      layoutType: "NOTENROLLED",
+      isEnrollable: true,
+    },
+  },
+};
+
 const scaleBenefitTitles = [
   "Synthetic Airline Fee Credit",
   "Synthetic Uber Cash",
@@ -348,7 +437,7 @@ function highScaleFixture(): ScenarioFixture {
       trackers: scaleBenefitTitles.slice(0, benefitCount).map((benefitName, benefitIndex) => ({
         sorBenefitId: `invented-scale-${cardIndex}-${benefitIndex}`,
         benefitName,
-        category: "spend",
+        category: "usage",
         status: "IN_PROGRESS",
         trackerDuration: "Synthetic annual period",
         tracker: {
@@ -383,6 +472,33 @@ function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
       },
       trackersByToken: { [PRIMARY_TOKEN]: emptyBenefitTrackers },
       catalogsByToken: { [PRIMARY_TOKEN]: { benefits: {} } },
+      catalogFailureTokens: new Set(),
+    };
+  }
+  if (scenario === "reviewed_exclusions") {
+    return {
+      member: {
+        accounts: [
+          {
+            account_token: PRIMARY_TOKEN,
+            product: { description: "American Express Business Platinum Card" },
+            account: { relationship: "BASIC", display_account_number: "1234" },
+          },
+          {
+            account_token: SUPPLEMENTARY_TOKEN,
+            product: { description: "American Express Platinum Card" },
+            account: { relationship: "BASIC", display_account_number: "56789" },
+          },
+        ],
+      },
+      trackersByToken: {
+        [PRIMARY_TOKEN]: reviewedExclusionTrackers,
+        [SUPPLEMENTARY_TOKEN]: reviewedResyTrackers,
+      },
+      catalogsByToken: {
+        [PRIMARY_TOKEN]: reviewedExclusionCatalog,
+        [SUPPLEMENTARY_TOKEN]: reviewedResyCatalog,
+      },
       catalogFailureTokens: new Set(),
     };
   }

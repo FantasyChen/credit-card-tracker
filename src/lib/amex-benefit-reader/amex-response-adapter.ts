@@ -17,6 +17,7 @@ import {
 } from "./contract";
 import { createBenefitKey } from "./identity";
 import {
+  isIgnoredAmexCatalogBenefitTitle,
   isSupportedAmexCatalogCard,
   matchSupportedAmexCardCredit,
   type SupportedAmexCardCreditMatch,
@@ -414,6 +415,18 @@ function catalogTitle(catalog: CatalogBenefitResponseItem): string | null {
   return text(catalog.benefitShortTitle, 200)
     ?? text(catalog.benefitTitle, 200)
     ?? text(catalog.benefitName, 200);
+}
+
+function isIgnoredCatalogBenefit(catalog: CatalogBenefitResponseItem): boolean {
+  return [catalog.benefitShortTitle, catalog.benefitTitle, catalog.benefitName]
+    .some((candidate) => {
+      const title = text(candidate, 200);
+      return title !== null && isIgnoredAmexCatalogBenefitTitle(title);
+    });
+}
+
+function isQualifyingSpendTracker(tracker: BenefitTrackerResponseItem): boolean {
+  return exactString(tracker.category)?.toLocaleLowerCase("en-US") === "spend";
 }
 
 function creditFamily(creditKey: string): string {
@@ -885,7 +898,9 @@ export function normalizeBenefits(input: {
   const catalogByIssuerId = new Map<string, CatalogBenefitResponseItem>();
   const catalogsByIssuerId = new Map<string, CatalogBenefitResponseItem[]>();
   const ambiguousCatalogIds = new Set<string>();
-  for (const catalog of Object.values(catalogResponse.benefits)) {
+  const selectedCatalogs = Object.values(catalogResponse.benefits)
+    .filter((catalog) => !isIgnoredCatalogBenefit(catalog));
+  for (const catalog of selectedCatalogs) {
     const issuerId = exactString(catalog.sorBenefitId);
     if (!issuerId) continue;
     const group = catalogsByIssuerId.get(issuerId) ?? [];
@@ -933,6 +948,7 @@ export function normalizeBenefits(input: {
 
   for (const block of trackerResponse) {
     for (const tracker of block.trackers) {
+      if (isQualifyingSpendTracker(tracker)) continue;
       const issuerId = exactString(tracker.sorBenefitId);
       const catalog = issuerId && !ambiguousCatalogIds.has(issuerId)
         ? catalogByIssuerId.get(issuerId)
@@ -997,7 +1013,7 @@ export function normalizeBenefits(input: {
     }
   }
 
-  for (const catalog of Object.values(catalogResponse.benefits)) {
+  for (const catalog of selectedCatalogs) {
     const title = catalogTitle(catalog);
     const supported = title ? matchSupportedAmexCardCredit(productName, title) : null;
     if (!title || !supported) continue;
