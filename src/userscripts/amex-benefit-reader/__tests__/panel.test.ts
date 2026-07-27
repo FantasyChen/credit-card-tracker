@@ -1,8 +1,12 @@
 import { fireEvent, waitFor } from "@testing-library/react";
-import type { NormalizedBenefitObservationV1, StoreEnvelopeV1 } from "@/lib/amex-benefit-reader/contract";
+import type {
+  NormalizedBenefitObservationV1,
+  NormalizedBenefitObservationV2,
+  StoreEnvelopeV1,
+} from "@/lib/amex-benefit-reader/contract";
 import type { BenefitIdentityConflictDetailSet } from "@/lib/amex-benefit-reader/amex-response-adapter";
 import { createEmptyStore, mergeCardAttempt, mergeScanSummary } from "@/lib/amex-benefit-reader/storage-policy";
-import { AmexBenefitReaderPanel, deriveBenefitUsageState } from "../panel";
+import { AmexBenefitReaderPanel, deriveBenefitUsageState, formatAmexSourcePeriod } from "../panel";
 
 const now = "2026-07-15T12:00:00.000Z";
 const cardOneId = "11111111-1111-4111-8111-111111111111";
@@ -25,7 +29,7 @@ const trackerConflictDetails: BenefitIdentityConflictDetailSet = {
         : "Synthetic Adobe Credit",
       supportedCreditKey: "american-express-business-platinum-card:adobe",
       supportedCreditFamily: "adobe",
-      category: { state: "observed" as const, value: "spend" },
+      category: { state: "observed" as const, value: "usage" },
       activityKind: { state: "observed" as const, value: "spend_progress" as const },
       enrollmentState: { state: "not_exposed" as const },
       trackerState: { state: "observed" as const, value: "in_progress" as const },
@@ -55,7 +59,7 @@ function benefit(overrides: Partial<NormalizedBenefitObservationV1> = {}): Norma
   return {
     benefitKey: "benefit-1234567890abcdef",
     title: "Synthetic benefit",
-    category: { state: "observed", value: "spend" },
+    category: { state: "observed", value: "usage" },
     activityKind: "spend_progress",
     enrollmentState: { state: "not_exposed" },
     trackerState: { state: "observed", value: "not_started" },
@@ -67,6 +71,18 @@ function benefit(overrides: Partial<NormalizedBenefitObservationV1> = {}): Norma
     confidence: "high",
     issueCodes: [],
     ...overrides,
+  };
+}
+
+function v2Benefit(
+  sourcePeriod: NormalizedBenefitObservationV2["sourcePeriod"],
+  period = "CalenderYear",
+): NormalizedBenefitObservationV2 {
+  return {
+    ...benefit(),
+    creditFamilyKey: "american-express-platinum-card:resy",
+    sourcePeriod,
+    period: { state: "observed", value: period },
   };
 }
 
@@ -106,6 +122,26 @@ function addCard(
       benefits: input.benefits ?? [],
     },
   }).store;
+}
+
+function withLatestScan(
+  store: StoreEnvelopeV1,
+  cards = Object.values(store.cards).map((record) => ({
+    localCardId: record.localCardId,
+    result: record.completeness === "failed" ? "failed" as const : record.completeness,
+    issueCode: record.error?.code ?? record.latest?.issueCodes[0] ?? null,
+  })),
+): StoreEnvelopeV1 {
+  return mergeScanSummary(store, {
+    startedAt: now,
+    finishedAt: "2026-07-15T12:01:00.000Z",
+    status: cards.some((card) => card.result !== "complete") ? "partial" : "complete",
+    discoveredCardCount: cards.length,
+    attemptedCardCount: cards.length,
+    unknownAccountVariantCount: 0,
+    cards,
+    visibleContext: "unchanged",
+  });
 }
 
 describe("Amex reader side panel", () => {
@@ -382,7 +418,68 @@ describe("Amex reader side panel", () => {
     expect(store.cards[cardOneId].latest?.benefits.map((item) => item.title)).toEqual(titles);
   });
 
-  it("renders benefit-bearing cards account-wide while hiding globally empty card identities", () => {
+  it("formats structured UTC source periods with deterministic compact calendar labels", () => {
+    const period = (startDate: string, endDate: string) => ({
+      kind: "calendar_date_range" as const,
+      startDate,
+      endDate,
+      timeZone: "UTC" as const,
+    });
+    expect(formatAmexSourcePeriod(period("2026-01-01", "2026-12-31"))).toBe("2026");
+    expect(formatAmexSourcePeriod(period("2026-07-01", "2026-07-31"))).toBe("Jul 2026");
+    expect(formatAmexSourcePeriod(period("2026-07-01", "2026-09-30"))).toBe("Jul–Sep 2026");
+    expect(formatAmexSourcePeriod(period("2026-07-01", "2026-12-31"))).toBe("Jul–Dec 2026");
+    expect(formatAmexSourcePeriod(period("2026-07-02", "2026-09-29"))).toBe("Jul 2–Sep 29, 2026");
+    expect(formatAmexSourcePeriod(period("2026-12-15", "2027-01-14"))).toBe("Dec 15, 2026–Jan 14, 2027");
+  });
+
+  it("prefers an observed V2 source range and falls back only when structured data is unavailable", () => {
+    let store = addCard(createEmptyStore(now), {
+      localCardId: cardOneId,
+      productName: "American Express Platinum Card",
+      endingDigits: "1234",
+      benefits: [],
+    });
+    const record = store.cards[cardOneId];
+    const base = record.latest;
+    if (!base) throw new Error("Expected a synthetic observation.");
+    record.latest = {
+      ...base,
+      contractVersion: "amex-benefits/2",
+      scanId: "99999999-9999-4999-8999-999999999999",
+      productKey: "american-express-platinum-card",
+      benefits: [v2Benefit({
+        state: "observed",
+        value: {
+          kind: "calendar_date_range",
+          startDate: "2026-07-01",
+          endDate: "2026-09-30",
+          timeZone: "UTC",
+        },
+      }, "QuarterYear")],
+    };
+    store = withLatestScan(store);
+    new AmexBenefitReaderPanel(store, {
+      startScan: jest.fn(async () => undefined),
+      cancelScan: jest.fn(),
+      clearData: jest.fn(async () => undefined),
+    });
+    expect(shadow().textContent).toContain("Jul–Sep 2026");
+    expect(shadow().textContent).not.toContain("QuarterYear");
+
+    document.getElementById("perks-reminder-amex-reader")?.remove();
+    const latest = store.cards[cardOneId].latest;
+    if (!latest || latest.contractVersion !== "amex-benefits/2") throw new Error("Expected a V2 observation.");
+    latest.benefits = [v2Benefit({ state: "not_exposed" }, "HalfYear")];
+    new AmexBenefitReaderPanel(store, {
+      startScan: jest.fn(async () => undefined),
+      cancelScan: jest.fn(),
+      clearData: jest.fn(async () => undefined),
+    });
+    expect(shadow().textContent).toContain("HalfYear");
+  });
+
+  it("renders unresolved empty cards instead of claiming they have no trackable benefits", () => {
     const firstBenefit = benefit({ title: "First card benefit" });
     const secondBenefit = benefit({ benefitKey: "benefit-abcdef1234567890", title: "Second card benefit" });
     let store = addCard(createEmptyStore(now), {
@@ -406,6 +503,7 @@ describe("Amex reader side panel", () => {
       sourceFingerprint: "c".repeat(64),
       benefits: [],
     });
+    store = withLatestScan(store);
     new AmexBenefitReaderPanel(store, {
       startScan: jest.fn(async () => undefined),
       cancelScan: jest.fn(),
@@ -414,23 +512,88 @@ describe("Amex reader side panel", () => {
 
     expect(shadow().querySelector('select[aria-label="Choose a card to review"]')).toBeNull();
     expect(Array.from(shadow().querySelectorAll(".card-group h3")).map((heading) => heading.textContent)).toEqual([
+      "Hidden Synthetic Card •••• 9999",
       "Synthetic Platinum •••• 1234",
       "Synthetic Platinum •••• 56789",
     ]);
     expect(shadow().textContent).toContain("First card benefit");
     expect(shadow().textContent).toContain("Second card benefit");
-    expect(shadow().textContent).not.toContain("Hidden Synthetic Card");
-    expect(shadow().textContent).not.toContain("9999");
-    expect(shadow().textContent).toContain("1 reviewed card had no trackable benefits and is hidden.");
+    expect(shadow().textContent).toContain("latest scan did not conclusively establish");
+    expect(shadow().textContent).not.toContain("confirmed to have no trackable benefits");
     expect(Array.from(shadow().querySelectorAll(".account-summary strong")).map((item) => item.textContent)).toEqual([
       "2",
       "2",
-      "0",
+      "1",
     ]);
     expect(Array.from(shadow().querySelectorAll(".account-summary span")).map((item) => item.textContent)).toEqual([
       "Cards with benefits",
       "Eligible benefits",
       "Data notes",
+    ]);
+  });
+
+  it("reconciles the reviewed 16-stored and 15-attempted coverage shape", () => {
+    let store = createEmptyStore(now);
+    const latestCards: Array<{
+      localCardId: string;
+      result: "complete" | "partial";
+      issueCode: NormalizedBenefitObservationV1["issueCodes"][number] | null;
+    }> = [];
+    for (let index = 1; index <= 15; index += 1) {
+      const localCardId = `${String(index).padStart(8, "0")}-0000-4000-8000-${String(index).padStart(12, "0")}`;
+      const isBenefitBearing = index <= 4;
+      const isConfirmedEmpty = index >= 5 && index <= 11;
+      const disposition = isConfirmedEmpty || isBenefitBearing ? "complete" as const : "partial" as const;
+      store = addCard(store, {
+        localCardId,
+        productName: `Synthetic Coverage Card ${String(index).padStart(2, "0")}`,
+        endingDigits: String(4000 + index),
+        sourceFingerprint: index.toString(16).padStart(2, "0").repeat(32),
+        disposition,
+        issueCodes: disposition === "partial" ? ["http_error"] : [],
+        benefits: isBenefitBearing ? [benefit({
+          benefitKey: `benefit-coverage-${index}-1234567890abcdef`,
+          title: `Coverage benefit ${index}`,
+        })] : [],
+      });
+      latestCards.push({
+        localCardId,
+        result: disposition,
+        issueCode: disposition === "partial" ? "http_error" : null,
+      });
+    }
+    const olderCardId = "99999999-9999-4999-8999-999999999999";
+    store = addCard(store, {
+      localCardId: olderCardId,
+      productName: "Older Retained Hilton Card",
+      endingDigits: "9999",
+      sourceFingerprint: "f".repeat(64),
+      benefits: [],
+    });
+    store = mergeCardAttempt(store, {
+      disposition: "failed",
+      identity: { localCardId: olderCardId, ...store.cards[olderCardId].identity },
+      attemptedAt: "2026-07-15T12:30:00.000Z",
+      errorCode: "http_error",
+    }).store;
+    store = withLatestScan(store, latestCards);
+
+    new AmexBenefitReaderPanel(store, {
+      startScan: jest.fn(async () => undefined),
+      cancelScan: jest.fn(),
+      clearData: jest.fn(async () => undefined),
+    });
+
+    expect(shadow().querySelectorAll(".card-group")).toHaveLength(9);
+    expect(shadow().textContent).toContain("15 cards checked in the latest scan; 16 stored card records; 1 older stored card remains retained for review.");
+    expect(shadow().textContent).toContain("7 cards were confirmed to have no trackable benefits and are hidden.");
+    expect(shadow().textContent).toContain("The benefit catalog was unavailable, so this card is not confirmed to have no trackable benefits.");
+    expect(shadow().textContent).toContain("This older stored card was not checked in the latest scan; its stale data remains for review.");
+    expect(shadow().textContent).not.toContain("No trackable benefits are available in the reviewed card observations.");
+    expect(Array.from(shadow().querySelectorAll(".account-summary strong"), (item) => item.textContent)).toEqual([
+      "4",
+      "4",
+      "5",
     ]);
   });
 
@@ -447,6 +610,7 @@ describe("Amex reader side panel", () => {
       endingDigits: "56789",
       benefits: [],
     });
+    store = withLatestScan(store);
     new AmexBenefitReaderPanel(store, {
       startScan: jest.fn(async () => undefined),
       cancelScan: jest.fn(),
@@ -456,7 +620,7 @@ describe("Amex reader side panel", () => {
     expect(shadow().querySelectorAll(".card-group")).toHaveLength(0);
     expect(shadow().querySelector(".filters")).toBeNull();
     expect(shadow().textContent).toContain("No trackable benefits are available in the reviewed card observations.");
-    expect(shadow().textContent).toContain("2 reviewed cards had no trackable benefits and are hidden.");
+    expect(shadow().textContent).toContain("2 cards were confirmed to have no trackable benefits and are hidden.");
     expect(shadow().textContent).not.toContain("Hidden Synthetic Card One");
     expect(shadow().textContent).not.toContain("Hidden Synthetic Card Two");
   });
@@ -484,6 +648,7 @@ describe("Amex reader side panel", () => {
       sourceFingerprint: "f".repeat(64),
       benefits: [],
     });
+    store = withLatestScan(store);
     new AmexBenefitReaderPanel(store, {
       startScan: jest.fn(async () => undefined),
       cancelScan: jest.fn(),
@@ -497,7 +662,7 @@ describe("Amex reader side panel", () => {
     ]);
     expect(shadow().querySelectorAll(".card-group")).toHaveLength(16);
     expect(shadow().querySelectorAll(".benefit-card")).toHaveLength(130);
-    expect(shadow().textContent).toContain("1 reviewed card had no trackable benefits and is hidden.");
+    expect(shadow().textContent).toContain("1 card was confirmed to have no trackable benefits and is hidden.");
     expect(shadow().textContent).not.toContain("Synthetic Empty Card");
     expect(shadow().querySelector("style")?.textContent).toContain("max-height: calc(100vh - 32px); overflow: auto");
   });

@@ -167,8 +167,18 @@ const EXCLUDED_NON_CREDIT_TITLE_PHRASES = [
   "elite status",
 ] as const;
 
+const REVIEWED_IGNORED_CATALOG_TITLES = new Set([
+  normalizedWords("35% Airline Bonus"),
+  normalizedWords("Link Your Resy Profile"),
+]);
+
+export function isIgnoredAmexCatalogBenefitTitle(title: string): boolean {
+  return REVIEWED_IGNORED_CATALOG_TITLES.has(normalizedWords(title));
+}
+
 function isExplicitlyUnsupportedTitle(normalizedTitle: string): boolean {
-  return EXCLUDED_NON_CREDIT_TITLE_PHRASES.some((phrase) => containsPhrase(normalizedTitle, phrase));
+  return REVIEWED_IGNORED_CATALOG_TITLES.has(normalizedTitle)
+    || EXCLUDED_NON_CREDIT_TITLE_PHRASES.some((phrase) => containsPhrase(normalizedTitle, phrase));
 }
 
 function productAliases(rule: CardMatchRule): string[] {
@@ -249,11 +259,20 @@ export function isSupportedAmexCatalogCard(productName: string): boolean {
   return PRODUCT_RULES.has(normalizedWords(productName));
 }
 
-export function retainSupportedAmexCardCredits<T extends { title: string }>(
+interface RetainableAmexBenefit {
+  title: string;
+  category?: { state: string; value?: unknown };
+}
+
+export function retainSupportedAmexCardCredits<T extends RetainableAmexBenefit>(
   productName: string,
   benefits: T[],
 ): T[] {
   const retained = benefits.filter((benefit) =>
-    matchSupportedAmexCardCredit(productName, benefit.title) !== null);
+    benefit.category?.state !== "observed"
+      || benefit.category.value !== "spend")
+    .filter((benefit) =>
+      !isIgnoredAmexCatalogBenefitTitle(benefit.title)
+      && matchSupportedAmexCardCredit(productName, benefit.title) !== null);
   return retained.length === benefits.length ? benefits : retained;
 }

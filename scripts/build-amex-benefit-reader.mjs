@@ -5,7 +5,7 @@ import { build } from "esbuild";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const output = resolve(root, "build/amex-benefit-reader.user.js");
-const userscriptVersion = "0.3.0";
+const userscriptVersion = "0.3.1";
 
 const metadata = `// ==UserScript==
 // @name         Perks Reminder — Amex Benefit Reader

@@ -4,7 +4,7 @@
       {
         "sorBenefitId": "invented-unknown-status-id",
         "benefitName": "Synthetic Adobe Credit",
-        "category": "spend",
+        "category": "usage",
         "status": "FUTURE_STATUS",
         "tracker": {
           "spentAmount": "not-a-decimal",

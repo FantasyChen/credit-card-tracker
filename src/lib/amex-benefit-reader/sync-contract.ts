@@ -9,6 +9,7 @@ import {
   type NormalizedBenefitObservationV2,
   type StoreEnvelopeV1,
 } from "./contract";
+import { retainSupportedAmexCardCredits } from "./supported-card-credits";
 
 export const AMEX_SYNC_ENVELOPE_VERSION = "amex-sync-envelope/1" as const;
 export const AMEX_SYNC_MAX_BYTES = 256 * 1024;
@@ -193,13 +194,14 @@ export function projectLatestV2SyncEnvelope(store: StoreEnvelopeV1): SyncEnvelop
       exclude("not_attempted_successfully", latest.benefits.length || 1);
       continue;
     }
+    const supportedBenefits = retainSupportedAmexCardCredits(latest.productName, latest.benefits);
     cards.push({
       sourceLocalCardId: latest.localCardId,
       productKey: latest.productKey,
       endingDigits: latest.endingDigits,
       observedAt: latest.observedAt,
       parserVersion: latest.parserVersion,
-      rows: latest.benefits.map(projectRow),
+      rows: supportedBenefits.map(projectRow),
     });
   }
 

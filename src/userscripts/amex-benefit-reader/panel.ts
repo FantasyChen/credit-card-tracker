@@ -3,6 +3,7 @@ import type {
   ObservedField,
   QuantityV1,
   ScanSummaryV1,
+  SourcePeriodV2,
   StoreEnvelopeV1,
   StoredCardRecordV1,
 } from "@/lib/amex-benefit-reader/contract";
@@ -70,6 +71,51 @@ function formatDate(value: string | null): string {
   if (!value) return "No observation";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
+}
+
+const COMPACT_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+] as const;
+
+interface CalendarDateParts {
+  year: number;
+  month: number;
+  day: number;
+}
+
+function calendarDateParts(value: string): CalendarDateParts {
+  const [year, month, day] = value.split("-").map(Number);
+  return { year, month, day };
+}
+
+function lastDayOfMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function compactExplicitDateRange(start: CalendarDateParts, end: CalendarDateParts): string {
+  const startMonth = COMPACT_MONTHS[start.month - 1];
+  const endMonth = COMPACT_MONTHS[end.month - 1];
+  if (start.year === end.year && start.month === end.month) {
+    return `${startMonth} ${start.day}–${end.day}, ${start.year}`;
+  }
+  if (start.year === end.year) {
+    return `${startMonth} ${start.day}–${endMonth} ${end.day}, ${start.year}`;
+  }
+  return `${startMonth} ${start.day}, ${start.year}–${endMonth} ${end.day}, ${end.year}`;
+}
+
+export function formatAmexSourcePeriod(period: SourcePeriodV2): string {
+  const start = calendarDateParts(period.startDate);
+  const end = calendarDateParts(period.endDate);
+  const startsOnMonthBoundary = start.day === 1;
+  const endsOnMonthBoundary = end.day === lastDayOfMonth(end.year, end.month);
+  if (startsOnMonthBoundary && endsOnMonthBoundary && start.year === end.year) {
+    if (start.month === 1 && end.month === 12) return String(start.year);
+    if (start.month === end.month) return `${COMPACT_MONTHS[start.month - 1]} ${start.year}`;
+    return `${COMPACT_MONTHS[start.month - 1]}–${COMPACT_MONTHS[end.month - 1]} ${start.year}`;
+  }
+  return compactExplicitDateRange(start, end);
 }
 
 function quantityText(quantity: QuantityV1): string {
@@ -183,6 +229,14 @@ export function deriveBenefitUsageState(benefit: NormalizedBenefitObservation): 
   return { label: "Status unavailable", tone: "muted", filter: "remaining" };
 }
 
+function benefitPeriodText(benefit: NormalizedBenefitObservation): string | null {
+  if ("sourcePeriod" in benefit) {
+    const sourcePeriod = observedValue(benefit.sourcePeriod);
+    if (sourcePeriod) return formatAmexSourcePeriod(sourcePeriod);
+  }
+  return observedValue(benefit.period);
+}
+
 function benefitPresentation(benefit: NormalizedBenefitObservation): BenefitPresentation {
   const state = deriveBenefitUsageState(benefit);
   const current = observedValue(benefit.earnedOrUsed);
@@ -200,7 +254,7 @@ function benefitPresentation(benefit: NormalizedBenefitObservation): BenefitPres
   return {
     ...state,
     amount,
-    period: observedValue(benefit.period),
+    period: benefitPeriodText(benefit),
   };
 }
 
@@ -219,6 +273,48 @@ function sortedCards(store: StoreEnvelopeV1): StoredCardRecordV1[] {
   return Object.values(store.cards).sort((left, right) =>
     left.identity.productName.localeCompare(right.identity.productName)
     || left.identity.endingDigits.localeCompare(right.identity.endingDigits));
+}
+
+export type CardCoverageKind =
+  | "benefit_bearing"
+  | "confirmed_empty"
+  | "latest_scan_unresolved"
+  | "older_retained";
+
+export interface CardCoverageEntry {
+  record: StoredCardRecordV1;
+  kind: CardCoverageKind;
+}
+
+function isConfirmedEmptyInLatestScan(
+  record: StoredCardRecordV1,
+  summary: ScanSummaryV1,
+  dispositions: NonNullable<ScanSummaryV1["cards"]>,
+): boolean {
+  const cardDispositions = dispositions.filter((card) => card.localCardId === record.localCardId);
+  if (cardDispositions.length !== 1 || cardDispositions[0].result !== "complete") return false;
+  if (
+    !record.latest
+    || record.latest.benefits.length !== 0
+    || record.freshness !== "current"
+    || record.completeness !== "complete"
+    || record.latest.completeness !== "complete"
+  ) return false;
+  return record.latest.contractVersion !== "amex-benefits/2"
+    || summary.scanId === undefined
+    || record.latest.scanId === summary.scanId;
+}
+
+export function projectCardCoverage(store: StoreEnvelopeV1): CardCoverageEntry[] {
+  const cards = sortedCards(store);
+  const summary = store.lastScan;
+  const latestCardIds = new Set(summary?.cards.flatMap((card) => card.localCardId ? [card.localCardId] : []) ?? []);
+  return cards.map((record) => {
+    if (!summary || !latestCardIds.has(record.localCardId)) return { record, kind: "older_retained" };
+    if ((record.latest?.benefits.length ?? 0) > 0) return { record, kind: "benefit_bearing" };
+    if (isConfirmedEmptyInLatestScan(record, summary, summary.cards)) return { record, kind: "confirmed_empty" };
+    return { record, kind: "latest_scan_unresolved" };
+  });
 }
 
 function filterLabel(filter: BenefitFilter): string {
@@ -562,7 +658,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     return article;
   }
 
-  private renderCardGroup(record: StoredCardRecordV1): HTMLElement {
+  private renderCardGroup(record: StoredCardRecordV1, coverageKind: CardCoverageKind): HTMLElement {
     const section = element("section");
     const headingId = `pr-card-${record.localCardId}`;
     const quality = observationQuality(record);
@@ -597,6 +693,27 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     heading.setAttribute("aria-describedby", qualityBadge.id);
     headingRow.append(headingCopy, qualityBadge);
     section.append(headingRow);
+
+    let coverageMessage: string | null = null;
+    if (coverageKind === "older_retained") {
+      coverageMessage = record.freshness === "stale_error"
+        ? "This older stored card was not checked in the latest scan; its stale data remains for review."
+        : "This older stored card was not checked in the latest scan and remains for review.";
+    } else if (record.freshness === "stale_error") {
+      coverageMessage = "Older benefit data was retained because the latest read failed.";
+    } else if (
+      record.latest?.benefits.length === 0
+      && record.latest.issueCodes.includes("http_error")
+    ) {
+      coverageMessage = "The benefit catalog was unavailable, so this card is not confirmed to have no trackable benefits.";
+    } else if (coverageKind === "latest_scan_unresolved") {
+      coverageMessage = "The latest scan did not conclusively establish whether this card has trackable benefits.";
+    }
+    if (coverageMessage) {
+      const notice = element("p", coverageMessage);
+      notice.className = "card-coverage-note";
+      section.append(notice);
+    }
 
     if (filtered.length) {
       const list = element("ul");
@@ -722,6 +839,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       .card-group-compact .card-heading { align-items: center; }
       .card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
       .card-summary { margin-top: 4px; color: var(--pr-muted); font-size: 12px; }
+      .card-coverage-note { margin: 8px 0 0; color: var(--pr-muted); font-size: 12px; }
       .quality-pill, .status-pill { display: inline-flex; align-items: center; flex: 0 0 auto; border: 1px solid; border-radius: 999px; font-size: 11px; font-weight: 750; white-space: nowrap; }
       .quality-pill { padding: 4px 8px; }
       .quality-good { border-color: var(--pr-green-border); background: var(--pr-green-bg); color: #047857; }
@@ -762,6 +880,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       .secondary-panel { padding: 10px 12px; border: 1px solid var(--pr-border); border-radius: 10px; background: #f8fafc; }
       .account-notes { margin: 12px 0 0; }
       .account-notes ul { margin-top: 9px; padding-left: 18px; color: #475467; font-size: 12px; }
+      .coverage-summary { margin: -4px 0 10px; color: var(--pr-muted); font-size: 12px; }
       .hidden-cards-note { margin: -4px 0 12px; color: var(--pr-muted); font-size: 12px; }
       .empty-state { margin-top: 12px; padding: 18px 12px; border: 1px dashed #cbd5e1; border-radius: 10px; color: var(--pr-muted); text-align: center; }
       .footer { padding: 0 16px 16px; }
@@ -867,15 +986,21 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     }
     panel.append(top);
 
-    const cards = sortedCards(this.store);
+    const coverage = projectCardCoverage(this.store);
+    const cards = coverage.map(({ record }) => record);
     const benefitCards = cards.filter((record) => (record.latest?.benefits.length ?? 0) > 0);
-    const globallyEmptyCards = cards.filter((record) => record.latest?.benefits.length === 0);
-    const reviewCards = cards.filter((record) => record.latest === null || record.latest.benefits.length > 0);
+    const confirmedEmptyCards = coverage.filter(({ kind }) => kind === "confirmed_empty");
+    const reviewEntries = coverage.filter(({ kind }) => kind !== "confirmed_empty");
+    const reviewCards = reviewEntries.map(({ record }) => record);
+    const olderRetainedCards = coverage.filter(({ kind }) => kind === "older_retained");
     const content = element("div");
     content.className = "content";
     if (cards.length) {
       const totalBenefits = benefitCards.reduce((sum, record) => sum + (record.latest?.benefits.length ?? 0), 0);
-      const dataNoteCards = benefitCards.filter((record) => observationQuality(record).tone !== "good").length;
+      const dataNoteCards = reviewEntries.filter(({ record, kind }) =>
+        kind === "latest_scan_unresolved"
+        || kind === "older_retained"
+        || observationQuality(record).tone !== "good").length;
       const metrics = element("div");
       metrics.className = "account-summary";
       ([[String(benefitCards.length), "Cards with benefits"], [String(totalBenefits), "Eligible benefits"], [String(dataNoteCards), "Data notes"]] as Array<[string,string]>).forEach(([value, label]) => {
@@ -886,13 +1011,26 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       });
       content.append(metrics);
 
-      if (globallyEmptyCards.length) {
-        const count = globallyEmptyCards.length;
+      if (this.store.lastScan) {
+        const attempted = this.store.lastScan.attemptedCardCount;
+        const older = olderRetainedCards.length;
+        const coverageSummary = element(
+          "p",
+          `${attempted} card${attempted === 1 ? "" : "s"} checked in the latest scan; `
+            + `${cards.length} stored card record${cards.length === 1 ? "" : "s"}; `
+            + `${older} older stored card${older === 1 ? " remains" : "s remain"} retained for review.`,
+        );
+        coverageSummary.className = "coverage-summary";
+        content.append(coverageSummary);
+      }
+
+      if (confirmedEmptyCards.length) {
+        const count = confirmedEmptyCards.length;
         const hiddenNote = element(
           "p",
           count === 1
-            ? "1 reviewed card had no trackable benefits and is hidden."
-            : `${count} reviewed cards had no trackable benefits and are hidden.`,
+            ? "1 card was confirmed to have no trackable benefits and is hidden."
+            : `${count} cards were confirmed to have no trackable benefits and are hidden.`,
         );
         hiddenNote.className = "hidden-cards-note";
         content.append(hiddenNote);
@@ -924,10 +1062,10 @@ export class AmexBenefitReaderPanel implements ScanReporter {
         content.append(filters);
       }
 
-      if (reviewCards.length) {
+      if (reviewEntries.length) {
         const groups = element("div");
         groups.className = "card-groups";
-        reviewCards.forEach((record) => groups.append(this.renderCardGroup(record)));
+        reviewEntries.forEach(({ record, kind }) => groups.append(this.renderCardGroup(record, kind)));
         content.append(groups);
       } else {
         const empty = element("p", "No trackable benefits are available in the reviewed card observations.");
@@ -939,7 +1077,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       empty.className = "empty-state";
       content.append(empty);
     }
-    const accountNotes = this.renderAccountNotes(benefitCards);
+    const accountNotes = this.renderAccountNotes(reviewCards);
     if (accountNotes) content.append(accountNotes);
     panel.append(content);
 
