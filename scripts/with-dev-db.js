@@ -6,8 +6,8 @@
  * Example: node scripts/with-dev-db.js npx prisma migrate status
  */
 
-const dotenv = require('dotenv');
-const { spawn } = require('child_process');
+import { spawn } from 'node:child_process';
+import dotenv from 'dotenv';
 
 dotenv.config();
 

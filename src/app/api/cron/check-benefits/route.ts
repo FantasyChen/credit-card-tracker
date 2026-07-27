@@ -3,6 +3,10 @@ import { prisma } from '@/lib/prisma';
 import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
 import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
 import { randomUUID } from 'crypto';
+import {
+  amexSyncAuditRetentionCutoff,
+  deleteExpiredAmexSyncRowAudits,
+} from '@/lib/amex-sync/repository';
 
 export const maxDuration = 10;
 
@@ -159,6 +163,10 @@ async function runCheckBenefitsLogic(dryRun = false) {
       }
     }
 
+    const amexSyncAuditsDeleted = dryRun
+      ? 0
+      : await deleteExpiredAmexSyncRowAudits(amexSyncAuditRetentionCutoff(now));
+
     const totalMs = Date.now() - startMs;
     console.log(`✅ Done in ${totalMs}ms: ${totalUpserted} upserted from ${rows.length} calculated`);
 
@@ -172,6 +180,7 @@ async function runCheckBenefitsLogic(dryRun = false) {
       skipped,
       calcErrors,
       validationWarnings,
+      amexSyncAuditsDeleted,
       durationMs: totalMs,
       timestamp: now.toISOString(),
     });
