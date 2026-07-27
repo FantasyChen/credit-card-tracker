@@ -2,3 +2,4 @@
 {"file":".trellis/spec/frontend/type-safety.md","reason":"Requires strict TypeScript boundaries and concrete normalized projection types for the new selection and card-coverage helpers."}
 {"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Provides colocated Jest, accessible UI assertion, targeted lint/type-check, and diff-check conventions for panel and normalization changes."}
 {"file":".trellis/spec/perks-reminder/verification.md","reason":"Constrains validation to safe targeted checks and requires explicit classification of browser, provider, build, database, and other conditional operations."}
+{"file":".trellis/tasks/archive/2026-07/07-15-amex-card-benefit-sync/research/amex-private-read-contract.md","reason":"Documents the characterized member-response ownership boundary: top-level BASIC versus nested SUPP, including why relationship and structure are stronger than display product names."}

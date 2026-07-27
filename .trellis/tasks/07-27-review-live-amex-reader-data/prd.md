@@ -6,9 +6,10 @@ Inspect the installed AMEX benefit reader against the user's already-open authen
 
 ## Background
 
-- Tampermonkey has the enabled `Perks Reminder — Amex Benefit Reader` userscript at version `0.3.0`.
+- Tampermonkey has the enabled `Perks Reminder — Amex Benefit Reader` userscript at version `0.3.1`.
 - The account is already open in Chrome and the user has explicitly authorized viewing the live account data for this review.
-- The live-account inspection remains read-only. The user has subsequently requested a planned code correction for three false benefit-identity conflicts, but this does not authorize synchronization or other operational actions.
+- The live-account inspection remains read-only. The user has requested code corrections for the reviewed false benefit-identity conflicts and two defects confirmed by the v0.3.1 manual scan, but this does not authorize synchronization or other operational actions.
+- The latest normalized scan attempted 15 cards: seven were supplementary relationships (three Additional Platinum and four Companion Platinum), four cards contained benefits, four current partial cards had zero benefits after catalog HTTP errors, and one older zero-benefit card remained retained.
 
 ## Requirements
 
@@ -29,6 +30,10 @@ Inspect the installed AMEX benefit reader against the user's already-open authen
 - Ignored provider records must be removed by narrow reviewed semantic rules and must not weaken fail-closed behavior for genuinely contradictory candidates that remain after filtering.
 - Include the confirmed panel corrections in the same implementation: separate conclusively empty cards from failed/partial empty cards, explain retained stale cards, and render human-readable periods from structured source ranges.
 - Summary and hidden-card counts must be computed from card quality and latest-scan membership, not from `benefits.length === 0` alone.
+- The reader must scan only characterized top-level accounts whose resolved relationship is exactly `BASIC`. Nested `supplementary_accounts[]` entries whose resolved relationship is exactly `SUPP` are understood policy exclusions and must not enter identity preparation, tracker/catalog requests, scan attempt counts, normalized storage, panel projection, or synchronization consideration. Unknown or contradictory relationship shapes remain fail-closed unknown variants.
+- Product names such as `Additional Platinum Card®` and `Companion Platinum Card®` must not be the primary ownership rule because a supplementary record may inherit its parent product name.
+- Existing role-unverified normalized snapshots and pending mailboxes created by pre-primary-only parser versions must be invalidated once without deleting the installation identity secret. The migration must be idempotent and must not rewrite malformed or future-schema stores.
+- Under the default `Remaining` filter, render a card group only when it contains at least one remaining row. Zero-benefit unresolved/stale/older-retained groups and all-used groups must be omitted from the card list while their scan-quality counts remain available in account-level summary copy. The explicit `Used` filter remains available and renders only cards containing used rows.
 - Treat every tracker whose normalized AMEX provider category is exactly `spend` as a qualifying-spend requirement and ignore it before conflict creation. Such trackers must not produce issue codes, conflict diagnostics, stored benefits, panel rows, or synchronization rows. Other characterized categories, including Dell's `usage` tracker, retain the existing credit-usage behavior regardless of amount. Do not use title, amount, status, or period heuristics for this decision.
 - Period presentation must prefer `sourcePeriod` and use deterministic compact calendar labels: `2026` for a full year, `Jul 2026` for a month, `Jul–Sep 2026` for a multi-month range, and `Jul–Dec 2026` for a half-year. Raw provider tokens such as `CalenderYear`, `QuarterYear`, and `HalfYear` must not be shown when a valid structured range is available; irregular ranges may use explicit compact start/end dates.
 
@@ -46,6 +51,8 @@ The evidence below uses redacted aliases from the temporary derived report. It d
 | Four zero-benefit cards degraded after catalog HTTP errors | Expected fail-closed limitation | Medium | High | C01-C03 and C16 are partial/current with `http_error`, zero retained benefits, and no record-level hard error, matching catalog-only degradation in `src/lib/amex-benefit-reader/scan-engine.ts:232-281`. | Retain safe tracker observations while clearly saying the benefit catalog was unavailable; do not represent the empty result as confirmed absence. |
 | Exact airline, Dell, and Resy conflict causes cannot be reconstructed after reload | Diagnostic limitation | Medium | High | Only generic `benefit_identity_conflict` persists. Structured candidates are intentionally ephemeral under `src/lib/amex-benefit-reader/amex-response-adapter.ts:926-1057` and `src/userscripts/amex-benefit-reader/panel.ts:632-655`. | Resolve the three reviewed false-conflict sources before candidate creation. Persisting additional diagnostics remains a separate future improvement. |
 | The Adobe `$250` title and `$600` amount describe reward value versus qualifying spend | Scope defect, not a parser-amount defect | Medium | High | C04 and C05 show `$250 Adobe Credit` with a completed `$600 of $600` provider-category `spend` tracker. The catalog identifies this as a $250 credit after $600 spend in `src/lib/american-express-card-catalog.ts:344-353`. | Ignore the provider-category `spend` tracker entirely rather than presenting it as credit consumption. |
+| Supplementary physical cards are scanned as ordinary cards | Confirmed ownership-scope defect | High | High | The v0.3.1 scan attempted three Additional Platinum and four Companion Platinum records. `parseAccountDiscovery` flattens top-level `BASIC` and nested `SUPP` entries in `src/lib/amex-benefit-reader/amex-response-adapter.ts:203-268`, then `scan-engine.ts:167-275` drops the role and reads every card. | Admit only top-level exact `BASIC`; treat nested exact `SUPP` as an understood exclusion before identity or network work. |
+| Empty or exhausted card groups remain in the active panel filter | Confirmed filter-projection defect | Medium | High | Current coverage excludes only `confirmed_empty`, so the latest shape renders nine card groups although only four contain benefits; five visible groups have no rows. An all-used card also remains as a compact `0 remaining benefits` group under `Remaining` because coverage uses unfiltered benefit count in `panel.ts:289-317,661-668,989-1069`. | Render a group only when it has rows in the active filter; keep omitted-card quality counts in account-level summary copy. |
 
 ### Synchronization impact
 
@@ -63,7 +70,9 @@ The evidence below uses redacted aliases from the temporary derived report. It d
 - [x] The approved airline filter retains `$200 Airline Fee Credit` while ignoring `35% Airline Bonus`.
 - [x] The approved Resy filter retains the credit tracker while ignoring `Link Your Resy Profile`.
 - [x] Narrow conflict-resolution tests prove ignored records create no conflict, stored row, panel row, or synchronization row, while unrelated genuine collisions remain fail-closed.
-- [x] The panel distinguishes confirmed-empty, catalog-unavailable, and retained-stale cards; the displayed counts reconcile with latest-scan and stored-card totals.
+- [x] Only characterized top-level `BASIC` cards are discovered and attempted; nested exact `SUPP` cards cause no identity, tracker, catalog, storage, panel, or sync work and do not degrade the scan as unknown.
+- [x] A one-time compatibility migration invalidates role-unverified observations and pending mailboxes, preserves the identity secret, refuses malformed/future stores unchanged, and is idempotent.
+- [x] The panel retains reconciled quality counts but renders only card groups with rows in the active filter; `Remaining` has no zero-benefit or all-used compact groups, and `Used` shows only groups with used rows.
 - [x] V2 periods render from structured date ranges without exposing raw provider duration tokens when the structured range is valid.
 - [x] No Sync action, mailbox handoff, confirmation, AMEX mutation, Perks Reminder mutation, or database write occurs.
 
@@ -71,6 +80,7 @@ The evidence below uses redacted aliases from the temporary derived report. It d
 
 - Synchronizing any benefit data or relaxing the existing complete-card synchronization gate for genuine conflicts.
 - Applying migrations, backfills, seeds, configuration changes, or server/database synchronization changes.
-- Persisting new conflict-detail fields or changing the normalized storage schema.
+- Persisting new conflict-detail fields or adding ownership-role fields to the normalized storage schema.
+- Removing the explicit `Used` filter; the fix changes filter-aware card-group visibility rather than discarding completed observations.
 - Installing the updated userscript, triggering another live scan, or performing browser-based account validation without separate explicit authorization after implementation review.
 - Recording credentials, session tokens, cookies, full raw provider responses, or unrelated browser-extension data.
