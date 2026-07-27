@@ -144,3 +144,40 @@ Refined the account-wide AMEX benefit review UI, truthful usage presentation, in
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Implement reviewed AMEX benefit synchronization
+
+**Date**: 2026-07-26
+**Task**: Implement reviewed AMEX benefit synchronization
+**Branch**: `feat/amex-benefit-reader-phase-1`
+
+### Summary
+
+Implemented fail-closed AMEX V2 synchronization through a one-time private mailbox and authenticated preview/confirm handoff, with exact mapping, replay-safe persistence, additive migration, privacy controls, comprehensive tests, and durable contracts; kept migration deployment and live operations pending.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `02204a6` | (see git log) |
+| `0ca2c4a` | (see git log) |
+| `2d2dc96` | (see git log) |
+| `64a14c1` | (see git log) |
+| `04d83aa` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
