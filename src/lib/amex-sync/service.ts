@@ -1,4 +1,11 @@
-import type { AmexSyncEnvelope } from "@/lib/amex-benefit-reader/sync-contract";
+import {
+  amexProductKeySchema,
+  type AmexProductKey,
+} from "@/lib/amex-benefit-reader/contract";
+import {
+  AMEX_SYNC_MAX_ROWS,
+  type AmexSyncEnvelope,
+} from "@/lib/amex-benefit-reader/sync-contract";
 import {
   canonicalManualMappings,
   planAmexSync,
@@ -48,6 +55,17 @@ function publicPreviewRows(plan: AmexSyncPlan): PublicAmexSyncRowResult[] {
   }));
 }
 
+const MAX_MAPPING_LABEL_LENGTH = 200;
+
+function mappingOptionLabel(displayName: string | undefined, lastFourDigits: string | null): string {
+  const suffix = lastFourDigits ? ` ending ${lastFourDigits}` : "";
+  const name = displayName?.trim() || "Card";
+  const availableNameLength = MAX_MAPPING_LABEL_LENGTH - suffix.length;
+  if (name.length <= availableNameLength) return `${name}${suffix}`;
+  const truncatedName = `${name.slice(0, Math.max(1, availableNameLength - 1)).trimEnd()}…`;
+  return `${truncatedName}${suffix}`;
+}
+
 export async function previewAmexSync(input: {
   userId: string;
   envelope: AmexSyncEnvelope;
@@ -60,7 +78,7 @@ export async function previewAmexSync(input: {
   rows: PublicAmexSyncRowResult[];
   proposalToken: string;
   proposalExpiresAt: string;
-  mappingOptions: Array<{ id: string; productKey: string; label: string }>;
+  mappingOptions: Array<{ id: string; productKey: AmexProductKey; label: string }>;
 }> {
   const now = input.now ?? new Date();
   const context = await loadAmexSyncDestinationContext(input.userId);
@@ -80,18 +98,29 @@ export async function previewAmexSync(input: {
     now,
     scanFinishedAt: input.envelope.scanFinishedAt,
   });
+  const sourceProductKeys = new Set(input.envelope.cards.map((card) => card.productKey));
   return {
     mode: input.mode,
     rows: publicPreviewRows(plan),
     proposalToken: proposal.token,
     proposalExpiresAt: proposal.body.expiresAt,
     mappingOptions: context.cards
-      .filter((card) => card.userId === input.userId && card.lifecycleStatus === "ACTIVE" && card.productKey)
-      .map((card) => ({
-        id: card.id,
-        productKey: card.productKey as string,
-        label: `${card.displayName ?? "Card"}${card.lastFourDigits ? ` ending ${card.lastFourDigits}` : ""}`,
-      })),
+      .flatMap((card) => {
+        const productKey = amexProductKeySchema.safeParse(card.productKey);
+        if (card.userId !== input.userId
+          || card.lifecycleStatus !== "ACTIVE"
+          || !productKey.success
+          || !sourceProductKeys.has(productKey.data)) {
+          return [];
+        }
+        return [{
+          id: card.id,
+          productKey: productKey.data,
+          label: mappingOptionLabel(card.displayName, card.lastFourDigits),
+        }];
+      })
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .slice(0, AMEX_SYNC_MAX_ROWS),
   };
 }
 
