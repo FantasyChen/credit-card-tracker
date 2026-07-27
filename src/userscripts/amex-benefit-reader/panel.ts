@@ -7,15 +7,6 @@ import type {
   StoreEnvelopeV1,
   StoredCardRecordV1,
 } from "@/lib/amex-benefit-reader/contract";
-import {
-  BENEFIT_IDENTITY_CONFLICT_DIAGNOSTICS,
-  type BenefitIdentityConflictCandidateDetail,
-  type BenefitIdentityConflictDetail,
-  type BenefitIdentityConflictDetailSet,
-  type BenefitIdentityConflictDiagnostic,
-  type ConflictDiagnosticField,
-} from "@/lib/amex-benefit-reader/amex-response-adapter";
-import { fixedErrorMessage } from "@/lib/amex-benefit-reader/storage-policy";
 import type { ScanProgress, ScanReporter } from "@/lib/amex-benefit-reader/scan-engine";
 import { formatAmexBenefitTitle } from "./provider-text";
 
@@ -35,7 +26,6 @@ export interface PanelOptions {
 
 type BenefitFilter = "remaining" | "used";
 type BenefitTone = "amber" | "blue" | "green" | "muted";
-type QualityTone = "good" | "note" | "warning" | "error";
 
 export type BenefitUsageLabel =
   | "Not used"
@@ -56,21 +46,10 @@ interface BenefitPresentation extends BenefitUsagePresentation {
   period: string | null;
 }
 
-interface QualityPresentation {
-  label: string;
-  tone: QualityTone;
-}
-
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string): HTMLElementTagNameMap[K] {
   const result = document.createElement(tag);
   if (text != null) result.textContent = text;
   return result;
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return "No observation";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
 }
 
 const COMPACT_MONTHS = [
@@ -177,25 +156,6 @@ function isObservedZero(quantity: QuantityV1 | null): boolean {
   return quantity !== null && compareNonnegativeDecimals(quantity.value, "0") === 0;
 }
 
-function observationQuality(record: StoredCardRecordV1): QualityPresentation {
-  if (record.freshness === "error_no_data") return { label: "Could not read", tone: "error" };
-  if (record.freshness === "stale_error") return { label: "Stale data", tone: "warning" };
-  if (record.completeness === "partial") return { label: "Partial data", tone: "note" };
-  return { label: "Current", tone: "good" };
-}
-
-function confidenceSummary(benefits: NormalizedBenefitObservation[]): string {
-  if (!benefits.length) return "No benefit observations";
-  const counts = { high: 0, medium: 0, low: 0 };
-  benefits.forEach((benefit) => {
-    counts[benefit.confidence] += 1;
-  });
-  return (["high", "medium", "low"] as const)
-    .filter((confidence) => counts[confidence] > 0)
-    .map((confidence) => `${counts[confidence]} ${confidence}`)
-    .join(", ");
-}
-
 export function deriveBenefitUsageState(benefit: NormalizedBenefitObservation): BenefitUsagePresentation {
   const completion = observedValue(benefit.completionState);
   const tracker = observedValue(benefit.trackerState);
@@ -258,17 +218,6 @@ function benefitPresentation(benefit: NormalizedBenefitObservation): BenefitPres
   };
 }
 
-function scanSummaryText(summary: ScanSummaryV1): string {
-  const count = `${summary.attemptedCardCount} card${summary.attemptedCardCount === 1 ? "" : "s"}`;
-  if (summary.status === "complete") return `Scan complete. ${count} updated.`;
-  if (summary.status === "partial") return `Scan finished with data notes. ${count} checked.`;
-  if (summary.status === "interrupted") {
-    const verb = summary.attemptedCardCount === 1 ? "was" : "were";
-    return `Scan interrupted after ${count} ${verb} checked. Nothing resumes automatically.`;
-  }
-  return `Scan failed safely. ${count} checked; existing local observations were preserved.`;
-}
-
 function sortedCards(store: StoreEnvelopeV1): StoredCardRecordV1[] {
   return Object.values(store.cards).sort((left, right) =>
     left.identity.productName.localeCompare(right.identity.productName)
@@ -321,77 +270,16 @@ function filterLabel(filter: BenefitFilter): string {
   return filter === "remaining" ? "Remaining" : "Used";
 }
 
-const CONFLICT_DIAGNOSTIC_LABELS: Record<BenefitIdentityConflictDiagnostic, string> = {
-  tracker_state_collision: "Conflicting tracker states",
-  tracker_catalog_key_mismatch: "Tracker and benefit details matched different credits",
-  ambiguous_catalog_join: "Benefit details could not be joined safely",
-  tracker_catalog_candidate_collision: "Tracker and enrollment details conflicted",
-};
-
-const CONFLICT_SOURCE_LABELS: Record<BenefitIdentityConflictCandidateDetail["sourceRole"], string> = {
-  tracker: "Tracker",
-  joined_catalog: "Joined benefit details",
-  catalog_enrollment_candidate: "Enrollment candidate",
-};
-
-interface PanelConflictState {
-  diagnostics: BenefitIdentityConflictDiagnostic[];
-  detailSet: BenefitIdentityConflictDetailSet;
-}
-
-function creditFamilyLabel(creditKey: string): string {
-  return creditKey.slice(creditKey.lastIndexOf(":") + 1);
-}
-
-function diagnosticFieldText<T>(
-  field: ConflictDiagnosticField<T>,
-  format: (value: T) => string = (value) => String(value),
-): string {
-  if (field.state === "not_exposed") return "Not exposed";
-  if (field.state === "unrecognized") return "Unrecognized";
-  return format(field.value);
-}
-
-function appendDiagnosticField<T>(
-  list: HTMLDListElement,
-  label: string,
-  fieldName: string,
-  field: ConflictDiagnosticField<T>,
-  format?: (value: T) => string,
-): void {
-  const value = element("dd", diagnosticFieldText(field, format));
-  value.dataset.amexConflictField = fieldName;
-  value.dataset.fieldState = field.state;
-  if (field.state === "observed") value.dataset.fieldValue = String(field.value);
-  list.append(element("dt", label), value);
-}
-
-function appendDiagnosticQuantity(
-  list: HTMLDListElement,
-  label: string,
-  fieldName: string,
-  field: ConflictDiagnosticField<QuantityV1>,
-): void {
-  const value = element("dd", diagnosticFieldText(field, quantityText));
-  value.dataset.amexConflictField = fieldName;
-  value.dataset.fieldState = field.state;
-  if (field.state === "observed") {
-    value.dataset.quantityValue = field.value.value;
-    value.dataset.quantityUnit = field.value.unit;
-    value.dataset.quantityCurrency = field.value.currency ?? "none";
-  }
-  list.append(element("dt", label), value);
-}
-
 export class AmexBenefitReaderPanel implements ScanReporter {
   private readonly host: HTMLDivElement;
   private readonly root: ShadowRoot;
   private store: StoreEnvelopeV1;
   private mode: "idle" | "scanning" | "cancelling" | "syncing" | "error" = "idle";
-  private progress = "Ready. Nothing is scanned until you start.";
+  private progress = "Ready to scan.";
+  private progressCardCount: number | null = null;
+  private progressCardIndex = 0;
   private errorMessage: string | null = null;
   private benefitFilter: BenefitFilter = "remaining";
-  private readonly conflictsByCard = new Map<string, PanelConflictState>();
   private collapsed: boolean;
   private readonly requiresReloadAfterClear: boolean;
 
@@ -407,7 +295,6 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     this.host.id = AMEX_READER_HOST_ID;
     this.root = this.host.attachShadow({ mode: "open" });
     document.documentElement.append(this.host);
-    if (initialStore.lastScan) this.progress = scanSummaryText(initialStore.lastScan);
     this.render();
   }
 
@@ -433,36 +320,31 @@ export class AmexBenefitReaderPanel implements ScanReporter {
   report(progress: ScanProgress): void {
     if (progress.type === "started") {
       this.collapsed = false;
-      this.conflictsByCard.clear();
       this.mode = "scanning";
+      this.progressCardCount = null;
+      this.progressCardIndex = 0;
       this.progress = "Starting your read-only scan…";
     } else if (progress.type === "discovered") {
-      this.progress = `Found ${progress.cardCount} supported card${progress.cardCount === 1 ? "" : "s"}${progress.unknownEntryCount ? ` and ${progress.unknownEntryCount} account item${progress.unknownEntryCount === 1 ? "" : "s"} that could not be classified` : ""}.`;
+      this.progressCardCount = progress.cardCount;
+      this.progressCardIndex = 0;
+      this.progress = progress.cardCount === 0
+        ? "No eligible cards were found. Finishing the scan…"
+        : `Preparing ${progress.cardCount} card${progress.cardCount === 1 ? "" : "s"} for a read-only scan…`;
     } else if (progress.type === "card") {
-      const phase = progress.phase === "trackers"
-        ? "reading benefit progress"
-        : progress.phase === "catalog"
-          ? "reading benefit details"
-          : "organizing safe fields";
-      this.progress = `Card ${progress.cardIndex} of ${progress.cardCount}: ${phase} for ${progress.productName} ending ${progress.endingDigits}.`;
+      this.progressCardCount = progress.cardCount;
+      this.progressCardIndex = progress.cardIndex;
+      this.progress = `Reading card ${progress.cardIndex} of ${progress.cardCount}…`;
     } else if (progress.type === "card_committed") {
       this.store = { ...this.store, cards: { ...this.store.cards, [progress.record.localCardId]: progress.record } };
-      const diagnostics = BENEFIT_IDENTITY_CONFLICT_DIAGNOSTICS.filter((diagnostic) =>
-        progress.conflictDiagnostics.includes(diagnostic));
-      if (diagnostics.length || progress.conflictDetails.details.length) {
-        this.conflictsByCard.set(progress.record.localCardId, {
-          diagnostics,
-          detailSet: progress.conflictDetails,
-        });
-      } else {
-        this.conflictsByCard.delete(progress.record.localCardId);
-      }
     } else if (progress.type === "verifying_context") {
-      this.progress = "Finishing the scan and checking that the visible Amex page did not change…";
+      if (this.progressCardCount !== null) this.progressCardIndex = this.progressCardCount;
+      this.progress = "Finishing the scan…";
     } else {
       this.mode = "idle";
+      this.progressCardCount = null;
+      this.progressCardIndex = 0;
       this.store = { ...this.store, lastScan: progress.summary };
-      this.progress = scanSummaryText(progress.summary);
+      this.progress = "Ready to scan.";
     }
     this.render();
   }
@@ -470,17 +352,17 @@ export class AmexBenefitReaderPanel implements ScanReporter {
   private async start(): Promise<void> {
     if (this.mode !== "idle") return;
     this.collapsed = false;
-    this.conflictsByCard.clear();
     this.mode = "scanning";
+    this.progressCardCount = null;
+    this.progressCardIndex = 0;
     this.progress = "Starting your read-only scan…";
     this.errorMessage = null;
     this.render();
     try {
+      // The engine's terminal `finished` event is the only authority that may
+      // restore result UI. A resolved action without that event must remain in
+      // the isolated workspace rather than exposing a partial scan as final.
       await this.actions.startScan();
-      if (this.mode === "scanning" || this.mode === "cancelling") {
-        this.mode = "idle";
-        this.render();
-      }
     } catch {
       this.mode = "error";
       this.errorMessage = "The scan could not finish safely. Existing local observations were preserved.";
@@ -516,7 +398,6 @@ export class AmexBenefitReaderPanel implements ScanReporter {
 
   private async clear(): Promise<void> {
     if (!window.confirm("Clear all local Amex benefit observations and the local identity secret?")) return;
-    this.conflictsByCard.clear();
     try {
       await this.actions.clearData();
       this.store = { schemaVersion: 1, revision: 0, updatedAt: new Date().toISOString(), cards: {}, lastScan: null };
@@ -564,104 +445,9 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     return item;
   }
 
-  private renderConflictCandidate(candidate: BenefitIdentityConflictCandidateDetail): HTMLElement {
-    const item = element("li");
-    item.className = "conflict-candidate";
-    item.dataset.amexConflictCandidate = "true";
-    item.dataset.candidateIndex = String(candidate.candidateIndex);
-    item.dataset.sourceRole = candidate.sourceRole;
-
-    const heading = element("h5", `Candidate ${candidate.candidateIndex}: ${CONFLICT_SOURCE_LABELS[candidate.sourceRole]}`);
-    item.append(heading);
-    const title = element(
-      "p",
-      candidate.displayTitle ? formatAmexBenefitTitle(candidate.displayTitle) : "No display title exposed",
-    );
-    title.className = "conflict-candidate-title";
-    title.dataset.amexConflictField = "display-title";
-    title.dataset.fieldState = candidate.displayTitle ? "observed" : "not_exposed";
-    item.append(title);
-
-    const fields = element("dl");
-    fields.className = "conflict-candidate-fields";
-    const key = element("dd", candidate.supportedCreditKey ?? "No reviewed credit match");
-    key.dataset.amexConflictField = "supported-credit-key";
-    key.dataset.fieldState = candidate.supportedCreditKey ? "observed" : "not_exposed";
-    if (candidate.supportedCreditKey) key.dataset.fieldValue = candidate.supportedCreditKey;
-    const family = element("dd", candidate.supportedCreditFamily ?? "No reviewed credit family");
-    family.dataset.amexConflictField = "supported-credit-family";
-    family.dataset.fieldState = candidate.supportedCreditFamily ? "observed" : "not_exposed";
-    if (candidate.supportedCreditFamily) family.dataset.fieldValue = candidate.supportedCreditFamily;
-    fields.append(
-      element("dt", "Reviewed credit"), key,
-      element("dt", "Reviewed credit family"), family,
-    );
-    appendDiagnosticField(fields, "Category", "category", candidate.category);
-    appendDiagnosticField(fields, "Activity", "activity-kind", candidate.activityKind);
-    appendDiagnosticField(fields, "Enrollment", "enrollment-state", candidate.enrollmentState);
-    appendDiagnosticField(fields, "Tracker", "tracker-state", candidate.trackerState);
-    appendDiagnosticField(fields, "Completion", "completion-state", candidate.completionState);
-    appendDiagnosticQuantity(fields, "Earned or used", "earned-or-used", candidate.earnedOrUsed);
-    appendDiagnosticQuantity(fields, "Target or limit", "target-or-limit", candidate.targetOrLimit);
-    appendDiagnosticQuantity(fields, "Remaining", "remaining", candidate.remaining);
-    appendDiagnosticField(fields, "Period", "period", candidate.period);
-    appendDiagnosticField(fields, "Catalog layout", "catalog-layout", candidate.catalogLayout);
-    appendDiagnosticField(fields, "Catalog enrollable", "catalog-enrollable", candidate.catalogEnrollable, (value) => value ? "Yes" : "No");
-    item.append(fields);
-    return item;
-  }
-
-  private renderConflictDetail(detail: BenefitIdentityConflictDetail): HTMLElement {
-    const article = element("article");
-    article.className = "conflict-detail";
-    article.dataset.amexConflict = "true";
-    article.dataset.conflictKey = detail.conflictKey;
-    article.dataset.conflictCategory = detail.category;
-    article.dataset.candidateCount = String(detail.candidateCount);
-    article.dataset.candidatesTruncated = String(detail.candidatesTruncated);
-
-    const heading = element("h4", CONFLICT_DIAGNOSTIC_LABELS[detail.category]);
-    heading.className = "conflict-detail-title";
-    article.append(heading);
-    const keyList = element("ul");
-    keyList.className = "conflict-credit-keys";
-    detail.reviewedCreditKeys.forEach((key) => {
-      const item = element("li", `${creditFamilyLabel(key)} (${key})`);
-      item.dataset.amexReviewedCreditKey = key;
-      item.dataset.creditFamily = creditFamilyLabel(key);
-      keyList.append(item);
-    });
-    article.append(keyList);
-
-    const candidates = element("ol");
-    candidates.className = "conflict-candidates";
-    detail.candidates.forEach((candidate) => candidates.append(this.renderConflictCandidate(candidate)));
-    article.append(candidates);
-    if (detail.candidatesTruncated) {
-      article.append(element("p", `Showing ${detail.candidates.length} of ${detail.candidateCount} parsed candidates.`));
-    }
-
-    const relations = element("dl");
-    relations.className = "conflict-relations";
-    ([
-      ["Same join", "same-join-id", detail.relations.sameJoinId],
-      ["Period comparison", "period", detail.relations.period],
-      ["Amount comparison", "amount", detail.relations.amount],
-      ["State comparison", "state", detail.relations.state],
-    ] as const).forEach(([label, relation, value]) => {
-      const result = element("dd", value === "unavailable" ? "Unavailable" : value === "same" ? "Same" : "Different");
-      result.dataset.amexConflictRelation = relation;
-      result.dataset.relationValue = value;
-      relations.append(element("dt", label), result);
-    });
-    article.append(relations);
-    return article;
-  }
-
-  private renderCardGroup(record: StoredCardRecordV1, coverageKind: CardCoverageKind): HTMLElement {
+  private renderCardGroup(record: StoredCardRecordV1): HTMLElement {
     const section = element("section");
     const headingId = `pr-card-${record.localCardId}`;
-    const quality = observationQuality(record);
     const benefits = record.latest?.benefits ?? [];
     const filtered = benefits.filter((benefit) => benefitPresentation(benefit).filter === this.benefitFilter);
     section.className = "card-group";
@@ -685,112 +471,15 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     summary.className = "card-summary";
     headingCopy.append(summary);
     section.setAttribute("aria-labelledby", `${headingId} ${summaryId}`);
-    const qualityBadge = element("span", quality.label);
-    qualityBadge.id = `${headingId}-quality`;
-    qualityBadge.className = `quality-pill quality-${quality.tone}`;
-    qualityBadge.setAttribute("aria-label", `Data quality: ${quality.label}`);
-    heading.setAttribute("aria-describedby", qualityBadge.id);
-    headingRow.append(headingCopy, qualityBadge);
+    headingRow.append(headingCopy);
     section.append(headingRow);
-
-    let coverageMessage: string | null = null;
-    if (coverageKind === "older_retained") {
-      coverageMessage = record.freshness === "stale_error"
-        ? "This older stored card was not checked in the latest scan; its stale data remains for review."
-        : "This older stored card was not checked in the latest scan and remains for review.";
-    } else if (record.freshness === "stale_error") {
-      coverageMessage = "Older benefit data was retained because the latest read failed.";
-    } else if (
-      record.latest?.benefits.length === 0
-      && record.latest.issueCodes.includes("http_error")
-    ) {
-      coverageMessage = "The benefit catalog was unavailable, so this card is not confirmed to have no trackable benefits.";
-    } else if (coverageKind === "latest_scan_unresolved") {
-      coverageMessage = "The latest scan did not conclusively establish whether this card has trackable benefits.";
-    }
-    if (coverageMessage) {
-      const notice = element("p", coverageMessage);
-      notice.className = "card-coverage-note";
-      section.append(notice);
-    }
 
     const list = element("ul");
     list.className = "benefit-list";
     filtered.forEach((benefit) => list.append(this.renderBenefit(benefit)));
     section.append(list);
 
-    const dataQuality = element("details");
-    dataQuality.className = "secondary-panel data-quality";
-    dataQuality.append(element("summary", "Data quality and timestamps"));
-    const timeList = element("dl");
-    timeList.append(
-      element("dt", "Observed"), element("dd", formatDate(record.observedAt)),
-      element("dt", "Last attempt"), element("dd", formatDate(record.lastAttemptAt)),
-      element("dt", "Parser"), element("dd", record.latest?.parserVersion ?? "No observation"),
-      element("dt", "Benefit confidence"), element("dd", confidenceSummary(benefits)),
-    );
-    dataQuality.append(timeList);
-    const qualityReasons = new Set<string>();
-    if (record.error) qualityReasons.add(record.error.message);
-    record.latest?.issueCodes.forEach((code) => qualityReasons.add(fixedErrorMessage(code)));
-    if (qualityReasons.size) {
-      const issues = element("ul");
-      issues.className = "detail-notes";
-      qualityReasons.forEach((message) => issues.append(element("li", message)));
-      dataQuality.append(issues);
-    }
-    const conflictState = this.conflictsByCard.get(record.localCardId);
-    if (conflictState) {
-      dataQuality.append(element("p", "Benefit matching notes from this scan"));
-      if (conflictState.diagnostics.length) {
-        const diagnostics = element("ul");
-        diagnostics.className = "detail-notes conflict-diagnostics";
-        conflictState.diagnostics.forEach((diagnostic) => {
-          diagnostics.append(element("li", CONFLICT_DIAGNOSTIC_LABELS[diagnostic]));
-        });
-        dataQuality.append(diagnostics);
-      }
-      if (conflictState.detailSet.details.length) {
-        const detailSection = element("section");
-        detailSection.className = "conflict-detail-section";
-        detailSection.dataset.amexConflictDetails = "true";
-        detailSection.dataset.conflictCount = String(conflictState.detailSet.totalCount);
-        detailSection.dataset.conflictsTruncated = String(conflictState.detailSet.truncated);
-        detailSection.setAttribute("aria-label", "Structured benefit matching ambiguities from this scan");
-        conflictState.detailSet.details.forEach((detail) => detailSection.append(this.renderConflictDetail(detail)));
-        if (conflictState.detailSet.truncated) {
-          detailSection.append(element("p", `Showing ${conflictState.detailSet.details.length} of ${conflictState.detailSet.totalCount} matching ambiguities.`));
-        }
-        dataQuality.append(detailSection);
-      }
-    }
-    section.append(dataQuality);
     return section;
-  }
-
-  private renderAccountNotes(benefitCards: StoredCardRecordV1[]): HTMLElement | null {
-    const messages: string[] = [];
-    const observationTimes = new Set(benefitCards.map((record) => record.observedAt).filter(Boolean));
-    if (
-      observationTimes.size > 1
-      || benefitCards.some((record) => observationQuality(record).tone !== "good")
-    ) {
-      messages.push("Some stored cards have partial, stale, failed, or differently timed observations. Their counts remain included in Data notes.");
-    }
-    if (this.store.lastScan?.unknownAccountVariantCount) {
-      const count = this.store.lastScan.unknownAccountVariantCount;
-      messages.push(`${count} account item${count === 1 ? " was" : "s were"} not recognized and not scanned.`);
-    }
-    if (this.store.lastScan?.visibleContext === "changed") messages.push(fixedErrorMessage("visible_context_changed"));
-    if (this.store.lastScan?.visibleContext === "unavailable") messages.push("The visible Amex card context could not be verified after the scan.");
-    if (!messages.length) return null;
-    const details = element("details");
-    details.className = "secondary-panel account-notes";
-    details.append(element("summary", `Scan notes (${messages.length})`));
-    const list = element("ul");
-    messages.forEach((message) => list.append(element("li", message)));
-    details.append(list);
-    return details;
   }
 
   private render(): void {
@@ -818,25 +507,18 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       button.primary:hover { background: var(--pr-primary-hover); }
       button:focus-visible, summary:focus-visible { outline: 3px solid rgba(71,85,105,.28); outline-offset: 2px; }
       button:disabled { opacity: .52; cursor: default; transform: none; }
-      .scan-status { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--pr-border); border-radius: 10px; background: #f8fafc; color: #475467; font-size: 13px; }
+      .scan-workspace { display: grid; gap: 14px; padding: 22px 18px; }
+      .scan-status { padding: 10px 12px; border: 1px solid var(--pr-border); border-radius: 10px; background: #f8fafc; color: #475467; font-size: 13px; }
+      .scan-progress { width: 100%; height: 10px; accent-color: var(--pr-primary); }
+      .scan-cancel { width: 100%; }
       .notice { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
       .notice-warning { border: 1px solid var(--pr-amber-border); background: var(--pr-amber-bg); color: #92400e; }
       .content { padding: 16px; }
-      .account-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
-      .metric { padding: 10px; border: 1px solid var(--pr-border); border-radius: 10px; background: var(--pr-card); }
-      .metric strong { display: block; font-size: 17px; line-height: 1.2; }
-      .metric span { display: block; margin-top: 3px; color: var(--pr-muted); font-size: 11px; }
       .card-groups { display: grid; gap: 12px; margin-top: 14px; }
       .card-group { padding: 14px; border: 1px solid var(--pr-border); border-radius: 14px; background: var(--pr-card); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
       .card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
       .card-summary { margin-top: 4px; color: var(--pr-muted); font-size: 12px; }
-      .card-coverage-note { margin: 8px 0 0; color: var(--pr-muted); font-size: 12px; }
-      .quality-pill, .status-pill { display: inline-flex; align-items: center; flex: 0 0 auto; border: 1px solid; border-radius: 999px; font-size: 11px; font-weight: 750; white-space: nowrap; }
-      .quality-pill { padding: 4px 8px; }
-      .quality-good { border-color: var(--pr-green-border); background: var(--pr-green-bg); color: #047857; }
-      .quality-note { border-color: var(--pr-blue-border); background: var(--pr-blue-bg); color: #1d4ed8; }
-      .quality-warning { border-color: var(--pr-amber-border); background: var(--pr-amber-bg); color: #92400e; }
-      .quality-error { border-color: var(--pr-red-border); background: var(--pr-red-bg); color: #b91c1c; }
+      .status-pill { display: inline-flex; align-items: center; flex: 0 0 auto; border: 1px solid; border-radius: 999px; font-size: 11px; font-weight: 750; white-space: nowrap; padding: 3px 7px; }
       .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
       .filter-button { min-height: 40px; padding: 7px 10px; color: #475467; font-size: 13px; }
       .filter-button[aria-pressed="true"] { border-color: #94a3b8; background: #eef2f6; color: #1f2937; box-shadow: inset 0 0 0 1px rgba(71,85,105,.08); }
@@ -855,33 +537,14 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       .period { color: var(--pr-muted); font-size: 12px; }
       details { margin-top: 10px; }
       summary { color: #475467; font-size: 12px; font-weight: 700; cursor: pointer; }
-      dl { display: grid; grid-template-columns: minmax(100px, auto) 1fr; gap: 5px 10px; margin: 10px 0 0; font-size: 12px; }
-      dt { color: #475467; font-weight: 700; } dd { margin: 0; overflow-wrap: anywhere; color: var(--pr-muted); }
-      .detail-notes { margin-top: 10px; padding-left: 18px; color: #92400e; font-size: 12px; }
-      .conflict-detail-section { display: grid; gap: 10px; margin-top: 10px; }
-      .conflict-detail { padding: 10px; border: 1px solid var(--pr-amber-border); border-radius: 9px; background: var(--pr-amber-bg); }
-      .conflict-detail-title { color: #78350f; font-size: 13px; }
-      .conflict-credit-keys { margin-top: 6px; padding-left: 18px; color: #92400e; font: 600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
-      .conflict-candidates { display: grid; gap: 8px; margin-top: 8px; padding-left: 20px; }
-      .conflict-candidate { padding: 8px; border: 1px solid #f3d28f; border-radius: 8px; background: #fff; }
-      .conflict-candidate h5 { margin: 0; color: #78350f; font-size: 12px; }
-      .conflict-candidate-title { margin-top: 4px; font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
-      .conflict-candidate-fields, .conflict-relations { grid-template-columns: minmax(105px, auto) 1fr; margin-top: 7px; }
-      .conflict-relations { padding-top: 7px; border-top: 1px solid #f3d28f; }
-      .secondary-panel { padding: 10px 12px; border: 1px solid var(--pr-border); border-radius: 10px; background: #f8fafc; }
-      .account-notes { margin: 12px 0 0; }
-      .account-notes ul { margin-top: 9px; padding-left: 18px; color: #475467; font-size: 12px; }
-      .coverage-summary { margin: -4px 0 10px; color: var(--pr-muted); font-size: 12px; }
-      .hidden-cards-note { margin: -4px 0 12px; color: var(--pr-muted); font-size: 12px; }
       .empty-state { margin-top: 12px; padding: 18px 12px; border: 1px dashed #cbd5e1; border-radius: 10px; color: var(--pr-muted); text-align: center; }
       .footer { padding: 0 16px 16px; }
       .privacy-details p { margin-top: 8px; color: var(--pr-muted); font-size: 12px; }
       .clear-button { width: 100%; margin-top: 10px; padding: 8px 10px; border-color: var(--pr-red-border); color: #b91c1c; }
-      @media (max-width: 520px) { .panel { top: 8px; right: 8px; width: calc(100vw - 16px); max-height: calc(100vh - 16px); } .account-summary { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+      @media (max-width: 520px) { .panel { top: 8px; right: 8px; width: calc(100vw - 16px); max-height: calc(100vh - 16px); } }
       @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
     `;
 
-    if (this.mode === "scanning" || this.mode === "cancelling") this.collapsed = false;
     if (this.collapsed) {
       const launcher = element("button", "PR");
       launcher.type = "button";
@@ -902,6 +565,37 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     panel.className = "panel";
     panel.setAttribute("aria-labelledby", "pr-reader-title");
 
+    if (this.mode === "scanning" || this.mode === "cancelling") {
+      const workspace = element("section");
+      workspace.className = "scan-workspace";
+      const title = element("h2", "Amex benefits");
+      title.id = "pr-reader-title";
+      workspace.append(title);
+      const status = element("p", this.progress);
+      status.className = "scan-status";
+      status.setAttribute("role", "status");
+      status.setAttribute("aria-live", "polite");
+      workspace.append(status);
+      const progress = element("progress");
+      progress.className = "scan-progress";
+      progress.setAttribute("aria-label", "Scan progress");
+      if (this.progressCardCount !== null && this.progressCardCount > 0) {
+        progress.max = this.progressCardCount;
+        progress.value = Math.min(this.progressCardIndex, this.progressCardCount);
+        progress.setAttribute("aria-valuetext", `Card ${this.progressCardIndex} of ${this.progressCardCount}`);
+      }
+      workspace.append(progress);
+      const cancel = element("button", this.mode === "cancelling" ? "Cancelling…" : "Cancel");
+      cancel.type = "button";
+      cancel.className = "scan-cancel";
+      cancel.disabled = this.mode === "cancelling";
+      cancel.addEventListener("click", () => this.cancel());
+      workspace.append(cancel);
+      panel.append(workspace);
+      this.root.append(style, panel);
+      return;
+    }
+
     const top = element("div");
     top.className = "top";
     const brand = element("div");
@@ -916,7 +610,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     brandText.append(title, element("p", "Perks Reminder local reader"));
     brandText.lastElementChild!.className = "eyebrow";
     brand.append(brandText);
-    if (this.mode !== "scanning" && this.mode !== "cancelling") {
+    if (this.mode === "idle" || this.mode === "syncing" || this.mode === "error") {
       const collapse = element("button", "Collapse");
       collapse.type = "button";
       collapse.className = "collapse-button";
@@ -947,7 +641,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     scan.disabled = this.mode !== "idle";
     scan.addEventListener("click", () => void this.start());
     controls.append(scan);
-    if (this.store.lastScan && this.actions.syncReviewed && this.mode !== "scanning" && this.mode !== "cancelling") {
+    if (this.store.lastScan && this.actions.syncReviewed) {
       const sync = element("button", "Sync reviewed");
       sync.type = "button";
       sync.dataset.amexSyncAction = "true";
@@ -955,20 +649,8 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       sync.addEventListener("click", () => void this.syncReviewed());
       controls.append(sync);
     }
-    if (this.mode === "scanning" || this.mode === "cancelling") {
-      const cancel = element("button", this.mode === "cancelling" ? "Cancelling…" : "Cancel");
-      cancel.type = "button";
-      cancel.disabled = this.mode === "cancelling";
-      cancel.addEventListener("click", () => this.cancel());
-      controls.append(cancel);
-    }
     top.append(controls);
 
-    const status = element("p", this.progress);
-    status.className = "scan-status";
-    status.setAttribute("role", "status");
-    status.setAttribute("aria-live", "polite");
-    top.append(status);
     if (this.errorMessage) {
       const error = element("p", this.errorMessage);
       error.className = "notice notice-warning";
@@ -981,10 +663,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     const cards = coverage.map(({ record }) => record);
     const benefitCards = cards.filter((record) => (record.latest?.benefits.length ?? 0) > 0);
     const confirmedEmptyCards = coverage.filter(({ kind }) => kind === "confirmed_empty");
-    const unresolvedCards = coverage.filter(({ kind }) => kind === "latest_scan_unresolved");
     const reviewEntries = coverage.filter(({ kind }) => kind !== "confirmed_empty");
-    const reviewCards = reviewEntries.map(({ record }) => record);
-    const olderRetainedCards = coverage.filter(({ kind }) => kind === "older_retained");
     const filterCounts: Record<BenefitFilter, number> = { remaining: 0, used: 0 };
     benefitCards.forEach((record) => {
       record.latest?.benefits.forEach((benefit) => {
@@ -998,47 +677,6 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     content.className = "content";
     if (cards.length) {
       const totalBenefits = filterCounts.remaining + filterCounts.used;
-      const dataNoteCards = reviewEntries.filter(({ record, kind }) =>
-        kind === "latest_scan_unresolved"
-        || kind === "older_retained"
-        || observationQuality(record).tone !== "good").length;
-      const metrics = element("div");
-      metrics.className = "account-summary";
-      ([[String(benefitCards.length), "Cards with benefits"], [String(totalBenefits), "Eligible benefits"], [String(dataNoteCards), "Data notes"]] as Array<[string,string]>).forEach(([value, label]) => {
-        const metric = element("div");
-        metric.className = "metric";
-        metric.append(element("strong", value), element("span", label));
-        metrics.append(metric);
-      });
-      content.append(metrics);
-
-      if (this.store.lastScan) {
-        const attempted = this.store.lastScan.attemptedCardCount;
-        const confirmed = confirmedEmptyCards.length;
-        const unresolved = unresolvedCards.length;
-        const older = olderRetainedCards.length;
-        const coverageSummary = element(
-          "p",
-          `${attempted} card${attempted === 1 ? "" : "s"} checked in the latest scan; `
-            + `${cards.length} stored card record${cards.length === 1 ? "" : "s"}; `
-            + `${confirmed} confirmed empty; ${unresolved} latest-scan record${unresolved === 1 ? "" : "s"} unresolved; `
-            + `${older} older stored card${older === 1 ? " remains" : "s remain"} retained for review.`,
-        );
-        coverageSummary.className = "coverage-summary";
-        content.append(coverageSummary);
-      }
-
-      if (confirmedEmptyCards.length) {
-        const count = confirmedEmptyCards.length;
-        const hiddenNote = element(
-          "p",
-          count === 1
-            ? "1 card was confirmed to have no trackable benefits and is hidden."
-            : `${count} cards were confirmed to have no trackable benefits and are hidden.`,
-        );
-        hiddenNote.className = "hidden-cards-note";
-        content.append(hiddenNote);
-      }
 
       if (benefitCards.length) {
         const filters = element("div");
@@ -1063,7 +701,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       if (renderedEntries.length) {
         const groups = element("div");
         groups.className = "card-groups";
-        renderedEntries.forEach(({ record, kind }) => groups.append(this.renderCardGroup(record, kind)));
+        renderedEntries.forEach(({ record }) => groups.append(this.renderCardGroup(record)));
         content.append(groups);
       } else {
         let message: string;
@@ -1073,7 +711,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
         if (allCardsConclusivelyEmpty) {
           message = "No trackable benefits are available in the reviewed card observations.";
         } else if (totalBenefits === 0) {
-          message = "No benefit rows are available in the reviewed observations. Unresolved records, older retained data, and other latest-scan quality notes remain reflected in the account summary and Data notes.";
+          message = "No benefit rows are available in the local observations.";
         } else {
           const otherFilter: BenefitFilter = this.benefitFilter === "remaining" ? "used" : "remaining";
           const otherCount = filterCounts[otherFilter];
@@ -1089,8 +727,6 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       empty.className = "empty-state";
       content.append(empty);
     }
-    const accountNotes = this.renderAccountNotes(reviewCards);
-    if (accountNotes) content.append(accountNotes);
     panel.append(content);
 
     const footer = element("div");
@@ -1102,7 +738,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     const clear = element("button", "Clear local data");
     clear.type = "button";
     clear.className = "clear-button";
-    clear.disabled = this.mode === "scanning" || this.mode === "cancelling" || this.mode === "syncing";
+    clear.disabled = this.mode === "syncing";
     clear.addEventListener("click", () => void this.clear());
     privacy.append(clear);
     footer.append(privacy);
