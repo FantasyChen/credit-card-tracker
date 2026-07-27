@@ -72,7 +72,90 @@ function retainSupportedAmexCardCredits<T extends { title: string }>(
   productName: string,
   benefits: T[],
 ): T[];
+
+type BenefitUsageLabel =
+  | "Not used"
+  | "Partially used"
+  | "Used"
+  | "Enrollment required"
+  | "Link required"
+  | "Status unavailable";
+
+type BenefitTone = "amber" | "blue" | "green" | "muted";
+
+interface BenefitUsagePresentation {
+  label: BenefitUsageLabel;
+  tone: BenefitTone;
+  filter: "remaining" | "used";
+}
+
+function deriveBenefitUsageState(
+  benefit: NormalizedBenefitObservationV1,
+): BenefitUsagePresentation;
+
+function decodeNumericCharacterReferences(value: string): string;
+function formatAmexBenefitTitle(value: string): string;
+
+type BenefitIdentityConflictDiagnostic =
+  | "tracker_state_collision"
+  | "tracker_catalog_key_mismatch"
+  | "ambiguous_catalog_join"
+  | "tracker_catalog_candidate_collision";
+
+type BenefitIdentityConflictSourceRole =
+  | "tracker"
+  | "joined_catalog"
+  | "catalog_enrollment_candidate";
+
+type ConflictDiagnosticField<T> =
+  | { state: "observed"; value: T }
+  | { state: "not_exposed" }
+  | { state: "unrecognized" };
+
+interface BenefitIdentityConflictDetail {
+  conflictKey: string;
+  category: BenefitIdentityConflictDiagnostic;
+  reviewedCreditKeys: string[];
+  reviewedCreditFamilies: string[];
+  candidateCount: number;
+  candidatesTruncated: boolean;
+  candidates: BenefitIdentityConflictCandidateDetail[];
+  relations: {
+    sameJoinId: "same" | "different" | "unavailable";
+    period: "same" | "different" | "unavailable";
+    amount: "same" | "different" | "unavailable";
+    state: "same" | "different" | "unavailable";
+  };
+}
+
+interface BenefitIdentityConflictDetailSet {
+  details: BenefitIdentityConflictDetail[];
+  totalCount: number;
+  truncated: boolean;
+}
+
+interface BenefitNormalizationResult {
+  benefits: NormalizedBenefitObservationV1[];
+  issueCodes: IssueCode[];
+  conflictDiagnostics: BenefitIdentityConflictDiagnostic[];
+  conflictDetails: BenefitIdentityConflictDetailSet;
+}
 ```
+
+`BenefitIdentityConflictCandidateDetail` is a closed projection containing only a one-based scan-local candidate index, one fixed source role, bounded parsed display title and supported-credit key/family, explicit parsed/not-exposed/unrecognized category/activity/enrollment/tracker/completion fields, parsed decimal quantity fields with characterized units/currency, parsed period, and bounded catalog layout/enrollability. It has no generic record field, issuer/source ID, provider token, request metadata, or raw object. The current Amex caps are 24 conflict details and four rendered candidates per conflict; bounded total counts plus truncation booleans disclose omitted detail without retaining unbounded output.
+
+```ts
+interface CardCommittedProgress {
+  type: "card_committed";
+  record: StoredCardRecordV1;
+  conflictDiagnostics: BenefitIdentityConflictDiagnostic[];
+  conflictDetails: BenefitIdentityConflictDetailSet;
+}
+```
+
+`deriveBenefitUsageState` is a conservative presentation projection, not a persisted binary status. `decodeNumericCharacterReferences` decodes one pass of valid semicolon-terminated decimal or hexadecimal Unicode scalar references for display and leaves named, malformed, null, surrogate, and out-of-range references literal. `formatAmexBenefitTitle` applies that one-pass decoder and removes only a reviewed Amex adornment: terminal `<sup>‡</sup>` or `<sup>®</sup>`, standalone `‡`, or either exact superscript marker immediately before the exact suffix ` Statement Credit`. It trims trailing whitespace, preserves one separating space before `Statement Credit` when a nonempty prefix remains, and falls back to the decoded title when terminal removal would make it empty. Formatted output must still enter the DOM through text-only APIs such as `textContent`.
+
+`BenefitIdentityConflictDiagnostic` remains an internal fixed vocabulary derived only from the adapter branch that detected a generic `benefit_identity_conflict`. The fixed category contains no source values. Under an explicit owner authorization that permits local semantic review, the same adapter may additionally project the minimum already-parsed candidate facts into `conflictDetails`; those facts are restricted to the current per-card progress event, panel memory, and the reader-owned open shadow tree. Neither the category nor structured details are part of normalized observations, scan summaries, storage, logs, network traffic, reload reconstruction, or task evidence.
 
 Do not expose a generic `request(url, init)` port to scan orchestration. Add a named method and an exact operation contract for every newly approved read.
 
@@ -90,11 +173,15 @@ Do not expose a generic `request(url, init)` port to scan orchestration. Add a n
 10. **Per-card commit and stale preservation**: commit each successful or partial card independently. A failed card preserves its prior observation as stale when one exists; it must not erase good data from an earlier scan.
 11. **No mutation or transport expansion**: browser readers must not enroll, activate, link, redeem, add offers, pay, or change provider state. They must not send observations to Perks Reminder, analytics, or third parties unless a separate task defines and approves that contract.
 12. **Visible-context invariant**: capture the reviewed exact origin and current pathname before scanning, plus a one-way selected-display fingerprint only when a recognized selected-card control is present. Final verification always requires the same origin/pathname. A captured fingerprint must remain present and equal; an absent selector is valid and makes route invariance sufficient, even if a selector appears later. Report changed or unavailable context without persisting the visible display string.
-13. **Separate evidence quality from benefit state**: user-facing presentation must not reuse parser completeness/freshness as a benefit status. Labels such as `Partial data`, `Stale data`, and `Could not read` describe the observation; labels such as `Enrollment required`, `In progress`, and `Completed` describe the benefit. Keep issue codes, field availability, confidence, and timestamps secondary to that distinction.
-14. **Scale by physical card identity and bounded presentation**: when an account can contain many observations or repeated product names, make the physical card the primary navigation level and include explicit ending digits in the card label. Render one selected card workspace at a time or use an equivalently bounded hierarchy; do not default to one continuous all-card technical list. A site-wide reader may keep collapse state only in panel memory, but scanning and cancelling must force the full progress/cancellation workspace to remain reachable.
+13. **Separate evidence quality from benefit state**: user-facing presentation must not reuse parser completeness/freshness as a benefit status. `Current`, `Partial data`, `Stale data`, and `Could not read` describe the card observation and belong once in the accessible card-group heading plus its secondary quality disclosure, not repeated on every benefit row. `Enrollment required`, `Link required`, `Used`, `Partially used`, `Not used`, and `Status unavailable` describe the benefit. Apply state precedence in this order: enrollment/linking requirements; explicit completion, recognized earned/completed tracker or activity kind, or compatible used-at/above-target evidence as `Used`; compatible observed zero-below-target evidence as `Not used` even when a generic tracker state says in progress; explicit in-progress or compatible positive-below-target evidence as `Partially used`; explicit not-started evidence as `Not used`; otherwise `Status unavailable`. Generic in-progress remains `Partially used` when compatible zero evidence is absent, including when quantities are missing, incompatible, or uncharacterized.
+14. **Scale by physical card identity and a grouped master list**: when an account can contain many observations or repeated product names, group one account-wide master list by physical card and include product plus explicit ending digits in every rendered group label. Keep every benefit-bearing physical-card group represented under both filters; when a benefit-bearing card has no rows in the active filter, retain a compact zero-count group rather than a repeated empty-message box. Hide cards whose latest normalized observation has zero eligible benefits, disclose only a non-identifying aggregate hidden-card count, and show one account-level no-trackable-benefits state when every reviewed card is benefit-empty. Scope review metrics and data-note counts to benefit-bearing cards while retaining attempted-card coverage in scan status. The only top-level benefit filters are `Remaining` (default; every non-`Used` row) and `Used` (only `Used` rows); filter membership never relabels a row. A site-wide reader may keep collapse/filter state only in panel memory, but scanning and cancelling must force the full progress/cancellation workspace to remain reachable.
 15. **Shared-catalog, card-specific selection**: normalized/persisted benefits must be usable, trackable credits represented by a positive-amount benefit on the matched Perks Reminder card. Product and benefit aliases belong to one browser-safe matcher backed by the shared static catalog; do not maintain a disconnected userscript allowlist or admit a credit represented only on a different card.
 16. **Fail-closed filtering before interpretation**: unknown product names, unreviewed benefit wording, ambiguous matches, and access/protection/insurance/free-night/status/informational/non-credit titles are omitted before provider status, quantity, category, or layout fields are interpreted. Intentional omission is not a parser issue and must not make an otherwise complete card partial.
 17. **Compatible-store projection**: when a parser update narrows the supported-credit set without changing the observation/storage schema, project compatible stored observations through the same matcher before display and future persistence. Preserve observation quality, freshness, timestamps, scan summaries, and redacted errors; increment storage revision and rewrite only when rows are actually removed. Malformed or future-schema stores remain refused, not repaired.
+18. **Conservative quantity compatibility**: infer usage from used-versus-target comparison only when both values are valid nonnegative decimal strings, the target is positive, both units are characterized and equal, and currencies are equal. Matching `unknown` units are never compatible. Compare decimal strings deterministically rather than converting them to floating point. Incompatible, invalid, negative, missing, or nonpositive-target quantities cannot infer usage state. A combined inline used/target amount requires equal characterized units and currencies; an individual characterized used or target quantity may still be shown when its counterpart is absent.
+19. **Practical row density**: show benefit name, exact truthful state, safely available observed used/target evidence, and period inline. Show partial/stale quality once at the card heading, and keep fixed redacted reasons, parser fields, confidence, issue codes, timestamps, and other technical evidence in a card-level secondary disclosure. Do not repeat card quality on each benefit row or make the grouped master list a raw normalized-data dump.
+20. **Provider text remains inert**: decode valid decimal and hexadecimal numeric character references exactly once at the presentation boundary, leave unsupported or invalid references literal, and insert the result with `textContent` or an equivalent text-only API. A provider-specific presentation formatter may remove only a reviewed footnote adornment after that single pass; for Amex, this is a terminal literal or numeric-reference-derived `<sup>‡</sup>` or `<sup>®</sup>`, standalone `‡`, or either exact superscript marker immediately before the exact suffix ` Statement Credit`. Preserve one separating space before `Statement Credit` when a nonempty prefix remains, trim trailing whitespace, and fall back to the decoded title when terminal stripping would empty it. Preserve arbitrary other nonterminal markers, whitespace variants, broader suffixes, other tags/symbols, double-encoded references, and unrelated markup-like text. Never decode provider text by assigning it to `innerHTML`, never use `DOMParser` or broad tag stripping for display cleanup, never execute decoded markup, and do not rewrite the stored normalized title solely for presentation compatibility.
+21. **Ephemeral authorized conflict review**: retain `benefit_identity_conflict` as the only persisted issue and preserve partial/fail-closed handling. Classify existing conflict sites with the stable fixed enum for tracker-state/same-supported-credit collision, joined tracker/catalog supported-key mismatch, ambiguous catalog join/record, and tracker/catalog enrollment-candidate collision. Without explicit owner authorization, expose only fixed redacted categories. When an owner explicitly authorizes local semantic conflict review, a per-card `card_committed` event may also contain a bounded closed projection of already-parsed candidate facts: card product/ending from the committed record; category; reviewed supported credit key/family (both keys for mismatch); fixed source role; bounded display title; explicit parsed enrollment/tracker/completion/activity, decimal quantity/unit/currency, and period fields; same/different/unavailable relations that compare joins, periods, amounts, and states without exposing issuer IDs; and catalog layout/enrollability only where needed. Cap details and candidates, mark truncation, sort candidates deterministically, and assign a stable scan-local key from category, reviewed family, and deterministic ordinal. Render the projection only in a bounded accessible card-level secondary section inside the reader-owned open shadow root, with semantic `data-amex-*` hooks for narrow native DOM extraction. It is acceptable for that local reader subtree and the sole operator's local prompt to contain authorized product names, endings, titles, states, periods, and amounts. Never include credentials, cookies, authorization headers, MFA values, opaque provider tokens, raw response objects, or issuer/source IDs; never place structured details or categories in normalized snapshots, scan summaries, GM storage, console, network, task artifacts, or reload reconstruction. Clear the card's prior details on any new committed success/failure, clear all details on scan start/clear, and reconstruct none from stored generic issues. Details are evidence for later user choices only: they must not choose a cycle/latest/first/last observation, invent persisted benefit identity, broaden matching, merge contradictory state, resolve/suppress the conflict, or expand transport authority.
 
 ### 4. Validation & Error Matrix
 
@@ -115,8 +202,22 @@ Do not expose a generic `request(url, init)` port to scan orchestration. Add a n
 | Local envelope fails schema/migration validation | Refuse to scan into malformed state and offer explicit local-data recovery |
 | Exact origin/pathname changes, or a selected display captured at scan start changes/disappears | Finish safe commits, but mark the summary changed or unavailable |
 | No recognized selected-card control exists at capture | Capture a null fingerprint and verify exact origin/pathname only; do not block manual scan or infer a display identity |
-| Observation is partial/stale while a benefit is complete or in progress | Show both facts independently; never relabel the benefit as incomplete because the observation has data-quality notes |
-| Duplicate products or a high-observation account are restored | Keep every physical card reachable by product plus ending digits without rendering every card's full technical detail at once |
+| Observation is partial/stale while a benefit is used or partially used | Show both facts independently; expose card quality once at the accessible card heading and keep fixed redacted reasons in card-level details, without repeating quality on each row or relabeling the benefit |
+| Duplicate products or a high-observation account are restored | Render one grouped account-wide master list, keep every benefit-bearing physical card represented by product plus ending digits under both filters, hide globally benefit-empty cards behind one aggregate note, and keep technical details secondary |
+| Benefit is anything other than `Used` | Include it in `Remaining` while preserving its exact truthful state label |
+| Compatible used quantity is zero below a positive target while tracker state is `in_progress` | Show `Not used`; the specific zero-usage evidence overrides the generic in-progress fallback |
+| Tracker state is `in_progress` and compatible observed zero evidence is absent | Show `Partially used`, including when quantities are missing, incompatible, or uncharacterized |
+| Used and target quantities have matching `unknown` units or mismatched units/currencies | Do not compare them, infer state from the quantities, or show a combined used/target amount |
+| Used or target quantity is invalid/negative, or the target is nonpositive | Do not infer usage state from the comparison; malformed quantities remain rejected by the normalized schema |
+| Benefit title contains a valid semicolon-terminated decimal or hexadecimal numeric character reference | Decode one pass for display and insert the result as inert text |
+| Benefit title contains a named, malformed, null, surrogate, or out-of-range reference | Leave it literal; do not throw or create markup |
+| Benefit title contains a double-encoded numeric reference | Decode at most the outer reference; leave any newly produced reference literal rather than decoding twice |
+| Amex benefit title ends with literal `<sup>‡</sup>` or `<sup>®</sup>`, an exact equivalent produced by the one decoding pass, or standalone `‡` | Remove only that terminal presentation adornment and trailing whitespace; retain the original normalized title in storage |
+| Literal or one-pass-decoded Amex `<sup>‡</sup>` or `<sup>®</sup>` is immediately followed by the exact suffix ` Statement Credit` | Remove only the marker, preserve one separating space before `Statement Credit` when a nonempty prefix remains, and retain the original normalized title in storage |
+| Amex benefit title contains either recognized superscript marker in arbitrary mid-title prose, an unreviewed superscript symbol/tag, a whitespace variant or broader suffix, unrelated markup-like text, double encoding, or only the terminal adornment | Preserve nonterminal/unrelated text as inert visible text; decode only the original pass; if terminal stripping would empty the title, show the decoded original |
+| An existing adapter path emits `benefit_identity_conflict` without authorized semantic review | Keep the generic issue and partial disposition; add only its fixed redacted branch category to the current card's ephemeral scan outcome |
+| An owner-authorized local semantic review detects a conflict | Keep the generic issue and partial disposition; attach only the typed bounded parsed candidate projection to that card's `card_committed` event and reader shadow tree; expose no issuer/source ID and make no automatic choice |
+| A card is committed again, panel reloads/reconstructs from a stored generic conflict, or a new scan/clear begins | Replace or clear that card's prior ephemeral details, show no restored prior conflict category/detail, and infer nothing from storage |
 | Product name has no exact normalized catalog alias | Omit all benefits for that card; do not guess a nearby product or borrow another card's credit rules |
 | Benefit title has no unique reviewed alias for a positive-amount credit on the matched card | Omit the record before interpreting its provider fields; do not add a parser issue or partial marker solely for the omission |
 | Title contains a credit brand plus an explicit non-credit phrase such as access, protection, insurance, free night, or status | Reject the record even when a broader merchant alias also appears |
@@ -128,8 +229,13 @@ Do not expose a generic `request(url, init)` port to scan orchestration. Add a n
 - **Good**: a manual scan uses named read methods, projects provider JSON into strict schemas, clears each transient token in `finally`, commits every card independently, keeps repeated products distinct through an HMAC fingerprint, and restores only normalized observations after reload.
 - **Base**: an optional catalog read fails after valid tracker data. The reader records the redacted catalog issue, leaves enrollment fields unexposed, and commits the tracker observation as partial.
 - **Bad**: a generic fetch helper accepts arbitrary paths, stores raw JSON for debugging, derives an ending from a full account number or token, defaults a missing amount to zero, or turns a catalog authentication failure into partial success.
-- **Presentation good**: a partial card can still show an observed benefit as `Completed`, while a separate `Partial data` badge and secondary details explain the observation quality.
-- **Presentation bad**: a card-level `Incomplete` badge is used as the primary benefit status, duplicate products are grouped only by name, or all cards and normalized fields are rendered at equal priority.
+- **Presentation good**: a partial card can still show an observed benefit as `Used`, while one accessible card-heading `Partial data` badge and card-level details explain observation quality without repeating it on every row; all benefit-bearing physical cards remain visible in one grouped list, globally empty cards contribute only to the aggregate hidden-card note, and `Remaining` contains exact non-used labels without flattening them.
+- **Presentation base**: a benefit-bearing card has no rows under the active filter. Its product-plus-ending group remains visible as a compact zero-count group rather than disappearing or rendering a repeated empty-message box. A globally benefit-empty card is represented only by the aggregate hidden-card note.
+- **Presentation bad**: a card-level `Incomplete` badge replaces the benefit state, duplicate products are grouped only by name, `Remaining` relabels every row as not used, or all normalized/technical fields render at equal priority.
+- **Provider-text good**: `&#36;` in a provider title displays as `$` through a single numeric-reference decoder, an Amex terminal `<sup>‡</sup>` / `<sup>®</sup>` or either exact marker before ` Statement Credit` is omitted only from display, and the DOM receives the result through `textContent` while normalized storage retains the source title.
+- **Provider-text bad**: provider text is assigned to `innerHTML`, decoded repeatedly, broadly stripped as markup, has arbitrary nonterminal markers removed, is rewritten in normalized storage, or is allowed to throw on a malformed/out-of-range reference.
+- **Conflict-diagnostic good**: all current generic identity-conflict sites map to unique fixed branch categories; an explicitly authorized local review additionally shows capped deterministic candidates with parsed titles/states/amounts/periods and safe join relations in the active reader shadow tree, while normalized storage contains only `benefit_identity_conflict`; restore-only reload retains the generic quality reason but no category or detail.
+- **Conflict-diagnostic bad**: a detail includes an issuer/source ID, token, raw object, credential/session material, or generic passthrough; enters a normalized snapshot/scan summary/storage/log/network/artifact channel; survives replacement/reload; escapes the reader-owned subtree without authorization; or is used to pick one contradictory observation automatically.
 - **Selection good**: an exact reviewed product alias and benefit-title alias resolve to one positive-amount credit on that same shared-catalog card; the stable card-scoped credit key owns deduplication.
 - **Selection base**: a provider returns an access-only Resy item, a free-night award, or an otherwise unrepresented tracker. The reader silently omits it before parsing its status fields, while supported credits on the card remain complete.
 - **Selection bad**: a global merchant substring list admits a credit on every card, a broad `Resy`/`Saks` match admits access or protection, or panel-only filtering leaves unsupported rows in local storage.
@@ -152,8 +258,11 @@ For each browser-side provider reader, assert:
 - per-card success replaces the latest observation, failure preserves stale prior data, and summary counts match attempted dispositions;
 - exact-origin page load restores local normalized state without scanning, primary paths start expanded, and non-primary paths expose an accessible collapsed launcher whose expansion/collapse does not scan or persist UI state; clear-data removes both normalized state and the installation identity secret;
 - visible context is reported as unchanged, changed, or unavailable without persisting its source display value; selector-present capture requires stable display equality, while selector-free capture permits unchanged route-only verification;
-- observation-quality labels remain distinct from benefit action/progress labels, filter state is accessible, and duplicate products remain selectable by ending digits;
-- a synthetic high-scale fixture (currently 16 cards / 130 observations for Amex) keeps every observation reachable while rendering only the selected card's workspace;
+- all six truthful benefit labels follow the required precedence, observation-quality labels remain independent and appear once per accessible card heading rather than on each benefit row, fixed redacted quality reasons remain in card-level details, `Remaining`/`Used` filter state and counts are accessible, every benefit-bearing card group persists under both filters, globally benefit-empty cards are hidden behind a non-identifying aggregate note and account-level empty state, and duplicate products remain distinct by ending digits;
+- decimal comparisons avoid floating point and cover equal/above/below/zero behavior; compatible zero overrides generic in-progress as `Not used`; explicit completion remains `Used` despite conflicting zero/in-progress evidence; generic in-progress without compatible zero remains `Partially used`; missing, incompatible, and matching-`unknown` quantities infer no state from quantity comparison; incompatible/unknown pairs show no combined amount; and malformed quantities remain rejected by the normalized schema;
+- valid semicolon-terminated decimal/hex numeric character references decode exactly once into inert title text; named, malformed, null, surrogate, and out-of-range inputs remain literal; double-encoded input decodes only its outer layer; literal/numeric-derived terminal Amex `<sup>‡</sup>` / `<sup>®</sup>`, standalone `‡`, and either exact superscript marker before ` Statement Credit` are removed only for display; spacing normalizes to one separator before `Statement Credit` when a prefix remains; arbitrary nonterminal markers, whitespace variants, broader suffixes, multiple markers, other tags/symbols, and unrelated markup-like text remain visible and inert; empty-result fallback is safe; and normalized storage retains the original title;
+- every existing `benefit_identity_conflict` production site maps to the expected stable fixed category using invented fixtures; owner-authorized structured detail has exact closed shapes for all four categories, both reviewed keys on mismatch, fixed source roles, parsed candidate fields and safe relations, candidate/detail caps and truncation, deterministic ordering and scan-local keys under relevant reversal, correct card scoping, replacement on partial/failed rescan, and clearing on new scan/clear/reload; generic card-versus-row issue locality and partial disposition remain unchanged; neither categories nor details contain source IDs/secret-like fields or serialize into normalized observations, scan summaries, GM storage, console, network, or artifacts; and generated-bundle tests prove narrow native availability under the reader-owned shadow tree only;
+- a synthetic high-scale fixture (currently 16 benefit-bearing cards / 130 observations for Amex) keeps every benefit-bearing card group visible under both filters and keeps every eligible observation reachable through its truthful filter in the account-wide grouped master list; separate fixtures cover hidden globally empty cards and the all-empty account state;
 - every positive-amount benefit intended for provider synchronization in the shared card catalog has an exact-card matching fixture, while zero-value/access/protection/insurance/free-night/status/informational records, wrong-card titles, unknown products, and ambiguous wording fail closed;
 - unsupported provider records with malformed or unknown status/category fields are omitted before parsing and do not create partial observations or issue codes;
 - equivalent reviewed wording deduplicates through the same card-scoped credit key, while materially different credit observations do not merge;
@@ -217,15 +326,34 @@ The named operation fixes the request tuple, validates the projected response, a
 #### Presentation boundary
 
 ```ts
-// Wrong: parser quality overwrites the user-facing benefit state.
-const label = card.completeness === "partial" ? "Incomplete" : benefit.trackerState;
+// Wrong: parser quality overwrites the benefit state, and Remaining flattens
+// every non-used row into one inaccurate label.
+const label = card.completeness === "partial"
+  ? "Incomplete"
+  : activeFilter === "remaining"
+    ? "Not used"
+    : benefit.trackerState;
 
-// Correct: derive and display two independent presentation facts.
+// Correct: derive independent facts. The filter controls membership only.
 const observationLabel = presentObservationQuality(card); // "Partial data"
-const benefitLabel = presentBenefitState(benefit); // "Completed"
+const usage = deriveBenefitUsageState(benefit); // e.g. "Partially used"
+const isVisible = usage.filter === activeFilter;
 ```
 
-This separation prevents data-collection uncertainty from being mistaken for a benefit that still needs user action.
+This separation prevents data-collection uncertainty or navigation state from being mistaken for the benefit's truthful usage state.
+
+#### Provider-text boundary
+
+```ts
+// Wrong: provider-controlled title text becomes an HTML parsing sink.
+row.innerHTML = decodeProviderText(benefit.title);
+
+// Correct: decode one pass, remove only the exact reviewed Amex terminal
+// or Statement Credit footnote shape, then render without changing storage.
+row.textContent = formatAmexBenefitTitle(benefit.title);
+```
+
+Single-pass numeric decoding plus narrow terminal-adornment cleanup fixes provider-visible labels without turning a presentation compatibility rule into markup execution, broad tag stripping, or a normalized-storage migration.
 
 #### Supported-credit boundary
 
@@ -266,9 +394,13 @@ npm run test:e2e:amex:visual         # optional headed synthetic preview
 ```ts
 type HarnessScenario =
   | "complete"
+  | "benefit_empty"
+  | "all_benefit_empty"
+  | "conflict_diagnostics"
   | "catalog_failure"
   | "cancellation"
-  | "rescan_tracker_failure";
+  | "rescan_tracker_failure"
+  | "high_scale";
 
 class SyntheticAmexHarness {
   readonly storage: Map<string, unknown>;
@@ -306,7 +438,7 @@ The task-scoped Playwright config must point only at the provider-reader E2E dir
 | Before the manual scan button is pressed | Zero member, tracker, and catalog operations |
 | Page reload restores local state | Reinject the built artifact, preserve GM state, and perform zero new provider reads |
 | Page error, unexpected console error, dialog, popup, navigation, failed request, WebSocket, or service worker occurs | Record and fail unless the exact event is an explicitly asserted scenario outcome |
-| Serialized synthetic storage contains fixture token/upstream ID or an unsupported benefit | Fail the test |
+| Serialized synthetic storage contains fixture token/upstream ID, an unsupported benefit, or an ephemeral conflict category/detail field | Fail the test |
 | Visual preview passes | Write only an ignored synthetic screenshot and exit normally |
 | Live provider/Tampermonkey behavior is needed | Stop at the harness boundary and use a separately authorized milestone validation |
 
@@ -323,10 +455,11 @@ For each generated-bundle provider harness, assert:
 - test discovery is scoped and the unit-test runner excludes browser E2E files;
 - the default command rebuilds the artifact and completes unattended with deterministic one-worker/no-retry isolation;
 - no named provider operation occurs before the explicit scan action, including after expansion from an off-primary-route launcher;
-- exact complete-flow operation counts, duplicate physical-card reachability, supported/non-credit filtering, card switching, and visible route/display invariance;
+- exact complete-flow operation counts, account-wide duplicate physical-card grouping, supported/non-credit filtering, global `Remaining`/`Used` switching without provider reads, and visible route/display invariance;
 - a selector-free non-primary exact-origin document mounts collapsed, expands without reads, completes a manual scan with route-only context verification, and remains on the same pathname;
 - normalized GM storage excludes raw fixture tokens and upstream identifiers, survives reload without autoscan, and clear-data removes both store and identity keys;
 - deterministic partial/failure paths exercise the built artifact and exact retry/error behavior;
+- an invented conflict-diagnostics scenario exercises every fixed category through the built artifact, exposes the exact bounded structured candidate projection through stable semantic hooks in the reader-owned shadow tree only during the active panel scan, stores only the generic issue/partial observation, and loses category labels/details after restore-only reload without provider reads;
 - a route gate proves cancellation aborts a later physical-card read only after an earlier card is committed, starts no later work, and records the engine's interrupted attempt/disposition counts;
 - a successful scan followed by a failed rescan proves a successful card advances with changed data while the failed card preserves its entire prior observation as stale after exactly one retry;
 - expected cancellation failures are matched to the exact gated browser request rather than accepted by URL or scenario alone;
@@ -335,7 +468,7 @@ For each generated-bundle provider harness, assert:
 - the visual command is optional, bounded, synthetic-only, and writes to an ignored location;
 - the production artifact remains free of harness bindings, privileged transport, expanded grants/destinations, mutation fragments, and debug storage APIs.
 
-Run this browser suite alongside targeted Jest, strict TypeScript, targeted ESLint, the isolated userscript build and artifact audit, sensitive-data scanning, structured-config validation, and `git diff --check`. Run authenticated provider/Tampermonkey validation only with explicit action-time authorization.
+Run this browser suite alongside targeted Jest, strict TypeScript, targeted ESLint, the isolated userscript build and artifact audit, sensitive-data scanning, structured-config validation, and `git diff --check`. Run authenticated provider/Tampermonkey validation only when an applicable exact-action authorization or recorded durable unchanged-scope read-only authorization covers it.
 
 ### 7. Wrong vs Correct
 
@@ -364,7 +497,7 @@ The browser URL may resemble the approved provider route so the real entry guard
 
 ### 1. Scope / Trigger
 
-Use this contract when an owner explicitly authorizes installing one exact locally built userscript version into their current Tampermonkey profile so a milestone can prove the complete build → install → live-mount iteration loop. This is not unattended update permission: authorization for one version or task does not authorize future updates, scans, account actions, extension permission expansion, or changes to other installed scripts.
+Use this contract when an owner authorizes installing an exact locally built userscript version into their current Tampermonkey profile so a milestone can prove the complete build → install → live-mount iteration loop. Authorization is exact-action by default: one version or task does not authorize future updates, scans, account actions, extension permission expansion, or changes to other installed scripts. A clearly stated durable authorization may cover later monotonic updates and read-only scans only within its recorded unchanged scope; it never expands to login/MFA automation, provider mutation, broader matches/grants, credential access, raw-response persistence, or other installed scripts.
 
 A same-version **Reinstall** is not valid update evidence. Tampermonkey may leave the page open, provides no version transition, and warns that script settings will be reset. Use a canonical monotonic version bump so the pre-action and post-action states are distinguishable.
 
@@ -401,13 +534,13 @@ Browser responsibility is split by authority:
 
 ### 3. Contracts
 
-1. **Exact-version authorization**: immediately before the consequential action, identify the userscript name, namespace, incoming version, currently installed version, exact match scope, and grants. Proceed only when the owner authorized that exact update and the observed metadata matches the built artifact.
+1. **Recorded authorization scope**: before the consequential action, identify the userscript name, namespace, incoming version, currently installed version, exact match scope, and grants. Proceed only when the observed metadata matches the built artifact and either the owner authorized that exact update or a recorded durable authorization explicitly covers monotonic updates with the same name/namespace/match/grants and read-only purpose. Any metadata or authority expansion requires fresh authorization.
 2. **Observable version transition**: bump the canonical build version, rebuild, and require the Tampermonkey **Userscript update** page to show `incomingVersion > installedVersion`. Do not use a same-version reinstall, timestamp, page refresh, or click-delivery result as proof.
 3. **Least-authoritative routing**: use a task-owned Playwriter page to open the loopback `.user.js` URL. Switch to Peekaboo only after Tampermonkey opens its protected confirmation page; do not attach DevTools or inspect browser-profile state to bypass the extension boundary.
 4. **Fresh protected-UI observation**: observe only a narrow installer region containing the script identity/version and confirmation controls. Do not take broad browser accessibility dumps or screenshots that include unrelated tabs, bookmarks, account pages, messages, email, password-manager UI, or browser history.
 5. **Confirmed native action**: prefer a semantic native control when exposed. If Tampermonkey does not expose **Update** through Accessibility, use fresh narrow visual evidence plus keyboard focus navigation: prove the visible focus ring moved from the default **Cancel** control to **Update**, then send Return. Coordinate clicks are a last resort and are not successful merely because the input tool reports delivery.
 6. **Post-install proof**: require the update confirmation tab to close or transition, then reopen the same loopback artifact. Tampermonkey must report the new version as **INSTALLED VERSION** on the resulting same-version re-installation page. Cancel that verification page; do not reinstall again.
-7. **Sanitized live mount proof**: on a task-owned exact-origin provider page, query only the reader host/shadow-root and known reader controls. Confirm one host, expected collapsed/expanded presentation, and no active status/cancel state. Expansion and collapse are allowed; never press the scan button without separate action-time authorization.
+7. **Sanitized live mount proof**: on a task-owned exact-origin provider page, query only the reader host/shadow-root and known reader controls. Confirm one host, expected collapsed/expanded presentation, and no active status/cancel state. Expansion and collapse are allowed, but mount proof does not press the scan button. A subsequent scan is a separate consequential action and requires either exact-scan authorization or a recorded durable unchanged-scope read-only-scan authorization; installation authority alone never implies scan authority.
 8. **Tool-overlay isolation**: if Playwriter's own toolbar intercepts a fixed reader control, remove or close only the tool-owned `[data-playwriter-toolbar]` overlay before retrying a fresh strict locator. Never remove, hide, or mutate provider-page elements to make validation pass.
 9. **Cleanup**: close task-owned provider pages, cancel the verification installer, delete the Playwriter session, and stop the loopback server. Temporary narrow installer captures remain outside the repository and must not be copied into task artifacts.
 
@@ -416,8 +549,9 @@ Browser responsibility is split by authority:
 | Condition | Required behavior |
 | --- | --- |
 | Incoming version equals installed version and Tampermonkey offers **Reinstall** | Stop; do not claim self-update evidence or reset script settings |
-| Script name, namespace, match scope, grants, or incoming version differs from the approved artifact | Cancel; do not install |
-| Owner has not authorized the exact consequential update | Stop at the protected confirmation page |
+| Script name, namespace, match scope, grants, or incoming version differs from the built artifact or recorded authorization scope | Cancel; do not install |
+| Neither exact-action nor applicable durable authorization covers the consequential update | Stop at the protected confirmation page |
+| Durable authorization exists but the update broadens matches, grants, purpose, provider mutation authority, or credential/raw-data access | Treat it as out of scope and obtain fresh authorization |
 | Tampermonkey shows the expected old → new version and **Update** | Freshly observe the control, invoke one native action, then verify post-install state |
 | Accessibility does not expose **Update** | Use a narrow visual region and verified keyboard focus; do not guess from a broad screenshot or stale coordinates |
 | Input delivery reports success but the page neither closes/transitions nor later reports the new installed version | Treat the update as unverified, not successful |
@@ -437,7 +571,8 @@ Browser responsibility is split by authority:
 
 For each owner-authorized automated userscript update, record or assert:
 
-- the canonical source and built metadata contain the same approved new version;
+- the applicable exact-action or durable authorization scope is recorded, and any durable scope is bounded to unchanged name/namespace/matches/grants/read-only purpose;
+- the canonical source and built metadata contain the same authorized new version;
 - build and artifact metadata/grant/match audits pass before opening Tampermonkey;
 - the pre-action installer narrowly shows the expected userscript identity, incoming new version, installed old version, and **Update**, not **Reinstall**;
 - the native confirmation action is based on fresh semantic state or a visibly verified focus ring;
