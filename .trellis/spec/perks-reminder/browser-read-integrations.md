@@ -375,6 +375,162 @@ return normalizeSupportedBenefit(providerBenefit, match.creditKey);
 
 The matcher must verify both sides of the contract: the card is a reviewed product alias, and the title resolves uniquely to a positive-amount usable credit represented on that exact shared-catalog card. Broad merchant wording never overrides explicit non-credit phrases.
 
+## Scenario: reviewed observation handoff and confirmed AMEX synchronization
+
+### 1. Scope / Trigger
+
+Use this contract when locally reviewed provider observations cross from a browser-session reader into an authenticated first-party preview and may later update durable benefit state. Scanning, local review, handoff, preview, and confirmation are separate explicit actions. Preview is read-only; only effective `write` mode plus a separate confirmation may persist.
+
+The initial writable policy is deliberately finite: product `american-express-platinum-card`, credit families `american-express-platinum-card:lululemon` and `american-express-platinum-card:resy`, a valid current structured UTC source range, and exactly one existing destination cycle/occurrence. Every broader product, family, period, V1 record, stale/partial/failed observation, or ambiguous mapping remains review-only. Raw provider responses, browser-session material, source fingerprints, and installation secrets never cross the handoff.
+
+### 2. Signatures
+
+The public browser and server boundaries are:
+
+```ts
+type AmexSyncMode = "off" | "preview" | "write";
+
+interface AmexSyncConfiguration {
+  mode: AmexSyncMode;
+  hmacKey: string | null;
+}
+
+interface AmexSyncMailbox {
+  mailboxVersion: "amex-sync-mailbox/1";
+  transferId: string; // 32 lowercase hexadecimal characters
+  nonce: string; // 32 lowercase hexadecimal characters
+  createdAt: string;
+  expiresAt: string;
+  digest: string; // 64-character SHA-256 hexadecimal digest
+  envelope: AmexSyncEnvelope;
+}
+
+type HandoffMessage =
+  | { type: "perks-reminder:amex-sync-ready"; transferId: string }
+  | {
+      type: "perks-reminder:amex-sync-payload";
+      transferId: string;
+      nonce: string;
+      digest: string;
+      envelope: AmexSyncEnvelope;
+    }
+  | {
+      type: "perks-reminder:amex-sync-accepted";
+      transferId: string;
+      nonce: string;
+    };
+
+function previewAmexSync(input: {
+  userId: string;
+  envelope: AmexSyncEnvelope;
+  manualMappings: ManualCardSelection[];
+  mode: "preview" | "write";
+  hmacKey: string;
+  now?: Date;
+}): Promise<PreviewResponse>;
+
+function confirmAmexSync(input: {
+  userId: string;
+  envelope: AmexSyncEnvelope;
+  manualMappings: ManualCardSelection[];
+  proposalToken: string;
+  hmacKey: string;
+  now?: Date;
+}): Promise<ConfirmationResponse>;
+```
+
+The first-party API consists only of `POST /api/integrations/amex-sync/preview` and `POST /api/integrations/amex-sync/confirm`. Server-only `AMEX_SYNC_MODE` and `AMEX_SYNC_HMAC_KEY` select capability; the key must be at least 32 characters, and missing, invalid, or incomplete configuration resolves to `off`. Durable uniqueness is `(userId, source, sourceLocalCardId)` for mappings, `(userId, idempotencyKey)` for attempts, `(benefitStatusId, source)` for latest provenance, and `(attemptId, sourceRowIdentity)` for row audits.
+
+### 3. Contracts
+
+1. **V2-only, exact candidate projection**: transfer only strict `amex-sync-envelope/1` rows projected from the latest completed `amex-benefits/2` scan whose card observation is current and complete. The scan must remain within 30 minutes at confirmation. Stable product/family keys and a validated structured UTC date range are authority; display titles and free-form periods are not.
+2. **One private mailbox**: a direct global Sync gesture creates at most one bounded `amex-sync-mailbox/1` value under the fixed GM key. Its ten-minute lifetime may not exceed the source scan deadline. The top-level handoff URL contains only the opaque transfer ID. No payload, nonce, digest, proposal, card ending, title, or amount belongs in a URL, page storage, DOM attribute, clipboard, or wildcard message.
+3. **Acknowledge server acceptance, not local acquisition**: the handoff validates exact origin/source/type/transfer/nonce, schema, digest, size, creation time, expiry, and scan deadline; safely acquires the envelope into memory; strips the locator with `history.replaceState`; calls preview; validates the complete typed preview response; and only then sends `perks-reminder:amex-sync-accepted`. `off`, HTTP failure, malformed response, unmount, or client exception sends no acceptance. The userscript deletes the mailbox only after the exact accepted message or terminal cancellation, clear, expiry, malformed content, replay, or timeout.
+4. **Early branch isolation**: the userscript entry rejects frames and selects the exact first-party handoff branch before dynamically importing provider client, scan engine, panel, or reader runtime. The handoff branch receives mailbox read/delete capability only and must not construct provider transport. Every unrelated origin/path returns without side effects.
+5. **Authenticated read-only preview and confirmed write**: both routes authenticate first, derive `userId` only from the server session, require exact first-party Origin and same-origin Fetch Metadata, accept strict bounded JSON only, and emit no CORS response. Preview performs no Prisma create/update/upsert/delete/transaction, mapping save, attempt/audit/provenance write, status materialization, or revalidation. Confirmation re-authenticates and requires `write` mode plus a valid short-lived HMAC proposal bound to purpose, user, effective mode, envelope digest, manual mappings, ordered row identities, before state, transition time, and expiry.
+6. **Exact transaction-time authority**: preview-time planning and HMAC binding are necessary but insufficient. Each applied or newer-already-current row runs in a serializable transaction that revalidates user ownership, active card lifecycle, exact non-null product/family/period keys, destination card/benefit/status IDs, cycle start/end, occurrence, before-state values, and current source provenance. Applied rows use a scoped compare-and-set; a count other than one is `conflict_repreview_required`. Confirmed manual mappings independently re-read ownership, lifecycle, and product compatibility inside their transaction.
+7. **Advance provenance for newer no-op observations**: `unchanged_replay` means equal source time and digest and advances nothing. `already_current` means a newer accepted source derives destination values already present; it performs no status update but transactionally advances `BenefitStatusSourceProvenance` and records an `UNCHANGED` audit. Both already-current and applied paths reject an older observation or an equal-time conflicting digest inside the transaction so provenance cannot move backward.
+8. **Resumable attempts and monotonic audits**: `COMPLETED` attempts replay stored results. `PROCESSING` and `PARTIAL_FAILED` attempts resume the same attempt ID. Existing `UPDATED`, `UNCHANGED`, or `SKIPPED` audits are terminal and are replayed; `FAILED` may retry and promote to any successful terminal disposition, including audit-only skipped or unchanged rows. A concurrent failure must never downgrade a successful result. One row failure does not stop unrelated rows, and final attempt counts/state come from durable row results.
+9. **Private-route telemetry boundary**: before the exact handoff path can expose a locator, suppress Google Analytics, Vercel Analytics, search analytics, service-worker interception, automatic/custom error reporting, and source-data console serialization. Return private/no-store, no-referrer, no-index, and non-frameable policy. Client and server monitoring retain origin/pathname only, independently suppress the exact handoff, strictly validate other reports, and preserve ordinary telemetry on lookalike paths.
+10. **Schema-dependent rollout gate**: keep synchronization operationally `off` until the additive migration exists, its SQL has been reviewed, the generated Prisma client has been validated, and the target migration status is verified under the separately authorized database workflow. Client generation does not create database objects, and a build or swallowed migration failure is not deployment evidence. See [Database and Data Safety](database-and-data-safety.md).
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Valid mailbox payload while server mode is `off` | Strip the locator only after safe acquisition; do not preview, acknowledge, confirm, or write; preserve the mailbox until terminal cleanup |
+| Preview returns non-2xx or a malformed response | Do not acknowledge; show a generic local failure; expose no confirm state |
+| Typed preview response succeeds | Acknowledge exactly once with the matching transfer ID and nonce; the bridge deletes only that mailbox |
+| Message origin/source/type/transfer/nonce is wrong | Ignore it; do not preview, acknowledge, or clear another mailbox |
+| Source is older than latest provenance | Return `stale_replay`; change no status, provenance, or success audit |
+| Source time and digest equal latest provenance | Return `unchanged_replay`; do not advance provenance |
+| Source time equals latest provenance but digest differs | Return `source_conflict`; perform no write |
+| Newer source derives values already current | Leave status unchanged; advance provenance and write `UNCHANGED` atomically |
+| Card, benefit, key, cycle, occurrence, before state, or provenance changed since preview | Return `conflict_repreview_required`; write no success audit or provenance |
+| Scoped status compare-and-set affects zero rows | Return `conflict_repreview_required`; do not upsert provenance or a successful audit |
+| Existing successful row audit is retried | Replay it; never execute or downgrade the row |
+| Existing `FAILED` audit retries successfully | Promote it to `UPDATED`, `UNCHANGED`, or `SKIPPED` as derived |
+| One independent row fails | Continue other rows and leave the attempt `PARTIAL_FAILED` until all durable results are terminal successes |
+| Exact handoff path is requested | Emit no analytics/automatic monitoring, service-worker interception, query/referrer retention, indexing, or framing authority |
+| Schema changed but migration/client/target verification is absent | Keep mode `off`; report deployment blocked rather than claiming rollout success |
+
+### 5. Good / Base / Bad Cases
+
+- **Good**: a newer complete Resy observation derives the same values already stored. Confirmation rechecks exact ownership, card, benefit, current cycle, before state, and provenance in one serializable transaction, performs no status update, advances provenance, and records `UNCHANGED`.
+- **Base**: one row updates while another row's audit write fails. The first remains durable, the attempt becomes `PARTIAL_FAILED`, and the same idempotency key later retries only the failed row and may promote its audit.
+- **Bad**: delete the mailbox immediately after receiving its payload, before a typed server preview accepts it.
+- **Bad**: trust preview-time mapping, update a status by ID alone, or upsert provenance without transaction-local ordering and compare-and-set authority.
+- **Bad**: statically import provider transport before selecting the exact userscript branch, or enable synchronization because `prisma generate` passed without a reviewed migration.
+
+### 6. Tests Required
+
+For every reviewed browser-to-first-party synchronization:
+
+- assert no acknowledgement in `off`, after preview HTTP failure, or after a malformed preview body; assert exactly one matching acknowledgement only after typed preview success and mailbox deletion only after acceptance or terminal cleanup;
+- assert exact two userscript match scopes, storage-only grants, `@noframes`, top-frame checks, no provider runtime on the handoff, and no side effects on unrelated origins/paths;
+- assert V1 remains review-only, V2 candidate selection is latest/current/complete/fresh, the finite product/family allowlist is exact, and structured source ranges resolve exactly one current cycle/occurrence;
+- assert older, equal-identical, equal-conflicting, newer-applied, and newer-already-current provenance ordering;
+- assert transaction-local ownership/card/benefit/cycle/before-state/provenance revalidation, a scoped status compare-and-set, and atomic status/provenance/audit persistence;
+- assert completed replay; processing/partial resume; `FAILED` promotion to updated, unchanged, and skipped; no successful-audit downgrade; row-failure isolation; and aggregate counts from durable results;
+- assert exact-path analytics/error/service-worker suppression, pathname-only monitoring, strict monitoring input, private headers, and unchanged policy on lookalike routes;
+- assert schema changes have separately reviewed migration SQL and generated-client/target verification before mode enablement; missing or skipped evidence keeps rollout blocked;
+- run targeted unit/route/component tests, strict TypeScript, targeted ESLint, the isolated userscript build and metadata/authority audits, deny-by-default synthetic browser tests, structured parsing, sensitive-data scans, and `git diff --check`. Live scans, real previews/writes, migration generation/deployment, client generation, cron invocation, and production builds remain separate operational authorizations.
+
+### 7. Wrong vs Correct
+
+#### Mailbox acknowledgement
+
+```ts
+// Wrong: local receipt is mistaken for server acceptance.
+setEnvelope(payload.envelope);
+postAccepted(payload);
+await runPreview(payload.envelope, []);
+
+// Correct: only a valid preview response consumes the one-time mailbox.
+setEnvelope(payload.envelope);
+const accepted = await runPreview(payload.envelope, []);
+if (accepted) postAccepted(payload);
+```
+
+#### Durable row application
+
+```ts
+// Wrong: preview-time resolution is trusted and provenance can move backward.
+await tx.benefitStatus.update({ where: { id: row.destinationStatusId }, data: row.after });
+await tx.benefitStatusSourceProvenance.upsert(provenanceArgs);
+
+// Correct: re-resolve exact authority and provenance, then compare-and-set.
+const current = await loadAuthorizedDestinationStatus(tx, userId, row);
+assertExactCardBenefitCycleAndBeforeState(current, row);
+await assertAmexProvenanceCanAdvance(tx, row);
+const result = await tx.benefitStatus.updateMany({ where: exactBeforeState(row), data: row.after });
+if (result.count !== 1) throw new Error("conflict_repreview_required");
+await tx.benefitStatusSourceProvenance.upsert(provenanceArgs);
+await writeOrPromoteSuccessfulAudit(tx, row);
+```
+
+The explicit acceptance event preserves local recovery until the first-party server accepts the bounded envelope. Transaction-local authority and monotonic provenance prevent a valid preview or newer no-op observation from becoming authorization for a later stale write.
+
 ## Scenario: generated-bundle synthetic browser validation
 
 ### 1. Scope / Trigger
