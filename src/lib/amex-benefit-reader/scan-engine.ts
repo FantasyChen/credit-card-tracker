@@ -9,14 +9,16 @@ import {
 } from "./amex-response-adapter";
 import {
   OBSERVATION_CONTRACT_VERSION,
+  OBSERVATION_CONTRACT_VERSION_V2,
   PARSER_VERSION,
   type IssueCode,
-  type NormalizedCardObservationV1,
+  type NormalizedCardObservation,
   type ScanSummaryV1,
   type StoreEnvelopeV1,
   type StoredCardRecordV1,
 } from "./contract";
 import { reconcileCardIdentity } from "./identity";
+import { matchSupportedAmexProduct } from "./supported-card-credits";
 import type { CardAttemptResult, CardIdentityMetadata } from "./storage-policy";
 
 export interface VisiblePageContext {
@@ -84,6 +86,16 @@ function issueFromError(error: unknown): IssueCode {
   return "response_schema_invalid";
 }
 
+function createScanId(): string {
+  if (!globalThis.crypto?.getRandomValues) throw new Error("Secure random scan identity is unavailable.");
+  if (globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID();
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 const CATALOG_PARTIAL_ISSUES = new Set<IssueCode>([
   "response_schema_invalid",
   "request_timeout",
@@ -119,6 +131,7 @@ export class AmexBenefitScanEngine {
     this.activeController = controller;
     const signal = controller.signal;
     const startedAt = this.clock.now().toISOString();
+    const scanId = createScanId();
     const dispositions: ScanSummaryV1["cards"] = [];
     let capturedContext: VisiblePageContext | null = null;
     let discovery: AccountDiscovery | null = null;
@@ -140,6 +153,7 @@ export class AmexBenefitScanEngine {
       throwIfAborted(signal);
       const initialStore = await this.store.load();
       await this.store.recordScanSummary({
+        scanId,
         startedAt,
         finishedAt: this.clock.now().toISOString(),
         status: "interrupted",
@@ -165,7 +179,7 @@ export class AmexBenefitScanEngine {
       });
       const claimed = new Set<string>();
 
-      await this.recordInterruptionCheckpoint(startedAt, discovery, attemptedCardCount, dispositions);
+      await this.recordInterruptionCheckpoint(scanId, startedAt, discovery, attemptedCardCount, dispositions);
 
       for (let index = 0; index < discovery.cards.length; index += 1) {
         throwIfAborted(signal);
@@ -185,7 +199,7 @@ export class AmexBenefitScanEngine {
         } catch {
           rawAccountToken = "";
           dispositions.push({ localCardId: null, result: "failed", issueCode: "identity_unavailable" });
-          await this.recordInterruptionCheckpoint(startedAt, discovery, attemptedCardCount, dispositions);
+          await this.recordInterruptionCheckpoint(scanId, startedAt, discovery, attemptedCardCount, dispositions);
           continue;
         }
 
@@ -203,7 +217,7 @@ export class AmexBenefitScanEngine {
             result: "failed",
             issueCode: resolution.kind === "ambiguous" ? "identity_ambiguous" : "identity_conflict",
           });
-          await this.recordInterruptionCheckpoint(startedAt, discovery, attemptedCardCount, dispositions);
+          await this.recordInterruptionCheckpoint(scanId, startedAt, discovery, attemptedCardCount, dispositions);
           continue;
         }
 
@@ -266,9 +280,9 @@ export class AmexBenefitScanEngine {
           ]));
           const disposition = issueCodes.length ? "partial" as const : "complete" as const;
           const observedAt = this.clock.now().toISOString();
-          const observation: NormalizedCardObservationV1 = {
-            contractVersion: OBSERVATION_CONTRACT_VERSION,
-            issuer: "american_express_us",
+          const productMatch = matchSupportedAmexProduct(prepared.productName);
+          const commonObservation = {
+            issuer: "american_express_us" as const,
             localCardId,
             productName: prepared.productName,
             endingDigits: prepared.endingDigits,
@@ -276,8 +290,20 @@ export class AmexBenefitScanEngine {
             parserVersion: PARSER_VERSION,
             completeness: disposition,
             issueCodes,
-            benefits: normalized.benefits,
           };
+          const observation: NormalizedCardObservation = productMatch
+            ? {
+                ...commonObservation,
+                contractVersion: OBSERVATION_CONTRACT_VERSION_V2,
+                scanId,
+                productKey: productMatch.productKey,
+                benefits: normalized.benefits,
+              }
+            : {
+                ...commonObservation,
+                contractVersion: OBSERVATION_CONTRACT_VERSION,
+                benefits: [],
+              };
           const record = await this.store.commitCard({
             disposition,
             identity,
@@ -311,7 +337,7 @@ export class AmexBenefitScanEngine {
           catalogResponse = null;
           rawAccountToken = "";
         }
-        await this.recordInterruptionCheckpoint(startedAt, discovery, attemptedCardCount, dispositions);
+        await this.recordInterruptionCheckpoint(scanId, startedAt, discovery, attemptedCardCount, dispositions);
       }
 
       for (const record of Object.values(initialStore.cards)) {
@@ -365,6 +391,7 @@ export class AmexBenefitScanEngine {
           ? "partial"
           : "complete";
     const summary: ScanSummaryV1 = {
+      scanId,
       startedAt,
       finishedAt: this.clock.now().toISOString(),
       status,
@@ -384,12 +411,14 @@ export class AmexBenefitScanEngine {
   }
 
   private async recordInterruptionCheckpoint(
+    scanId: string,
     startedAt: string,
     discovery: AccountDiscovery,
     attemptedCardCount: number,
     cards: ScanSummaryV1["cards"],
   ): Promise<void> {
     await this.store.recordScanSummary({
+      scanId,
       startedAt,
       finishedAt: this.clock.now().toISOString(),
       status: "interrupted",

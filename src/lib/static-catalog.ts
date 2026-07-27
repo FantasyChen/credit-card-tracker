@@ -5,6 +5,9 @@ export type StaticBenefitFrequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARL
 export type StaticBenefitCycleAlignment = 'CARD_ANNIVERSARY' | 'CALENDAR_FIXED';
 
 export interface StaticPredefinedBenefit {
+  productKey?: string;
+  creditFamilyKey?: string;
+  periodKey?: string;
   category: string;
   description: string;
   percentage: number;
@@ -17,6 +20,7 @@ export interface StaticPredefinedBenefit {
 }
 
 export interface StaticPredefinedCard {
+  productKey?: string;
   name: string;
   issuer: string;
   annualFee: number;

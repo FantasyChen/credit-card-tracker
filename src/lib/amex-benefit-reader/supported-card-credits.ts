@@ -1,4 +1,5 @@
 import { americanExpressCardCatalog } from "@/lib/american-express-card-catalog";
+import type { AmexProductKey } from "./contract";
 
 interface CreditMatchRule {
   key: string;
@@ -14,6 +15,7 @@ interface CardMatchRule {
 
 export interface SupportedAmexCardCreditMatch {
   catalogCardName: string;
+  productKey: AmexProductKey;
   creditKey: string;
 }
 
@@ -144,6 +146,10 @@ function normalizedWords(value: string): string {
     .replace(/\s+/g, " ");
 }
 
+function productKeyForCatalogName(catalogName: string): AmexProductKey {
+  return normalizedWords(catalogName).replace(/ /g, "-") as AmexProductKey;
+}
+
 function containsPhrase(value: string, phrase: string): boolean {
   return ` ${value} `.includes(` ${normalizedWords(phrase)} `);
 }
@@ -223,10 +229,20 @@ export function matchSupportedAmexCardCredit(
   const highestSpecificity = Math.max(...matches.map((match) => match.specificity));
   const mostSpecific = matches.filter((match) => match.specificity === highestSpecificity);
   if (mostSpecific.length !== 1) return null;
+  const productKey = productKeyForCatalogName(cardRule.catalogName);
   return {
     catalogCardName: cardRule.catalogName,
-    creditKey: `${normalizedWords(cardRule.catalogName).replace(/ /g, "-")}:${mostSpecific[0].rule.key}`,
+    productKey,
+    creditKey: `${productKey}:${mostSpecific[0].rule.key}`,
   };
+}
+
+export function matchSupportedAmexProduct(productName: string): {
+  catalogCardName: string;
+  productKey: AmexProductKey;
+} | null {
+  const rule = PRODUCT_RULES.get(normalizedWords(productName));
+  return rule ? { catalogCardName: rule.catalogName, productKey: productKeyForCatalogName(rule.catalogName) } : null;
 }
 
 export function isSupportedAmexCatalogCard(productName: string): boolean {
