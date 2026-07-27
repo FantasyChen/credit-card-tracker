@@ -1,6 +1,11 @@
 import { PrismaClient, LoyaltyProgramType } from '../src/generated/prisma';
 import { inferBenefitUsageWaySlug } from '../src/lib/benefit-usage-matching';
-import { benefitUsageWays, predefinedCardsData, type StaticPredefinedBenefit } from '../src/lib/static-catalog';
+import {
+  benefitUsageWays,
+  predefinedCardsData,
+  type StaticPredefinedBenefit,
+  type StaticPredefinedCard,
+} from '../src/lib/static-catalog';
 
 const prisma = new PrismaClient();
 
@@ -12,7 +17,8 @@ async function main() {
 
   // --- Upsert Logic (ensure benefits are deleted/recreated or updated properly) ---
   console.log('Starting upsert process...');
-  for (const cardData of predefinedCardsData) {
+  for (const rawCardData of predefinedCardsData) {
+    const cardData = rawCardData as StaticPredefinedCard;
     const benefits = cardData.benefits as readonly StaticPredefinedBenefit[];
     console.log(`Processing card: ${cardData.name}`);
     const existingCard = await prisma.predefinedCard.findUnique({
@@ -29,6 +35,7 @@ async function main() {
                 issuer: cardData.issuer,
                 annualFee: cardData.annualFee,
                 imageUrl: cardData.imageUrl,
+                ...(cardData.productKey ? { productKey: cardData.productKey } : {}),
             },
         });
 
@@ -53,6 +60,9 @@ async function main() {
                   fixedCycleStartMonth: benefit.fixedCycleStartMonth, // Explicitly map
                   fixedCycleDurationMonths: benefit.fixedCycleDurationMonths, // Explicitly map
                   occurrencesInCycle: benefit.occurrencesInCycle,
+                  ...(benefit.productKey ? { productKey: benefit.productKey } : {}),
+                  ...(benefit.creditFamilyKey ? { creditFamilyKey: benefit.creditFamilyKey } : {}),
+                  ...(benefit.periodKey ? { periodKey: benefit.periodKey } : {}),
               })),
           });
         }
@@ -65,6 +75,7 @@ async function main() {
               issuer: cardData.issuer,
               annualFee: cardData.annualFee,
               imageUrl: cardData.imageUrl,
+              ...(cardData.productKey ? { productKey: cardData.productKey } : {}),
               benefits: {
                 create: benefits.map(benefit => ({
                   // Ensure all fields are explicitly mapped here too for consistency
@@ -77,6 +88,9 @@ async function main() {
                   fixedCycleStartMonth: benefit.fixedCycleStartMonth,
                   fixedCycleDurationMonths: benefit.fixedCycleDurationMonths,
                   occurrencesInCycle: benefit.occurrencesInCycle,
+                  ...(benefit.productKey ? { productKey: benefit.productKey } : {}),
+                  ...(benefit.creditFamilyKey ? { creditFamilyKey: benefit.creditFamilyKey } : {}),
+                  ...(benefit.periodKey ? { periodKey: benefit.periodKey } : {}),
                 })),
               },
             },

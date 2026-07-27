@@ -35,28 +35,21 @@ export async function createCardForUser(
     // 1. Fetch the predefined card and its benefits
     const predefinedCard = await prisma.predefinedCard.findUnique({
       where: { id: predefinedCardId },
-      include: {
-        benefits: { // Select all needed fields from PredefinedBenefit
-          select: {
-            id: true,
-            category: true,
-            description: true,
-            percentage: true,
-            maxAmount: true,
-            frequency: true,
-            cycleAlignment: true,
-            fixedCycleStartMonth: true,
-            fixedCycleDurationMonths: true,
-            occurrencesInCycle: true,
-          }
-        }
-      },
+      include: { benefits: true },
     });
 
     if (!predefinedCard) {
       console.error('createCardForUser: Predefined card not found for ID:', predefinedCardId);
       return { success: false, message: 'Predefined card not found.' };
     }
+    const keyedPredefinedCard = predefinedCard as typeof predefinedCard & {
+      productKey: string | null;
+      benefits: Array<(typeof predefinedCard.benefits)[number] & {
+        productKey: string | null;
+        creditFamilyKey: string | null;
+        periodKey: string | null;
+      }>;
+    };
 
 
     // 2. Create the credit card
@@ -72,6 +65,7 @@ export async function createCardForUser(
         annualFeeDueDate: predefinedCard.annualFee > 0
           ? deriveNextAnnualFeeDueDate(openedDate)
           : null,
+        ...(keyedPredefinedCard.productKey ? { productKey: keyedPredefinedCard.productKey } : {}),
       },
     });
 
@@ -88,7 +82,7 @@ export async function createCardForUser(
 
     // 3. Create benefits and initial statuses
     const now = new Date(); // Consistent time for this operation
-    for (const predefBenefit of predefinedCard.benefits) {
+    for (const predefBenefit of keyedPredefinedCard.benefits) {
       // Create the benefit record
       const newBenefit = await prisma.benefit.create({
         data: {
@@ -103,6 +97,9 @@ export async function createCardForUser(
           fixedCycleDurationMonths: predefBenefit.fixedCycleDurationMonths,
           occurrencesInCycle: predefBenefit.occurrencesInCycle,
           startDate: now, // Set start date to now
+          ...(predefBenefit.productKey ? { productKey: predefBenefit.productKey } : {}),
+          ...(predefBenefit.creditFamilyKey ? { creditFamilyKey: predefBenefit.creditFamilyKey } : {}),
+          ...(predefBenefit.periodKey ? { periodKey: predefBenefit.periodKey } : {}),
         }
       });
 
