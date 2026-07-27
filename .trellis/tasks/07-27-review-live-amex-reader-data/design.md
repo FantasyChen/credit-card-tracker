@@ -111,21 +111,21 @@ The panel derives four card groups from the store and latest scan summary:
 3. **Latest-scan unresolved** — card belongs to the latest scan but is partial, failed, stale after failure, or otherwise not conclusively complete.
 4. **Older retained** — stored card is not represented in the latest scan summary.
 
-Coverage remains the account-quality projection, but active-filter rendering is a separate projection. Account metrics still include all coverage entries; a card group renders only when it contains at least one row in the selected filter:
+Coverage remains an internal account-quality projection, but active-filter rendering is a separate presentation projection. A card group renders only when it contains at least one row in the selected filter:
 
 - `Remaining` renders cards with at least one conservatively classified non-used row;
 - `Used` renders cards with at least one used row;
 - zero-benefit partial, failed, stale, and older-retained records render no card group;
-- an all-used card renders no compact group under `Remaining`, but appears with rows and quality warnings under `Used`;
-- partial/stale cards with actual rows remain visible in the corresponding filter with their quality disclosure.
+- an all-used card renders no compact group under `Remaining`, but appears with rows under `Used`;
+- partial/stale cards with actual rows remain visible in the corresponding filter without a quality badge or disclosure.
 
-The account summary must reconcile latest attempted count, stored count, confirmed-empty count, older-retained count, and omitted quality-problem records. Scan failures remain visible as aggregate data notes rather than empty card shells. Filter-specific empty states explain whether the other filter contains rows. The compact zero-row card-group path is removed.
+The completed panel does not render account metrics, scan notes, coverage reconciliation, hidden-card counts, or quality-problem copy. Those classifications continue to support correct omission and conclusive-empty decisions internally. Filter-specific empty states still point users to the other filter when it contains rows.
 
-For the reviewed v0.3.1 shape, the existing projection explains nine groups while only four contain benefits. Under the corrected `Remaining` projection, only cards with remaining rows render; the five zero-benefit unresolved/retained groups do not. After primary-only migration and a separately authorized fresh scan, supplementary relationships are absent from both counts and storage.
+For the reviewed v0.3.1 shape, only cards with rows in the selected filter render; zero-benefit unresolved/retained groups do not. After primary-only migration and a separately authorized fresh scan, supplementary relationships are absent from both internal counts and storage.
 
-## Benefit presentation
+## Scan workspace and benefit presentation
 
-Credit-usage behavior remains unchanged:
+Credit-usage behavior remains unchanged after a scan reaches its terminal `finished` event:
 
 - `Used`
 - `Partially used`
@@ -133,6 +133,10 @@ Credit-usage behavior remains unchanged:
 - enrollment/linking/status precedence as currently defined
 
 Newly normalized and compatibility-projected `spend` rows do not reach the panel. The panel may retain conservative fallback behavior for malformed or unsupported legacy values, but it must not reintroduce ignored rows.
+
+During `scanning` or `cancelling`, the panel is a distinct workspace rather than a progressively updated result view. It renders only an accessible determinate progress bar, concise progress copy, and the cancellation control. `discovered` supplies the total card count; each `card` event supplies the one-based current card index; start and context-verification phases remain indeterminate until a total is known or the terminal result arrives. `card_committed` may update the panel's in-memory store so final rendering is accurate, but it must not render the store, card headings, benefit rows, summaries, filters, Sync, footer controls, diagnostics, or timestamps before `finished`.
+
+At `finished`, the panel returns to its normal filter-aware result view. The visible result view deliberately excludes scan notes, coverage/data-quality metrics and labels, issue/error explanations, conflict diagnostics/details, parser/confidence fields, and observation/attempt timestamps. These fields remain in the existing normalized store and scan contracts for fail-closed behavior, compatibility, and synchronization eligibility; presentation removal must not mutate or relax them.
 
 ## Structured period formatting
 
@@ -155,7 +159,7 @@ No normalized contract or store schema version changes.
 Because ownership authority and display behavior change:
 
 - bump parser marker from `amex-api-us/2.0.1` to `amex-api-us/2.0.2`;
-- bump userscript version from `0.3.1` to `0.3.2`;
+- bump userscript version from `0.3.1` to `0.3.3`;
 - add a non-sensitive fixed compatibility marker for one-time role-unverified snapshot invalidation;
 - require current-parser observations at sync-envelope projection/validation so pre-primary-only V2 data fails closed pending a fresh scan;
 - update generated-bundle assertions.
@@ -196,7 +200,9 @@ Prove top-level exact `BASIC` is the only emitted card; nested exact `SUPP`, inc
 
 Prove the one-time compatibility migration invalidates every role-unverified card and pending mailbox, preserves the identity secret, refuses malformed/future data unchanged, and is idempotent.
 
-Prove the reviewed mixed-quality shape retains reconciled counts but renders only cards with rows in the active filter. Zero-benefit unresolved/stale/retained groups and all-used compact groups are absent from `Remaining`; used cards appear under `Used`; partial/stale cards with actual rows retain quality warnings.
+Prove the reviewed mixed-quality shape retains filter-aware card-group membership without rendering user-facing quality labels, coverage/count notes, issue explanations, timestamps, parser/confidence fields, or conflict diagnostics. Zero-benefit unresolved/stale/retained groups and all-used compact groups are absent from `Remaining`; used cards appear under `Used`.
+
+Prove a running or cancelling panel renders only the accessible progress workspace, with a determinate value derived from actual discovery/card progress once discovery completes; it must conceal prior and newly committed card data until the terminal `finished` event restores the final result view.
 
 Prove compact period formatting for annual, monthly, quarterly, half-year, irregular, cross-year, and fallback cases, including absence of raw provider tokens when `sourcePeriod` is observed.
 
@@ -208,4 +214,4 @@ Use only the local synthetic harness. Cover the three reviewed exclusions, one g
 
 The source rollback is limited to parser/matcher/panel changes and version markers. No schema or database rollback is needed.
 
-If compatibility invalidation or primary-only filtering is found incorrect before release, revert the compatibility marker, parser gate, and discovery change before installation. Once an installed v0.3.2 invalidates a role-unverified snapshot, observations cannot be reconstructed without another scan; that fresh authenticated scan is already required to establish primary-only completeness and remains separately authorized.
+If compatibility invalidation or primary-only filtering is found incorrect before release, revert the compatibility marker, parser gate, and discovery change before installation. Once an installed v0.3.3 invalidates a role-unverified snapshot, observations cannot be reconstructed without another scan; that fresh authenticated scan is already required to establish primary-only completeness and remains separately authorized.
