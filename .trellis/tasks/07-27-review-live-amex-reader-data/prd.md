@@ -2,7 +2,7 @@
 
 ## Goal
 
-Inspect the installed AMEX benefit reader against the user's already-open authenticated AMEX account, compare its live read-only observations with the visible provider data, collaboratively identify likely correctness, presentation, or data-quality issues, and—after planning review—resolve the approved false benefit-identity conflicts before any synchronization is attempted.
+Inspect the installed AMEX benefit reader against the user's already-open authenticated AMEX account, compare its live read-only observations with visible provider data, resolve approved false benefit-identity and presentation defects, and replace product-gated local normalization with product-independent tracker-backed V3 observations while keeping synchronization separately mapped and fail closed.
 
 ## Background
 
@@ -39,6 +39,14 @@ Inspect the installed AMEX benefit reader against the user's already-open authen
 - Remove all user-facing scan notes, data-quality labels, issue explanations, conflict diagnostics, parser/confidence fields, and observation/attempt timestamps. Existing normalized storage and fail-closed scan/synchronization contracts retain their required diagnostic fields internally; this change does not alter their persistence or eligibility behavior.
 - During an active or cancelling manual scan, render only an accessible in-progress workspace: a determinate progress bar driven by the existing discovery/card progress events, minimal progress copy, and the cancellation control. Do not render prior or incrementally committed card results, summaries, filters, Sync, privacy/details controls, data-quality information, timestamps, or scan notes until the scan reports its terminal `finished` state.
 - At terminal completion, render the normal card/benefit/filter presentation from the final local state without the removed diagnostic and data-quality UI. Preserve the explicit manual trigger, primary-only discovery, filter-aware card visibility, privacy boundary, and no automatic scan or synchronization behavior.
+- Local AMEX observation, storage, and display must not depend on a product-name or destination-card allowlist. Every characterized top-level exact `BASIC` card is normalized from bounded tracker evidence under the same product-independent policy.
+- A locally displayed credit row must be backed by an AMEX tracker whose normalized provider category is exactly `usage`. Exact `spend`, `access`, `loan`, missing, and unrecognized categories remain excluded unless separately characterized in a future review. Catalog-only records must not manufacture local rows.
+- Product and credit-family authority is introduced only at synchronization projection through a closed exact product-title mapping. Unknown, Morgan Stanley, Hilton Honors Card, Delta Gold Business, and near-matching names remain local-only unless separately reviewed; fuzzy, substring, amount, cadence, and ending-digit product inference are forbidden.
+- The server synchronization authority remains independently deny-by-default and must not import or share the browser mapping as its authority source.
+- A fresh observation contract must keep local provider facts separate from destination `productKey` and `creditFamilyKey`; these destination mapping fields must not be persisted on local V3 observations.
+- The approved live outcomes are: the reviewed Morgan Stanley Platinum card exposes its ten tracker-backed usage credits including CLEAR+ and Equinox; Hilton Honors Card produces a truthful complete empty observation; Delta Gold Business exposes only `$150 Delta Stays Credit`, while its exact `spend` `$200 Delta Flight Credit` and catalog-only `$120 Rideshare Credit` remain absent.
+- The new reader version must invalidate selection-incomplete V1/V2 local observations and pending handoffs once, preserve the installation identity secret, remain retryable/idempotent, and require a fresh separately authorized scan rather than fabricating missing rows.
+- Preserve all existing privacy limits: no account tokens, provider IDs, source join IDs, raw requests/responses, cookies, credentials, authorization data, or destination authority claims may enter local normalized observations.
 
 ## Inspection Findings
 
@@ -56,6 +64,10 @@ The evidence below uses redacted aliases from the temporary derived report. It d
 | The Adobe `$250` title and `$600` amount describe reward value versus qualifying spend | Scope defect, not a parser-amount defect | Medium | High | C04 and C05 show `$250 Adobe Credit` with a completed `$600 of $600` provider-category `spend` tracker. The catalog identifies this as a $250 credit after $600 spend in `src/lib/american-express-card-catalog.ts:344-353`. | Ignore the provider-category `spend` tracker entirely rather than presenting it as credit consumption. |
 | Supplementary physical cards are scanned as ordinary cards | Confirmed ownership-scope defect | High | High | The v0.3.1 scan attempted three Additional Platinum and four Companion Platinum records. `parseAccountDiscovery` flattens top-level `BASIC` and nested `SUPP` entries in `src/lib/amex-benefit-reader/amex-response-adapter.ts:203-268`, then `scan-engine.ts:167-275` drops the role and reads every card. | Admit only top-level exact `BASIC`; treat nested exact `SUPP` as an understood exclusion before identity or network work. |
 | Empty or exhausted card groups remain in the active panel filter | Confirmed filter-projection defect | Medium | High | Current coverage excludes only `confirmed_empty`, so the latest shape renders nine card groups although only four contain benefits; five visible groups have no rows. An all-used card also remains as a compact `0 remaining benefits` group under `Remaining` because coverage uses unfiltered benefit count in `panel.ts:289-317,661-668,989-1069`. | Render a group only when it has rows in the active filter; keep omitted-card quality counts in account-level summary copy. |
+| Product-name gating silently empties valid primary cards | Confirmed normalization defect | High | High | The v0.3.3 run attempted reviewed Morgan Stanley Platinum, Hilton Honors Card, and Delta Gold Business cards but stored empty V1 fallbacks because `normalizeBenefits` and `scan-engine.ts` require a finite supported-product match. Provider review found ten Morgan Stanley usage trackers and one Delta Stays usage tracker. | Normalize every characterized top-level BASIC card from product-independent tracker evidence; reserve exact product/family matching for synchronization only. |
+| Current Platinum credit rules omit CLEAR+ and Equinox | Confirmed hard-coded coverage defect | High | High | Morgan Stanley Platinum exposes `$219 CLEAR+ Credit` and `$300 Equinox Credit`, but neither exists in the Platinum `CARD_RULES`; adding only a Morgan Stanley product alias would still discard both. | Local usage-tracker observation must not use a finite card-credit registry. Both rows render locally without granting sync authority. |
+| Hilton Honors Card has no eligible usage tracker | Confirmed truthful-empty outcome | Low | High | Provider-visible benefits contain rewards, status, service, and a `$20,000` status-upgrade spend condition, but no Benefits Activity credit-usage tracker. | Commit a complete current V3 observation with zero rows; hide the card under row-based filters without treating its product name as unsupported. |
+| Delta Gold Business has one eligible local credit | Confirmed product-independent outcome | Medium | High | Provider Benefits Activity shows `$150 Delta Stays Credit` as usage, `$200 Delta Flight Credit` as a spend qualification, and `$120 Rideshare Credit` only as a catalog enrollment/future highlight. | Retain only the tracker-backed Delta Stays usage row; exclude the spend tracker and catalog-only Rideshare candidate. |
 
 ### Synchronization impact
 
@@ -82,11 +94,19 @@ The evidence below uses redacted aliases from the temporary derived report. It d
 - [x] Progress updates deterministically from existing discovery/card events and the terminal `finished` event restores the final normal card/benefit presentation without the removed diagnostic UI.
 - [x] Focused unit and generated-bundle synthetic tests cover the scanning-only workspace, real card progress, terminal result restoration, and absence of removed user-facing diagnostic fields.
 - [x] No Sync action, mailbox handoff, confirmation, AMEX mutation, Perks Reminder mutation, or database write occurs.
+- [x] A V3 local observation contract contains tracker-backed provider facts without persisted `productKey` or `creditFamilyKey`, and every successfully read characterized BASIC card uses it regardless of product name.
+- [x] Local normalization admits only exact `usage` trackers, rejects exact `spend`/`access`/`loan`/missing/unrecognized categories, and never creates a local row from catalog-only evidence.
+- [x] Synthetic Morgan Stanley-like coverage persists and displays ten usage rows including CLEAR+ and Equinox; the same tracker response normalizes identically under unrelated bounded product display names.
+- [x] Synthetic Hilton Honors Card coverage commits a complete empty observation without an unsupported-product fallback or visible empty card group.
+- [x] Synthetic Delta Gold Business coverage retains only `$150 Delta Stays Credit` and excludes its `$200 Delta Flight Credit` spend tracker and `$120 Rideshare Credit` catalog-only candidate from storage, display, and synchronization.
+- [x] Synchronization projection maps only exact separately reviewed product-title pairs, rejects unknown/near-matching/Morgan Stanley/Hilton/Delta source products, and remains independently constrained by unchanged server write authority.
+- [x] A one-time V3 compatibility invalidation removes selection-incomplete V1/V2 observations and pending mailboxes, preserves the installation identity secret, writes its marker last, and is idempotent and fail-closed for malformed/future data.
+- [x] Userscript `0.4.0`, parser `amex-api-us/3.0.0`, unit tests, strict type-checking, focused lint, local build, and deny-by-default synthetic E2E validation pass without live AMEX reads, installation, synchronization, or database writes.
 
 ## Out of Scope
 
 - Synchronizing any benefit data or relaxing the existing complete-card synchronization gate for genuine conflicts.
-- Applying migrations, backfills, seeds, configuration changes, or server/database synchronization changes.
+- Applying database migrations, backfills, seeds, configuration changes, or expanding server/database synchronization authority.
 - Persisting new conflict-detail fields or adding ownership-role fields to the normalized storage schema.
 - Removing the explicit `Used` filter; the fix changes filter-aware card-group visibility rather than discarding completed observations.
 - Installing the updated userscript, triggering another live scan, or performing browser-based account validation without separate explicit authorization after implementation review.

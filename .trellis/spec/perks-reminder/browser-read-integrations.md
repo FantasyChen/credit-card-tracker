@@ -41,18 +41,39 @@ interface ResultStore {
 The persisted observation boundary is versioned and normalized:
 
 ```ts
-interface NormalizedCardObservationV1 {
-  contractVersion: "amex-benefits/1";
+interface NormalizedBenefitObservationV3 {
+  benefitKey: string;
+  title: string;
+  category: ObservedField<string>;
+  activityKind: "credit_usage" | "completed";
+  enrollmentState: ObservedField<EnrollmentState>;
+  trackerState: ObservedField<TrackerState>;
+  completionState: ObservedField<"complete" | "incomplete">;
+  earnedOrUsed: ObservedField<QuantityV1>;
+  targetOrLimit: ObservedField<QuantityV1>;
+  remaining: ObservedField<QuantityV1>;
+  period: ObservedField<string>;
+  sourcePeriod: ObservedField<SourcePeriodV2>;
+  confidence: "high" | "medium" | "low";
+  issueCodes: IssueCode[];
+}
+
+interface NormalizedCardObservationV3 {
+  contractVersion: "amex-benefits/3";
   issuer: "american_express_us";
   localCardId: string;
   productName: string;
   endingDigits: string;
   observedAt: string;
-  parserVersion: string;
+  parserVersion: "amex-api-us/3.0.0";
+  scanId: string;
   completeness: "complete" | "partial";
   issueCodes: IssueCode[];
-  benefits: NormalizedBenefitObservationV1[];
+  benefits: NormalizedBenefitObservationV3[];
 }
+
+// Destination authority is deliberately absent from local V3 observations:
+// no productKey on the card and no creditFamilyKey on a benefit.
 ```
 
 Account ownership is decided before identity preparation or card-specific reads:
@@ -76,33 +97,30 @@ function parseAccountDiscovery(response: MemberResponse): AccountDiscovery;
 const PRIMARY_ONLY_COMPATIBILITY_KEY =
   "perksReminder.amexBenefitReader.compat.primaryOnly.v1";
 const PRIMARY_ONLY_COMPATIBILITY_VALUE = "primary-only/1";
+
+const V3_SELECTION_COMPATIBILITY_KEY =
+  "perksReminder.amexBenefitReader.compat.v3Selection.v1";
+const V3_SELECTION_COMPATIBILITY_VALUE = "v3-selection/1";
 ```
 
-Provider-benefit selection is a separate shared-catalog boundary, not a presentation filter:
+Local provider observation and destination synchronization are separate boundaries:
 
 ```ts
-interface SupportedAmexCardCreditMatch {
-  catalogCardName: string;
-  productKey: AmexProductKey;
-  creditKey: string;
-}
-
-function matchSupportedAmexCardCredit(
-  productName: string,
-  benefitTitle: string,
-): SupportedAmexCardCreditMatch | null;
-
+function normalizeAmexSelectionText(value: string): string;
 function isIgnoredAmexCatalogBenefitTitle(title: string): boolean;
+function isEligibleLocalAmexUsageTitle(title: string): boolean;
 
-interface RetainableAmexBenefit {
-  title: string;
-  category?: { state: string; value?: unknown };
+interface AmexBrowserSyncMatch {
+  productKey: "american-express-platinum-card";
+  creditFamilyKey:
+    | "american-express-platinum-card:resy"
+    | "american-express-platinum-card:lululemon";
 }
 
-function retainSupportedAmexCardCredits<T extends RetainableAmexBenefit>(
+function matchAmexBrowserSyncCredit(
   productName: string,
-  benefits: T[],
-): T[];
+  trackerTitle: string,
+): AmexBrowserSyncMatch | null;
 
 type BenefitUsageLabel =
   | "Not used"
@@ -121,7 +139,7 @@ interface BenefitUsagePresentation {
 }
 
 function deriveBenefitUsageState(
-  benefit: NormalizedBenefitObservationV1,
+  benefit: NormalizedBenefitObservationV3,
 ): BenefitUsagePresentation;
 
 function decodeNumericCharacterReferences(value: string): string;
@@ -180,14 +198,14 @@ interface BenefitIdentityConflictDetailSet {
 }
 
 interface BenefitNormalizationResult {
-  benefits: NormalizedBenefitObservationV1[];
+  benefits: NormalizedBenefitObservationV3[];
   issueCodes: IssueCode[];
   conflictDiagnostics: BenefitIdentityConflictDiagnostic[];
   conflictDetails: BenefitIdentityConflictDetailSet;
 }
 ```
 
-`BenefitIdentityConflictCandidateDetail` is a closed projection containing only a one-based scan-local candidate index, one fixed source role, bounded parsed display title and supported-credit key/family, explicit parsed/not-exposed/unrecognized category/activity/enrollment/tracker/completion fields, parsed decimal quantity fields with characterized units/currency, parsed period, and bounded catalog layout/enrollability. It has no generic record field, issuer/source ID, provider token, request metadata, or raw object. The current Amex caps are 24 conflict details and four rendered candidates per conflict; bounded total counts plus truncation booleans disclose omitted detail without retaining unbounded output.
+`BenefitIdentityConflictCandidateDetail` is a closed projection containing only a one-based scan-local candidate index, one fixed source role, bounded parsed display title, explicit parsed/not-exposed/unrecognized category/activity/enrollment/tracker/completion fields, parsed decimal quantity fields with characterized units/currency, parsed period, and bounded catalog layout/enrollability. V3 local conflicts carry no destination product/family claims; legacy supported-credit key/family slots remain null. The projection has no generic record field, issuer/source ID, provider token, request metadata, or raw object. The current Amex caps are 24 conflict details and four rendered candidates per conflict; bounded total counts plus truncation booleans disclose omitted detail without retaining unbounded output.
 
 ```ts
 type ScanProgress =
@@ -221,15 +239,17 @@ interface ScanReporter {
 
 `deriveBenefitUsageState` is a conservative presentation projection, not a persisted binary status. `decodeNumericCharacterReferences` decodes one pass of valid semicolon-terminated decimal or hexadecimal Unicode scalar references for display and leaves named, malformed, null, surrogate, and out-of-range references literal. `formatAmexBenefitTitle` applies that one-pass decoder and removes only a reviewed Amex adornment: terminal `<sup>‡</sup>` or `<sup>®</sup>`, standalone `‡`, or either exact superscript marker immediately before the exact suffix ` Statement Credit`. It trims trailing whitespace, preserves one separating space before `Statement Credit` when a nonempty prefix remains, and falls back to the decoded title when terminal removal would make it empty. Formatted output must still enter the DOM through text-only APIs such as `textContent`.
 
-`isIgnoredAmexCatalogBenefitTitle` is the exact reviewed catalog-title exclusion boundary. The current closed set is `35% Airline Bonus` and `Link Your Resy Profile` after the same bounded title normalization used by matching. Catalog rows matching this set are removed before issuer-ID grouping, joined enrichment, ambiguity detection, or enrollment-candidate creation. Trackers whose normalized provider category is exactly `spend` are qualifying-spend requirements and are removed even earlier, before title joining, field interpretation, candidate evidence, or conflict creation. Missing, unknown, and every non-`spend` category continue through the ordinary supported-credit and fail-closed paths; title, amount, state, and period are not substitutes for the category decision.
+`isEligibleLocalAmexUsageTitle` is product-independent and is used only after a tracker category normalizes exactly to `usage`. It rejects the closed reviewed titles `35% Airline Bonus` and `Link Your Resy Profile`, plus explicit non-credit access/protection/insurance/free-night/status phrases. Exact `spend`, `access`, `loan`, missing, and unrecognized categories are omitted before title joining, field interpretation, candidate evidence, or conflict creation. Product name, amount, state, cadence, ending digits, and destination catalog membership are never local-row admission evidence.
 
-`retainSupportedAmexCardCredits` reapplies both the exact title exclusion and observed-`spend` exclusion to normalized observations. Storage compatibility projection and synchronization projection must call the same function. A no-op returns the original array reference; removal creates a new array. Compatibility filtering never clears a generic conflict, changes quality, or promotes a historical partial card.
+Catalog data can enrich enrollment state only for an already-admitted tracker row through one unambiguous transient issuer-ID join. Catalog titles never replace the tracker title, catalog-only records never manufacture local rows, and issuer IDs never enter normalized output. An ambiguous join leaves the tracker-backed row present, records bounded internal conflict evidence, marks the card partial, and therefore keeps synchronization fail closed.
+
+`matchAmexBrowserSyncCredit` is a separate destination-boundary function. It matches one closed exact-normalized product/title pair to one destination product/family and uses no substring, amount, cadence, ending, or near-product inference. Local observations contain neither `productKey` nor `creditFamilyKey`; those fields exist only in a projected sync envelope. The browser mapping does not replace or share authority with the independent server allowlist.
 
 `parseAccountDiscovery` emits only characterized top-level cards whose exact resolved relationship is `BASIC`. A nested exact `SUPP` relationship is an understood primary-only policy exclusion and is skipped before its token, ending, or product fields are inspected; it creates no identity preparation, card-specific provider request, discovered/attempted count, normalized record, panel group, or sync candidate. Missing, contradictory, and uncharacterized relationship shapes remain fail-closed unknown variants. Structure and relationship are authoritative because a supplementary entry may inherit an ordinary supported parent product name.
 
-`projectCardCoverage` classifies each stored physical card against the latest scan as benefit-bearing, conclusively empty, unresolved in the latest scan, or older retained. This classification remains an internal projection for correctness; the panel does not expose quality counts, quality badges, scan notes, timestamps, parser/confidence fields, issue explanations, or other diagnostic metadata. Active-filter row membership alone decides which card groups render. `formatAmexSourcePeriod` renders observed V2 UTC date ranges deterministically as compact English calendar text: a full year as `2026`, a full month as `Jul 2026`, a same-year whole-month range as `Jul–Sep 2026`, and irregular/cross-year ranges with explicit compact dates. Raw provider duration text is a V1/unavailable-structured-period fallback only.
+`projectCardCoverage` classifies each stored physical card against the latest scan as benefit-bearing, conclusively empty, unresolved in the latest scan, or older retained. This classification remains an internal projection for correctness; the panel does not expose quality counts, quality badges, scan notes, timestamps, parser/confidence fields, issue explanations, or other diagnostic metadata. Active-filter row membership alone decides which card groups render. `formatAmexSourcePeriod` renders observed V3 UTC date ranges deterministically as compact English calendar text: a full year as `2026`, a full month as `Jul 2026`, a same-year whole-month range as `Jul–Sep 2026`, and irregular/cross-year ranges with explicit compact dates. Raw provider duration text is a legacy or unavailable-structured-period fallback only.
 
-`BenefitIdentityConflictDiagnostic` remains an internal fixed vocabulary derived only from the adapter branch that detected a generic `benefit_identity_conflict`. The fixed category contains no source values. The adapter may additionally project the minimum already-parsed candidate facts into `conflictDetails` for in-memory debugging and tests, but the panel must ignore both fields and must not expose them in visible copy, accessibility text, semantic DOM hooks, normalized observations, scan summaries, storage, logs, network traffic, reload reconstruction, or task evidence.
+`BenefitIdentityConflictDiagnostic` remains an internal fixed vocabulary derived only from the adapter branch that detected a generic `benefit_identity_conflict`. The fixed category contains no source values or destination identity. The adapter may additionally project the minimum already-parsed candidate facts into `conflictDetails` for in-memory debugging and tests, but the panel must ignore both fields and must not expose them in visible copy, accessibility text, semantic DOM hooks, normalized observations, scan summaries, storage, logs, network traffic, reload reconstruction, or task evidence.
 
 Do not expose a generic `request(url, init)` port to scan orchestration. Add a named method and an exact operation contract for every newly approved read.
 
@@ -249,13 +269,13 @@ Do not expose a generic `request(url, init)` port to scan orchestration. Add a n
 12. **Visible-context invariant**: capture the reviewed exact origin and current pathname before scanning, plus a one-way selected-display fingerprint only when a recognized selected-card control is present. Final verification always requires the same origin/pathname. A captured fingerprint must remain present and equal; an absent selector is valid and makes route invariance sufficient, even if a selector appears later. Report changed or unavailable context without persisting the visible display string.
 13. **Keep evidence quality internal and benefit state truthful**: user-facing presentation must never reuse parser completeness/freshness as a benefit status, and it must not expose observation-quality labels, quality badges, scan notes, issue explanations, timestamps, parser/confidence fields, or conflict diagnostics. `Enrollment required`, `Link required`, `Used`, `Partially used`, `Not used`, and `Status unavailable` describe the benefit. Apply state precedence in this order: enrollment/linking requirements; explicit completion, recognized earned/completed tracker or activity kind, or compatible used-at/above-target evidence as `Used`; compatible observed zero-below-target evidence as `Not used` even when a generic tracker state says in progress; explicit in-progress or compatible positive-below-target evidence as `Partially used`; explicit not-started evidence as `Not used`; otherwise `Status unavailable`. Generic in-progress remains `Partially used` when compatible zero evidence is absent, including when quantities are missing, incompatible, or uncharacterized.
 14. **Scale by physical card identity, isolate active scans, and render only active-filter rows**: when an account can contain many observations or repeated product names, maintain internal coverage by physical card and include product plus explicit ending digits in every terminal card-group label. The terminal card list is filter-aware: render a group only when it has at least one row in the selected filter. `Remaining` is the default and contains every non-`Used` row; `Used` contains only `Used` rows; membership never relabels a row. An all-used card is absent from `Remaining` and appears with rows under `Used`; zero-benefit partial/failed/stale/older-retained records create no empty card shell or data-quality copy. Use one filter-specific terminal empty state that points to the other filter when applicable. While scanning or cancelling, replace the entire terminal panel body with a dedicated workspace containing only the panel title, minimal accessible status text, a native progress element, and Cancel (disabled while cancelling). Do not render stale or incrementally committed cards, filters, summaries, Sync, privacy/footer/details controls, diagnostic copy, or timestamps. Progress is indeterminate until discovery yields a positive card count; then use real card index/count events, clamp the value to the discovered count, and remain in the isolated workspace through context verification. A zero-eligible-card scan remains indeterminate. Only the engine's `finished` event may restore terminal results; resolving `startScan()` is not terminal authority.
-15. **Shared-catalog, card-specific selection**: normalized/persisted benefits must be usable, trackable credits represented by a positive-amount benefit on the matched Perks Reminder card. Product and benefit aliases belong to one browser-safe matcher backed by the shared static catalog; do not maintain a disconnected userscript allowlist or admit a credit represented only on a different card.
-16. **Fail-closed filtering before interpretation**: unknown product names, unreviewed benefit wording, ambiguous matches, and access/protection/insurance/free-night/status/informational/non-credit titles are omitted before provider status, quantity, category, or layout fields are interpreted. For Amex, also omit every tracker whose exact normalized provider category is `spend`, plus catalog titles in the closed reviewed exclusion set (`35% Airline Bonus`, `Link Your Resy Profile`). Remove reviewed catalog exclusions before issuer-ID grouping so they cannot manufacture `ambiguous_catalog_join`; remove `spend` trackers before joining or candidate evidence so they cannot manufacture any identity conflict. Do not infer either exclusion from amount, state, period, or broad merchant wording. Intentional omission produces no normalized row, issue code, conflict diagnostic/detail, panel row, or synchronization row, and must not make an otherwise complete card partial. Every other materially different supported candidate remains fail-closed.
-17. **Compatible-store, ownership invalidation, and sync projection**: when a parser update only narrows supported benefits, project compatible observations through the shared title/category retention function before display/persistence and again before sync. When a parser update changes the trustworthy physical-card ownership boundary and old normalized records contain no role, do not guess from product names: validate the store, then invalidate every role-unverified card plus `lastScan` and delete any pending mailbox under one fixed non-sensitive compatibility marker while preserving the installation identity secret. Read the marker before the store so a concurrent load that observes completed migration cannot return a pre-migration snapshot; write the marker last so partial persistence failure remains retryable. Increment revision once only when a nonempty snapshot is invalidated; the second load is idempotent; clear removes the marker. Malformed or future-schema stores are refused unchanged and unmarked. Sync card schema and projection require the exact current `PARSER_VERSION`, in addition to V2/current/latest/complete/successful gates, so a directly supplied pre-primary-only store or mailbox fails closed pending a fresh scan. Never promote a historical partial card or clear `benefit_identity_conflict` because of compatibility work.
+15. **Product-independent local observation**: every characterized top-level exact `BASIC` card uses the same local selection rule regardless of product display name. Admit only tracker-backed rows whose normalized provider category is exactly `usage` and whose bounded title passes the reviewed non-credit exclusions. Use the tracker title as local display/identity evidence. Never require a shared-catalog card match, borrow another product's rules, or infer local eligibility from product resemblance, amount, cadence, or ending digits. A successfully read unknown product commits V3; an empty usage set is a truthful complete V3 empty observation.
+16. **Fail-closed filtering and enrichment before interpretation**: omit exact `spend`, `access`, `loan`, missing, and unrecognized tracker categories before status/quantity interpretation, joining, candidate evidence, or conflict creation. Remove catalog titles in the closed reviewed exclusion set (`35% Airline Bonus`, `Link Your Resy Profile`) before issuer-ID grouping. Catalog evidence may enrich one tracker-backed row only through an unambiguous same-card join; it cannot create a row, replace its title, add destination identity, or erase a valid usage row. Intentional omission produces no row or issue. Materially different duplicate trackers and ambiguous enrichment retain the generic conflict and partial/fail-closed behavior.
+17. **Versioned compatibility and exact sync projection**: when physical-card ownership or local selection authority changes and old observations cannot reconstruct discarded evidence, validate first and invalidate rather than guess. The primary-only marker clears role-unverified cards and `lastScan`; the V3-selection marker removes V1/V2 cards and `lastScan`; both delete legacy/current pending mailboxes, preserve the installation identity secret, read markers before the store, and write each marker last. Increment only when state changes, make later loads idempotent, clear every marker/mailbox key, and refuse malformed/future stores unchanged and unmarked. Sync projection requires the exact current V3 contract, parser, scan ID, freshness, completeness, successful disposition, structured period, and a closed exact browser product/title mapping. It introduces destination keys only in the envelope and never promotes partial history or clears a generic conflict.
 18. **Conservative quantity compatibility**: infer usage from used-versus-target comparison only when both values are valid nonnegative decimal strings, the target is positive, both units are characterized and equal, and currencies are equal. Matching `unknown` units are never compatible. Compare decimal strings deterministically rather than converting them to floating point. Incompatible, invalid, negative, missing, or nonpositive-target quantities cannot infer usage state. A combined inline used/target amount requires equal characterized units and currencies; an individual characterized used or target quantity may still be shown when its counterpart is absent.
-19. **Practical row density and structured periods**: show benefit name, exact truthful state, safely available observed used/target evidence, and period inline. For V2, prefer an observed structured UTC source range and render it deterministically with compact English month labels (`2026`, `Jul 2026`, `Jul–Sep 2026`); use explicit compact start/end dates for irregular or cross-year ranges. Show the raw normalized period only as a V1 or unavailable-structured-period fallback, never alongside a valid structured range. Keep completeness/freshness, fixed redacted reasons, parser fields, confidence, issue codes, observation/scan timestamps, and other technical evidence internal; do not render them in card headings, secondary disclosures, notes, summaries, or accessibility text.
+19. **Practical row density and structured periods**: show benefit name, exact truthful state, safely available observed used/target evidence, and period inline. For V3, prefer an observed structured UTC source range and render it deterministically with compact English month labels (`2026`, `Jul 2026`, `Jul–Sep 2026`); use explicit compact start/end dates for irregular or cross-year ranges. Show the raw normalized period only as a legacy or unavailable-structured-period fallback, never alongside a valid structured range. Keep completeness/freshness, fixed redacted reasons, parser fields, confidence, issue codes, observation/scan timestamps, and other technical evidence internal; do not render them in card headings, secondary disclosures, notes, summaries, or accessibility text.
 20. **Provider text remains inert**: decode valid decimal and hexadecimal numeric character references exactly once at the presentation boundary, leave unsupported or invalid references literal, and insert the result with `textContent` or an equivalent text-only API. A provider-specific presentation formatter may remove only a reviewed footnote adornment after that single pass; for Amex, this is a terminal literal or numeric-reference-derived `<sup>‡</sup>` or `<sup>®</sup>`, standalone `‡`, or either exact superscript marker immediately before the exact suffix ` Statement Credit`. Preserve one separating space before `Statement Credit` when a nonempty prefix remains, trim trailing whitespace, and fall back to the decoded title when terminal stripping would empty it. Preserve arbitrary other nonterminal markers, whitespace variants, broader suffixes, other tags/symbols, double-encoded references, and unrelated markup-like text. Never decode provider text by assigning it to `innerHTML`, never use `DOMParser` or broad tag stripping for display cleanup, never execute decoded markup, and do not rewrite the stored normalized title solely for presentation compatibility.
-21. **Internal conflict diagnostics only**: retain `benefit_identity_conflict` as the only persisted issue and preserve partial/fail-closed handling. Classify existing conflict sites with the stable fixed enum for tracker-state/same-supported-credit collision, joined tracker/catalog supported-key mismatch, ambiguous catalog join/record, and tracker/catalog enrollment-candidate collision. A per-card `card_committed` event may contain a bounded closed projection of already-parsed candidate facts for in-memory debugging and deterministic tests: category; reviewed supported credit key/family (both keys for mismatch); fixed source role; bounded display title; explicit parsed enrollment/tracker/completion/activity, decimal quantity/unit/currency, and period fields; same/different/unavailable relations; and catalog layout/enrollability only where needed. Cap details and candidates, mark truncation, sort deterministically, and use stable scan-local keys. The production panel must ignore this projection and expose no category, detail, scan note, semantic diagnostic hook, or restored explanation in visible or accessible DOM. Never include credentials, cookies, authorization headers, MFA values, opaque provider tokens, raw response objects, or issuer/source IDs; never place structured details or categories in normalized snapshots, scan summaries, GM storage, console, network, task artifacts, or reload reconstruction. Diagnostics must not choose an observation, invent persisted benefit identity, broaden matching, merge contradictory state, resolve/suppress a conflict, or expand transport authority.
+21. **Internal conflict diagnostics only**: retain `benefit_identity_conflict` as the only persisted issue and preserve partial/fail-closed handling. Classify active V3 conflict sites with the stable fixed enum; local candidates carry no destination product/family claim and any legacy supported-key slots remain null. A per-card `card_committed` event may contain a bounded closed projection of already-parsed candidate facts for in-memory debugging and deterministic tests: category; fixed source role; bounded display title; explicit parsed enrollment/tracker/completion/activity, decimal quantity/unit/currency, and period fields; same/different/unavailable relations; and catalog layout/enrollability only where needed. Cap details and candidates, mark truncation, sort deterministically, and use stable scan-local keys. The production panel must ignore this projection and expose no category, detail, scan note, semantic diagnostic hook, or restored explanation in visible or accessible DOM. Never include credentials, cookies, authorization headers, MFA values, opaque provider tokens, raw response objects, or issuer/source IDs; never place structured details or categories in normalized snapshots, scan summaries, GM storage, console, network, task artifacts, or reload reconstruction. Diagnostics must not choose an observation, invent persisted benefit identity, broaden matching, merge contradictory state, resolve/suppress a conflict, or expand transport authority.
 
 ### 4. Validation & Error Matrix
 
@@ -289,9 +309,10 @@ Do not expose a generic `request(url, init)` port to scan orchestration. Add a n
 | Discovery has not produced a positive card count, including zero eligible cards | Keep progress indeterminate and remain in the isolated workspace until `finished` |
 | Positive discovery and card events are reported | Set progress max to discovered card count and value to the clamped current card index; do not show card identity or result rows |
 | `startScan()` resolves before a terminal engine event | Remain isolated; only `finished` may restore terminal result UI |
-| Amex tracker category normalizes exactly to `spend` | Omit it before joining, interpretation, candidate evidence, conflicts, persistence, panel rendering, and sync projection; retain non-`spend` usage independent of amount |
+| Amex tracker category normalizes exactly to `usage` and its bounded title passes reviewed exclusions | Admit it locally for every characterized BASIC product, independent of product name and amount |
+| Amex tracker category is exact `spend`, `access`, or `loan`, or is missing/unrecognized | Omit it before joining, interpretation, candidate evidence, conflicts, persistence, panel rendering, and sync projection |
 | Amex catalog title is exactly a reviewed ignored title after bounded normalization | Omit it before issuer-ID grouping and enrollment-candidate creation; it cannot make a supported joined catalog record ambiguous |
-| V2 benefit has an observed structured UTC source range | Render deterministic compact calendar text and suppress the raw provider duration token; use raw period only when structured data is unavailable |
+| V3 benefit has an observed structured UTC source range | Render deterministic compact calendar text and suppress the raw provider duration token; use raw period only when structured data is unavailable |
 | Benefit is anything other than `Used` | Include it in `Remaining` while preserving its exact truthful state label |
 | Compatible used quantity is zero below a positive target while tracker state is `in_progress` | Show `Not used`; the specific zero-usage evidence overrides the generic in-progress fallback |
 | Tracker state is `in_progress` and compatible observed zero evidence is absent | Show `Partially used`, including when quantities are missing, incompatible, or uncharacterized |
@@ -306,13 +327,14 @@ Do not expose a generic `request(url, init)` port to scan orchestration. Add a n
 | An adapter path emits `benefit_identity_conflict` | Keep the generic issue and partial disposition; any fixed category or bounded parsed candidate projection remains internal to the current event/debug path |
 | A `card_committed` event contains conflict diagnostics or details | Ignore those fields in panel presentation; expose no visible/accessibility copy or semantic diagnostic hooks and make no automatic choice |
 | A card is committed again, panel reloads/reconstructs from a stored generic conflict, or a new scan/clear begins | Show no prior conflict category/detail and infer nothing from storage |
-| Product name has no exact normalized catalog alias | Omit all benefits for that card; do not guess a nearby product or borrow another card's credit rules |
-| Benefit title has no unique reviewed alias for a positive-amount credit on the matched card | Omit the record before interpreting its provider fields; do not add a parser issue or partial marker solely for the omission |
-| Title contains a credit brand plus an explicit non-credit phrase such as access, protection, insurance, free night, or status | Reject the record even when a broader merchant alias also appears |
-| Compatible stored observation contains benefits no longer supported by the current matcher under the same ownership policy | Remove only those rows, preserve record/scan quality metadata, and rewrite with one revision increment only when the projection changes the store |
-| Primary-only compatibility marker is absent for a valid existing snapshot | Invalidate all cards and `lastScan`, delete the pending mailbox, preserve the identity secret, increment revision once when state existed, and write the marker only after successful mutation |
+| Product name has no exact normalized destination mapping | Persist and display its valid local usage rows, but project no sync card; do not guess a nearby product or borrow destination authority |
+| Exact usage tracker title has no destination mapping | Persist and display it locally, but omit it from the sync envelope without changing card completeness |
+| Title contains a credit brand plus an explicit non-credit phrase such as access, protection, insurance, free night, or status | Reject the local row even when a broader merchant phrase also appears |
+| Catalog record has no tracker-backed usage row | Do not create a local observation, enrollment candidate, panel row, or sync row |
+| Primary-only compatibility marker is absent for a valid existing snapshot | Invalidate all cards and `lastScan`, delete legacy/current pending mailboxes, preserve the identity secret, increment revision once when state existed, and write the marker only after successful mutation |
+| V3-selection compatibility marker is absent for a valid store containing V1/V2 | Remove selection-incomplete legacy cards and `lastScan`, preserve valid V3/null-latest state and the identity secret, delete both mailbox keys, and write the marker last |
 | Concurrent compatibility loads or a persistence step fails | Marker-before-store read ordering prevents stale return after completed migration; an unwritten marker makes partial failure retryable and later loads converge on the invalidated snapshot |
-| V2 observation or sync mailbox uses a parser older than current `PARSER_VERSION` | Reject it from projection/schema validation and require a fresh primary-only scan |
+| Observation or mailbox is not exact current V3/parser/envelope-v2/mailbox-v2 | Reject it from synchronization projection/schema validation and require a fresh scan |
 | Stored envelope is malformed or from a future schema | Refuse it unchanged and unmarked; do not project, invalidate, or overwrite storage |
 
 ### 5. Good / Base / Bad Cases
@@ -323,7 +345,7 @@ Do not expose a generic `request(url, init)` port to scan orchestration. Add a n
 - **Ownership good**: discovery emits validated top-level exact `BASIC` cards only; nested exact `SUPP` is an understood exclusion before token/identity/request work, even when its product text says ordinary Platinum; unknown relationships still degrade discovery fail closed.
 - **Ownership bad**: flatten supplementary cards, filter by `Additional`/`Companion` display wording, or let a SUPP entry inherit the parent product and reach tracker/catalog requests.
 - **Presentation good**: duplicate primary products remain distinct by ending; only active-filter row-bearing groups render; `Remaining` contains exact non-used labels without flattening them; and completeness/freshness, scan notes, issue reasons, timestamps, parser/confidence fields, and conflict diagnostics remain internal.
-- **Presentation base**: an all-used card is absent under `Remaining`, while selecting `Used` renders that card's used rows. A catalog failure with no rows creates neither a card shell nor diagnostic copy. A valid V2 quarterly source range renders as `Jul–Sep 2026` rather than `QuarterYear`.
+- **Presentation base**: an all-used card is absent under `Remaining`, while selecting `Used` renders that card's used rows. A catalog failure with no rows creates neither a card shell nor diagnostic copy. A valid V3 quarterly source range renders as `Jul–Sep 2026` rather than `QuarterYear`.
 - **Presentation bad**: retain compact `0 remaining benefits` groups, render unresolved zero-row card shells, expose quality/data-note/timestamp/debug fields, replace benefit state with card quality, group duplicate products only by name, show raw `CalenderYear` despite a structured range, or relabel every Remaining row as not used.
 - **Active-scan good**: scan start immediately replaces all terminal content with title, accessible minimal status, native indeterminate/determinate progress, and Cancel; positive discovery/card events advance real progress; zero-card discovery stays indeterminate; and only `finished` restores terminal results.
 - **Active-scan bad**: leave old cards or filters behind, append committed cards as they arrive, expose Sync/details/footer controls mid-scan, mark progress complete before context verification, or treat a resolved `startScan()` promise as terminal authority.
@@ -331,10 +353,10 @@ Do not expose a generic `request(url, init)` port to scan orchestration. Add a n
 - **Provider-text bad**: provider text is assigned to `innerHTML`, decoded repeatedly, broadly stripped as markup, has arbitrary nonterminal markers removed, is rewritten in normalized storage, or is allowed to throw on a malformed/out-of-range reference.
 - **Conflict-diagnostic good**: all current generic identity-conflict sites map to unique fixed branch categories and bounded deterministic candidate projections for internal tests, while normalized storage contains only `benefit_identity_conflict` and the panel exposes no category, candidate, reason, or diagnostic hook.
 - **Conflict-diagnostic bad**: a detail appears in visible/accessibility DOM, includes an issuer/source ID, token, raw object, credential/session material, or generic passthrough; enters a normalized snapshot/scan summary/storage/log/network/artifact channel; survives reload; or is used to pick one contradictory observation automatically.
-- **Selection good**: an exact reviewed product alias and benefit-title alias resolve to one positive-amount credit on that same shared-catalog card; the stable card-scoped credit key owns deduplication. An Amex `usage` tracker remains eligible independent of amount, while an exact `spend` tracker and the closed ignored catalog titles are removed before conflicts can form.
-- **Selection base**: a provider returns an access-only Resy item, `Link Your Resy Profile`, `35% Airline Bonus`, a qualifying-spend tracker, a free-night award, or an otherwise unrepresented tracker. The reader silently omits it before parsing or grouping can affect supported rows, while the Resy credit, `$200 Airline Fee Credit`, and other supported usage credits remain complete.
-- **Selection bad**: a global merchant substring list admits a credit on every card, a broad `Resy`/`Saks` match admits access or protection, a catalog exclusion happens only after duplicate join grouping, a spend requirement is chosen or rejected by its dollar amount, or panel-only filtering leaves unsupported rows in local storage.
-- **Compatible-store good**: a same-ownership compatible store removes unsupported title/category rows once while preserving quality metadata. A missing primary-only marker instead invalidates every role-unverified card and `lastScan`, deletes the mailbox, preserves the identity secret, writes the marker last, and makes the second load a no-op. Sync projection independently requires the exact current parser.
+- **Selection good**: the same exact `usage` tracker response normalizes identically for recognized, unknown, and partner-branded BASIC product names. Tracker title owns local identity; catalog evidence can only enrich it. Exact `spend`/`access`/`loan` and the closed ignored titles disappear before conflicts can form.
+- **Selection base**: a provider returns a valid Delta Stays usage tracker, a spend-qualified flight credit, and a catalog-only rideshare offer. The reader keeps only Delta Stays locally, regardless of product mapping; the card remains sync-ineligible unless an independent exact mapping exists.
+- **Selection bad**: gate local rows on a finite card registry, add a partner-card alias to reuse another product's rules, admit all non-`spend` categories, create catalog-only rows, use a global merchant substring, or infer destination identity from amount/product resemblance.
+- **Compatible-store good**: missing primary-only or V3-selection markers invalidate unreconstructable legacy evidence, clear legacy/current mailbox state, preserve the identity secret, write markers last, and make the second load a no-op. Sync projection independently requires exact current V3/parser and exact reviewed product/title mapping.
 
 ### 6. Tests Required
 
@@ -356,16 +378,15 @@ For each browser-side provider reader, assert:
 - visible context is reported as unchanged, changed, or unavailable without persisting its source display value; selector-present capture requires stable display equality, while selector-free capture permits unchanged route-only verification;
 - scan start and cancelling render only the title, minimal live status, native progress, and Cancel; stale and incrementally committed cards, filters, summaries, Sync, privacy/footer/details controls, quality/data-note/timestamp/debug copy, and semantic diagnostic hooks are absent until `finished`; progress is indeterminate before positive discovery and for zero eligible cards, determinate/clamped from real card index/count events afterward, remains isolated through context verification, and is not terminated by a resolved action promise;
 - all six truthful benefit labels follow the required precedence, `Remaining`/`Used` state and membership are accessible, only groups with rows in the active filter render, all-used cards move from absent under Remaining to row-bearing under Used, unresolved/stale/older-retained zero-benefit records create no card shells or diagnostic copy, duplicate primary products remain distinct by ending digits, and observation quality/timestamps remain internal;
-- observed V2 structured periods format deterministically for full-year, full-month, same-year multi-month, irregular, and cross-year ranges; valid structured ranges suppress raw provider duration tokens, while V1/unavailable-structured-period rows retain the bounded raw fallback;
+- observed V3 structured periods format deterministically for full-year, full-month, same-year multi-month, irregular, and cross-year ranges; valid structured ranges suppress raw provider duration tokens, while legacy/unavailable-structured-period rows retain the bounded raw fallback;
 - decimal comparisons avoid floating point and cover equal/above/below/zero behavior; compatible zero overrides generic in-progress as `Not used`; explicit completion remains `Used` despite conflicting zero/in-progress evidence; generic in-progress without compatible zero remains `Partially used`; missing, incompatible, and matching-`unknown` quantities infer no state from quantity comparison; incompatible/unknown pairs show no combined amount; and malformed quantities remain rejected by the normalized schema;
 - valid semicolon-terminated decimal/hex numeric character references decode exactly once into inert title text; named, malformed, null, surrogate, and out-of-range inputs remain literal; double-encoded input decodes only its outer layer; literal/numeric-derived terminal Amex `<sup>‡</sup>` / `<sup>®</sup>`, standalone `‡`, and either exact superscript marker before ` Statement Credit` are removed only for display; spacing normalizes to one separator before `Statement Credit` when a prefix remains; arbitrary nonterminal markers, whitespace variants, broader suffixes, multiple markers, other tags/symbols, and unrelated markup-like text remain visible and inert; empty-result fallback is safe; and normalized storage retains the original title;
-- every existing `benefit_identity_conflict` production site maps to the expected stable fixed category using invented fixtures; structured detail has exact closed shapes for all four categories, both reviewed keys on mismatch, fixed source roles, parsed candidate fields and safe relations, candidate/detail caps and truncation, deterministic ordering and scan-local keys under relevant reversal, and correct card scoping; generic card-versus-row issue locality and partial disposition remain unchanged; neither categories nor details contain source IDs/secret-like fields or serialize into normalized observations, scan summaries, GM storage, console, network, artifacts, visible/accessibility DOM, or semantic panel hooks;
+- every active `benefit_identity_conflict` production site maps to its stable fixed category using invented fixtures; structured detail has an exact closed destination-key-free shape, fixed source roles, parsed candidate fields and safe relations, candidate/detail caps and truncation, deterministic ordering and scan-local keys under relevant reversal, and correct card scoping; generic card-versus-row issue locality and partial disposition remain unchanged; neither categories nor details contain source IDs/secret-like fields or serialize into normalized observations, scan summaries, GM storage, console, network, artifacts, visible/accessibility DOM, or semantic panel hooks;
 - a synthetic high-scale fixture keeps every eligible row reachable through its truthful filter while rendering only row-bearing card groups; mixed internal coverage containing confirmed-empty, unresolved zero-benefit, benefit-bearing, and older-retained records produces no empty shells, quality counts, data notes, timestamps, or false empty claims; terminal all-empty/partial cases use only non-diagnostic filter/result copy;
-- every positive-amount benefit intended for provider synchronization in the shared card catalog has an exact-card matching fixture, while zero-value/access/protection/insurance/free-night/status/informational records, wrong-card titles, unknown products, and ambiguous wording fail closed;
-- unsupported provider records with malformed or unknown status/category fields, every exact normalized Amex `spend` tracker, `35% Airline Bonus`, and `Link Your Resy Profile` are omitted before interpretation/conflict creation and do not create normalized rows, partial observations, issue codes, conflict diagnostics/details, panel rows, or sync rows; order-reversed fixtures prove Dell `usage`, `$200 Airline Fee Credit`, and the Resy credit remain while unrelated genuine collisions stay fail-closed;
-- equivalent reviewed wording deduplicates through the same card-scoped credit key, while materially different credit observations do not merge;
-- same-ownership legacy row projection preserves quality/freshness metadata and rewrites only when title/category rows change; missing primary-only compatibility instead invalidates all valid role-unverified cards/lastScan and pending mailbox while preserving identity secret, writes its fixed marker last, increments revision at most once, handles concurrent loads without stale return, retries after partial persistence failure, clears the marker with local data, and refuses malformed/future stores unchanged/unmarked; sync schema/projection additionally requires exact current parser plus all existing complete/current/latest-V2 gates;
-- shared-catalog extraction has a website parity assertion so browser-safe reuse cannot silently remove or alter static catalog cards/benefits;
+- product-independent fixtures prove the same usage trackers normalize under recognized, partner-branded, and unknown BASIC product names; Morgan-like coverage includes CLEAR+ and Equinox, truthful empty Hilton creates no shell, and Delta Business retains only Delta Stays while spend Flight Credit and catalog-only Rideshare remain absent;
+- every exact `spend`, `access`, `loan`, missing, or unrecognized tracker category plus `35% Airline Bonus` and `Link Your Resy Profile` is omitted before interpretation/conflict creation and creates no normalized row, issue, panel row, or sync row; order reversal does not change output, while materially different duplicate usage trackers stay partial/fail-closed;
+- equivalent usage observations deduplicate through deterministic local benefit identity, while materially different observations do not merge or depend on provider response order;
+- missing primary-only or V3-selection compatibility invalidates unreconstructable V1/V2 cards/lastScan and both mailbox keys while preserving identity secret, writes fixed markers last, increments only on state change, handles concurrent loads without stale return, retries after partial persistence failure, clears all markers with local data, and refuses malformed/future stores unchanged/unmarked; sync schema/projection additionally requires exact current V3/parser/current/latest/complete/successful gates and exact source mapping;
 - the built userscript contains only approved grants and destinations and contains no mutation fragments, privileged transport, background polling, remote update metadata, or website-sync destination.
 
 Run targeted Jest for the reader and userscript surfaces, strict TypeScript, targeted ESLint, the isolated userscript build, artifact/source allowlist audits, a sensitive-data scan, structured-data parsing, and `git diff --check`. Authenticated browser validation requires explicit owner authorization and must capture only sanitized aggregates and URL/method/status metadata—never payloads.
@@ -495,45 +516,40 @@ row.textContent = formatAmexBenefitTitle(benefit.title);
 
 Single-pass numeric decoding plus narrow terminal-adornment cleanup fixes provider-visible labels without turning a presentation compatibility rule into markup execution, broad tag stripping, or a normalized-storage migration.
 
-#### Supported-credit boundary
+#### Local observation versus synchronization authority
 
 ```ts
-// Wrong: a global substring filter admits the merchant on unsupported cards
-// and leaves rejected rows persisted for the panel to hide.
-const visibleBenefits = observation.benefits.filter((benefit) =>
-  ["resy", "saks", "uber"].some((merchant) =>
-    benefit.title.toLowerCase().includes(merchant),
-  ),
-);
-
-// Correct: normalize through the shared-catalog, card-specific matcher before
-// provider fields enter the normalized observation or compatible local store.
-const match = matchSupportedAmexCardCredit(productName, providerBenefit.title);
+// Wrong: a finite destination-card registry decides whether provider facts may
+// exist locally, so partner-branded and unknown products silently become empty.
+const match = matchSupportedCardCredit(productName, tracker.benefitName);
 if (!match) return null;
-return normalizeSupportedBenefit(providerBenefit, match.creditKey);
+return normalizeTracker(tracker, match.productKey, match.creditFamilyKey);
+
+// Correct: exact usage trackers are local provider facts for every BASIC card.
+if (normalizeCategory(tracker.category) !== "usage") return null;
+if (!isEligibleLocalAmexUsageTitle(tracker.benefitName)) return null;
+return normalizeV3Tracker(tracker); // no destination keys
 ```
 
-The matcher must verify both sides of the contract: the card is a reviewed product alias, and the title resolves uniquely to a positive-amount usable credit represented on that exact shared-catalog card. Broad merchant wording never overrides explicit non-credit phrases.
+Product display wording is not local credit authority. Catalog records may enrich an existing row through a transient unambiguous join, but cannot replace the tracker title or create a catalog-only observation.
 
 ```ts
-// Wrong: reviewed exclusions happen after grouping/normalization, so ignored
-// rows can still create conflicts or survive in storage and synchronization.
-const groupedCatalog = groupCatalogByIssuerId(catalogResponse.benefits);
-const visible = normalizeTrackers(trackers, groupedCatalog).filter(panelFilter);
+// Wrong: infer destination identity from local presence or a merchant substring.
+const family = title.toLowerCase().includes("resy")
+  ? "american-express-platinum-card:resy"
+  : null;
 
-// Correct: remove exact reviewed source roles before candidate/conflict creation,
-// then reuse the normalized-observation predicate at storage and sync boundaries.
-const selectedCatalog = catalogResponse.benefits.filter(
-  (row) => !isIgnoredAmexCatalogBenefitTitle(catalogTitle(row)),
+// Correct: destination authority appears only at sync projection through one
+// closed exact-normalized product/title mapping, then the server reauthorizes it.
+const mapping = matchAmexBrowserSyncCredit(
+  observation.productName,
+  benefit.title,
 );
-const selectedTrackers = trackers.filter(
-  (row) => normalizeCategory(row.category) !== "spend",
-);
-const normalized = normalizeSelectedBenefits(selectedTrackers, selectedCatalog);
-const retained = retainSupportedAmexCardCredits(productName, normalized);
+if (!mapping) return null;
+return projectSyncRow(benefit, mapping);
 ```
 
-Source selection must happen early enough that an ignored row cannot alter ambiguity, issue codes, or completeness. Compatibility and sync filtering are defense in depth, not permission to normalize a known ignored source first.
+Local-only rows remain visible but produce no envelope row. Browser mapping and server write authority are separate closed checks; neither uses fuzzy matching, amounts, cadence, endings, or product resemblance.
 
 ## Scenario: reviewed observation handoff and confirmed AMEX synchronization
 
@@ -541,7 +557,7 @@ Source selection must happen early enough that an ignored row cannot alter ambig
 
 Use this contract when locally reviewed provider observations cross from a browser-session reader into an authenticated first-party preview and may later update durable benefit state. Scanning, local review, handoff, preview, and confirmation are separate explicit actions. Preview is read-only; only effective `write` mode plus a separate confirmation may persist.
 
-The initial writable policy is deliberately finite: product `american-express-platinum-card`, credit families `american-express-platinum-card:lululemon` and `american-express-platinum-card:resy`, a valid current structured UTC source range, and exactly one existing destination cycle/occurrence. Every broader product, family, period, V1 record, stale/partial/failed observation, or ambiguous mapping remains review-only. Raw provider responses, browser-session material, source fingerprints, and installation secrets never cross the handoff.
+The initial writable policy is deliberately finite: product `american-express-platinum-card`, credit families `american-express-platinum-card:lululemon` and `american-express-platinum-card:resy`, a valid current structured UTC source range, and exactly one existing destination cycle/occurrence. Every broader or locally unmapped product/family, legacy V1/V2 record, invalid period, stale/partial/failed observation, duplicate-family projection, or ambiguous mapping remains review-only. Raw provider responses, browser-session material, source fingerprints, and installation secrets never cross the handoff.
 
 ### 2. Signatures
 
@@ -555,8 +571,17 @@ interface AmexSyncConfiguration {
   hmacKey: string | null;
 }
 
+interface AmexSyncEnvelope {
+  envelopeVersion: "amex-sync-envelope/2";
+  observationContractVersion: "amex-benefits/3";
+  scanId: string;
+  scanFinishedAt: string;
+  cards: AmexSyncCard[];
+  exclusions: Array<{ reason: SyncExclusionReason; count: number }>;
+}
+
 interface AmexSyncMailbox {
-  mailboxVersion: "amex-sync-mailbox/1";
+  mailboxVersion: "amex-sync-mailbox/2";
   transferId: string; // 32 lowercase hexadecimal characters
   nonce: string; // 32 lowercase hexadecimal characters
   createdAt: string;
@@ -667,8 +692,8 @@ The first-party API consists only of `POST /api/integrations/amex-sync/preview` 
 
 ### 3. Contracts
 
-1. **Current-parser V2-only, exact candidate projection**: transfer only strict `amex-sync-envelope/1` rows projected from the latest completed `amex-benefits/2` scan whose card observation is current, complete, and stamped with the exact current `PARSER_VERSION`. The sync card schema also requires that literal marker, so role-unverified data from an older parser cannot cross through a direct store or mailbox. Before row projection, reapply the browser reader's shared supported-credit retention predicate so reviewed ignored titles and observed `spend` requirements cannot cross the handoff; this defense never promotes a partial card or bypasses latest-scan gates. The scan must remain within 30 minutes at confirmation. Stable product/family keys and a validated structured UTC date range are authority; display titles and free-form periods are not.
-2. **One private mailbox**: a direct global Sync gesture creates at most one bounded `amex-sync-mailbox/1` value under the fixed GM key. Its ten-minute lifetime may not exceed the source scan deadline. The top-level handoff URL contains only the opaque transfer ID. No payload, nonce, digest, proposal, card ending, title, or amount belongs in a URL, page storage, DOM attribute, clipboard, or wildcard message.
+1. **Current-parser V3-only, exact candidate projection**: transfer only strict `amex-sync-envelope/2` rows projected from the latest completed `amex-benefits/3` scan whose card observation is current, complete, successfully attempted, and stamped with the exact current `PARSER_VERSION`. Local V3 contains no destination keys; projection introduces them only through the closed exact-normalized browser product/title mapping. Unmapped local rows and cards stay review-only. Multiple materially distinct rows mapping to one destination family exclude the whole source card. The scan must remain within 30 minutes at confirmation. The independent server allowlist reauthorizes every projected product/family; a display title or browser map alone is never write authority.
+2. **One private mailbox**: a direct global Sync gesture creates at most one bounded `amex-sync-mailbox/2` value under the fixed GM key. Its ten-minute lifetime may not exceed the source scan deadline. The top-level handoff URL contains only the opaque transfer ID. No payload, nonce, digest, proposal, card ending, title, or amount belongs in a URL, page storage, DOM attribute, clipboard, or wildcard message.
 3. **Acknowledge server acceptance, not local acquisition**: the handoff validates exact origin/source/type/transfer/nonce, schema, digest, size, creation time, expiry, and scan deadline; safely acquires the envelope into memory; strips the locator with `history.replaceState`; calls preview; validates the complete typed preview response; and only then sends `perks-reminder:amex-sync-accepted`. `off`, HTTP failure, malformed response, unmount, or client exception sends no acceptance. The userscript deletes the mailbox only after the exact accepted message or terminal cancellation, clear, expiry, malformed content, replay, or timeout.
 4. **Early branch isolation**: the userscript entry rejects frames and selects the exact first-party handoff branch before dynamically importing provider client, scan engine, panel, or reader runtime. The handoff branch receives mailbox read/delete capability only and must not construct provider transport. Every unrelated origin/path returns without side effects.
 5. **Authenticated read-only preview and confirmed write**: both routes authenticate first, derive `userId` only from the server session, require exact first-party Origin and same-origin Fetch Metadata, accept strict bounded JSON only, and emit no CORS response. Preview performs no Prisma create/update/upsert/delete/transaction, mapping save, attempt/audit/provenance write, status materialization, or revalidation. Confirmation re-authenticates and requires `write` mode plus a valid short-lived HMAC proposal bound to purpose, user, effective mode, envelope digest, manual mappings, ordered row identities, before state, transition time, and expiry. The client strictly validates every successful response as a closed complete DTO, including nested status/change objects and disposition/reason compatibility: preview permits only proposed/unchanged/skipped rows, confirmation permits only updated/unchanged/skipped/failed rows, and `updatedCount` must equal the final updated-row count. Mapping options are limited to active user-owned cards whose finite product key is represented in the source envelope, sorted deterministically, capped at `AMEX_SYNC_MAX_ROWS`, and labeled with at most 200 characters while preserving ending digits.
@@ -718,7 +743,7 @@ For every reviewed browser-to-first-party synchronization:
 - assert no acknowledgement in `off`, after preview HTTP failure, or after a malformed preview body; assert exactly one matching acknowledgement only after typed preview success and mailbox deletion only after acceptance or terminal cleanup;
 - assert successful preview/confirmation responses reject missing and unknown fields, incomplete nested state/change objects, oversized arrays/strings, impossible phase dispositions, invalid disposition/reason combinations, and inconsistent `updatedCount`; assert mapping options are active, owned, limited to source-envelope product keys, deterministically sorted, capped, and labeled within 200 characters;
 - assert exact two userscript match scopes, storage-only grants, `@noframes`, top-frame checks, no provider runtime on the handoff, and no side effects on unrelated origins/paths;
-- assert V1 remains review-only, older-parser V2 stores/mailboxes fail closed, current-parser V2 candidate selection is latest/current/complete/fresh, the finite product/family allowlist is exact, and structured source ranges resolve exactly one current cycle/occurrence;
+- assert V1/V2 remain review-only, non-current envelope/mailbox/parser versions fail closed, current-parser V3 selection is latest/current/complete/fresh/successful, local observations contain no destination keys, browser product/title mapping is exact, duplicate destination families exclude the card, server product/family authority is independently exact, and structured source ranges resolve exactly one current cycle/occurrence;
 - assert older, equal-identical, equal-conflicting, newer-applied, and newer-already-current provenance ordering;
 - assert transaction-local ownership/card/benefit/cycle/before-state/provenance revalidation, a scoped status compare-and-set, and atomic status/provenance/audit persistence;
 - assert completed replay; processing/partial resume; `FAILED` promotion to updated, unchanged, and skipped; no successful-audit downgrade; row-failure isolation; and aggregate counts from durable results;

@@ -2,6 +2,8 @@
 
 ## Scope and boundaries
 
+> The original sections through **Testing strategy** document the completed v0.3.3 baseline. The later **Follow-up architecture: product-independent local observations** section is the final v0.4.0 authority and supersedes earlier shared product/credit matcher and compatible-row-retention statements.
+
 This change corrects three reviewed false-conflict mechanisms, excludes supplementary relationships from the primary-card reader, and fixes the confirmed panel presentation defects found in the redacted live-data reviews.
 
 It changes only local account discovery, reader normalization, compatibility invalidation/filtering, sync-envelope defense-in-depth, panel projection, tests, and userscript/parser version markers. It does not change AMEX request tuples, grants, response schemas, mailbox behavior, server synchronization authority, database schema, migrations, or deployment configuration.
@@ -209,6 +211,45 @@ Prove compact period formatting for annual, monthly, quarterly, half-year, irreg
 ### Synthetic E2E
 
 Use only the local synthetic harness. Cover the three reviewed exclusions, one genuine control conflict, corrected empty-card coverage, usage wording, compact periods, and sanitized GM storage. No live AMEX or Perks Reminder origin may be contacted.
+
+## Follow-up architecture: product-independent local observations
+
+The live review found a second trust-boundary defect in v0.3.3: local observation reused the finite synchronization/catalog mapping as an admission rule. That made an unknown product indistinguishable from a recognized product with no tracker-backed credits and also omitted CLEAR+ and Equinox from Platinum-like products. The approved correction separates three authorities:
+
+1. **Local provider observation** — any characterized top-level exact `BASIC` card; exact tracker category `usage`; no product-name allowlist.
+2. **Browser sync mapping** — a closed exact normalized product-name plus exact normalized tracker-title pair mapped to destination `productKey` and `creditFamilyKey` only at envelope projection.
+3. **Server write authority** — the existing independently maintained deny-by-default product/family allowlist in `src/lib/amex-sync/authority.ts`.
+
+The local policy never uses fuzzy matching, product resemblance, amounts, cadence, ending digits, or destination catalog membership. Exact `spend`, `access`, `loan`, missing, and unrecognized categories are not local credit-usage rows. Reviewed exact title exclusions remain defense-in-depth. Catalog records may enrich an unambiguous tracker-backed row's enrollment state, but cannot create a local row, replace its tracker title, confer destination identity, or make an otherwise valid usage row disappear. Ambiguous enrichment remains internal partial/conflict evidence and continues to block synchronization.
+
+### V3 normalized contract
+
+Add `amex-benefits/3` with parser `amex-api-us/3.0.0`. A V3 card keeps the existing bounded display identity, scan ID, completeness, issue codes, and structured periods, but has no `productKey`. A V3 benefit keeps a deterministic local `benefitKey`, bounded tracker title, exact observed category, normalized activity/state/amount/period fields, confidence, and issue codes, but has no `creditFamilyKey`. `credit_usage` is the truthful nonterminal activity for category `usage`; `completed` remains valid when the provider status establishes completion.
+
+Provider IDs and join IDs are transient enrichment evidence only. V3 persistence rejects destination keys, provider IDs, raw objects, tokens, request metadata, cookies, and authorization data. Materially identical duplicate trackers deduplicate deterministically; materially different rows with the same local identity retain a generic conflict, make the card partial, and cannot synchronize.
+
+Every successfully read BASIC card commits V3. Morgan Stanley-like, Hilton, Delta Business, and arbitrary bounded product display names no longer take a V1 empty fallback. A product-independent empty tracker set is a truthful complete V3 empty observation.
+
+### Sync boundary and transport versioning
+
+Synchronization projection accepts only current, complete, latest-scan V3 observations and applies a small exact reviewed source mapping. Initially, only the already writable base-Platinum Resy and lululemon product/title pairs map to destination keys. Morgan Stanley Platinum, Hilton Honors Card, Delta Gold Business, CLEAR+, Equinox, Delta Stays, airline fee, and near matches remain local-only. If two materially distinct V3 rows map to one destination family, the whole card is excluded rather than choosing a winner.
+
+The sync envelope and mailbox advance to version 2 because their required source observation contract changes to V3, while their bounded payload fields and storage-only handoff mechanism remain otherwise unchanged. The server parser accepts the new exact transport and continues to apply its separate existing authority. No database schema, destination catalog, ownership mapping, or server write allowlist is expanded.
+
+### Compatibility and release
+
+The store envelope schema remains version 1 because its outer structure does not change and its observation union gains V3. Add a fixed non-sensitive V3-selection compatibility marker. On first v0.4.0 load, validate the old store, invalidate all V1/V2 cards and `lastScan` because discarded rows cannot be reconstructed, delete pending legacy mailbox state, preserve the installation identity secret, persist the invalidated store only when needed, and write the marker last. Malformed or future-schema data remains untouched and unmarked; retries and subsequent loads are idempotent. The existing primary-only migration still runs first when needed.
+
+Release markers become userscript `0.4.0`, parser `amex-api-us/3.0.0`, observation `amex-benefits/3`, sync envelope `amex-sync-envelope/2`, and mailbox `amex-sync-mailbox/2`. No endpoint, request tuple, userscript match/grant, or private-read transport changes.
+
+### Approved outcome fixtures
+
+Synthetic fixtures, never live identifiers or raw responses, prove:
+
+- Morgan Stanley-like product: ten exact `usage` rows, including CLEAR+ and Equinox, with the same normalized output under unrelated bounded product names.
+- Hilton Honors Card: complete V3 observation with zero rows even when catalog-only status/reward entries exist.
+- Delta Gold Business: only `$150 Delta Stays Credit`; exact `spend` `$200 Delta Flight Credit` and catalog-only `$120 Rideshare Credit` are absent from observation, panel, and sync.
+- Unknown/local-only products display valid usage rows but produce no sync envelope card.
 
 ## Rollback
 
