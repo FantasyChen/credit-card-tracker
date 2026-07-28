@@ -216,3 +216,37 @@ Completed the parent cross-milestone review, closed strict preview/confirmation 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Make AMEX observations product-independent
+
+**Date**: 2026-07-27
+**Task**: Make AMEX observations product-independent
+**Branch**: `feat/amex-benefit-reader-phase-1`
+
+### Summary
+
+Reviewed live AMEX benefit gaps, replaced local product-gated normalization with tracker-backed V3 observations, preserved exact fail-closed sync mapping and independent server authority, added compatibility invalidation, and verified userscript v0.4.0 with focused tests and synthetic E2E.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `05cc4f8` | (see git log) |
+| `3b87f17` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
