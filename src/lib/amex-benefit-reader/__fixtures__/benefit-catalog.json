@@ -1,0 +1,35 @@
+{
+  "cardProduct": { "ignored": true },
+  "benefits": {
+    "spend-fixture": {
+      "sorBenefitId": "invented-spend-id",
+      "benefitTitle": "Synthetic Airline Fee Credit",
+      "layoutType": "ENROLLED",
+      "isEnrollable": true
+    },
+    "earned-fixture": {
+      "sorBenefitId": "invented-earned-id",
+      "benefitTitle": "Synthetic Hilton Credit",
+      "layoutType": "ENROLLED",
+      "isEnrollable": true
+    },
+    "complete-fixture": {
+      "sorBenefitId": "invented-complete-id",
+      "benefitTitle": "Synthetic Dell Technologies Credit",
+      "layoutType": "ENROLLED",
+      "isEnrollable": true
+    },
+    "candidate-fixture": {
+      "sorBenefitId": "invented-candidate-id",
+      "benefitShortTitle": "Synthetic Adobe Credit",
+      "layoutType": "NOTENROLLED",
+      "isEnrollable": true
+    },
+    "informational-fixture": {
+      "sorBenefitId": "invented-info-id",
+      "benefitTitle": "Synthetic Information Only",
+      "layoutType": "ENROLLED",
+      "isEnrollable": false
+    }
+  }
+}

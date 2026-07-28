@@ -1,0 +1,7 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Defines the AMEX reader's manual-read, normalization, presentation, synthetic-browser, and owner-authorized live-validation boundaries."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Defines repository UI composition, accessibility, and component conventions for the panel refactor."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Guides transient filter state and prevents unnecessary durable UI state or duplicated normalized state."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Defines strict TypeScript and external-data boundary conventions for presentation helpers."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Provides focused frontend test and accessibility expectations."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Defines safe validation commands and commands that must not be used as routine checks."}
+{"file":".trellis/tasks/archive/2026-07/07-15-amex-card-benefit-sync/amex-research.md","reason":"Provides sanitized prior account-scale and live-reader evidence for the grouped master-list design."}

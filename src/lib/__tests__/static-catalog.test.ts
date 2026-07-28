@@ -1,3 +1,4 @@
+import { americanExpressCardCatalog } from '../american-express-card-catalog';
 import {
   benefitUsageWays,
   calculateAnnualBenefitValue,
@@ -19,6 +20,12 @@ describe('static catalog', () => {
     }));
     expect(cards.flatMap((card) => card.benefits).every((benefit) => benefit.id.length > 0)).toBe(true);
     expect(cards.flatMap((card) => card.benefits).every((benefit) => benefit.usageWay?.slug)).toBe(true);
+  });
+
+  it('reuses every shared Amex card without changing its website catalog data', () => {
+    expect(predefinedCardsData.filter((card) => card.issuer === 'American Express')).toEqual(
+      Object.values(americanExpressCardCatalog),
+    );
   });
 
   it('finds cards by public route name', () => {

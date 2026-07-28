@@ -9,7 +9,7 @@
 
 ## Cron and notification safety
 
-- `/api/cron/check-benefits` and `/api/cron/send-notifications` consume both Vercel Hobby cron slots and must remain within the 10-second function ceiling.
+- `vercel.json` currently schedules `/api/cron/check-benefits` at `0 5 * * *` and `/api/cron/send-notifications` at `30 5 * * *`; both handlers export `maxDuration = 10`. Preserve those source-controlled contracts unless the task intentionally changes scheduling/runtime behavior. Provider plan limits and available cron slots are external state and must be verified in Vercel rather than asserted from the repository.
 - Cron authorization uses `Authorization: Bearer <CRON_SECRET>`. Log authorization presence and aggregate counts, never the secret or recipient data.
 - Never trigger notification/email endpoints against production data during testing. A non-production `mockDate` changes time selection but does not prevent email delivery.
 - Do not send production announcement or notification batches without explicit authorization, dry-run evidence, recipient counts, a cap, and resumable/auditable state.

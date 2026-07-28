@@ -7,6 +7,16 @@
 import React from 'react';
 import { ErrorInfo, ReactNode } from 'react';
 
+const AMEX_HANDOFF_PATH = '/integrations/amex-sync';
+
+export function sanitizedClientUrl(): string {
+  return typeof window === 'undefined' ? 'server' : `${window.location.origin}${window.location.pathname}`;
+}
+
+function isAmexHandoffPage(): boolean {
+  return typeof window !== 'undefined' && window.location.pathname === AMEX_HANDOFF_PATH;
+}
+
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
@@ -47,27 +57,26 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     const errorId = generateErrorId();
+    const isPrivateHandoff = isAmexHandoffPage();
 
-    // Log structured error information
-    const errorLog = {
-      errorId,
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      url: typeof window !== 'undefined' ? window.location.href : 'server',
-      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'server',
-      timestamp: new Date().toISOString(),
-      userId: this.getUserId(),
-    };
+    if (!isPrivateHandoff) {
+      // Log structured error information only outside the private handoff.
+      const errorLog = {
+        errorId,
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+        url: sanitizedClientUrl(),
+        timestamp: new Date().toISOString(),
+      };
 
-    // Log to console for development
-    console.error('Error Boundary caught an error:', errorLog);
+      console.error('Error Boundary caught an error:', errorLog);
+      this.reportError(errorLog);
+    }
 
-    // Send to monitoring service (implement based on your monitoring solution)
-    this.reportError(errorLog);
-
-    // Call custom error handler if provided
-    if (this.props.onError) {
+    // Custom handlers are also suppressed on the private handoff because their
+    // logging behavior is outside this boundary's control.
+    if (this.props.onError && !isPrivateHandoff) {
       this.props.onError(error, errorInfo);
     }
 
@@ -77,19 +86,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     });
   }
 
-  private getUserId(): string | null {
-    // Try to get user ID from session storage or other client-side storage
-    if (typeof window !== 'undefined') {
-      try {
-        return localStorage.getItem('userId') || null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
-
   private async reportError(errorLog: Record<string, unknown>) {
+    if (isAmexHandoffPage()) return;
     try {
       // Send to your monitoring endpoint
       await fetch('/api/monitoring/errors', {
@@ -163,10 +161,10 @@ function ErrorFallback({ error, errorId, onRetry }: ErrorFallbackProps) {
             Something went wrong
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            We apologize for the inconvenience. The error has been automatically reported.
+            We apologize for the inconvenience. The error was isolated safely.
           </p>
           
-          {process.env.NODE_ENV === 'development' && error && (
+          {process.env.NODE_ENV === 'development' && error && !isAmexHandoffPage() && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md text-left">
               <h3 className="text-sm font-medium text-red-800">Error Details (Development Only)</h3>
               <p className="mt-2 text-sm text-red-700 font-mono">{error.message}</p>
@@ -213,20 +211,21 @@ function generateErrorId(): string {
  * Hook for handling async errors in components
  */
 export function useErrorHandler() {
-  return (error: Error, errorInfo?: Record<string, unknown>) => {
+  return (error: Error) => {
+    // Do not serialize or log handoff errors: they may contain reviewed source data.
+    if (isAmexHandoffPage()) return;
+
     const errorId = generateErrorId();
     const errorLog = {
       errorId,
       message: error.message,
       stack: error.stack,
-      additionalInfo: errorInfo,
-      url: window.location.href,
+      url: sanitizedClientUrl(),
       timestamp: new Date().toISOString(),
     };
 
     console.error('Async error caught:', errorLog);
 
-    // Report to monitoring service
     fetch('/api/monitoring/errors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

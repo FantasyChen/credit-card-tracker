@@ -1,0 +1,5 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Owns the completed pre-sync reader, reviewed handoff, confirmed synchronization, privacy, replay, and synthetic-browser contracts shared by both child milestones."}
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Defines authenticated user ownership, mutation boundaries, cycle semantics, domain helpers, and revalidation needed for the parent integration review."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Defines the additive migration and explicit deployment gates that remain intentionally pending after code completion."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Defines shared catalog identity and existing-user behavior linking reader selection to destination stable keys."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines final cross-layer UI, accessibility, strict type, lint, and test expectations for the review and handoff surfaces."}
