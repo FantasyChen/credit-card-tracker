@@ -1,5 +1,7 @@
 # Implementation plan: enforce primary-only AMEX reader scope and useful panel rows
 
+> Steps 0–7 are the completed v0.3.3 baseline. Steps 8–10 supersede their product-gated normalization, compatibility-retention, synchronization-projection, and release-version details for the final v0.4.0 implementation.
+
 ## 0. Enforce primary-only discovery and invalidate role-unverified state
 
 - Update `parseAccountDiscovery` in `src/lib/amex-benefit-reader/amex-response-adapter.ts` to emit only top-level exact `BASIC` cards.
@@ -73,7 +75,36 @@
 - Update `tests/e2e/amex-benefit-reader/amex-benefit-reader.spec.ts` for version assertions, primary-only discovery, reviewed exclusions, genuine-conflict control, hidden zero-row groups, Used-filter behavior, compact periods, and sanitized storage.
 - Do not install the resulting script or contact live AMEX/Perks Reminder pages.
 
-## 8. Validate
+## 8. Replace product-gated local normalization with V3 observations
+
+- Add `amex-benefits/3` and parser `amex-api-us/3.0.0` in `contract.ts`. Define V3 card/benefit schemas with scan identity and structured period but without persisted `productKey` or `creditFamilyKey`; add truthful `credit_usage` activity and forbidden-field tests.
+- Keep storage envelope schema 1 and legacy V1/V2 validation for migration only. Extend the observation union to V3 and ensure all store invariants remain strict.
+- Refactor `supported-card-credits.ts` so local eligibility is product-independent: exact normalized category `usage`, bounded tracker title, reviewed exact exclusions, and existing explicit non-credit exclusions as defense-in-depth. Remove the finite card registry from local admission.
+- Add a separate exact browser synchronization mapping from reviewed base-Platinum product aliases plus reviewed Resy/lululemon tracker titles to destination keys. Do not use substring/fuzzy matching and do not share this map with server authority.
+- Rewrite `normalizeBenefits` to remove the unsupported-product early return, use tracker title as local identity/display authority, skip every non-`usage` tracker before interpretation, retain only tracker-backed rows, and use catalog data only for unambiguous enrollment enrichment. Remove catalog-only enrollment-row creation and ensure ambiguous enrichment cannot erase the tracker row.
+- Keep deterministic duplicate handling and genuine tracker-state conflict behavior; do not persist provider/join IDs or raw source records.
+- Update `scan-engine.ts` so every successfully read BASIC card commits V3, including unknown products and truthful empty tracker sets; remove the recognized-V2 versus empty-V1 branch.
+
+## 9. Separate strict synchronization and compatibility boundaries
+
+- Project only complete/current/latest-scan V3 observations through the exact reviewed browser sync mapping. Unknown, Morgan Stanley, Hilton, Delta Business, CLEAR+, Equinox, Delta Stays, airline-fee, near-product, and near-title values produce no mapped sync card.
+- Exclude a whole source card when multiple materially distinct rows map to one destination family. Preserve all freshness, parser, scan, completeness, structured-period, and successful-disposition gates.
+- Advance the bounded transport to `amex-sync-envelope/2` and `amex-sync-mailbox/2`, require observation `amex-benefits/3`, and update handoff/API/service/repository fixtures without expanding `src/lib/amex-sync/authority.ts`.
+- Add a V3-selection compatibility marker in Tampermonkey storage. After the existing primary-only migration, validate and invalidate every selection-incomplete V1/V2 card and `lastScan`, delete legacy pending mailbox state, preserve the installation identity secret, persist only when needed, and write the marker last.
+- Prove marker-last retry behavior, malformed/future refusal, first-load revision behavior, idempotent second load, and `clear()` removal of all markers/mailbox versions.
+
+## 10. Cover approved live outcomes synthetically
+
+- Add adapter/engine/storage/panel/E2E fixtures with invented identity data for:
+  - Morgan Stanley-like product with ten `usage` trackers including CLEAR+ and Equinox;
+  - Hilton Honors Card with no usage trackers and catalog-only status/reward entries;
+  - Delta Gold Business with `$150 Delta Stays Credit` usage, `$200 Delta Flight Credit` spend, and catalog-only `$120 Rideshare Credit`.
+- Assert normalization is product-name-independent, Morgan produces ten stored/displayed rows, Hilton commits a complete empty V3 observation without a card shell, and Delta produces exactly one stored/displayed row.
+- Assert all three remain sync-ineligible, local storage contains no destination mapping claims or provider/raw identity, and the generated bundle remains deny-by-default with no automatic scan or handoff.
+- Update panel structured-period and coverage projections to recognize V3 scan identity and benefits.
+- Bump the generated userscript version to `0.4.0` without changing match scopes, grants, or request transport.
+
+## 11. Validate
 
 Run focused unit tests:
 
@@ -146,7 +177,7 @@ After implementation and checks:
 
 - Do not perform a live scan, click Sync, create a mailbox, install/update Tampermonkey, apply a migration, deploy, or write to a database.
 - Present source/test results for review.
-- If the user wants manual verification, separately confirm installation of version `0.3.3`, then separately confirm a new manual scan because it issues authenticated first-party AMEX reads.
+- If the user wants manual verification, separately confirm installation of version `0.4.0`, then separately confirm a new manual scan because it issues authenticated first-party AMEX reads.
 - Keep synchronization blocked until a new scan produces complete eligible observations and the user separately authorizes any handoff.
 
 ## Rollback points
