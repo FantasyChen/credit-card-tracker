@@ -2,8 +2,9 @@ import { z } from "zod";
 
 export const OBSERVATION_CONTRACT_VERSION = "amex-benefits/1" as const;
 export const OBSERVATION_CONTRACT_VERSION_V2 = "amex-benefits/2" as const;
+export const OBSERVATION_CONTRACT_VERSION_V3 = "amex-benefits/3" as const;
 export const STORAGE_SCHEMA_VERSION = 1 as const;
-export const PARSER_VERSION = "amex-api-us/2.0.2" as const;
+export const PARSER_VERSION = "amex-api-us/3.0.0" as const;
 
 export const issueCodeSchema = z.enum([
   "unknown_account_variant",
@@ -65,6 +66,7 @@ export type ObservedField<T> =
 export const activityKindSchema = z.enum([
   "enrollment_candidate",
   "spend_progress",
+  "credit_usage",
   "credit_earned",
   "completed",
 ]);
@@ -151,7 +153,16 @@ export const normalizedBenefitObservationV2Schema = z.object({
   sourcePeriod: observedFieldSchema(sourcePeriodV2Schema),
 }).strict();
 export type NormalizedBenefitObservationV2 = z.infer<typeof normalizedBenefitObservationV2Schema>;
-export type NormalizedBenefitObservation = NormalizedBenefitObservationV1 | NormalizedBenefitObservationV2;
+
+export const normalizedBenefitObservationV3Schema = z.object({
+  ...benefitObservationFields,
+  sourcePeriod: observedFieldSchema(sourcePeriodV2Schema),
+}).strict();
+export type NormalizedBenefitObservationV3 = z.infer<typeof normalizedBenefitObservationV3Schema>;
+export type NormalizedBenefitObservation =
+  | NormalizedBenefitObservationV1
+  | NormalizedBenefitObservationV2
+  | NormalizedBenefitObservationV3;
 
 function requireUniqueBenefitKeys(
   observation: { benefits: Array<{ benefitKey: string }> },
@@ -196,11 +207,23 @@ export const normalizedCardObservationV2Schema = z.object({
   benefits: z.array(normalizedBenefitObservationV2Schema).max(300),
 }).strict().superRefine(requireUniqueBenefitKeys);
 export type NormalizedCardObservationV2 = z.infer<typeof normalizedCardObservationV2Schema>;
-export type NormalizedCardObservation = NormalizedCardObservationV1 | NormalizedCardObservationV2;
+
+export const normalizedCardObservationV3Schema = z.object({
+  contractVersion: z.literal(OBSERVATION_CONTRACT_VERSION_V3),
+  ...cardObservationFields,
+  scanId: z.string().uuid(),
+  benefits: z.array(normalizedBenefitObservationV3Schema).max(300),
+}).strict().superRefine(requireUniqueBenefitKeys);
+export type NormalizedCardObservationV3 = z.infer<typeof normalizedCardObservationV3Schema>;
+export type NormalizedCardObservation =
+  | NormalizedCardObservationV1
+  | NormalizedCardObservationV2
+  | NormalizedCardObservationV3;
 
 export const normalizedCardObservationAnySchema = z.union([
   normalizedCardObservationSchema,
   normalizedCardObservationV2Schema,
+  normalizedCardObservationV3Schema,
 ]);
 
 export const redactedErrorSchema = z.object({

@@ -249,7 +249,7 @@ function isConfirmedEmptyInLatestScan(
     || record.completeness !== "complete"
     || record.latest.completeness !== "complete"
   ) return false;
-  return record.latest.contractVersion !== "amex-benefits/2"
+  return record.latest.contractVersion === "amex-benefits/1"
     || summary.scanId === undefined
     || record.latest.scanId === summary.scanId;
 }

@@ -2,10 +2,13 @@ import { expect, test } from "@playwright/test";
 import { digestAmexSyncEnvelope, parseAmexSyncEnvelope } from "../../../src/lib/amex-benefit-reader/sync-contract";
 import {
   IDENTITY_SECRET_KEY,
+  LEGACY_SYNC_MAILBOX_KEY,
   PRIMARY_ONLY_COMPATIBILITY_KEY,
   PRIMARY_ONLY_COMPATIBILITY_VALUE,
   STORE_KEY,
   SYNC_MAILBOX_KEY,
+  V3_SELECTION_COMPATIBILITY_KEY,
+  V3_SELECTION_COMPATIBILITY_VALUE,
   SYNTHETIC_AMEX_NON_BENEFITS_URL,
   SYNTHETIC_HANDOFF_TRANSFER_ID,
   SyntheticAmexHarness,
@@ -20,10 +23,17 @@ interface PersistedCardRecord {
   lastAttemptAt: string;
   error: null | { code: string; message: string };
   latest: null | {
+    contractVersion: string;
     productName: string;
     endingDigits: string;
+    parserVersion: string;
+    scanId: string;
     completeness: string;
-    benefits: Array<{ title: string; earnedOrUsed: { state: string; value?: { value: string } } }>;
+    benefits: Array<{
+      title: string;
+      category: { state: string; value?: string };
+      earnedOrUsed: { state: string; value?: { value: string } };
+    }>;
   };
 }
 
@@ -112,6 +122,7 @@ test("invalidates one role-unverified snapshot and mailbox without reading Amex"
   const identitySecret = "f".repeat(64);
   harness.storage.set(STORE_KEY, legacyRoleUnverifiedStore());
   harness.storage.set(IDENTITY_SECRET_KEY, identitySecret);
+  harness.storage.set(LEGACY_SYNC_MAILBOX_KEY, { syntheticLegacyMailbox: true });
   harness.storage.set(SYNC_MAILBOX_KEY, { syntheticPendingMailbox: true });
 
   await harness.installBeforeNavigation();
@@ -119,8 +130,10 @@ test("invalidates one role-unverified snapshot and mailbox without reading Amex"
 
   expect(persistedEnvelope(harness)).toMatchObject({ revision: 5, cards: {}, lastScan: null });
   expect(harness.storage.get(IDENTITY_SECRET_KEY)).toBe(identitySecret);
+  expect(harness.storage.has(LEGACY_SYNC_MAILBOX_KEY)).toBe(false);
   expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(false);
   expect(harness.storage.get(PRIMARY_ONLY_COMPATIBILITY_KEY)).toBe(PRIMARY_ONLY_COMPATIBILITY_VALUE);
+  expect(harness.storage.get(V3_SELECTION_COMPATIBILITY_KEY)).toBe(V3_SELECTION_COMPATIBILITY_VALUE);
   expect(harness.apiRequests()).toHaveLength(0);
   await expect(page.getByText("No local card observations yet")).toBeVisible();
   harness.assertNetworkStayedSynthetic();
@@ -132,7 +145,7 @@ test("shows only real scan progress until the built reader reaches a terminal re
   await harness.openAndInject();
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.3.3");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.4.0");
   const scanButton = page.getByRole("button", { name: "Scan all cards" });
   expect(harness.apiRequests()).toHaveLength(0);
   await scanButton.click();
@@ -191,6 +204,79 @@ test("keeps primary-only discovery and reviewed exclusions in the generated bund
   await expect(page.locator("[data-amex-conflict]")).toHaveCount(0);
   expect(harness.apiRequests("tracker")).toHaveLength(2);
   expect(harness.apiRequests("catalog")).toHaveLength(2);
+  expectNoRawSyntheticIdentity(harness);
+  harness.assertNetworkStayedSynthetic();
+});
+
+test("keeps genuine V3 identity conflicts fail closed and internal", async ({ context, page }) => {
+  const harness = new SyntheticAmexHarness(context, page, "conflict_diagnostics");
+  await harness.installBeforeNavigation();
+  await harness.openAndInject();
+  await page.getByRole("button", { name: "Scan all cards" }).click();
+  await waitForFinalReader(page);
+
+  const stored = persistedEnvelope(harness);
+  expect(stored.lastScan).toMatchObject({
+    status: "partial",
+    discoveredCardCount: 1,
+    attemptedCardCount: 1,
+  });
+  expect(Object.values(stored.cards)[0]).toMatchObject({
+    freshness: "current",
+    completeness: "partial",
+    latest: { contractVersion: "amex-benefits/3", completeness: "partial" },
+  });
+  const serialized = JSON.stringify(stored);
+  expect(serialized).toContain("benefit_identity_conflict");
+  expect(serialized).not.toMatch(/tracker_state_collision|ambiguous_catalog_join|conflictDetails|candidateIndex|sourceRole/);
+  expect(serialized).not.toMatch(/invented-(?:adobe-state|key-mismatch|ambiguous-wireless|indeed-)/);
+  await expect(page.locator("[data-amex-conflict]")).toHaveCount(0);
+  await expect(page.getByText(/tracker state collision|ambiguous catalog join/i)).toHaveCount(0);
+  expectNoRawSyntheticIdentity(harness);
+  harness.assertNetworkStayedSynthetic();
+});
+
+test("persists approved Morgan, empty Hilton, and Delta-Stays-only V3 outcomes", async ({ context, page }) => {
+  const harness = new SyntheticAmexHarness(context, page, "approved_v3_products");
+  await harness.installBeforeNavigation();
+  await harness.openAndInject();
+  await page.getByRole("button", { name: "Scan all cards" }).click();
+  await waitForFinalReader(page);
+
+  const stored = persistedEnvelope(harness);
+  expect(stored.lastScan).toMatchObject({
+    status: "complete",
+    discoveredCardCount: 3,
+    attemptedCardCount: 3,
+  });
+  const records = Object.values(stored.cards);
+  const morgan = records.find((record) => record.identity.productName === "Morgan Stanley Platinum");
+  const hilton = records.find((record) => record.identity.productName === "Hilton Honors Card");
+  const delta = records.find((record) => record.identity.productName === "Delta SkyMiles Gold Business Card");
+  expect(morgan?.latest).toMatchObject({
+    contractVersion: "amex-benefits/3",
+    parserVersion: "amex-api-us/3.0.0",
+    completeness: "complete",
+  });
+  expect(morgan?.latest?.benefits).toHaveLength(10);
+  expect(morgan?.latest?.benefits.map((benefit) => benefit.title)).toEqual(expect.arrayContaining([
+    "$219 CLEAR+ Credit",
+    "$300 Equinox Credit",
+  ]));
+  expect(hilton?.latest).toMatchObject({
+    contractVersion: "amex-benefits/3",
+    completeness: "complete",
+    benefits: [],
+  });
+  expect(delta?.latest?.benefits.map((benefit) => benefit.title)).toEqual(["$150 Delta Stays Credit"]);
+  expect(records.every((record) => record.latest?.benefits.every((benefit) =>
+    benefit.category.state === "observed" && benefit.category.value === "usage"))).toBe(true);
+  const serialized = JSON.stringify(stored);
+  expect(serialized).not.toMatch(/productKey|creditFamilyKey|sorBenefitId|Delta Flight|Rideshare/);
+  expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(false);
+  await expect(page.getByRole("heading", { name: "$219 CLEAR+ Credit" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "$300 Equinox Credit" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "$150 Delta Stays Credit" })).toBeVisible();
   expectNoRawSyntheticIdentity(harness);
   harness.assertNetworkStayedSynthetic();
 });
@@ -280,8 +366,8 @@ test("bridges one strict storage-only mailbox on the exact first-party handoff b
   await harness.installBeforeNavigation();
   const now = new Date();
   const envelope = parseAmexSyncEnvelope({
-    envelopeVersion: "amex-sync-envelope/1",
-    observationContractVersion: "amex-benefits/2",
+    envelopeVersion: "amex-sync-envelope/2",
+    observationContractVersion: "amex-benefits/3",
     scanId: "22222222-2222-4222-8222-222222222222",
     scanFinishedAt: now.toISOString(),
     cards: [{
@@ -289,7 +375,7 @@ test("bridges one strict storage-only mailbox on the exact first-party handoff b
       productKey: "american-express-platinum-card",
       endingDigits: "1234",
       observedAt: now.toISOString(),
-      parserVersion: "amex-api-us/2.0.2",
+      parserVersion: "amex-api-us/3.0.0",
       rows: [{
         creditFamilyKey: "american-express-platinum-card:resy",
         sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },
@@ -302,7 +388,7 @@ test("bridges one strict storage-only mailbox on the exact first-party handoff b
     exclusions: [],
   });
   const mailbox = {
-    mailboxVersion: "amex-sync-mailbox/1" as const,
+    mailboxVersion: "amex-sync-mailbox/2" as const,
     transferId: SYNTHETIC_HANDOFF_TRANSFER_ID,
     nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     createdAt: now.toISOString(),

@@ -1,9 +1,14 @@
 import { storeEnvelopeSchema, type NormalizedBenefitObservationV1 } from "@/lib/amex-benefit-reader/contract";
 import { IDENTITY_SECRET_KEY, STORE_KEY } from "@/lib/amex-benefit-reader/storage-policy";
-import { AMEX_SYNC_MAILBOX_KEY } from "@/lib/amex-benefit-reader/sync-mailbox";
+import {
+  AMEX_SYNC_MAILBOX_KEY,
+  LEGACY_AMEX_SYNC_MAILBOX_KEY,
+} from "@/lib/amex-benefit-reader/sync-mailbox";
 import {
   PRIMARY_ONLY_COMPATIBILITY_KEY,
   PRIMARY_ONLY_COMPATIBILITY_VALUE,
+  V3_SELECTION_COMPATIBILITY_KEY,
+  V3_SELECTION_COMPATIBILITY_VALUE,
   TampermonkeyResultStore,
 } from "../tampermonkey-storage";
 
@@ -13,14 +18,15 @@ interface FakeGm {
   deleteValue: jest.Mock<Promise<void>, [string]>;
 }
 
-function storedBenefit(
-  title: string,
-  category: NormalizedBenefitObservationV1["category"] = { state: "not_exposed" },
-): NormalizedBenefitObservationV1 {
+const localCardId = "11111111-1111-4111-8111-111111111111";
+const scanId = "22222222-2222-4222-8222-222222222222";
+const observedAt = "2026-07-15T12:00:00.000Z";
+
+function storedBenefit(title: string): NormalizedBenefitObservationV1 {
   return {
     benefitKey: `legacy-benefit-${title.toLowerCase().replace(/\s+/g, "-")}`,
     title,
-    category,
+    category: { state: "observed", value: "usage" },
     activityKind: "spend_progress",
     enrollmentState: { state: "not_exposed" },
     trackerState: { state: "not_exposed" },
@@ -34,9 +40,39 @@ function storedBenefit(
   };
 }
 
-function legacyUnfilteredStore() {
-  const localCardId = "11111111-1111-4111-8111-111111111111";
-  const observedAt = "2026-07-15T12:00:00.000Z";
+function legacyStore(version: 1 | 2) {
+  const benefit = storedBenefit("Dining Credit");
+  const latest = version === 1
+    ? {
+      contractVersion: "amex-benefits/1",
+      issuer: "american_express_us",
+      localCardId,
+      productName: "American Express Gold Card",
+      endingDigits: "1234",
+      observedAt,
+      parserVersion: "amex-api-us/1.0.0",
+      completeness: "complete",
+      issueCodes: [],
+      benefits: [benefit],
+    }
+    : {
+      contractVersion: "amex-benefits/2",
+      issuer: "american_express_us",
+      localCardId,
+      productName: "American Express Platinum Card",
+      productKey: "american-express-platinum-card",
+      endingDigits: "1234",
+      observedAt,
+      parserVersion: "amex-api-us/2.0.2",
+      scanId,
+      completeness: "complete",
+      issueCodes: [],
+      benefits: [{
+        ...benefit,
+        creditFamilyKey: "american-express-platinum-card:resy",
+        sourcePeriod: { state: "not_exposed" },
+      }],
+    };
   return storeEnvelopeSchema.parse({
     schemaVersion: 1,
     revision: 4,
@@ -46,25 +82,56 @@ function legacyUnfilteredStore() {
         localCardId,
         identity: {
           sourceFingerprint: "a".repeat(64),
-          productName: "American Express Gold Card",
+          productName: latest.productName,
+          endingDigits: "1234",
+        },
+        latest,
+        freshness: "current",
+        completeness: "complete",
+        observedAt,
+        lastAttemptAt: observedAt,
+        error: null,
+      },
+    },
+    lastScan: {
+      scanId,
+      startedAt: "2026-07-15T11:59:00.000Z",
+      finishedAt: observedAt,
+      status: "complete",
+      discoveredCardCount: 1,
+      attemptedCardCount: 1,
+      unknownAccountVariantCount: 0,
+      cards: [{ localCardId, result: "complete", issueCode: null }],
+      visibleContext: "unchanged",
+    },
+  });
+}
+
+function currentEmptyHiltonV3Store() {
+  return storeEnvelopeSchema.parse({
+    schemaVersion: 1,
+    revision: 7,
+    updatedAt: observedAt,
+    cards: {
+      [localCardId]: {
+        localCardId,
+        identity: {
+          sourceFingerprint: "c".repeat(64),
+          productName: "Hilton Honors Card",
           endingDigits: "1234",
         },
         latest: {
-          contractVersion: "amex-benefits/1",
+          contractVersion: "amex-benefits/3",
           issuer: "american_express_us",
           localCardId,
-          productName: "American Express Gold Card",
+          productName: "Hilton Honors Card",
           endingDigits: "1234",
           observedAt,
-          parserVersion: "amex-api-us/1.0.0",
+          parserVersion: "amex-api-us/3.0.0",
+          scanId,
           completeness: "complete",
           issueCodes: [],
-          benefits: [
-            storedBenefit("Dining Credit", { state: "observed", value: "usage" }),
-            storedBenefit("Monthly Dining Credit", { state: "observed", value: "spend" }),
-            storedBenefit("Link Your Resy Profile", { state: "not_exposed" }),
-            storedBenefit("Cell Phone Protection"),
-          ],
+          benefits: [],
         },
         freshness: "current",
         completeness: "complete",
@@ -73,20 +140,22 @@ function legacyUnfilteredStore() {
         error: null,
       },
     },
-    lastScan: null,
+    lastScan: {
+      scanId,
+      startedAt: "2026-07-15T11:59:00.000Z",
+      finishedAt: observedAt,
+      status: "complete",
+      discoveredCardCount: 1,
+      attemptedCardCount: 1,
+      unknownAccountVariantCount: 0,
+      cards: [{ localCardId, result: "complete", issueCode: null }],
+      visibleContext: "unchanged",
+    },
   });
 }
 
 describe("Tampermonkey storage adapter", () => {
   let gm: FakeGm;
-
-  function loadCompatibleStore(value: unknown): void {
-    gm.getValue.mockImplementation(async (key) => {
-      if (key === STORE_KEY) return value;
-      if (key === PRIMARY_ONLY_COMPATIBILITY_KEY) return PRIMARY_ONLY_COMPATIBILITY_VALUE;
-      return null;
-    });
-  }
 
   beforeEach(() => {
     gm = {
@@ -101,60 +170,61 @@ describe("Tampermonkey storage adapter", () => {
     delete (globalThis as unknown as { GM?: FakeGm }).GM;
   });
 
-  it("marks a new empty store primary-only without creating an observation envelope", async () => {
-    const store = new TampermonkeyResultStore();
-    await expect(store.load()).resolves.toMatchObject({ schemaVersion: 1, revision: 0, cards: {} });
-    expect(gm.getValue).toHaveBeenCalledWith(STORE_KEY, null);
-    expect(gm.deleteValue).toHaveBeenCalledWith(AMEX_SYNC_MAILBOX_KEY);
-    expect(gm.setValue).toHaveBeenCalledTimes(1);
+  it("marks a new empty installation only after deleting both mailbox generations", async () => {
+    await expect(new TampermonkeyResultStore().load()).resolves.toMatchObject({
+      schemaVersion: 1,
+      revision: 0,
+      cards: {},
+      lastScan: null,
+    });
     expect(gm.setValue).toHaveBeenCalledWith(
       PRIMARY_ONLY_COMPATIBILITY_KEY,
       PRIMARY_ONLY_COMPATIBILITY_VALUE,
     );
+    expect(gm.setValue).toHaveBeenCalledWith(
+      V3_SELECTION_COMPATIBILITY_KEY,
+      V3_SELECTION_COMPATIBILITY_VALUE,
+    );
     expect(gm.setValue).not.toHaveBeenCalledWith(STORE_KEY, expect.anything());
+    expect(gm.deleteValue).toHaveBeenCalledWith(LEGACY_AMEX_SYNC_MAILBOX_KEY);
+    expect(gm.deleteValue).toHaveBeenCalledWith(AMEX_SYNC_MAILBOX_KEY);
   });
 
-  it("invalidates role-unverified cards and a pending mailbox once while preserving the identity secret", async () => {
-    const values = new Map<string, unknown>([
-      [STORE_KEY, legacyUnfilteredStore()],
-      [IDENTITY_SECRET_KEY, "f".repeat(64)],
-      [AMEX_SYNC_MAILBOX_KEY, { syntheticPendingMailbox: true }],
-    ]);
+  it.each([1, 2] as const)(
+    "invalidates V%s observations and lastScan once while preserving identity",
+    async (version) => {
+      const values = new Map<string, unknown>([
+        [STORE_KEY, legacyStore(version)],
+        [IDENTITY_SECRET_KEY, "f".repeat(64)],
+        [PRIMARY_ONLY_COMPATIBILITY_KEY, PRIMARY_ONLY_COMPATIBILITY_VALUE],
+        [LEGACY_AMEX_SYNC_MAILBOX_KEY, { syntheticLegacyMailbox: true }],
+        [AMEX_SYNC_MAILBOX_KEY, { syntheticCurrentMailbox: true }],
+      ]);
+      gm.getValue.mockImplementation(async (key, defaultValue) =>
+        values.has(key) ? values.get(key) : defaultValue);
+      gm.setValue.mockImplementation(async (key, value) => { values.set(key, value); });
+      gm.deleteValue.mockImplementation(async (key) => { values.delete(key); });
+
+      const store = new TampermonkeyResultStore();
+      const first = await store.load();
+      const second = await store.load();
+
+      expect(first).toMatchObject({ revision: 5, cards: {}, lastScan: null });
+      expect(second).toEqual(first);
+      expect(values.get(IDENTITY_SECRET_KEY)).toBe("f".repeat(64));
+      expect(values.has(LEGACY_AMEX_SYNC_MAILBOX_KEY)).toBe(false);
+      expect(values.has(AMEX_SYNC_MAILBOX_KEY)).toBe(false);
+      expect(values.get(V3_SELECTION_COMPATIBILITY_KEY)).toBe(V3_SELECTION_COMPATIBILITY_VALUE);
+      expect(gm.setValue.mock.calls.filter(([key]) => key === STORE_KEY)).toHaveLength(1);
+      expect(gm.setValue.mock.calls.filter(([key]) => key === V3_SELECTION_COMPATIBILITY_KEY)).toHaveLength(1);
+    },
+  );
+
+  it("does not let concurrent compatibility loads restore a pre-migration snapshot", async () => {
+    const values = new Map<string, unknown>([[STORE_KEY, legacyStore(2)]]);
     gm.getValue.mockImplementation(async (key, defaultValue) =>
       values.has(key) ? values.get(key) : defaultValue);
     gm.setValue.mockImplementation(async (key, value) => { values.set(key, value); });
-    gm.deleteValue.mockImplementation(async (key) => { values.delete(key); });
-
-    const store = new TampermonkeyResultStore();
-    const first = await store.load();
-    const second = await store.load();
-
-    expect(first).toMatchObject({ revision: 5, cards: {}, lastScan: null });
-    expect(second).toEqual(first);
-    expect(values.get(IDENTITY_SECRET_KEY)).toBe("f".repeat(64));
-    expect(values.has(AMEX_SYNC_MAILBOX_KEY)).toBe(false);
-    expect(values.get(PRIMARY_ONLY_COMPATIBILITY_KEY)).toBe(PRIMARY_ONLY_COMPATIBILITY_VALUE);
-    expect(gm.setValue.mock.calls.filter(([key]) => key === STORE_KEY)).toHaveLength(1);
-    expect(gm.setValue.mock.calls.filter(([key]) => key === PRIMARY_ONLY_COMPATIBILITY_KEY)).toHaveLength(1);
-    expect(gm.deleteValue.mock.calls.filter(([key]) => key === AMEX_SYNC_MAILBOX_KEY)).toHaveLength(1);
-  });
-
-  it("does not let a concurrent load restore a pre-migration store snapshot", async () => {
-    const values = new Map<string, unknown>([[STORE_KEY, legacyUnfilteredStore()]]);
-    let markerReadCount = 0;
-    let releaseSecondMarker!: () => void;
-    const firstMarkerWritten = new Promise<void>((resolve) => { releaseSecondMarker = resolve; });
-    gm.getValue.mockImplementation(async (key, defaultValue) => {
-      if (key === PRIMARY_ONLY_COMPATIBILITY_KEY) {
-        markerReadCount += 1;
-        if (markerReadCount === 2) await firstMarkerWritten;
-      }
-      return values.has(key) ? values.get(key) : defaultValue;
-    });
-    gm.setValue.mockImplementation(async (key, value) => {
-      values.set(key, value);
-      if (key === PRIMARY_ONLY_COMPATIBILITY_KEY) releaseSecondMarker();
-    });
     gm.deleteValue.mockImplementation(async (key) => { values.delete(key); });
 
     const store = new TampermonkeyResultStore();
@@ -164,12 +234,42 @@ describe("Tampermonkey storage adapter", () => {
     expect(second).toEqual(first);
     expect(values.get(STORE_KEY)).toEqual(first);
     expect(values.get(PRIMARY_ONLY_COMPATIBILITY_KEY)).toBe(PRIMARY_ONLY_COMPATIBILITY_VALUE);
+    expect(values.get(V3_SELECTION_COMPATIBILITY_KEY)).toBe(V3_SELECTION_COMPATIBILITY_VALUE);
   });
 
-  it("leaves the migration unmarked and retryable when invalidated-store persistence fails", async () => {
-    const original = legacyUnfilteredStore();
+  it("preserves a complete empty V3 Hilton observation while invalidating legacy lastScan authority", async () => {
+    const values = new Map<string, unknown>([
+      [STORE_KEY, currentEmptyHiltonV3Store()],
+      [PRIMARY_ONLY_COMPATIBILITY_KEY, PRIMARY_ONLY_COMPATIBILITY_VALUE],
+    ]);
+    gm.getValue.mockImplementation(async (key, defaultValue) =>
+      values.has(key) ? values.get(key) : defaultValue);
+    gm.setValue.mockImplementation(async (key, value) => { values.set(key, value); });
+    gm.deleteValue.mockImplementation(async (key) => { values.delete(key); });
+
+    const loaded = await new TampermonkeyResultStore().load();
+    expect(loaded).toMatchObject({
+      revision: 8,
+      lastScan: null,
+      cards: {
+        [localCardId]: {
+          latest: {
+            contractVersion: "amex-benefits/3",
+            productName: "Hilton Honors Card",
+            completeness: "complete",
+            benefits: [],
+          },
+        },
+      },
+    });
+    expect(values.get(V3_SELECTION_COMPATIBILITY_KEY)).toBe(V3_SELECTION_COMPATIBILITY_VALUE);
+  });
+
+  it("leaves V3 migration unmarked and retryable when invalidated-store persistence fails", async () => {
+    const original = legacyStore(2);
     const values = new Map<string, unknown>([
       [STORE_KEY, original],
+      [PRIMARY_ONLY_COMPATIBILITY_KEY, PRIMARY_ONLY_COMPATIBILITY_VALUE],
       [AMEX_SYNC_MAILBOX_KEY, { syntheticPendingMailbox: true }],
     ]);
     gm.getValue.mockImplementation(async (key, defaultValue) =>
@@ -184,106 +284,61 @@ describe("Tampermonkey storage adapter", () => {
     await expect(store.load()).rejects.toThrow("synthetic store persistence failure");
     expect(values.get(STORE_KEY)).toBe(original);
     expect(values.has(AMEX_SYNC_MAILBOX_KEY)).toBe(false);
-    expect(values.has(PRIMARY_ONLY_COMPATIBILITY_KEY)).toBe(false);
-    expect(gm.setValue).not.toHaveBeenCalledWith(
-      PRIMARY_ONLY_COMPATIBILITY_KEY,
-      PRIMARY_ONLY_COMPATIBILITY_VALUE,
-    );
+    expect(values.has(V3_SELECTION_COMPATIBILITY_KEY)).toBe(false);
 
     gm.setValue.mockImplementation(async (key, value) => { values.set(key, value); });
     await expect(store.load()).resolves.toMatchObject({ revision: 5, cards: {}, lastScan: null });
-    expect(values.get(PRIMARY_ONLY_COMPATIBILITY_KEY)).toBe(PRIMARY_ONLY_COMPATIBILITY_VALUE);
+    expect(values.get(V3_SELECTION_COMPATIBILITY_KEY)).toBe(V3_SELECTION_COMPATIBILITY_VALUE);
   });
 
-  it("removes unsupported benefits from a legacy compatible store before persistence and display", async () => {
-    loadCompatibleStore(legacyUnfilteredStore());
-
-    const loaded = await new TampermonkeyResultStore().load();
-    const record = Object.values(loaded.cards)[0];
-    expect(record.latest?.benefits.map((benefit) => benefit.title)).toEqual(["Dining Credit"]);
-    expect(record).toMatchObject({
-      freshness: "current",
-      completeness: "complete",
-      observedAt: "2026-07-15T12:00:00.000Z",
-      lastAttemptAt: "2026-07-15T12:00:00.000Z",
-      error: null,
-      latest: {
-        parserVersion: "amex-api-us/1.0.0",
-        completeness: "complete",
-        issueCodes: [],
-      },
-    });
-    expect(loaded).toMatchObject({ schemaVersion: 1, revision: 5, lastScan: null });
-    expect(gm.setValue).toHaveBeenCalledTimes(1);
-    expect(gm.setValue).toHaveBeenCalledWith(STORE_KEY, loaded);
-  });
-
-  it("projects ignored rows only once without promoting legacy partial conflict state", async () => {
-    let persisted = legacyUnfilteredStore();
-    const record = Object.values(persisted.cards)[0];
-    if (!record.latest) throw new Error("Expected a synthetic latest observation.");
-    record.latest.completeness = "partial";
-    record.latest.issueCodes = ["benefit_identity_conflict"];
-    record.completeness = "partial";
-    gm.getValue.mockImplementation(async (key) => {
-      if (key === STORE_KEY) return persisted;
-      if (key === PRIMARY_ONLY_COMPATIBILITY_KEY) return PRIMARY_ONLY_COMPATIBILITY_VALUE;
-      return null;
-    });
+  it("retries marker-last after marker persistence fails without another revision", async () => {
+    const values = new Map<string, unknown>([
+      [STORE_KEY, legacyStore(1)],
+      [PRIMARY_ONLY_COMPATIBILITY_KEY, PRIMARY_ONLY_COMPATIBILITY_VALUE],
+    ]);
+    gm.getValue.mockImplementation(async (key, defaultValue) =>
+      values.has(key) ? values.get(key) : defaultValue);
+    gm.deleteValue.mockImplementation(async (key) => { values.delete(key); });
+    let failMarker = true;
     gm.setValue.mockImplementation(async (key, value) => {
-      if (key === STORE_KEY) persisted = value as typeof persisted;
+      if (key === V3_SELECTION_COMPATIBILITY_KEY && failMarker) {
+        failMarker = false;
+        throw new Error("synthetic marker failure");
+      }
+      values.set(key, value);
     });
 
     const store = new TampermonkeyResultStore();
-    const first = await store.load();
-    const second = await store.load();
-    const projected = Object.values(second.cards)[0];
+    await expect(store.load()).rejects.toThrow("synthetic marker failure");
+    expect(values.get(STORE_KEY)).toMatchObject({ revision: 5, cards: {}, lastScan: null });
+    expect(values.has(V3_SELECTION_COMPATIBILITY_KEY)).toBe(false);
 
-    expect(first.revision).toBe(5);
-    expect(second.revision).toBe(5);
-    expect(projected).toMatchObject({
-      freshness: "current",
-      completeness: "partial",
-      latest: {
-        completeness: "partial",
-        issueCodes: ["benefit_identity_conflict"],
-        benefits: [{ title: "Dining Credit" }],
-      },
-    });
-    expect(gm.setValue).toHaveBeenCalledTimes(1);
+    await expect(store.load()).resolves.toMatchObject({ revision: 5, cards: {}, lastScan: null });
+    expect(values.get(V3_SELECTION_COMPATIBILITY_KEY)).toBe(V3_SELECTION_COMPATIBILITY_VALUE);
+    expect(gm.setValue.mock.calls.filter(([key]) => key === STORE_KEY)).toHaveLength(1);
   });
 
-  it("does not rewrite a compatible store when every persisted benefit is still supported", async () => {
-    const compatible = legacyUnfilteredStore();
-    const record = Object.values(compatible.cards)[0];
-    if (!record.latest) throw new Error("Expected a synthetic latest observation.");
-    record.latest.benefits = [storedBenefit("Dining Credit")];
-    loadCompatibleStore(compatible);
-
-    const loaded = await new TampermonkeyResultStore().load();
-    expect(loaded.revision).toBe(4);
-    expect(gm.setValue).not.toHaveBeenCalled();
-  });
-
-  it("refuses malformed local data without overwriting it during projection", async () => {
-    gm.getValue.mockResolvedValue({
+  it("refuses malformed local data unchanged and unmarked", async () => {
+    const malformed = {
       schemaVersion: 1,
       revision: 4,
-      updatedAt: "2026-07-15T12:00:00.000Z",
+      updatedAt: observedAt,
       cards: "not-a-card-map",
       lastScan: null,
-    });
+    };
+    gm.getValue.mockImplementation(async (key, defaultValue) =>
+      key === STORE_KEY ? malformed : defaultValue);
 
     await expect(new TampermonkeyResultStore().load()).rejects.toThrow();
     expect(gm.setValue).not.toHaveBeenCalled();
     expect(gm.deleteValue).not.toHaveBeenCalled();
   });
 
-  it("refuses a future-schema store without deleting its pending mailbox or writing the marker", async () => {
+  it("refuses a future-schema store unchanged and unmarked", async () => {
     const futureStore = {
       schemaVersion: 2,
       revision: 1,
-      updatedAt: "2026-07-15T12:00:00.000Z",
+      updatedAt: observedAt,
       cards: {},
       lastScan: null,
     };
@@ -295,13 +350,15 @@ describe("Tampermonkey storage adapter", () => {
     expect(gm.deleteValue).not.toHaveBeenCalled();
   });
 
-  it("clears the normalized store, local identity secret, pending sync mailbox, and compatibility marker", async () => {
+  it("clears store, identity, both mailboxes, and both compatibility markers", async () => {
     await new TampermonkeyResultStore().clear();
     expect(gm.deleteValue.mock.calls.map(([key]) => key).sort()).toEqual([
       AMEX_SYNC_MAILBOX_KEY,
       IDENTITY_SECRET_KEY,
+      LEGACY_AMEX_SYNC_MAILBOX_KEY,
       PRIMARY_ONLY_COMPATIBILITY_KEY,
       STORE_KEY,
+      V3_SELECTION_COMPATIBILITY_KEY,
     ].sort());
   });
 });

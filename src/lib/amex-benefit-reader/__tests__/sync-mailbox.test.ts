@@ -19,8 +19,8 @@ class MemoryStorage implements MailboxStorage {
 
 const now = new Date("2026-07-15T12:00:00.000Z");
 const envelope = parseAmexSyncEnvelope({
-  envelopeVersion: "amex-sync-envelope/1",
-  observationContractVersion: "amex-benefits/2",
+  envelopeVersion: "amex-sync-envelope/2",
+  observationContractVersion: "amex-benefits/3",
   scanId: "22222222-2222-4222-8222-222222222222",
   scanFinishedAt: now.toISOString(),
   cards: [{
@@ -28,7 +28,7 @@ const envelope = parseAmexSyncEnvelope({
     productKey: "american-express-platinum-card",
     endingDigits: "1234",
     observedAt: now.toISOString(),
-    parserVersion: "amex-api-us/2.0.2",
+    parserVersion: "amex-api-us/3.0.0",
     rows: [],
   }],
   exclusions: [],
@@ -37,6 +37,8 @@ const envelope = parseAmexSyncEnvelope({
 describe("private Amex sync mailbox", () => {
   it("creates opaque locator and nonce and builds only the exact first-party URL", async () => {
     const mailbox = await createAmexSyncMailbox(envelope, now);
+    expect(mailbox.mailboxVersion).toBe("amex-sync-mailbox/2");
+    expect(AMEX_SYNC_MAILBOX_KEY).toBe("perksReminder.amexBenefitReader.syncMailbox.v2");
     expect(mailbox.transferId).toMatch(/^[a-f0-9]{32}$/);
     expect(mailbox.nonce).toMatch(/^[a-f0-9]{32}$/);
     expect(mailbox.transferId).not.toBe(mailbox.nonce);

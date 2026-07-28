@@ -10,8 +10,8 @@ const transferId = "a".repeat(32);
 const nonce = "b".repeat(32);
 const scanTime = new Date(Date.now() - 60_000).toISOString();
 const envelope = parseAmexSyncEnvelope({
-  envelopeVersion: "amex-sync-envelope/1",
-  observationContractVersion: "amex-benefits/2",
+  envelopeVersion: "amex-sync-envelope/2",
+  observationContractVersion: "amex-benefits/3",
   scanId: "22222222-2222-4222-8222-222222222222",
   scanFinishedAt: scanTime,
   cards: [{
@@ -19,7 +19,7 @@ const envelope = parseAmexSyncEnvelope({
     productKey: "american-express-platinum-card",
     endingDigits: "1234",
     observedAt: scanTime,
-    parserVersion: "amex-api-us/2.0.2",
+    parserVersion: "amex-api-us/3.0.0",
     rows: [],
   }],
   exclusions: [],

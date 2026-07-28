@@ -213,6 +213,7 @@ function exclusionText(reason: AmexSyncEnvelope["exclusions"][number]["reason"])
     no_structured_period: "Exact source period was not exposed",
     prerequisite_only: "Enrollment or linking is still required",
     status_unavailable: "Usable source status was not exposed",
+    source_mapping_ambiguous: "More than one source row mapped to the same reviewed benefit",
   };
   return labels[reason];
 }
