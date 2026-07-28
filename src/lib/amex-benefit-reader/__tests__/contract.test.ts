@@ -1,8 +1,11 @@
 import {
   OBSERVATION_CONTRACT_VERSION,
   OBSERVATION_CONTRACT_VERSION_V2,
+  OBSERVATION_CONTRACT_VERSION_V3,
+  PARSER_VERSION,
   normalizedCardObservationSchema,
   normalizedCardObservationV2Schema,
+  normalizedCardObservationV3Schema,
   parseStoreEnvelope,
   sourcePeriodV2Schema,
 } from "../contract";
@@ -94,6 +97,49 @@ describe("portable Amex observation contract", () => {
     expect(() => normalizedCardObservationV2Schema.parse({ ...v2, rawResponse: {} })).toThrow();
     expect(() => normalizedCardObservationV2Schema.parse({ ...v2, productKey: "invented-card" })).toThrow();
     expect(() => normalizedCardObservationV2Schema.parse({ ...v2, scanId: undefined })).toThrow();
+  });
+
+  it("requires product-independent V3 scan identity and rejects destination or provider fields", () => {
+    const benefit = {
+      benefitKey: "benefit-1234567890abcdef",
+      title: "Synthetic Usage Credit",
+      category: { state: "observed", value: "usage" },
+      activityKind: "credit_usage",
+      enrollmentState: { state: "not_exposed" },
+      trackerState: { state: "observed", value: "in_progress" },
+      completionState: { state: "observed", value: "incomplete" },
+      earnedOrUsed: { state: "not_exposed" },
+      targetOrLimit: { state: "not_exposed" },
+      remaining: { state: "not_exposed" },
+      period: { state: "not_exposed" },
+      sourcePeriod: { state: "not_exposed" },
+      confidence: "high",
+      issueCodes: [],
+    };
+    const v3 = {
+      ...card,
+      contractVersion: OBSERVATION_CONTRACT_VERSION_V3,
+      parserVersion: PARSER_VERSION,
+      scanId: "22222222-2222-4222-8222-222222222222",
+      benefits: [benefit],
+    };
+
+    expect(normalizedCardObservationV3Schema.parse(v3)).toEqual(v3);
+    expect(() => normalizedCardObservationV3Schema.parse({
+      ...v3,
+      productKey: "american-express-platinum-card",
+    })).toThrow();
+    expect(() => normalizedCardObservationV3Schema.parse({
+      ...v3,
+      benefits: [{ ...benefit, creditFamilyKey: "american-express-platinum-card:resy" }],
+    })).toThrow();
+    for (const forbidden of ["sorBenefitId", "providerId", "rawResponse", "requestBody", "accountToken"]) {
+      expect(() => normalizedCardObservationV3Schema.parse({
+        ...v3,
+        benefits: [{ ...benefit, [forbidden]: "synthetic-private-value" }],
+      })).toThrow();
+    }
+    expect(() => normalizedCardObservationV3Schema.parse({ ...v3, scanId: undefined })).toThrow();
   });
 
   it("rejects forbidden sensitive field names anywhere in storage", () => {

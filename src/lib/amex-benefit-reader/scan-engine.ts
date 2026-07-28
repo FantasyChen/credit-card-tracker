@@ -8,8 +8,7 @@ import {
   type BenefitIdentityConflictDetailSet,
 } from "./amex-response-adapter";
 import {
-  OBSERVATION_CONTRACT_VERSION,
-  OBSERVATION_CONTRACT_VERSION_V2,
+  OBSERVATION_CONTRACT_VERSION_V3,
   PARSER_VERSION,
   type IssueCode,
   type NormalizedCardObservation,
@@ -18,7 +17,6 @@ import {
   type StoredCardRecordV1,
 } from "./contract";
 import { reconcileCardIdentity } from "./identity";
-import { matchSupportedAmexProduct } from "./supported-card-credits";
 import type { CardAttemptResult, CardIdentityMetadata } from "./storage-policy";
 
 export interface VisiblePageContext {
@@ -280,30 +278,19 @@ export class AmexBenefitScanEngine {
           ]));
           const disposition = issueCodes.length ? "partial" as const : "complete" as const;
           const observedAt = this.clock.now().toISOString();
-          const productMatch = matchSupportedAmexProduct(prepared.productName);
-          const commonObservation = {
-            issuer: "american_express_us" as const,
+          const observation: NormalizedCardObservation = {
+            contractVersion: OBSERVATION_CONTRACT_VERSION_V3,
+            issuer: "american_express_us",
             localCardId,
             productName: prepared.productName,
             endingDigits: prepared.endingDigits,
             observedAt,
             parserVersion: PARSER_VERSION,
+            scanId,
             completeness: disposition,
             issueCodes,
+            benefits: normalized.benefits,
           };
-          const observation: NormalizedCardObservation = productMatch
-            ? {
-                ...commonObservation,
-                contractVersion: OBSERVATION_CONTRACT_VERSION_V2,
-                scanId,
-                productKey: productMatch.productKey,
-                benefits: normalized.benefits,
-              }
-            : {
-                ...commonObservation,
-                contractVersion: OBSERVATION_CONTRACT_VERSION,
-                benefits: [],
-              };
           const record = await this.store.commitCard({
             disposition,
             identity,

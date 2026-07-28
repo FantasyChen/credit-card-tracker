@@ -2,6 +2,7 @@ import { fireEvent, waitFor } from "@testing-library/react";
 import type {
   NormalizedBenefitObservationV1,
   NormalizedBenefitObservationV2,
+  NormalizedBenefitObservationV3,
   StoreEnvelopeV1,
 } from "@/lib/amex-benefit-reader/contract";
 import { createEmptyStore, mergeCardAttempt, mergeScanSummary } from "@/lib/amex-benefit-reader/storage-policy";
@@ -35,6 +36,16 @@ function benefit(overrides: Partial<NormalizedBenefitObservationV1> = {}): Norma
     confidence: "high",
     issueCodes: [],
     ...overrides,
+  };
+}
+
+function v3Benefit(title: string, benefitKey: string): NormalizedBenefitObservationV3 {
+  return {
+    ...benefit(),
+    benefitKey,
+    title,
+    activityKind: "credit_usage",
+    sourcePeriod: { state: "not_exposed" },
   };
 }
 
@@ -298,6 +309,61 @@ describe("Amex reader side panel", () => {
     expect(shadow().textContent).toContain("Used Card •••• 56789");
     expect(shadow().textContent).toContain("Used benefit");
     expect(shadow().textContent).not.toContain("Remaining benefit");
+  });
+
+  it("renders Morgan and Delta V3 rows while omitting the complete-empty Hilton card shell", () => {
+    const hiltonId = "33333333-3333-4333-8333-333333333333";
+    const deltaId = "44444444-4444-4444-8444-444444444444";
+    const morganTitles = [
+      "$200 Airline Fee Credit", "$219 CLEAR+ Credit", "$300 Equinox Credit",
+      "$300 lululemon Credit", "$400 Resy Credit", "Digital Entertainment Credit",
+      "Hotel Credit", "Saks Fifth Avenue Credit", "Uber Cash", "Walmart+ Credit",
+    ];
+    let store = addCard(createEmptyStore(now), {
+      productName: "Morgan Stanley Platinum",
+      benefits: [],
+    });
+    store = addCard(store, {
+      localCardId: hiltonId,
+      productName: "Hilton Honors Card",
+      endingDigits: "5678",
+      benefits: [],
+    });
+    store = addCard(store, {
+      localCardId: deltaId,
+      productName: "Delta SkyMiles Gold Business Card",
+      endingDigits: "9999",
+      benefits: [],
+    });
+    const setV3 = (localCardId: string, benefits: NormalizedBenefitObservationV3[]): void => {
+      const latest = store.cards[localCardId].latest;
+      if (!latest) throw new Error("Expected a synthetic observation.");
+      store.cards[localCardId].latest = {
+        ...latest,
+        contractVersion: "amex-benefits/3",
+        parserVersion: "amex-api-us/3.0.0",
+        scanId: "99999999-9999-4999-8999-999999999999",
+        benefits,
+      };
+    };
+    setV3(cardOneId, morganTitles.map((title, index) =>
+      v3Benefit(title, `benefit-morgan-${String(index).padStart(16, "0")}`)));
+    setV3(hiltonId, []);
+    setV3(deltaId, [v3Benefit("$150 Delta Stays Credit", "benefit-delta-stays-0001")]);
+
+    new AmexBenefitReaderPanel(withLatestScan(store), {
+      startScan: jest.fn(async () => undefined),
+      cancelScan: jest.fn(),
+      clearData: jest.fn(async () => undefined),
+    });
+
+    expect(shadow().querySelectorAll(".card-group")).toHaveLength(2);
+    expect(shadow().querySelectorAll(".benefit-card")).toHaveLength(11);
+    expect(shadow().textContent).toContain("$219 CLEAR+ Credit");
+    expect(shadow().textContent).toContain("$300 Equinox Credit");
+    expect(shadow().textContent).toContain("$150 Delta Stays Credit");
+    expect(shadow().textContent).not.toContain("Hilton Honors Card");
+    expect(JSON.stringify(store)).not.toMatch(/productKey|creditFamilyKey/);
   });
 
   it("formats structured periods and suppresses raw provider tokens when a V2 range is observed", () => {

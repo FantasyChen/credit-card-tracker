@@ -5,7 +5,7 @@ import {
   createAmexSyncMailbox,
   storeAmexSyncMailbox,
 } from "@/lib/amex-benefit-reader/sync-mailbox";
-import { projectLatestV2SyncEnvelope } from "@/lib/amex-benefit-reader/sync-contract";
+import { projectLatestV3SyncEnvelope } from "@/lib/amex-benefit-reader/sync-contract";
 import { AMEX_READER_HOST_ID, AmexBenefitReaderPanel } from "./panel";
 import {
   TampermonkeyCardIdentityService,
@@ -44,9 +44,9 @@ export async function mountAmexBenefitReader(version: string): Promise<void> {
         if (!popup) throw new Error("Allow pop-ups for Amex, then choose Sync reviewed again.");
         popup.opener = null;
         try {
-          const projection = projectLatestV2SyncEnvelope(await store.load());
+          const projection = projectLatestV3SyncEnvelope(await store.load());
           if (!projection.envelope) {
-            throw new Error(projection.reason === "fresh_v2_scan_required"
+            throw new Error(projection.reason === "fresh_v3_scan_required"
               ? "Run and review a fresh complete scan before syncing."
               : "No complete reviewed card observations are available to sync.");
           }

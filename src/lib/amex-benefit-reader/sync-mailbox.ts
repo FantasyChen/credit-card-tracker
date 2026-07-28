@@ -8,8 +8,9 @@ import {
   type AmexSyncEnvelope,
 } from "./sync-contract";
 
-export const AMEX_SYNC_MAILBOX_KEY = "perksReminder.amexBenefitReader.syncMailbox.v1" as const;
-export const AMEX_SYNC_MAILBOX_VERSION = "amex-sync-mailbox/1" as const;
+export const LEGACY_AMEX_SYNC_MAILBOX_KEY = "perksReminder.amexBenefitReader.syncMailbox.v1" as const;
+export const AMEX_SYNC_MAILBOX_KEY = "perksReminder.amexBenefitReader.syncMailbox.v2" as const;
+export const AMEX_SYNC_MAILBOX_VERSION = "amex-sync-mailbox/2" as const;
 export const AMEX_SYNC_HANDOFF_ORIGIN = "https://www.perks-reminder.com" as const;
 export const AMEX_SYNC_HANDOFF_PATH = "/integrations/amex-sync" as const;
 export const AMEX_SYNC_MAILBOX_TTL_MS = 10 * 60 * 1000;

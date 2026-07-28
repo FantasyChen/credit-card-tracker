@@ -1,18 +1,18 @@
 import { z } from "zod";
 import {
-  OBSERVATION_CONTRACT_VERSION_V2,
+  OBSERVATION_CONTRACT_VERSION_V3,
   PARSER_VERSION,
   amexProductKeySchema,
   assertNoForbiddenFieldNames,
   creditFamilyKeySchema,
   quantitySchema,
   sourcePeriodV2Schema,
-  type NormalizedBenefitObservationV2,
+  type NormalizedBenefitObservationV3,
   type StoreEnvelopeV1,
 } from "./contract";
-import { retainSupportedAmexCardCredits } from "./supported-card-credits";
+import { matchAmexBrowserSyncCredit } from "./supported-card-credits";
 
-export const AMEX_SYNC_ENVELOPE_VERSION = "amex-sync-envelope/1" as const;
+export const AMEX_SYNC_ENVELOPE_VERSION = "amex-sync-envelope/2" as const;
 export const AMEX_SYNC_MAX_BYTES = 256 * 1024;
 export const AMEX_SYNC_MAX_CARDS = 50;
 export const AMEX_SYNC_MAX_ROWS = 300;
@@ -33,6 +33,7 @@ export const syncExclusionReasonSchema = z.enum([
   "no_structured_period",
   "prerequisite_only",
   "status_unavailable",
+  "source_mapping_ambiguous",
 ]);
 export type SyncExclusionReason = z.infer<typeof syncExclusionReasonSchema>;
 
@@ -58,7 +59,7 @@ export type AmexSyncCard = z.infer<typeof amexSyncCardSchema>;
 
 export const amexSyncEnvelopeSchema = z.object({
   envelopeVersion: z.literal(AMEX_SYNC_ENVELOPE_VERSION),
-  observationContractVersion: z.literal(OBSERVATION_CONTRACT_VERSION_V2),
+  observationContractVersion: z.literal(OBSERVATION_CONTRACT_VERSION_V3),
   scanId: z.string().uuid(),
   scanFinishedAt: z.string().datetime({ offset: true }),
   cards: z.array(amexSyncCardSchema).min(1).max(AMEX_SYNC_MAX_CARDS),
@@ -135,9 +136,12 @@ function observedValue<T>(field: { state: string; value?: T }): T | null {
   return field.state === "observed" && field.value !== undefined ? field.value : null;
 }
 
-function projectRow(benefit: NormalizedBenefitObservationV2): AmexSyncRow {
+function projectRow(
+  benefit: NormalizedBenefitObservationV3,
+  creditFamilyKey: AmexSyncRow["creditFamilyKey"],
+): AmexSyncRow {
   return {
-    creditFamilyKey: benefit.creditFamilyKey,
+    creditFamilyKey,
     sourcePeriod: observedValue(benefit.sourcePeriod),
     enrollmentState: observedValue(benefit.enrollmentState),
     completionState: observedValue(benefit.completionState),
@@ -148,13 +152,13 @@ function projectRow(benefit: NormalizedBenefitObservationV2): AmexSyncRow {
 
 export interface SyncEnvelopeProjection {
   envelope: AmexSyncEnvelope | null;
-  reason: "ready" | "fresh_v2_scan_required" | "no_complete_cards";
+  reason: "ready" | "fresh_v3_scan_required" | "no_complete_cards";
 }
 
-export function projectLatestV2SyncEnvelope(store: StoreEnvelopeV1): SyncEnvelopeProjection {
+export function projectLatestV3SyncEnvelope(store: StoreEnvelopeV1): SyncEnvelopeProjection {
   const summary = store.lastScan;
   if (!summary?.scanId || summary.status === "interrupted" || summary.status === "failed") {
-    return { envelope: null, reason: "fresh_v2_scan_required" };
+    return { envelope: null, reason: "fresh_v3_scan_required" };
   }
 
   const successfulCardIds = new Set(summary.cards
@@ -162,10 +166,7 @@ export function projectLatestV2SyncEnvelope(store: StoreEnvelopeV1): SyncEnvelop
     .map((card) => card.localCardId as string));
   const exclusions = new Map<SyncExclusionReason, number>();
   const exclude = (reason: SyncExclusionReason, count = 1): void => {
-    exclusions.set(
-      reason,
-      Math.min(AMEX_SYNC_MAX_ROWS, (exclusions.get(reason) ?? 0) + count),
-    );
+    exclusions.set(reason, Math.min(AMEX_SYNC_MAX_ROWS, (exclusions.get(reason) ?? 0) + count));
   };
 
   const cards: AmexSyncCard[] = [];
@@ -175,11 +176,7 @@ export function projectLatestV2SyncEnvelope(store: StoreEnvelopeV1): SyncEnvelop
       exclude("failed");
       continue;
     }
-    if (latest.contractVersion !== OBSERVATION_CONTRACT_VERSION_V2) {
-      exclude("v1_only", latest.benefits.length || 1);
-      continue;
-    }
-    if (latest.parserVersion !== PARSER_VERSION) {
+    if (latest.contractVersion !== OBSERVATION_CONTRACT_VERSION_V3 || latest.parserVersion !== PARSER_VERSION) {
       exclude("v1_only", latest.benefits.length || 1);
       continue;
     }
@@ -199,14 +196,30 @@ export function projectLatestV2SyncEnvelope(store: StoreEnvelopeV1): SyncEnvelop
       exclude("not_attempted_successfully", latest.benefits.length || 1);
       continue;
     }
-    const supportedBenefits = retainSupportedAmexCardCredits(latest.productName, latest.benefits);
+
+    const mapped = latest.benefits.flatMap((benefit) => {
+      if (benefit.category.state !== "observed" || benefit.category.value !== "usage") return [];
+      const match = matchAmexBrowserSyncCredit(latest.productName, benefit.title);
+      return match ? [{ benefit, match }] : [];
+    });
+    const familyCounts = new Map<string, number>();
+    mapped.forEach(({ match }) => familyCounts.set(
+      match.creditFamilyKey,
+      (familyCounts.get(match.creditFamilyKey) ?? 0) + 1,
+    ));
+    if (Array.from(familyCounts.values()).some((count) => count > 1)) {
+      exclude("source_mapping_ambiguous", mapped.length);
+      continue;
+    }
+    if (!mapped.length) continue;
+
     cards.push({
       sourceLocalCardId: latest.localCardId,
-      productKey: latest.productKey,
+      productKey: mapped[0].match.productKey,
       endingDigits: latest.endingDigits,
       observedAt: latest.observedAt,
       parserVersion: latest.parserVersion,
-      rows: supportedBenefits.map(projectRow),
+      rows: mapped.map(({ benefit, match }) => projectRow(benefit, match.creditFamilyKey)),
     });
   }
 
@@ -215,7 +228,7 @@ export function projectLatestV2SyncEnvelope(store: StoreEnvelopeV1): SyncEnvelop
     reason: "ready",
     envelope: parseAmexSyncEnvelope({
       envelopeVersion: AMEX_SYNC_ENVELOPE_VERSION,
-      observationContractVersion: OBSERVATION_CONTRACT_VERSION_V2,
+      observationContractVersion: OBSERVATION_CONTRACT_VERSION_V3,
       scanId: summary.scanId,
       scanFinishedAt: summary.finishedAt,
       cards,

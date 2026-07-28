@@ -1,6 +1,5 @@
 import { createInstallationSecret, fingerprintCardToken } from "@/lib/amex-benefit-reader/identity";
 import type { CardIdentityService, PreparedCardIdentity, ResultStore } from "@/lib/amex-benefit-reader/scan-engine";
-import { retainSupportedAmexCardCredits } from "@/lib/amex-benefit-reader/supported-card-credits";
 import {
   IDENTITY_SECRET_KEY,
   STORE_KEY,
@@ -13,6 +12,7 @@ import {
 import type { ScanSummaryV1, StoreEnvelopeV1, StoredCardRecordV1 } from "@/lib/amex-benefit-reader/contract";
 import {
   AMEX_SYNC_MAILBOX_KEY,
+  LEGACY_AMEX_SYNC_MAILBOX_KEY,
   type MailboxStorage,
 } from "@/lib/amex-benefit-reader/sync-mailbox";
 
@@ -24,76 +24,76 @@ declare const GM: {
 
 export const PRIMARY_ONLY_COMPATIBILITY_KEY = "perksReminder.amexBenefitReader.compat.primaryOnly.v1" as const;
 export const PRIMARY_ONLY_COMPATIBILITY_VALUE = "primary-only/1" as const;
+export const V3_SELECTION_COMPATIBILITY_KEY = "perksReminder.amexBenefitReader.compat.v3Selection.v1" as const;
+export const V3_SELECTION_COMPATIBILITY_VALUE = "v3-selection/1" as const;
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
-function retainSupportedStoredCredits(store: StoreEnvelopeV1, projectedAt: string): StoreEnvelopeV1 {
-  let changed = false;
-  const cards: StoreEnvelopeV1["cards"] = {};
-  for (const [localCardId, record] of Object.entries(store.cards)) {
-    if (!record.latest) {
-      cards[localCardId] = record;
-      continue;
-    }
-    if (record.latest.contractVersion === "amex-benefits/2") {
-      const benefits = retainSupportedAmexCardCredits(record.latest.productName, record.latest.benefits);
-      if (benefits === record.latest.benefits) {
-        cards[localCardId] = record;
-        continue;
-      }
-      changed = true;
-      cards[localCardId] = { ...record, latest: { ...record.latest, benefits } };
-    } else {
-      const benefits = retainSupportedAmexCardCredits(record.latest.productName, record.latest.benefits);
-      if (benefits === record.latest.benefits) {
-        cards[localCardId] = record;
-        continue;
-      }
-      changed = true;
-      cards[localCardId] = { ...record, latest: { ...record.latest, benefits } };
-    }
-  }
-  if (!changed) return store;
+function invalidateObservations(store: StoreEnvelopeV1, invalidatedAt: string): StoreEnvelopeV1 {
+  if (Object.keys(store.cards).length === 0 && store.lastScan === null) return store;
   return {
     ...store,
     revision: store.revision + 1,
-    updatedAt: projectedAt,
-    cards,
+    updatedAt: invalidatedAt,
+    cards: {},
+    lastScan: null,
   };
+}
+
+function invalidateSelectionIncompleteObservations(
+  store: StoreEnvelopeV1,
+  invalidatedAt: string,
+): StoreEnvelopeV1 {
+  const cards = Object.fromEntries(Object.entries(store.cards).filter(([, record]) =>
+    record.latest === null || record.latest.contractVersion === "amex-benefits/3"));
+  if (Object.keys(cards).length === Object.keys(store.cards).length && store.lastScan === null) return store;
+  return {
+    ...store,
+    revision: store.revision + 1,
+    updatedAt: invalidatedAt,
+    cards,
+    lastScan: null,
+  };
+}
+
+async function deletePendingMailboxes(): Promise<void> {
+  await GM.deleteValue(LEGACY_AMEX_SYNC_MAILBOX_KEY);
+  await GM.deleteValue(AMEX_SYNC_MAILBOX_KEY);
 }
 
 export class TampermonkeyResultStore implements ResultStore {
   async load(): Promise<StoreEnvelopeV1> {
-    const projectedAt = nowIso();
-    // Read the marker before the store so a concurrent load that observes a
-    // completed migration cannot retain an older pre-migration store snapshot.
-    const compatibility = await GM.getValue(PRIMARY_ONLY_COMPATIBILITY_KEY, null);
+    const migratedAt = nowIso();
+    // Both compatibility markers are read before the store. A concurrent load
+    // that observes either completed marker must therefore read the resulting
+    // post-migration snapshot rather than retain a pre-migration value.
+    const primaryCompatibility = await GM.getValue(PRIMARY_ONLY_COMPATIBILITY_KEY, null);
+    const v3Compatibility = await GM.getValue(V3_SELECTION_COMPATIBILITY_KEY, null);
     const rawStore = await GM.getValue(STORE_KEY, null);
-    // Validate before any mutation so malformed and future-schema stores remain
-    // untouched and cannot be marked as compatible.
-    const loaded = loadStoreValue(rawStore, projectedAt);
-    if (compatibility !== PRIMARY_ONLY_COMPATIBILITY_VALUE) {
-      const requiresInvalidation = Object.keys(loaded.cards).length > 0 || loaded.lastScan !== null;
-      const invalidated: StoreEnvelopeV1 = requiresInvalidation
-        ? {
-            ...loaded,
-            revision: loaded.revision + 1,
-            updatedAt: projectedAt,
-            cards: {},
-            lastScan: null,
-          }
-        : loaded;
-      await GM.deleteValue(AMEX_SYNC_MAILBOX_KEY);
+    // Validate before deleting mailboxes or writing markers. Malformed and
+    // future-schema stores stay untouched and unmarked.
+    let loaded = loadStoreValue(rawStore, migratedAt);
+
+    if (primaryCompatibility !== PRIMARY_ONLY_COMPATIBILITY_VALUE) {
+      const invalidated = invalidateObservations(loaded, migratedAt);
+      await deletePendingMailboxes();
       if (invalidated !== loaded) await GM.setValue(STORE_KEY, invalidated);
       await GM.setValue(PRIMARY_ONLY_COMPATIBILITY_KEY, PRIMARY_ONLY_COMPATIBILITY_VALUE);
-      return invalidated;
+      loaded = invalidated;
     }
 
-    const projected = retainSupportedStoredCredits(loaded, projectedAt);
-    if (projected !== loaded) await GM.setValue(STORE_KEY, projected);
-    return projected;
+    if (v3Compatibility !== V3_SELECTION_COMPATIBILITY_VALUE) {
+      const invalidated = invalidateSelectionIncompleteObservations(loaded, migratedAt);
+      await deletePendingMailboxes();
+      if (invalidated !== loaded) await GM.setValue(STORE_KEY, invalidated);
+      // Marker last keeps a partial persistence failure retryable.
+      await GM.setValue(V3_SELECTION_COMPATIBILITY_KEY, V3_SELECTION_COMPATIBILITY_VALUE);
+      loaded = invalidated;
+    }
+
+    return loaded;
   }
 
   async commitCard(result: CardAttemptResult): Promise<StoredCardRecordV1> {
@@ -113,7 +113,9 @@ export class TampermonkeyResultStore implements ResultStore {
       GM.deleteValue(STORE_KEY),
       GM.deleteValue(IDENTITY_SECRET_KEY),
       GM.deleteValue(AMEX_SYNC_MAILBOX_KEY),
+      GM.deleteValue(LEGACY_AMEX_SYNC_MAILBOX_KEY),
       GM.deleteValue(PRIMARY_ONLY_COMPATIBILITY_KEY),
+      GM.deleteValue(V3_SELECTION_COMPATIBILITY_KEY),
     ]);
   }
 

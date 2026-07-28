@@ -30,8 +30,8 @@ jest.mock("../repository", () => ({
 const now = new Date("2026-07-15T12:00:00.000Z");
 const key = "synthetic-hmac-key-that-is-at-least-32-characters";
 const envelope = parseAmexSyncEnvelope({
-  envelopeVersion: "amex-sync-envelope/1",
-  observationContractVersion: "amex-benefits/2",
+  envelopeVersion: "amex-sync-envelope/2",
+  observationContractVersion: "amex-benefits/3",
   scanId: "22222222-2222-4222-8222-222222222222",
   scanFinishedAt: now.toISOString(),
   cards: [{
@@ -39,7 +39,7 @@ const envelope = parseAmexSyncEnvelope({
     productKey: "american-express-platinum-card",
     endingDigits: "1234",
     observedAt: "2026-07-15T11:59:00.000Z",
-    parserVersion: "amex-api-us/2.0.2",
+    parserVersion: "amex-api-us/3.0.0",
     rows: [{
       creditFamilyKey: "american-express-platinum-card:resy",
       sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },

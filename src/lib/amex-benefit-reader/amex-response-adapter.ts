@@ -6,21 +6,19 @@ import type {
   TrackerResponse,
 } from "./amex-api-contract";
 import {
-  normalizedBenefitObservationV2Schema,
+  normalizedBenefitObservationV3Schema,
   sourcePeriodV2Schema,
   type ActivityKind,
   type IssueCode,
-  type NormalizedBenefitObservationV2,
+  type NormalizedBenefitObservationV3,
   type ObservedField,
   type QuantityV1,
   type SourcePeriodV2,
 } from "./contract";
 import { createBenefitKey } from "./identity";
 import {
+  isEligibleLocalAmexUsageTitle,
   isIgnoredAmexCatalogBenefitTitle,
-  isSupportedAmexCatalogCard,
-  matchSupportedAmexCardCredit,
-  type SupportedAmexCardCreditMatch,
 } from "./supported-card-credits";
 
 export interface TransientAccountCard {
@@ -106,7 +104,7 @@ export interface BenefitIdentityConflictDetailSet {
 }
 
 export interface BenefitNormalizationResult {
-  benefits: NormalizedBenefitObservationV2[];
+  benefits: NormalizedBenefitObservationV3[];
   issueCodes: IssueCode[];
   conflictDiagnostics: BenefitIdentityConflictDiagnostic[];
   conflictDetails: BenefitIdentityConflictDetailSet;
@@ -300,12 +298,6 @@ function quantityField(
   return observed({ value, unit: unit.unit, currency: unit.currency });
 }
 
-function categoryField(value: unknown): ObservedField<string> {
-  if (value == null) return notExposed();
-  const normalized = text(value, 100);
-  return normalized ? observed(normalized) : unrecognized("unknown_activity_kind");
-}
-
 function periodField(tracker: BenefitTrackerResponseItem): ObservedField<string> {
   const duration = text(tracker.trackerDuration, 160);
   if (duration) return observed(duration);
@@ -334,8 +326,8 @@ function sourcePeriodField(tracker: BenefitTrackerResponseItem): ObservedField<S
 }
 
 function trackerStatusFields(statusValue: unknown, activityKind: ActivityKind, issues: Set<IssueCode>): {
-  trackerState: NormalizedBenefitObservationV2["trackerState"];
-  completionState: NormalizedBenefitObservationV2["completionState"];
+  trackerState: NormalizedBenefitObservationV3["trackerState"];
+  completionState: NormalizedBenefitObservationV3["completionState"];
 } {
   if (statusValue == null) {
     return { trackerState: notExposed(), completionState: notExposed() };
@@ -360,16 +352,7 @@ function trackerStatusFields(statusValue: unknown, activityKind: ActivityKind, i
   };
 }
 
-function activityKindForTracker(tracker: BenefitTrackerResponseItem, issues: Set<IssueCode>): ActivityKind | null {
-  const status = exactString(tracker.status)?.toUpperCase();
-  if (status === "ACHIEVED") return "completed";
-  const category = exactString(tracker.category)?.toLocaleLowerCase("en-US") ?? null;
-  if (["spend", "usage", "access", "loan"].includes(category ?? "")) return "spend_progress";
-  issues.add("unknown_activity_kind");
-  return null;
-}
-
-function enrollmentField(catalog: CatalogBenefitResponseItem | undefined, issues: Set<IssueCode>): NormalizedBenefitObservationV2["enrollmentState"] {
+function enrollmentField(catalog: CatalogBenefitResponseItem | undefined, issues: Set<IssueCode>): NormalizedBenefitObservationV3["enrollmentState"] {
   if (!catalog) return notExposed();
   const layout = exactString(catalog.layoutType)?.toUpperCase();
   if (layout === "ENROLLED") return observed("enrolled");
@@ -394,10 +377,6 @@ function isIgnoredCatalogBenefit(catalog: CatalogBenefitResponseItem): boolean {
       const title = text(candidate, 200);
       return title !== null && isIgnoredAmexCatalogBenefitTitle(title);
     });
-}
-
-function isQualifyingSpendTracker(tracker: BenefitTrackerResponseItem): boolean {
-  return exactString(tracker.category)?.toLocaleLowerCase("en-US") === "spend";
 }
 
 function creditFamily(creditKey: string): string {
@@ -428,148 +407,6 @@ interface ConflictCandidateDraft extends Omit<BenefitIdentityConflictCandidateDe
   joinId: string | null;
 }
 
-function trackerDiagnosticCandidate(
-  tracker: BenefitTrackerResponseItem,
-  title: string,
-  match: SupportedAmexCardCreditMatch,
-): ConflictCandidateDraft {
-  const candidateIssues = new Set<IssueCode>();
-  const activityKind = activityKindForTracker(tracker, candidateIssues);
-  const statusFields = activityKind
-    ? trackerStatusFields(tracker.status, activityKind, candidateIssues)
-    : tracker.status == null
-      ? { trackerState: notExposed<"not_started" | "in_progress" | "earned" | "completed">(), completionState: notExposed<"complete" | "incomplete">() }
-      : { trackerState: unrecognized<"not_started" | "in_progress" | "earned" | "completed">("unknown_status"), completionState: unrecognized<"complete" | "incomplete">("unknown_status") };
-  const category = categoryField(tracker.category);
-  return {
-    sourceRole: "tracker",
-    displayTitle: title,
-    supportedCreditKey: match.creditKey,
-    supportedCreditFamily: creditFamily(match.creditKey),
-    category: diagnosticField(category),
-    activityKind: activityKind ? { state: "observed", value: activityKind } : tracker.status == null && tracker.category == null ? { state: "not_exposed" } : { state: "unrecognized" },
-    enrollmentState: { state: "not_exposed" },
-    trackerState: diagnosticField(statusFields.trackerState),
-    completionState: diagnosticField(statusFields.completionState),
-    earnedOrUsed: diagnosticField(quantityField(tracker.tracker?.spentAmount, tracker.tracker, candidateIssues)),
-    targetOrLimit: diagnosticField(quantityField(tracker.tracker?.targetAmount, tracker.tracker, candidateIssues)),
-    remaining: diagnosticField(quantityField(tracker.tracker?.remainingAmount, tracker.tracker, candidateIssues)),
-    period: diagnosticField(periodField(tracker)),
-    catalogLayout: { state: "not_exposed" },
-    catalogEnrollable: { state: "not_exposed" },
-    joinId: exactString(tracker.sorBenefitId),
-  };
-}
-
-function catalogDiagnosticCandidate(
-  productName: string,
-  catalog: CatalogBenefitResponseItem,
-  sourceRole: "joined_catalog" | "catalog_enrollment_candidate",
-): ConflictCandidateDraft {
-  const title = catalogTitle(catalog);
-  const match = title ? matchSupportedAmexCardCredit(productName, title) : null;
-  const candidateIssues = new Set<IssueCode>();
-  return {
-    sourceRole,
-    displayTitle: title,
-    supportedCreditKey: match?.creditKey ?? null,
-    supportedCreditFamily: match ? creditFamily(match.creditKey) : null,
-    category: { state: "not_exposed" },
-    activityKind: sourceRole === "catalog_enrollment_candidate"
-      ? { state: "observed", value: "enrollment_candidate" }
-      : { state: "not_exposed" },
-    enrollmentState: diagnosticField(enrollmentField(catalog, candidateIssues)),
-    trackerState: { state: "not_exposed" },
-    completionState: { state: "not_exposed" },
-    earnedOrUsed: { state: "not_exposed" },
-    targetOrLimit: { state: "not_exposed" },
-    remaining: { state: "not_exposed" },
-    period: { state: "not_exposed" },
-    catalogLayout: catalogLayoutField(catalog),
-    catalogEnrollable: catalogEnrollableField(catalog),
-    joinId: exactString(catalog.sorBenefitId),
-  };
-}
-
-function normalizedDiagnosticCandidate(
-  sourceRole: "tracker" | "catalog_enrollment_candidate",
-  benefit: NormalizedBenefitObservationV2,
-  supportedCreditKey: string,
-  joinId: string | null,
-): ConflictCandidateDraft {
-  return {
-    sourceRole,
-    displayTitle: benefit.title,
-    supportedCreditKey,
-    supportedCreditFamily: creditFamily(supportedCreditKey),
-    category: diagnosticField(benefit.category),
-    activityKind: { state: "observed", value: benefit.activityKind },
-    enrollmentState: diagnosticField(benefit.enrollmentState),
-    trackerState: diagnosticField(benefit.trackerState),
-    completionState: diagnosticField(benefit.completionState),
-    earnedOrUsed: diagnosticField(benefit.earnedOrUsed),
-    targetOrLimit: diagnosticField(benefit.targetOrLimit),
-    remaining: diagnosticField(benefit.remaining),
-    period: diagnosticField(benefit.period),
-    catalogLayout: { state: "not_exposed" },
-    catalogEnrollable: { state: "not_exposed" },
-    joinId,
-  };
-}
-
-interface SupportedTrackerTitle {
-  kind: "supported";
-  title: string;
-  match: SupportedAmexCardCreditMatch;
-  catalog: CatalogBenefitResponseItem | undefined;
-}
-
-interface ConflictingSupportedTrackerTitle {
-  kind: "conflict";
-  trackerTitle: string;
-  trackerMatch: SupportedAmexCardCreditMatch;
-  catalogTitle: string;
-  catalogMatch: SupportedAmexCardCreditMatch;
-  catalog: CatalogBenefitResponseItem;
-}
-
-function supportedTrackerTitle(
-  productName: string,
-  tracker: BenefitTrackerResponseItem,
-  catalog: CatalogBenefitResponseItem | undefined,
-): SupportedTrackerTitle | ConflictingSupportedTrackerTitle | null {
-  const trackerTitle = text(tracker.benefitName, 200);
-  const catalogBenefitTitle = catalog ? catalogTitle(catalog) : null;
-  const trackerMatch = trackerTitle ? matchSupportedAmexCardCredit(productName, trackerTitle) : null;
-  const catalogMatch = catalogBenefitTitle
-    ? matchSupportedAmexCardCredit(productName, catalogBenefitTitle)
-    : null;
-  if (
-    trackerMatch
-    && trackerTitle
-    && catalogMatch
-    && catalogBenefitTitle
-    && catalog
-    && trackerMatch.creditKey !== catalogMatch.creditKey
-  ) {
-    return {
-      kind: "conflict",
-      trackerTitle,
-      trackerMatch,
-      catalogTitle: catalogBenefitTitle,
-      catalogMatch,
-      catalog,
-    };
-  }
-  if (catalogMatch && catalogBenefitTitle) {
-    return { kind: "supported", title: catalogBenefitTitle, match: catalogMatch, catalog };
-  }
-  if (trackerMatch && trackerTitle) {
-    return { kind: "supported", title: trackerTitle, match: trackerMatch, catalog: undefined };
-  }
-  return null;
-}
-
 function benefitKey(title: string, category: ObservedField<string>, activityKind: ActivityKind): string {
   return createBenefitKey({
     title,
@@ -588,48 +425,6 @@ function sameCatalogObservation(
     && exactString(left.benefitName) === exactString(right.benefitName)
     && exactString(left.layoutType) === exactString(right.layoutType)
     && left.isEnrollable === right.isEnrollable;
-}
-
-function supportedCreditState(benefit: NormalizedBenefitObservationV2): unknown {
-  return {
-    category: benefit.category,
-    activityKind: benefit.activityKind,
-    enrollmentState: benefit.enrollmentState,
-    trackerState: benefit.trackerState,
-    completionState: benefit.completionState,
-    earnedOrUsed: benefit.earnedOrUsed,
-    targetOrLimit: benefit.targetOrLimit,
-    remaining: benefit.remaining,
-    period: benefit.period,
-    creditFamilyKey: benefit.creditFamilyKey,
-    sourcePeriod: benefit.sourcePeriod,
-    confidence: benefit.confidence,
-    issueCodes: benefit.issueCodes,
-  };
-}
-
-function sameSupportedCreditObservation(
-  left: NormalizedBenefitObservationV2,
-  right: NormalizedBenefitObservationV2,
-): boolean {
-  return JSON.stringify(supportedCreditState(left)) === JSON.stringify(supportedCreditState(right));
-}
-
-type SupportedCreditCandidateSource = "tracker" | "catalog_candidate";
-
-interface SupportedCreditCandidate {
-  benefit: NormalizedBenefitObservationV2;
-  source: SupportedCreditCandidateSource;
-  diagnosticCandidate: ConflictCandidateDraft;
-}
-
-function collisionDiagnostic(
-  left: SupportedCreditCandidateSource,
-  right: SupportedCreditCandidateSource,
-): BenefitIdentityConflictDiagnostic {
-  if (left === "tracker" && right === "tracker") return "tracker_state_collision";
-  if (left !== right) return "tracker_catalog_candidate_collision";
-  return "ambiguous_catalog_join";
 }
 
 function orderedConflictDiagnostics(
@@ -674,29 +469,6 @@ interface JoinIdEvidence {
 
 type ConflictCandidatesByCreditKey = ReadonlyMap<string, ReadonlyMap<string, ConflictCandidateDraft>>;
 type JoinIdEvidenceByCreditKey = ReadonlyMap<string, ReadonlyMap<string, JoinIdEvidence>>;
-
-function recordCandidateEvidence(
-  candidatesByCreditKey: Map<string, Map<string, ConflictCandidateDraft>>,
-  joinIdEvidenceByCreditKey: Map<string, Map<string, JoinIdEvidence>>,
-  supportedCreditKey: string,
-  candidate: ConflictCandidateDraft,
-): void {
-  const signature = candidateSignature(candidate);
-  const candidates = candidatesByCreditKey.get(supportedCreditKey) ?? new Map<string, ConflictCandidateDraft>();
-  if (!candidates.has(signature)) candidates.set(signature, candidate);
-  candidatesByCreditKey.set(supportedCreditKey, candidates);
-
-  const evidenceBySignature = joinIdEvidenceByCreditKey.get(supportedCreditKey)
-    ?? new Map<string, JoinIdEvidence>();
-  const evidence = evidenceBySignature.get(signature) ?? {
-    ids: new Set<string>(),
-    unavailable: false,
-  };
-  if (candidate.joinId === null) evidence.unavailable = true;
-  else evidence.ids.add(candidate.joinId);
-  evidenceBySignature.set(signature, evidence);
-  joinIdEvidenceByCreditKey.set(supportedCreditKey, evidenceBySignature);
-}
 
 function sameSet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
   return left.size === right.size && Array.from(left).every((item) => right.has(item));
@@ -847,8 +619,56 @@ class ConflictDetailCollector {
   }
 }
 
-function emptyConflictDetails(): BenefitIdentityConflictDetailSet {
-  return { details: [], totalCount: 0, truncated: false };
+function v3TrackerDiagnosticCandidate(
+  benefit: NormalizedBenefitObservationV3,
+): ConflictCandidateDraft {
+  return {
+    sourceRole: "tracker",
+    displayTitle: benefit.title,
+    supportedCreditKey: null,
+    supportedCreditFamily: null,
+    category: diagnosticField(benefit.category),
+    activityKind: { state: "observed", value: benefit.activityKind },
+    enrollmentState: diagnosticField(benefit.enrollmentState),
+    trackerState: diagnosticField(benefit.trackerState),
+    completionState: diagnosticField(benefit.completionState),
+    earnedOrUsed: diagnosticField(benefit.earnedOrUsed),
+    targetOrLimit: diagnosticField(benefit.targetOrLimit),
+    remaining: diagnosticField(benefit.remaining),
+    period: diagnosticField(benefit.period),
+    catalogLayout: { state: "not_exposed" },
+    catalogEnrollable: { state: "not_exposed" },
+    joinId: null,
+  };
+}
+
+function v3CatalogDiagnosticCandidate(catalog: CatalogBenefitResponseItem): ConflictCandidateDraft {
+  return {
+    sourceRole: "joined_catalog",
+    displayTitle: catalogTitle(catalog),
+    supportedCreditKey: null,
+    supportedCreditFamily: null,
+    category: { state: "not_exposed" },
+    activityKind: { state: "not_exposed" },
+    enrollmentState: { state: "not_exposed" },
+    trackerState: { state: "not_exposed" },
+    completionState: { state: "not_exposed" },
+    earnedOrUsed: { state: "not_exposed" },
+    targetOrLimit: { state: "not_exposed" },
+    remaining: { state: "not_exposed" },
+    period: { state: "not_exposed" },
+    catalogLayout: catalogLayoutField(catalog),
+    catalogEnrollable: catalogEnrollableField(catalog),
+    joinId: null,
+  };
+}
+
+function sameV3Observation(
+  left: NormalizedBenefitObservationV3,
+  right: NormalizedBenefitObservationV3,
+): boolean {
+  return JSON.stringify({ ...left, title: undefined, benefitKey: undefined })
+    === JSON.stringify({ ...right, title: undefined, benefitKey: undefined });
 }
 
 export function normalizeBenefits(input: {
@@ -856,21 +676,12 @@ export function normalizeBenefits(input: {
   trackerResponse: TrackerResponse;
   catalogResponse: CatalogResponse;
 }): BenefitNormalizationResult {
-  const { productName, trackerResponse, catalogResponse } = input;
-  if (!isSupportedAmexCatalogCard(productName)) {
-    return { benefits: [], issueCodes: [], conflictDiagnostics: [], conflictDetails: emptyConflictDetails() };
-  }
-
   const issues = new Set<IssueCode>();
   const conflictDiagnostics = new Set<BenefitIdentityConflictDiagnostic>();
   const conflictDetailCollector = new ConflictDetailCollector();
-  const conflictCandidatesByCreditKey = new Map<string, Map<string, ConflictCandidateDraft>>();
-  const joinIdEvidenceByCreditKey = new Map<string, Map<string, JoinIdEvidence>>();
-  const catalogByIssuerId = new Map<string, CatalogBenefitResponseItem>();
-  const catalogsByIssuerId = new Map<string, CatalogBenefitResponseItem[]>();
-  const ambiguousCatalogIds = new Set<string>();
-  const selectedCatalogs = Object.values(catalogResponse.benefits)
+  const selectedCatalogs = Object.values(input.catalogResponse.benefits)
     .filter((catalog) => !isIgnoredCatalogBenefit(catalog));
+  const catalogsByIssuerId = new Map<string, CatalogBenefitResponseItem[]>();
   for (const catalog of selectedCatalogs) {
     const issuerId = exactString(catalog.sorBenefitId);
     if (!issuerId) continue;
@@ -878,172 +689,84 @@ export function normalizeBenefits(input: {
     if (!group.some((existing) => sameCatalogObservation(existing, catalog))) group.push(catalog);
     catalogsByIssuerId.set(issuerId, group);
   }
-  catalogsByIssuerId.forEach((catalogs, issuerId) => {
-    if (catalogs.length === 1) catalogByIssuerId.set(issuerId, catalogs[0]);
-    else ambiguousCatalogIds.add(issuerId);
-  });
 
-  const normalized = new Map<string, SupportedCreditCandidate>();
-  const add = (
-    supportedCreditKey: string,
-    benefit: NormalizedBenefitObservationV2,
-    source: SupportedCreditCandidateSource,
-    joinId: string | null,
-    diagnosticOverride?: ConflictCandidateDraft,
-  ): void => {
-    const validated = normalizedBenefitObservationV2Schema.parse(benefit);
-    const diagnosticCandidate = diagnosticOverride ?? normalizedDiagnosticCandidate(
-      source === "tracker" ? "tracker" : "catalog_enrollment_candidate",
-      validated,
-      supportedCreditKey,
-      joinId,
-    );
-    recordCandidateEvidence(
-      conflictCandidatesByCreditKey,
-      joinIdEvidenceByCreditKey,
-      supportedCreditKey,
-      diagnosticCandidate,
-    );
-    const existing = normalized.get(supportedCreditKey);
-    if (!existing) {
-      normalized.set(supportedCreditKey, { benefit: validated, source, diagnosticCandidate });
-      return;
-    }
-    if (!sameSupportedCreditObservation(existing.benefit, validated)) {
-      const diagnostic = collisionDiagnostic(existing.source, source);
-      issues.add("benefit_identity_conflict");
-      conflictDiagnostics.add(diagnostic);
-      conflictDetailCollector.add(diagnostic, [existing.diagnosticCandidate, diagnosticCandidate], [supportedCreditKey]);
-    }
-  };
-
-  for (const block of trackerResponse) {
+  const normalized = new Map<string, NormalizedBenefitObservationV3>();
+  for (const block of input.trackerResponse) {
     for (const tracker of block.trackers) {
-      if (isQualifyingSpendTracker(tracker)) continue;
-      const issuerId = exactString(tracker.sorBenefitId);
-      const catalog = issuerId && !ambiguousCatalogIds.has(issuerId)
-        ? catalogByIssuerId.get(issuerId)
-        : undefined;
-      const supported = supportedTrackerTitle(productName, tracker, catalog);
-      if (!supported) continue;
-      if (supported.kind === "conflict") {
-        issues.add("benefit_identity_conflict");
-        conflictDiagnostics.add("tracker_catalog_key_mismatch");
-        conflictDetailCollector.add("tracker_catalog_key_mismatch", [
-          trackerDiagnosticCandidate(tracker, supported.trackerTitle, supported.trackerMatch),
-          catalogDiagnosticCandidate(productName, supported.catalog, "joined_catalog"),
-        ], [supported.trackerMatch.creditKey, supported.catalogMatch.creditKey]);
-        continue;
-      }
+      const normalizedCategory = exactString(tracker.category)?.toLocaleLowerCase("en-US") ?? null;
+      if (normalizedCategory !== "usage") continue;
+      const title = text(tracker.benefitName, 200);
+      if (!title || !isEligibleLocalAmexUsageTitle(title)) continue;
 
       const itemIssues = new Set<IssueCode>();
-      if (issuerId && ambiguousCatalogIds.has(issuerId)) {
+      const issuerId = exactString(tracker.sorBenefitId);
+      const catalogGroup = issuerId ? catalogsByIssuerId.get(issuerId) ?? [] : [];
+      const ambiguousCatalog = catalogGroup.length > 1;
+      if (ambiguousCatalog) {
         itemIssues.add("benefit_identity_conflict");
+        issues.add("benefit_identity_conflict");
         conflictDiagnostics.add("ambiguous_catalog_join");
-        conflictDetailCollector.add("ambiguous_catalog_join", [
-          trackerDiagnosticCandidate(tracker, supported.title, supported.match),
-          ...(catalogsByIssuerId.get(issuerId) ?? []).map((candidate) =>
-            catalogDiagnosticCandidate(productName, candidate, "joined_catalog")),
-        ], [supported.match.creditKey]);
       }
-      const activityKind = activityKindForTracker(tracker, itemIssues);
-      if (!activityKind) {
-        itemIssues.forEach((issue) => issues.add(issue));
-        continue;
-      }
-      const category = categoryField(tracker.category);
-      if (category.state === "unrecognized") itemIssues.add(category.issueCode);
+      const category = observed("usage");
+      const activityKind: ActivityKind = exactString(tracker.status)?.toUpperCase() === "ACHIEVED"
+        ? "completed"
+        : "credit_usage";
       const statusFields = trackerStatusFields(tracker.status, activityKind, itemIssues);
-      const earnedOrUsed = quantityField(tracker.tracker?.spentAmount, tracker.tracker, itemIssues);
-      const targetOrLimit = quantityField(tracker.tracker?.targetAmount, tracker.tracker, itemIssues);
-      const remaining = quantityField(tracker.tracker?.remainingAmount, tracker.tracker, itemIssues);
       const period = periodField(tracker);
       if (period.state === "unrecognized") itemIssues.add(period.issueCode);
       const sourcePeriod = sourcePeriodField(tracker);
       if (sourcePeriod.state === "unrecognized") itemIssues.add(sourcePeriod.issueCode);
-      const enrollmentState = enrollmentField(supported.catalog, itemIssues);
-      const benefit: NormalizedBenefitObservationV2 = {
-        benefitKey: benefitKey(supported.title, category, activityKind),
-        creditFamilyKey: supported.match.creditKey,
+      const benefit = normalizedBenefitObservationV3Schema.parse({
+        benefitKey: benefitKey(title, category, "credit_usage"),
         sourcePeriod,
-        title: supported.title,
+        title,
         category,
         activityKind,
-        enrollmentState,
+        enrollmentState: enrollmentField(ambiguousCatalog ? undefined : catalogGroup[0], itemIssues),
         trackerState: statusFields.trackerState,
         completionState: statusFields.completionState,
-        earnedOrUsed,
-        targetOrLimit,
-        remaining,
+        earnedOrUsed: quantityField(tracker.tracker?.spentAmount, tracker.tracker, itemIssues),
+        targetOrLimit: quantityField(tracker.tracker?.targetAmount, tracker.tracker, itemIssues),
+        remaining: quantityField(tracker.tracker?.remainingAmount, tracker.tracker, itemIssues),
         period,
         confidence: itemIssues.size === 0 ? "high" : "medium",
-        issueCodes: Array.from(itemIssues),
-      };
-      add(supported.match.creditKey, benefit, "tracker", issuerId);
+        issueCodes: Array.from(itemIssues).sort(),
+      });
+
+      if (ambiguousCatalog) {
+        conflictDetailCollector.add("ambiguous_catalog_join", [
+          v3TrackerDiagnosticCandidate(benefit),
+          ...catalogGroup.map(v3CatalogDiagnosticCandidate),
+        ]);
+      }
+
+      const existing = normalized.get(benefit.benefitKey);
+      if (!existing) {
+        normalized.set(benefit.benefitKey, benefit);
+      } else {
+        if (!sameV3Observation(existing, benefit)) {
+          issues.add("benefit_identity_conflict");
+          conflictDiagnostics.add("tracker_state_collision");
+          conflictDetailCollector.add("tracker_state_collision", [
+            v3TrackerDiagnosticCandidate(existing),
+            v3TrackerDiagnosticCandidate(benefit),
+          ]);
+        }
+        // Equivalent display variants share a normalized local key. Choose one
+        // deterministically so provider response order cannot change storage.
+        if (JSON.stringify(benefit) < JSON.stringify(existing)) {
+          normalized.set(benefit.benefitKey, benefit);
+        }
+      }
       itemIssues.forEach((issue) => issues.add(issue));
     }
   }
 
-  for (const catalog of selectedCatalogs) {
-    const title = catalogTitle(catalog);
-    const supported = title ? matchSupportedAmexCardCredit(productName, title) : null;
-    if (!title || !supported) continue;
-
-    const issuerId = exactString(catalog.sorBenefitId);
-    if (issuerId && ambiguousCatalogIds.has(issuerId)) {
-      issues.add("benefit_identity_conflict");
-      conflictDiagnostics.add("ambiguous_catalog_join");
-      conflictDetailCollector.add(
-        "ambiguous_catalog_join",
-        (catalogsByIssuerId.get(issuerId) ?? []).map((candidate) =>
-          catalogDiagnosticCandidate(productName, candidate, "joined_catalog")),
-        [supported.creditKey],
-      );
-      continue;
-    }
-    const layout = exactString(catalog.layoutType)?.toUpperCase();
-    if (layout !== "NOTENROLLED" || catalog.isEnrollable !== true) {
-      if (
-        catalog.layoutType != null
-        && layout !== "ENROLLED"
-        && layout !== "NOTENROLLED"
-        && layout !== "LOGGEDIN"
-        && layout !== "SUPP"
-      ) {
-        issues.add("unknown_status");
-      }
-      continue;
-    }
-    const hasJoinedTracker = issuerId && trackerResponse.some((block) =>
-      block.trackers.some((tracker) => exactString(tracker.sorBenefitId) === issuerId));
-    if (hasJoinedTracker) continue;
-    const category = notExposed<string>();
-    add(supported.creditKey, {
-      benefitKey: benefitKey(title, category, "enrollment_candidate"),
-      creditFamilyKey: supported.creditKey,
-      sourcePeriod: notExposed(),
-      title,
-      category,
-      activityKind: "enrollment_candidate",
-      enrollmentState: observed("required"),
-      trackerState: notExposed(),
-      completionState: notExposed(),
-      earnedOrUsed: notExposed(),
-      targetOrLimit: notExposed(),
-      remaining: notExposed(),
-      period: notExposed(),
-      confidence: "high",
-      issueCodes: [],
-    }, "catalog_candidate", issuerId, catalogDiagnosticCandidate(productName, catalog, "catalog_enrollment_candidate"));
-  }
-
   return {
-    benefits: Array.from(normalized.values(), (candidate) => candidate.benefit),
-    issueCodes: Array.from(issues),
+    benefits: Array.from(normalized.values()).sort((left, right) =>
+      left.title.localeCompare(right.title) || left.benefitKey.localeCompare(right.benefitKey)),
+    issueCodes: Array.from(issues).sort(),
     conflictDiagnostics: orderedConflictDiagnostics(conflictDiagnostics),
-    conflictDetails: conflictDetailCollector.finish(
-      conflictCandidatesByCreditKey,
-      joinIdEvidenceByCreditKey,
-    ),
+    conflictDetails: conflictDetailCollector.finish(new Map(), new Map()),
   };
 }

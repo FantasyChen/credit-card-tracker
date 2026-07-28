@@ -121,10 +121,81 @@ describe("API Amex scan engine", () => {
       visibleContext: "unchanged",
     });
     expect(store.attempts.map((attempt) => attempt.disposition)).toEqual(["complete", "complete"]);
+    expect(store.attempts.every((attempt) =>
+      attempt.disposition !== "failed"
+      && attempt.observation.contractVersion === "amex-benefits/3"
+      && attempt.observation.parserVersion === "amex-api-us/3.0.0"
+      && !("productKey" in attempt.observation)
+      && attempt.observation.benefits.every((benefit) => !("creditFamilyKey" in benefit))
+    )).toBe(true);
     expect(events.at(-1)?.type).toBe("finished");
     const serialized = JSON.stringify(store.value);
     expect(serialized).not.toContain("invented-token");
     expect(serialized).not.toMatch(/accountToken|rawResponse|requestBody|authorization|cookie/i);
+  });
+
+  it("commits product-independent Morgan, empty Hilton, and Delta-Stays-only V3 observations", async () => {
+    const products = [
+      { token: "morgan-token", productName: "Morgan Stanley Platinum", endingDigits: "1001" },
+      { token: "hilton-token", productName: "Hilton Honors Card", endingDigits: "1002" },
+      { token: "delta-token", productName: "Delta SkyMiles Gold Business Card", endingDigits: "1003" },
+    ];
+    const discovery = memberResponseSchema.parse({ accounts: products.map((product) => ({
+      account_token: product.token,
+      relationship: "BASIC",
+      product: { description: product.productName },
+      display_account_number: product.endingDigits,
+    })) });
+    const morganTitles = [
+      "$200 Airline Fee Credit", "$219 CLEAR+ Credit", "$300 Equinox Credit",
+      "$300 lululemon Credit", "$400 Resy Credit", "Digital Entertainment Credit",
+      "Hotel Credit", "Saks Fifth Avenue Credit", "Uber Cash", "Walmart+ Credit",
+    ];
+    const responseFor = (token: string) => trackerResponseSchema.parse([{ trackers:
+      token === "morgan-token"
+        ? morganTitles.map((benefitName) => ({ benefitName, category: "usage", status: "ACTIVE" }))
+        : token === "hilton-token"
+          ? [{ benefitName: "Status Tracker", category: "spend", status: "ACTIVE" }]
+          : [
+            { benefitName: "$150 Delta Stays Credit", category: "usage", status: "ACTIVE" },
+            { benefitName: "$200 Delta Flight Credit", category: "spend", status: "ACTIVE" },
+          ],
+    }]);
+    const client: AmexReadClient = {
+      discoverAccounts: async () => discovery,
+      readBenefitTrackers: async (token) => responseFor(token),
+      readBenefitCatalog: async () => catalogResponseSchema.parse({ benefits: {
+        catalogOnly: { benefitTitle: "$120 Rideshare Credit", layoutType: "NOTENROLLED", isEnrollable: true },
+      } }),
+    };
+    const preparedIdentity = {
+      prepareCard: async (card: { productName: string; endingDigits: string }) => ({
+        productName: card.productName,
+        endingDigits: card.endingDigits,
+        sourceFingerprint: card.endingDigits.repeat(16),
+      }),
+    };
+    const store = new MemoryStore(createEmptyStore(times[0]));
+    await new AmexBenefitScanEngine(
+      client,
+      visible(),
+      store,
+      preparedIdentity,
+      { report: () => undefined },
+      { now: () => new Date(times[2]) },
+    ).scanAllCards();
+
+    const observations = store.attempts.flatMap((attempt) =>
+      attempt.disposition === "failed" ? [] : [attempt.observation]);
+    expect(observations).toHaveLength(3);
+    expect(observations.every((observation) => observation.contractVersion === "amex-benefits/3")).toBe(true);
+    expect(observations.find((observation) => observation.productName === "Morgan Stanley Platinum")?.benefits)
+      .toHaveLength(10);
+    expect(observations.find((observation) => observation.productName === "Hilton Honors Card")?.benefits)
+      .toEqual([]);
+    expect(observations.find((observation) => observation.productName === "Delta SkyMiles Gold Business Card")?.benefits
+      .map((benefit) => benefit.title)).toEqual(["$150 Delta Stays Credit"]);
+    expect(JSON.stringify(observations)).not.toMatch(/productKey|creditFamilyKey|Rideshare|Delta Flight/);
   });
 
   it("does no identity or benefit work for nested exact SUPP cards", async () => {
@@ -211,8 +282,8 @@ describe("API Amex scan engine", () => {
         totalCount: 1,
         truncated: false,
         details: [expect.objectContaining({
-          conflictKey: "tracker_state_collision:adobe:01",
-          reviewedCreditFamilies: ["adobe"],
+          conflictKey: "tracker_state_collision:unresolved:01",
+          reviewedCreditFamilies: [],
           candidateCount: 2,
         })],
       }),
@@ -352,7 +423,7 @@ describe("API Amex scan engine", () => {
       observation: {
         completeness: "partial",
         issueCodes: ["network_error"],
-        benefits: [expect.objectContaining({ title: "Synthetic Wireless Bill Credit", activityKind: "spend_progress" })],
+        benefits: [expect.objectContaining({ title: "Synthetic Wireless Bill Credit", activityKind: "credit_usage" })],
       },
     });
   });

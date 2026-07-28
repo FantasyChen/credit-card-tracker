@@ -22,8 +22,8 @@ jest.mock("@/lib/amex-sync/service", () => ({ previewAmexSync: jest.fn(), confir
 const session = { user: { id: "user-1" } };
 const key = "synthetic-hmac-key-that-is-at-least-32-characters";
 const envelope = {
-  envelopeVersion: "amex-sync-envelope/1",
-  observationContractVersion: "amex-benefits/2",
+  envelopeVersion: "amex-sync-envelope/2",
+  observationContractVersion: "amex-benefits/3",
   scanId: "22222222-2222-4222-8222-222222222222",
   scanFinishedAt: "2026-07-15T12:00:00.000Z",
   cards: [{
@@ -31,7 +31,7 @@ const envelope = {
     productKey: "american-express-platinum-card",
     endingDigits: "1234",
     observedAt: "2026-07-15T11:59:00.000Z",
-    parserVersion: "amex-api-us/2.0.2",
+    parserVersion: "amex-api-us/3.0.0",
     rows: [],
   }],
   exclusions: [],

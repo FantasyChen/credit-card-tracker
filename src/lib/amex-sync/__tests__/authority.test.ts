@@ -25,8 +25,8 @@ function source(overrides: Record<string, unknown> = {}): AmexSyncEnvelope {
     ...overrides,
   };
   return parseAmexSyncEnvelope({
-    envelopeVersion: "amex-sync-envelope/1",
-    observationContractVersion: "amex-benefits/2",
+    envelopeVersion: "amex-sync-envelope/2",
+    observationContractVersion: "amex-benefits/3",
     scanId: "22222222-2222-4222-8222-222222222222",
     scanFinishedAt: now.toISOString(),
     cards: [{
@@ -34,7 +34,7 @@ function source(overrides: Record<string, unknown> = {}): AmexSyncEnvelope {
       productKey: "american-express-platinum-card",
       endingDigits: "1234",
       observedAt,
-      parserVersion: "amex-api-us/2.0.2",
+      parserVersion: "amex-api-us/3.0.0",
       rows: [baseRow],
     }],
     exclusions: [],

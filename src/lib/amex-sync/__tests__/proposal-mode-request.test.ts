@@ -14,7 +14,7 @@ const plan: AmexSyncPlan = {
     productKey: "american-express-platinum-card",
     creditFamilyKey: "american-express-platinum-card:resy",
     observedAt: "2026-07-15T11:59:00.000Z",
-    parserVersion: "amex-api-us/2.0.2",
+    parserVersion: "amex-api-us/3.0.0",
     periodKey: "calendar-quarter-q3",
     sourcePeriodStartDate: "2026-07-01",
     sourcePeriodEndDate: "2026-09-30",
@@ -33,8 +33,8 @@ const plan: AmexSyncPlan = {
 };
 
 const envelope = {
-  envelopeVersion: "amex-sync-envelope/1",
-  observationContractVersion: "amex-benefits/2",
+  envelopeVersion: "amex-sync-envelope/2",
+  observationContractVersion: "amex-benefits/3",
   scanId: "22222222-2222-4222-8222-222222222222",
   scanFinishedAt: now.toISOString(),
   cards: [{
@@ -42,7 +42,7 @@ const envelope = {
     productKey: "american-express-platinum-card",
     endingDigits: "1234",
     observedAt: "2026-07-15T11:59:00.000Z",
-    parserVersion: "amex-api-us/2.0.2",
+    parserVersion: "amex-api-us/3.0.0",
     rows: [],
   }],
   exclusions: [],

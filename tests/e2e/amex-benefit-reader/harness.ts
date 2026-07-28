@@ -11,9 +11,12 @@ export type SyntheticAmexDocumentUrl = typeof SYNTHETIC_AMEX_URL | typeof SYNTHE
 export type SyntheticDocumentUrl = SyntheticAmexDocumentUrl | typeof SYNTHETIC_HANDOFF_URL;
 export const STORE_KEY = "perksReminder.amexBenefitReader.store.v1";
 export const IDENTITY_SECRET_KEY = "perksReminder.amexBenefitReader.identitySecret.v1";
-export const SYNC_MAILBOX_KEY = "perksReminder.amexBenefitReader.syncMailbox.v1";
+export const LEGACY_SYNC_MAILBOX_KEY = "perksReminder.amexBenefitReader.syncMailbox.v1";
+export const SYNC_MAILBOX_KEY = "perksReminder.amexBenefitReader.syncMailbox.v2";
 export const PRIMARY_ONLY_COMPATIBILITY_KEY = "perksReminder.amexBenefitReader.compat.primaryOnly.v1";
 export const PRIMARY_ONLY_COMPATIBILITY_VALUE = "primary-only/1";
+export const V3_SELECTION_COMPATIBILITY_KEY = "perksReminder.amexBenefitReader.compat.v3Selection.v1";
+export const V3_SELECTION_COMPATIBILITY_VALUE = "v3-selection/1";
 
 const MEMBER_URL = "https://global.americanexpress.com/api/servicing/v1/member";
 const TRACKER_URL = "https://functions.americanexpress.com/ReadBestLoyaltyBenefitsTrackers.v1";
@@ -27,7 +30,7 @@ const EXCLUDED_SUPPLEMENTARY_TOKEN = "invented-e2e-excluded-supplementary-token"
 const EMPTY_BENEFITS_TOKEN = "invented-e2e-empty-benefits-token";
 const SYNTHETIC_ORIGIN = "https://global.americanexpress.com";
 
-export type HarnessScenario = "complete" | "benefit_empty" | "all_benefit_empty" | "reviewed_exclusions" | "conflict_diagnostics" | "catalog_failure" | "cancellation" | "rescan_tracker_failure" | "high_scale";
+export type HarnessScenario = "complete" | "benefit_empty" | "all_benefit_empty" | "reviewed_exclusions" | "approved_v3_products" | "conflict_diagnostics" | "catalog_failure" | "cancellation" | "rescan_tracker_failure" | "high_scale";
 export type ApiOperation = "member" | "tracker" | "catalog";
 export type SyntheticCard = "primary" | "secondary" | "empty" | `scale-${number}`;
 
@@ -505,6 +508,85 @@ function scenarioFixture(scenario: HarnessScenario): ScenarioFixture {
       catalogsByToken: {
         [PRIMARY_TOKEN]: reviewedExclusionCatalog,
         [SECONDARY_TOKEN]: reviewedResyCatalog,
+      },
+      catalogFailureTokens: new Set(),
+    };
+  }
+  if (scenario === "approved_v3_products") {
+    const morganTitles = [
+      "$200 Airline Fee Credit",
+      "$219 CLEAR+ Credit",
+      "$300 Equinox Credit",
+      "$300 lululemon Credit",
+      "$400 Resy Credit",
+      "Digital Entertainment Credit",
+      "Hotel Credit",
+      "Saks Fifth Avenue Credit",
+      "Uber Cash",
+      "Walmart+ Credit",
+    ];
+    return {
+      member: {
+        accounts: [
+          {
+            account_token: PRIMARY_TOKEN,
+            relationship: "BASIC",
+            product: { description: "Morgan Stanley Platinum" },
+            display_account_number: "1234",
+          },
+          {
+            account_token: SECONDARY_TOKEN,
+            relationship: "BASIC",
+            product: { description: "Hilton Honors Card" },
+            display_account_number: "56789",
+          },
+          {
+            account_token: EMPTY_BENEFITS_TOKEN,
+            relationship: "BASIC",
+            product: { description: "Delta SkyMiles Gold Business Card" },
+            display_account_number: "9999",
+          },
+        ],
+      },
+      trackersByToken: {
+        [PRIMARY_TOKEN]: [{ trackers: morganTitles.map((benefitName, index) => ({
+          sorBenefitId: `invented-morgan-${index}`,
+          benefitName,
+          category: "usage",
+          status: "IN_PROGRESS",
+        })) }],
+        [SECONDARY_TOKEN]: [{ trackers: [{
+          sorBenefitId: "invented-hilton-spend",
+          benefitName: "Hilton Spend Requirement",
+          category: "spend",
+          status: "IN_PROGRESS",
+        }] }],
+        [EMPTY_BENEFITS_TOKEN]: [{ trackers: [
+          {
+            sorBenefitId: "invented-delta-stays",
+            benefitName: "$150 Delta Stays Credit",
+            category: "usage",
+            status: "IN_PROGRESS",
+          },
+          {
+            sorBenefitId: "invented-delta-flight-spend",
+            benefitName: "$200 Delta Flight Credit",
+            category: "spend",
+            status: "IN_PROGRESS",
+          },
+        ] }],
+      },
+      catalogsByToken: {
+        [PRIMARY_TOKEN]: { benefits: {} },
+        [SECONDARY_TOKEN]: { benefits: {} },
+        [EMPTY_BENEFITS_TOKEN]: { benefits: {
+          catalogOnly: {
+            sorBenefitId: "invented-delta-rideshare-catalog-only",
+            benefitTitle: "$120 Rideshare Credit",
+            layoutType: "NOTENROLLED",
+            isEnrollable: true,
+          },
+        } },
       },
       catalogFailureTokens: new Set(),
     };

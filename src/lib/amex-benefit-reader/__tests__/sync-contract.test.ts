@@ -1,11 +1,11 @@
-import type { StoreEnvelopeV1 } from "../contract";
+import type { NormalizedBenefitObservationV3, StoreEnvelopeV1 } from "../contract";
 import {
   AMEX_SYNC_MAX_BYTES,
   canonicalJson,
   digestAmexSyncEnvelope,
   isSyncEnvelopeFresh,
   parseAmexSyncEnvelope,
-  projectLatestV2SyncEnvelope,
+  projectLatestV3SyncEnvelope,
   type AmexSyncEnvelope,
 } from "../sync-contract";
 
@@ -15,8 +15,8 @@ const finishedAt = "2026-07-15T12:00:00.000Z";
 
 function envelope(): AmexSyncEnvelope {
   return parseAmexSyncEnvelope({
-    envelopeVersion: "amex-sync-envelope/1",
-    observationContractVersion: "amex-benefits/2",
+    envelopeVersion: "amex-sync-envelope/2",
+    observationContractVersion: "amex-benefits/3",
     scanId,
     scanFinishedAt: finishedAt,
     cards: [{
@@ -24,7 +24,7 @@ function envelope(): AmexSyncEnvelope {
       productKey: "american-express-platinum-card",
       endingDigits: "1234",
       observedAt: "2026-07-15T11:59:00.000Z",
-      parserVersion: "amex-api-us/2.0.2",
+      parserVersion: "amex-api-us/3.0.0",
       rows: [{
         creditFamilyKey: "american-express-platinum-card:resy",
         sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },
@@ -38,37 +38,35 @@ function envelope(): AmexSyncEnvelope {
   });
 }
 
-function v2Store(): StoreEnvelopeV1 {
-  const observation = {
-    contractVersion: "amex-benefits/2" as const,
-    issuer: "american_express_us" as const,
-    localCardId: cardId,
-    productName: "American Express Platinum Card",
-    productKey: "american-express-platinum-card" as const,
-    endingDigits: "1234",
-    observedAt: "2026-07-15T11:59:00.000Z",
-    parserVersion: "amex-api-us/2.0.2",
-    scanId,
-    completeness: "complete" as const,
+function benefit(
+  title = "$400 Resy Credit",
+  benefitKey = "benefit-1234567890abcdef",
+): NormalizedBenefitObservationV3 {
+  return {
+    benefitKey,
+    title,
+    category: { state: "observed", value: "usage" },
+    activityKind: "credit_usage",
+    enrollmentState: { state: "observed", value: "enrolled" },
+    trackerState: { state: "observed", value: "in_progress" },
+    completionState: { state: "observed", value: "incomplete" },
+    earnedOrUsed: { state: "observed", value: { value: "25.00", unit: "USD", currency: "USD" } },
+    targetOrLimit: { state: "observed", value: { value: "100.00", unit: "USD", currency: "USD" } },
+    remaining: { state: "observed", value: { value: "75.00", unit: "USD", currency: "USD" } },
+    period: { state: "observed", value: "Synthetic quarter" },
+    sourcePeriod: { state: "observed", value: {
+      kind: "calendar_date_range",
+      startDate: "2026-07-01",
+      endDate: "2026-09-30",
+      timeZone: "UTC",
+    } },
+    confidence: "high",
     issueCodes: [],
-    benefits: [{
-      benefitKey: "benefit-1234567890abcdef",
-      title: "Synthetic Resy credit",
-      category: { state: "observed" as const, value: "usage" },
-      activityKind: "spend_progress" as const,
-      enrollmentState: { state: "observed" as const, value: "enrolled" as const },
-      trackerState: { state: "observed" as const, value: "in_progress" as const },
-      completionState: { state: "observed" as const, value: "incomplete" as const },
-      earnedOrUsed: { state: "observed" as const, value: { value: "25.00", unit: "USD" as const, currency: "USD" as const } },
-      targetOrLimit: { state: "observed" as const, value: { value: "100.00", unit: "USD" as const, currency: "USD" as const } },
-      remaining: { state: "observed" as const, value: { value: "75.00", unit: "USD" as const, currency: "USD" as const } },
-      period: { state: "observed" as const, value: "Synthetic quarter" },
-      creditFamilyKey: "american-express-platinum-card:resy",
-      sourcePeriod: { state: "observed" as const, value: { kind: "calendar_date_range" as const, startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" as const } },
-      confidence: "high" as const,
-      issueCodes: [],
-    }],
   };
+}
+
+function v3Store(productName = "American Express Platinum Card"): StoreEnvelopeV1 {
+  const observedAt = "2026-07-15T11:59:00.000Z";
   return {
     schemaVersion: 1,
     revision: 1,
@@ -76,12 +74,24 @@ function v2Store(): StoreEnvelopeV1 {
     cards: {
       [cardId]: {
         localCardId: cardId,
-        identity: { sourceFingerprint: "a".repeat(64), productName: observation.productName, endingDigits: "1234" },
-        latest: observation,
+        identity: { sourceFingerprint: "a".repeat(64), productName, endingDigits: "1234" },
+        latest: {
+          contractVersion: "amex-benefits/3",
+          issuer: "american_express_us",
+          localCardId: cardId,
+          productName,
+          endingDigits: "1234",
+          observedAt,
+          parserVersion: "amex-api-us/3.0.0",
+          scanId,
+          completeness: "complete",
+          issueCodes: [],
+          benefits: [benefit()],
+        },
         freshness: "current",
         completeness: "complete",
-        observedAt: observation.observedAt,
-        lastAttemptAt: observation.observedAt,
+        observedAt,
+        lastAttemptAt: observedAt,
         error: null,
       },
     },
@@ -99,6 +109,26 @@ function v2Store(): StoreEnvelopeV1 {
   };
 }
 
+function addValidCard(store: StoreEnvelopeV1): void {
+  const secondId = "33333333-3333-4333-8333-333333333333";
+  const source = store.cards[cardId];
+  if (!source.latest || source.latest.contractVersion !== "amex-benefits/3") throw new Error("Expected V3 fixture.");
+  store.cards[secondId] = {
+    ...source,
+    localCardId: secondId,
+    identity: { ...source.identity, sourceFingerprint: "b".repeat(64), endingDigits: "5678" },
+    latest: {
+      ...source.latest,
+      localCardId: secondId,
+      endingDigits: "5678",
+      benefits: [benefit("$300 lululemon Credit", "benefit-fedcba0987654321")],
+    },
+  };
+  store.lastScan!.discoveredCardCount = 2;
+  store.lastScan!.attemptedCardCount = 2;
+  store.lastScan!.cards.push({ localCardId: secondId, result: "complete", issueCode: null });
+}
+
 describe("Amex sync transport contract", () => {
   it("canonicalizes keys and produces a stable envelope digest", async () => {
     const value = envelope();
@@ -107,29 +137,87 @@ describe("Amex sync transport contract", () => {
     await expect(digestAmexSyncEnvelope({ ...value })).resolves.toBe(await digestAmexSyncEnvelope(value));
   });
 
-  it("rejects unknown, forbidden, duplicate-card, and oversized transport", () => {
+  it("requires V2 transport over V3 observations and rejects forbidden or invalid transport", () => {
     const value = envelope();
+    expect(value).toMatchObject({
+      envelopeVersion: "amex-sync-envelope/2",
+      observationContractVersion: "amex-benefits/3",
+    });
     expect(() => parseAmexSyncEnvelope({ ...value, sourceFingerprint: "a".repeat(64) })).toThrow("forbidden field");
     expect(() => parseAmexSyncEnvelope({ ...value, extra: true })).toThrow();
+    expect(() => parseAmexSyncEnvelope({ ...value, envelopeVersion: "amex-sync-envelope/1" })).toThrow();
+    expect(() => parseAmexSyncEnvelope({ ...value, observationContractVersion: "amex-benefits/2" })).toThrow();
     expect(() => parseAmexSyncEnvelope({ ...value, cards: [value.cards[0], value.cards[0]] })).toThrow("unique");
     expect(() => parseAmexSyncEnvelope({
       ...value,
       cards: [{ ...value.cards[0], observedAt: "2026-07-15T12:00:00.001Z" }],
     })).toThrow("newer than its completed scan");
+    expect(() => parseAmexSyncEnvelope({
+      ...value,
+      cards: [{ ...value.cards[0], parserVersion: "amex-api-us/2.0.2" }],
+    })).toThrow();
     const huge = { ...value, cards: [{ ...value.cards[0], parserVersion: "x".repeat(AMEX_SYNC_MAX_BYTES) }] };
     expect(() => parseAmexSyncEnvelope(huge)).toThrow();
   });
 
-  it("projects only the latest complete current-parser V2 scan and never upgrades older data", () => {
-    const projected = projectLatestV2SyncEnvelope(v2Store());
+  it("projects destination authority only from exact approved product-title pairs", () => {
+    const projected = projectLatestV3SyncEnvelope(v3Store());
     expect(projected.reason).toBe("ready");
     expect(projected.envelope?.cards[0]).toMatchObject({
       sourceLocalCardId: cardId,
       productKey: "american-express-platinum-card",
+      parserVersion: "amex-api-us/3.0.0",
       rows: [{ creditFamilyKey: "american-express-platinum-card:resy" }],
     });
 
-    const v1 = v2Store();
+    for (const [productName, title] of [
+      ["Morgan Stanley Platinum", "$400 Resy Credit"],
+      ["Hilton Honors Card", "$400 Resy Credit"],
+      ["Delta SkyMiles Gold Business Card", "$150 Delta Stays Credit"],
+      ["American Express Platinum Card Extra", "$400 Resy Credit"],
+      ["American Express Platinum Card", "$401 Resy Credit"],
+      ["American Express Platinum Card", "$219 CLEAR+ Credit"],
+      ["American Express Platinum Card", "$300 Equinox Credit"],
+      ["American Express Platinum Card", "$200 Airline Fee Credit"],
+    ]) {
+      const store = v3Store(productName);
+      const latest = store.cards[cardId].latest;
+      if (!latest || latest.contractVersion !== "amex-benefits/3") throw new Error("Expected V3 fixture.");
+      latest.benefits = [benefit(title)];
+      expect(projectLatestV3SyncEnvelope(store)).toEqual({ envelope: null, reason: "no_complete_cards" });
+    }
+  });
+
+  it("excludes the whole source card when exact titles collide on one destination family", () => {
+    const store = v3Store();
+    addValidCard(store);
+    const latest = store.cards[cardId].latest;
+    if (!latest || latest.contractVersion !== "amex-benefits/3") throw new Error("Expected V3 fixture.");
+    latest.benefits = [
+      benefit("Resy Credit", "benefit-aaaaaaaaaaaaaaaa"),
+      benefit("$400 Resy Credit", "benefit-bbbbbbbbbbbbbbbb"),
+    ];
+
+    const projected = projectLatestV3SyncEnvelope(store);
+    expect(projected.reason).toBe("ready");
+    expect(projected.envelope?.cards.map((card) => card.sourceLocalCardId)).toEqual([
+      "33333333-3333-4333-8333-333333333333",
+    ]);
+    expect(projected.envelope?.exclusions).toContainEqual({ reason: "source_mapping_ambiguous", count: 2 });
+  });
+
+  it("requires the latest complete current-parser successful V3 scan", () => {
+    const partial = v3Store();
+    partial.cards[cardId].completeness = "partial";
+    partial.cards[cardId].latest!.completeness = "partial";
+    expect(projectLatestV3SyncEnvelope(partial)).toEqual({ envelope: null, reason: "no_complete_cards" });
+
+    const older = v3Store();
+    if (older.cards[cardId].latest?.contractVersion !== "amex-benefits/3") throw new Error("Expected V3 fixture.");
+    older.cards[cardId].latest.scanId = "44444444-4444-4444-8444-444444444444";
+    expect(projectLatestV3SyncEnvelope(older)).toEqual({ envelope: null, reason: "no_complete_cards" });
+
+    const v1 = v3Store();
     const latest = v1.cards[cardId].latest!;
     v1.cards[cardId].latest = {
       contractVersion: "amex-benefits/1",
@@ -143,48 +231,11 @@ describe("Amex sync transport contract", () => {
       issueCodes: latest.issueCodes,
       benefits: [],
     };
-    expect(projectLatestV2SyncEnvelope(v1)).toEqual({ envelope: null, reason: "no_complete_cards" });
+    expect(projectLatestV3SyncEnvelope(v1)).toEqual({ envelope: null, reason: "no_complete_cards" });
 
-    const outdated = v2Store();
-    outdated.cards[cardId].latest!.parserVersion = "amex-api-us/2.0.1";
-    expect(projectLatestV2SyncEnvelope(outdated)).toEqual({ envelope: null, reason: "no_complete_cards" });
-    expect(() => parseAmexSyncEnvelope({
-      ...envelope(),
-      cards: [{ ...envelope().cards[0], parserVersion: "amex-api-us/2.0.1" }],
-    })).toThrow();
-  });
-
-  it("reapplies supported-credit retention before sync projection without relaxing complete-card gates", () => {
-    const store = v2Store();
-    const latest = store.cards[cardId].latest;
-    if (!latest || latest.contractVersion !== "amex-benefits/2") throw new Error("Expected a V2 fixture.");
-    const retained = latest.benefits[0];
-    latest.benefits = [
-      retained,
-      {
-        ...retained,
-        benefitKey: "benefit-spend-1234567890abcdef",
-        title: "Resy Dining Credit",
-        category: { state: "observed", value: "spend" },
-      },
-      {
-        ...retained,
-        benefitKey: "benefit-profile-1234567890abcdef",
-        title: "Link Your Resy Profile",
-      },
-    ];
-
-    const projected = projectLatestV2SyncEnvelope(store);
-    expect(projected.reason).toBe("ready");
-    expect(projected.envelope?.cards[0].rows).toEqual([
-      expect.objectContaining({ creditFamilyKey: "american-express-platinum-card:resy" }),
-    ]);
-
-    latest.completeness = "partial";
-    latest.issueCodes = ["benefit_identity_conflict"];
-    store.cards[cardId].completeness = "partial";
-    store.lastScan!.cards[0] = { localCardId: cardId, result: "partial", issueCode: "benefit_identity_conflict" };
-    expect(projectLatestV2SyncEnvelope(store)).toEqual({ envelope: null, reason: "no_complete_cards" });
+    const noSummary = v3Store();
+    noSummary.lastScan = null;
+    expect(projectLatestV3SyncEnvelope(noSummary)).toEqual({ envelope: null, reason: "fresh_v3_scan_required" });
   });
 
   it("uses the injected time for the exact 30-minute freshness boundary", () => {
