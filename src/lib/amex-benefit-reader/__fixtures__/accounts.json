@@ -1,0 +1,43 @@
+{
+  "accounts": [
+    {
+      "account_token": "invented-primary-token-a",
+      "product": { "description": "Synthetic Rewards Card" },
+      "account": {
+        "relationship": "BASIC",
+        "display_account_number": "ending 12345",
+        "unrelated_nested_field": "discard-me"
+      },
+      "supplementary_accounts": [
+        {
+          "account_token": "invented-supp-token-b",
+          "product": { "description": "Synthetic Rewards Card" },
+          "account": {
+            "relationship": "SUPP",
+            "display_account_number": "ending 54321"
+          }
+        }
+      ]
+    },
+    {
+      "account_token": "invented-primary-token-c",
+      "product": { "product_description": "Synthetic Rewards Card" },
+      "account": {
+        "relationship": "BASIC",
+        "display_account_number": "9876"
+      }
+    },
+    {
+      "account_token": "invented-unknown-token",
+      "relationship": "OTHER",
+      "product": { "description": "Uncharacterized Account" },
+      "display_account_number": "1111"
+    },
+    {
+      "account_token": "invented-long-number-token",
+      "relationship": "BASIC",
+      "product": { "description": "Unsafe Number Fixture" },
+      "account_number": "4111111111111111"
+    }
+  ]
+}

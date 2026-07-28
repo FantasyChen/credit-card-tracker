@@ -1,0 +1,17 @@
+[
+  {
+    "trackers": [
+      {
+        "sorBenefitId": "invented-unknown-status-id",
+        "benefitName": "Synthetic Adobe Credit",
+        "category": "usage",
+        "status": "FUTURE_STATUS",
+        "tracker": {
+          "spentAmount": "not-a-decimal",
+          "targetAmount": "10",
+          "targetUnit": "FUTURE_UNIT"
+        }
+      }
+    ]
+  }
+]

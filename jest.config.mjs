@@ -26,6 +26,7 @@ const config = {
     '^@/generated/prisma$': '<rootDir>/src/generated/prisma', 
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'], // if you have a setup file
+  testPathIgnorePatterns: ['<rootDir>/tests/e2e/'],
   // Adjusted transformIgnorePatterns for ESM modules
   transformIgnorePatterns: [
     '/node_modules/(?!(@auth/prisma-adapter|next-auth|@prisma/client|@vercel/analytics))/', // Transform these specific ESM packages

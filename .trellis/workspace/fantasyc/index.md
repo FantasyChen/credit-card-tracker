@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 0
-- **Last Active**: -
+- **Total Sessions**: 7
+- **Last Active**: 2026-07-27
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~0 | Active |
+| `journal-1.md` | ~252 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,13 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 7 | 2026-07-27 | Make AMEX observations product-independent | `05cc4f8`, `3b87f17` | `feat/amex-benefit-reader-phase-1` |
+| 6 | 2026-07-27 | Complete AMEX BenefitSync integration review | `fadce9f`, `339581b`, `0e0d114` | `feat/amex-benefit-reader-phase-1` |
+| 5 | 2026-07-26 | Implement reviewed AMEX benefit synchronization | `02204a6`, `0ca2c4a`, `2d2dc96`, `64a14c1`, `04d83aa` | `feat/amex-benefit-reader-phase-1` |
+| 4 | 2026-07-26 | Refine AMEX pre-sync benefit review | `6697fc6`, `79c51d7`, `ad26634` | `feat/amex-benefit-reader-phase-1` |
+| 3 | 2026-07-21 | Complete site-wide Amex reader rollout | `8d277ee`, `645e6ef`, `e512dd1` | `feat/amex-benefit-reader-phase-1` |
+| 2 | 2026-07-19 | Improve Amex reader quality and browser E2E | `1c7716e`, `ec05855`, `17fb09f`, `acd464f`, `93e6ae2` | `feat/amex-benefit-reader-phase-1` |
+| 1 | 2026-07-15 | Initialize Trellis and bootstrap specs | `30e080a` | `main` |
 <!-- @@@/auto:session-history -->
 
 ---

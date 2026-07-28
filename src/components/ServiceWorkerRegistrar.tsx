@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 
 export default function ServiceWorkerRegistrar() {
+  const pathname = usePathname();
+
   useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
+    if (pathname === '/integrations/amex-sync' || !('serviceWorker' in navigator)) return;
 
     if (process.env.NODE_ENV !== 'production') {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -26,7 +29,7 @@ export default function ServiceWorkerRegistrar() {
 
     window.addEventListener('load', register, { once: true });
     return () => window.removeEventListener('load', register);
-  }, []);
+  }, [pathname]);
 
   return null;
 }

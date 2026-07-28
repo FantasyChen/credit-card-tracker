@@ -1,0 +1,8 @@
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Apply the repository's mutation/security test shape and avoid unsafe general build commands during verification."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Run the required lint, type, test, accessibility, and diff-quality checks for the new modules and side panel."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Verify strict parsing of Amex DOM and Tampermonkey storage, explicit unknown states, and no unsafe boundary assumptions."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check semantic controls, keyboard behavior, aria-live progress, and Shadow-DOM panel accessibility."}
+{"file":".trellis/tasks/07-15-amex-card-benefit-sync/amex-research.md","reason":"Confirm owner-only validation remains redacted and limited to trackable benefit data without persisting live payloads."}
+{"file":".trellis/tasks/07-15-amex-card-benefit-sync/research/amex-assistant-reference-architecture.md","reason":"Compare endpoint and normalization behavior against the pinned public reference while rejecting its mutation and inferred-value behavior."}
+{"file":".trellis/tasks/07-15-amex-card-benefit-sync/research/amex-assistant-permissions-privacy-security.md","reason":"Verify exact first-party read requests, browser-attached credentials, scan-scoped raw responses, no raw persistence, and no write/third-party endpoint."}
+{"file":".trellis/tasks/07-15-amex-card-benefit-sync/research/amex-private-read-contract.md","reason":"Audit exact request tuples, strict minimal response parsing, mutation denylist, retry/timeout behavior, and unresolved public-contract gaps."}

@@ -106,6 +106,7 @@ describe('buildBenefitDashboardProjection', () => {
     productChangedFrom: null,
     productChangedTo: null,
     lifecycleNotes: null,
+    productKey: null,
   };
 
   function rawStatus(
@@ -148,6 +149,9 @@ describe('buildBenefitDashboardProjection', () => {
         fixedCycleStartMonth: null,
         occurrencesInCycle: 1,
         ...benefitOverrides,
+        productKey: benefitOverrides.productKey ?? null,
+        creditFamilyKey: benefitOverrides.creditFamilyKey ?? null,
+        periodKey: benefitOverrides.periodKey ?? null,
         creditCard: (hasCreditCardOverride ? benefitOverrides.creditCard : card) as never,
       },
     };

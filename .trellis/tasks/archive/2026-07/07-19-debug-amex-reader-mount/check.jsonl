@@ -1,0 +1,5 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Check that mount broadening does not weaken manual start, exact reads, transient raw-data handling, visible-context safety, or fail-closed E2E routing."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check launcher and collapse controls for semantic buttons, accessible names/state, focus behavior, and reachable scan/cancel actions."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check behavior-oriented unit coverage, accessibility assertions, strict TypeScript, targeted lint, and truthful baseline reporting."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Select safe static/browser checks and prevent production build, database, deployment, or unapproved live-provider effects."}
+{"file":".trellis/tasks/archive/2026-07/07-15-amex-card-benefit-sync/amex-research.md","reason":"Check the final diff and validation against the established sanitized live-browser and no-sensitive-data boundary."}
