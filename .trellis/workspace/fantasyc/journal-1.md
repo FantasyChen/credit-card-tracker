@@ -250,3 +250,37 @@ Reviewed live AMEX benefit gaps, replaced local product-gated normalization with
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: Complete and deploy AMEX sync reconciliation
+
+**Date**: 2026-07-28
+**Task**: Complete and deploy AMEX sync reconciliation
+**Branch**: `chore/archive-complete-amex-sync-reconciliation`
+
+### Summary
+
+Completed authoritative AMEX card and benefit reconciliation, exact-last-five matching, transaction-safe status updates, protected card-edit preview refresh, safe operator tooling, production userscript 0.5.1, full review, PR #8 merge, and verified Vercel production deployment with sync still fail-closed.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a035b7a` | (see git log) |
+| `9f5dc22` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
