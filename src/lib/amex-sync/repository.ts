@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import type {
   AmexSyncDestinationContext,
   AmexSyncPlanRow,
-  ManualCardSelection,
   StatusStateProjection,
 } from "./authority";
 
@@ -66,29 +65,23 @@ interface RawDestinationCard {
   userId: string;
   name: string;
   nickname: string | null;
+  issuer: string;
   productKey: string | null;
   lastFourDigits: string | null;
   lifecycleStatus: "ACTIVE" | "CLOSED" | "PRODUCT_CHANGED";
   benefits: RawDestinationBenefit[];
 }
 
-interface RawMapping {
-  sourceLocalCardId: string;
-  sourceProductKey: string;
-  creditCardId: string;
-  inactiveAt: Date | null;
-}
-
 export async function loadAmexSyncDestinationContext(userId: string): Promise<AmexSyncDestinationContext> {
   const db = client();
-  const [rawCards, rawMappings] = await Promise.all([
-    db.creditCard.findMany({
+  const rawCards = await db.creditCard.findMany({
       where: { userId },
       select: {
         id: true,
         userId: true,
         name: true,
         nickname: true,
+        issuer: true,
         productKey: true,
         lastFourDigits: true,
         lifecycleStatus: true,
@@ -127,19 +120,8 @@ export async function loadAmexSyncDestinationContext(userId: string): Promise<Am
           },
         },
       },
-    }),
-    db.externalCardMapping.findMany({
-      where: { userId, source: "AMEX" },
-      select: {
-        sourceLocalCardId: true,
-        sourceProductKey: true,
-        creditCardId: true,
-        inactiveAt: true,
-      },
-    }),
-  ]);
+    });
   const cards = rawCards as unknown as RawDestinationCard[];
-  const mappings = rawMappings as unknown as RawMapping[];
   return {
     cards: cards.map((card) => ({
       ...card,
@@ -152,7 +134,6 @@ export async function loadAmexSyncDestinationContext(userId: string): Promise<Am
         })),
       })),
     })),
-    savedMappings: mappings,
   };
 }
 
@@ -198,66 +179,6 @@ export async function createAmexSyncAttempt(input: {
     },
     select: { id: true },
   }) as Promise<{ id: string }>;
-}
-
-export async function saveConfirmedManualMappings(input: {
-  userId: string;
-  selections: ManualCardSelection[];
-  productKeyBySourceCard: ReadonlyMap<string, string>;
-  endingBySourceCard: ReadonlyMap<string, string>;
-}): Promise<void> {
-  if (!input.selections.length) return;
-  await client().$transaction(async (transaction) => {
-    for (const selection of input.selections) {
-      const sourceProductKey = input.productKeyBySourceCard.get(selection.sourceLocalCardId);
-      if (!sourceProductKey) continue;
-      const destinationCard = await transaction.creditCard.findUnique({
-        where: { id: selection.destinationCardId },
-        select: {
-          id: true,
-          userId: true,
-          productKey: true,
-          lifecycleStatus: true,
-        },
-      }) as {
-        id: string;
-        userId: string;
-        productKey: string | null;
-        lifecycleStatus: "ACTIVE" | "CLOSED" | "PRODUCT_CHANGED";
-      } | null;
-      if (!destinationCard
-        || destinationCard.userId !== input.userId
-        || destinationCard.lifecycleStatus !== "ACTIVE"
-        || destinationCard.productKey !== sourceProductKey) {
-        throw new Error("conflict_repreview_required");
-      }
-      await transaction.externalCardMapping.upsert({
-        where: {
-          userId_source_sourceLocalCardId: {
-            userId: input.userId,
-            source: "AMEX",
-            sourceLocalCardId: selection.sourceLocalCardId,
-          },
-        },
-        create: {
-          userId: input.userId,
-          source: "AMEX",
-          sourceLocalCardId: selection.sourceLocalCardId,
-          creditCardId: selection.destinationCardId,
-          sourceProductKey,
-          endingSnapshot: input.endingBySourceCard.get(selection.sourceLocalCardId) ?? null,
-          kind: "MANUAL_CONFIRMED",
-        },
-        update: {
-          creditCardId: selection.destinationCardId,
-          sourceProductKey,
-          endingSnapshot: input.endingBySourceCard.get(selection.sourceLocalCardId) ?? null,
-          kind: "MANUAL_CONFIRMED",
-          inactiveAt: null,
-        },
-      });
-    }
-  }, { isolationLevel: "Serializable" });
 }
 
 export async function deactivateAmexCardMapping(input: {
@@ -389,7 +310,9 @@ interface TransactionalDestinationStatus {
     creditCard: {
       id: string;
       userId: string;
+      issuer: string;
       productKey: string | null;
+      lastFourDigits: string | null;
       lifecycleStatus: "ACTIVE" | "CLOSED" | "PRODUCT_CHANGED";
     } | null;
   };
@@ -468,7 +391,9 @@ async function loadAuthorizedDestinationStatus(
             select: {
               id: true,
               userId: true,
+              issuer: true,
               productKey: true,
+              lastFourDigits: true,
               lifecycleStatus: true,
             },
           },
@@ -489,8 +414,11 @@ async function loadAuthorizedDestinationStatus(
     || !status.benefit.creditCard
     || status.benefit.creditCard.id !== row.destinationCardId
     || status.benefit.creditCard.userId !== userId
+    || status.benefit.creditCard.issuer !== "American Express"
     || status.benefit.creditCard.lifecycleStatus !== "ACTIVE"
-    || status.benefit.creditCard.productKey !== row.productKey) return null;
+    || status.benefit.creditCard.productKey !== row.productKey
+    || !/^\d{5}$/.test(status.benefit.creditCard.lastFourDigits ?? "")
+    || status.benefit.creditCard.lastFourDigits !== row.sourceEndingDigits) return null;
   return status;
 }
 
@@ -579,7 +507,7 @@ export async function applyAmexSyncRow(input: {
     if (existingAudit && existingAudit.disposition !== "FAILED") return existingAudit;
 
     const currentStatus = await loadAuthorizedDestinationStatus(transaction, userId, row);
-    if (!stateMatchesProjection(currentStatus, userId, before)) {
+    if (!currentStatus || !stateMatchesProjection(currentStatus, userId, before)) {
       throw new Error("conflict_repreview_required");
     }
     await assertAmexProvenanceCanAdvance(transaction, row);
@@ -589,8 +517,8 @@ export async function applyAmexSyncRow(input: {
         id: row.destinationStatusId,
         userId,
         benefitId: row.destinationBenefitId,
-        cycleStartDate: new Date(`${row.sourcePeriodStartDate}T00:00:00.000Z`),
-        cycleEndDate: new Date(`${row.sourcePeriodEndDate}T00:00:00.000Z`),
+        cycleStartDate: currentStatus.cycleStartDate,
+        cycleEndDate: currentStatus.cycleEndDate,
         occurrenceIndex: 0,
         usedAmount: before.usedAmount,
         isCompleted: before.isCompleted,
@@ -618,6 +546,101 @@ export async function applyAmexSyncRow(input: {
       await transaction.amexSyncRowAudit.create({ data: successfulAudit });
     }
     return { sourceRowIdentity: row.sourceRowIdentity, disposition: "UPDATED", reasonCode: row.reason };
+  }, { isolationLevel: "Serializable" });
+}
+
+export async function applyAmexSyncGroup(input: {
+  attemptId: string;
+  userId: string;
+  rows: AmexSyncPlanRow[];
+}): Promise<StoredRowResult[]> {
+  const { attemptId, userId, rows } = input;
+  if (rows.length < 2
+    || new Set(rows.map((row) => row.atomicGroupIdentity)).size !== 1
+    || rows.some((row) => (row.disposition !== "proposed"
+      && !(row.disposition === "unchanged" && row.reason === "already_current"))
+      || !row.destinationStatusId
+      || !row.destinationCardId
+      || !row.destinationBenefitId
+      || !row.before
+      || !row.after
+      || !row.periodKey
+      || !row.sourcePeriodStartDate
+      || !row.sourcePeriodEndDate)) {
+    throw new Error("An applied sync group is incomplete.");
+  }
+
+  return client().$transaction(async (transaction) => {
+    const existingAudits: Array<StoredRowResult | null> = [];
+    for (const row of rows) {
+      existingAudits.push(await transaction.amexSyncRowAudit.findUnique({
+        where: { attemptId_sourceRowIdentity: { attemptId, sourceRowIdentity: row.sourceRowIdentity } },
+        select: { sourceRowIdentity: true, disposition: true, reasonCode: true },
+      }) as StoredRowResult | null);
+    }
+    const successfulExisting = existingAudits.filter((audit) => audit && audit.disposition !== "FAILED") as StoredRowResult[];
+    if (successfulExisting.length) {
+      if (successfulExisting.length === rows.length) return successfulExisting;
+      throw new Error("conflict_repreview_required");
+    }
+
+    const currentStatuses: TransactionalDestinationStatus[] = [];
+    for (const row of rows) {
+      const currentStatus = await loadAuthorizedDestinationStatus(transaction, userId, row);
+      if (!currentStatus || !stateMatchesProjection(currentStatus, userId, row.before!)) {
+        throw new Error("conflict_repreview_required");
+      }
+      currentStatuses.push(currentStatus);
+      await assertAmexProvenanceCanAdvance(transaction, row);
+    }
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
+      if (row.disposition !== "proposed") continue;
+      const before = row.before!;
+      const after = row.after!;
+      const currentStatus = currentStatuses[index];
+      const update = await transaction.benefitStatus.updateMany({
+        where: {
+          id: row.destinationStatusId,
+          userId,
+          benefitId: row.destinationBenefitId,
+          cycleStartDate: currentStatus.cycleStartDate,
+          cycleEndDate: currentStatus.cycleEndDate,
+          occurrenceIndex: 0,
+          usedAmount: before.usedAmount,
+          isCompleted: before.isCompleted,
+          completedAt: before.completedAt ? new Date(before.completedAt) : null,
+          isNotUsable: before.isNotUsable,
+        },
+        data: {
+          usedAmount: after.usedAmount,
+          isCompleted: after.isCompleted,
+          completedAt: after.completedAt ? new Date(after.completedAt) : null,
+        },
+      });
+      if (update.count !== 1) throw new Error("conflict_repreview_required");
+    }
+
+    const results: StoredRowResult[] = [];
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
+      await transaction.benefitStatusSourceProvenance.upsert(
+        provenanceUpsertArgs(attemptId, row),
+      );
+      const disposition = row.disposition === "proposed" ? "UPDATED" : "UNCHANGED";
+      const data = auditData(attemptId, row, disposition, row.reason);
+      if (existingAudits[index]) {
+        await transaction.amexSyncRowAudit.update({
+          where: { attemptId_sourceRowIdentity: { attemptId, sourceRowIdentity: row.sourceRowIdentity } },
+          data,
+        });
+      } else {
+        await transaction.amexSyncRowAudit.create({ data });
+      }
+      results.push({ sourceRowIdentity: row.sourceRowIdentity, disposition, reasonCode: row.reason });
+    }
+    return results;
   }, { isolationLevel: "Serializable" });
 }
 

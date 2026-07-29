@@ -191,3 +191,43 @@ export function classifyCatalogKeyBackfill(
     conflicts,
   };
 }
+
+export interface CatalogBackfillWriter {
+  fillNullCardProductKey(cardId: string, productKey: string): Promise<boolean>;
+  fillNullBenefitKeys(input: CatalogBackfillProposal["benefits"][number]): Promise<boolean>;
+  materializeMissingStatuses(benefitId: string): Promise<number>;
+}
+
+export interface CatalogBackfillExecutionReport extends CatalogBackfillDryRun {
+  mode: "dry-run" | "apply";
+  applied: { cards: number; benefits: number; statusesMaterialized: number };
+}
+
+/**
+ * Executes only a previously classifiable additive backfill. Dry-run is the
+ * default and cannot call a writer. Apply callers must provide compare-and-set
+ * ports that fill null keys only; existing status values are never accepted by
+ * this boundary and therefore cannot be reset.
+ */
+export async function executeCatalogKeyBackfill(input: {
+  cards: CatalogBackfillCardShape[];
+  templates: CatalogBackfillTemplateCardShape[];
+  mode?: "dry-run" | "apply";
+  writer?: CatalogBackfillWriter;
+}): Promise<CatalogBackfillExecutionReport> {
+  const dryRun = classifyCatalogKeyBackfill(input.cards, input.templates);
+  const mode = input.mode ?? "dry-run";
+  const applied = { cards: 0, benefits: 0, statusesMaterialized: 0 };
+  if (mode === "dry-run") return { ...dryRun, mode, applied };
+  if (!input.writer) throw new Error("Apply mode requires an authorized additive backfill writer.");
+
+  for (const proposal of dryRun.proposals) {
+    if (await input.writer.fillNullCardProductKey(proposal.cardId, proposal.productKey)) applied.cards += 1;
+    for (const benefit of proposal.benefits) {
+      if (!await input.writer.fillNullBenefitKeys(benefit)) continue;
+      applied.benefits += 1;
+      applied.statusesMaterialized += await input.writer.materializeMissingStatuses(benefit.benefitId);
+    }
+  }
+  return { ...dryRun, mode, applied };
+}

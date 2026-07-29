@@ -22,7 +22,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     const result = await confirmAmexSync({
       userId: session.user.id,
       envelope: parsed.envelope,
-      manualMappings: parsed.manualMappings,
       proposalToken: parsed.proposalToken,
       hmacKey: configuration.hmacKey,
     });

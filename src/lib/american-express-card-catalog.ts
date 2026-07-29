@@ -1,3 +1,9 @@
+import {
+  AMEX_CATALOG_IDENTITY_REGISTRY,
+  type AmexCatalogCardName,
+  type AmexSourceSemantics,
+} from "./amex-sync/catalog-registry";
+
 export type AmericanExpressCatalogFrequency = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY" | "ONE_TIME";
 export type AmericanExpressCatalogCycleAlignment = "CARD_ANNIVERSARY" | "CALENDAR_FIXED";
 
@@ -5,6 +11,8 @@ interface AmericanExpressCatalogBenefit {
   productKey?: string;
   creditFamilyKey?: string;
   periodKey?: string;
+  sourceSemantics?: AmexSourceSemantics;
+  sourceCreditKey?: string | null;
   category: string;
   description: string;
   percentage: number;
@@ -27,7 +35,7 @@ interface AmericanExpressCatalogCard {
 
 // Shared DB-free source for the website catalog and the browser-side Amex
 // supported-credit projection. Keep provider matching aliases outside this file.
-export const americanExpressCardCatalog = {
+const americanExpressCardCatalogBase = {
   "American Express Gold Card": {
       name: 'American Express Gold Card',
       issuer: 'American Express',
@@ -642,4 +650,41 @@ export const americanExpressCardCatalog = {
         },
       ],
     },
-} as const satisfies Record<string, AmericanExpressCatalogCard>;
+} as const satisfies Record<AmexCatalogCardName, AmericanExpressCatalogCard>;
+
+/**
+ * Public and persisted catalog projection with complete immutable AMEX identity.
+ * The positional registry is validated below so a catalog edit cannot silently
+ * create an unkeyed or unclassified destination row.
+ */
+export const americanExpressCardCatalog = Object.fromEntries(
+  Object.entries(americanExpressCardCatalogBase).map(([name, card]) => {
+    const identity = AMEX_CATALOG_IDENTITY_REGISTRY[name as AmexCatalogCardName];
+    if (!identity || identity.benefits.length !== card.benefits.length) {
+      throw new Error(`AMEX catalog identity registry is out of sync for ${name}.`);
+    }
+    return [name, {
+      ...card,
+      productKey: identity.productKey,
+      benefits: card.benefits.map((benefit, index) => ({
+        ...benefit,
+        productKey: identity.productKey,
+        creditFamilyKey: identity.benefits[index].creditFamilyKey,
+        periodKey: identity.benefits[index].periodKey,
+        sourceSemantics: identity.benefits[index].sourceSemantics,
+        sourceCreditKey: identity.benefits[index].sourceCreditKey,
+      })),
+    }];
+  }),
+) as {
+  [Name in keyof typeof americanExpressCardCatalogBase]: AmericanExpressCatalogCard & {
+    productKey: string;
+    benefits: Array<AmericanExpressCatalogBenefit & {
+      productKey: string;
+      creditFamilyKey: string;
+      periodKey: string;
+      sourceSemantics: AmexSourceSemantics;
+      sourceCreditKey: string | null;
+    }>;
+  };
+};

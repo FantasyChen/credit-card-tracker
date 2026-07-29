@@ -1,5 +1,11 @@
 import { z } from "zod";
 import {
+  AMEX_SYNC_HANDOFF_PATH,
+  PRODUCTION_AMEX_SYNC_HANDOFF_TARGET,
+  resolveAmexSyncHandoffTarget,
+  type AmexSyncHandoffTargetName,
+} from "./handoff-target";
+import {
   AMEX_SYNC_MAX_BYTES,
   amexSyncEnvelopeSchema,
   canonicalJson,
@@ -11,8 +17,8 @@ import {
 export const LEGACY_AMEX_SYNC_MAILBOX_KEY = "perksReminder.amexBenefitReader.syncMailbox.v1" as const;
 export const AMEX_SYNC_MAILBOX_KEY = "perksReminder.amexBenefitReader.syncMailbox.v2" as const;
 export const AMEX_SYNC_MAILBOX_VERSION = "amex-sync-mailbox/2" as const;
-export const AMEX_SYNC_HANDOFF_ORIGIN = "https://www.perks-reminder.com" as const;
-export const AMEX_SYNC_HANDOFF_PATH = "/integrations/amex-sync" as const;
+export const AMEX_SYNC_HANDOFF_ORIGIN = PRODUCTION_AMEX_SYNC_HANDOFF_TARGET.origin;
+export { AMEX_SYNC_HANDOFF_PATH };
 export const AMEX_SYNC_MAILBOX_TTL_MS = 10 * 60 * 1000;
 
 const opaqueIdSchema = z.string().regex(/^[a-f0-9]{32}$/);
@@ -70,9 +76,13 @@ export async function createAmexSyncMailbox(
   });
 }
 
-export function amexSyncHandoffUrl(transferId: string): string {
+export function amexSyncHandoffUrl(
+  transferId: string,
+  targetName: AmexSyncHandoffTargetName = "production",
+): string {
   const validated = opaqueIdSchema.parse(transferId);
-  return `${AMEX_SYNC_HANDOFF_ORIGIN}${AMEX_SYNC_HANDOFF_PATH}?transfer=${validated}`;
+  const target = resolveAmexSyncHandoffTarget(targetName);
+  return `${target.origin}${target.path}?transfer=${validated}`;
 }
 
 export async function storeAmexSyncMailbox(
