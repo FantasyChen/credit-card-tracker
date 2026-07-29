@@ -15,17 +15,21 @@ const finishedAt = "2026-07-15T12:00:00.000Z";
 
 function envelope(): AmexSyncEnvelope {
   return parseAmexSyncEnvelope({
-    envelopeVersion: "amex-sync-envelope/2",
+    envelopeVersion: "amex-sync-envelope/3",
     observationContractVersion: "amex-benefits/3",
     scanId,
     scanFinishedAt: finishedAt,
     cards: [{
       sourceLocalCardId: cardId,
+      providerProductName: "American Express Platinum Card",
       productKey: "american-express-platinum-card",
-      endingDigits: "1234",
+      endingDigits: "12345",
       observedAt: "2026-07-15T11:59:00.000Z",
       parserVersion: "amex-api-us/3.0.0",
       rows: [{
+        providerTitle: "Resy Credit",
+        providerCategory: "usage",
+        sourceCreditKey: "american-express-platinum-card:resy",
         creditFamilyKey: "american-express-platinum-card:resy",
         sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },
         enrollmentState: "enrolled",
@@ -74,13 +78,13 @@ function v3Store(productName = "American Express Platinum Card"): StoreEnvelopeV
     cards: {
       [cardId]: {
         localCardId: cardId,
-        identity: { sourceFingerprint: "a".repeat(64), productName, endingDigits: "1234" },
+        identity: { sourceFingerprint: "a".repeat(64), productName, endingDigits: "12345" },
         latest: {
           contractVersion: "amex-benefits/3",
           issuer: "american_express_us",
           localCardId: cardId,
           productName,
-          endingDigits: "1234",
+          endingDigits: "12345",
           observedAt,
           parserVersion: "amex-api-us/3.0.0",
           scanId,
@@ -109,26 +113,6 @@ function v3Store(productName = "American Express Platinum Card"): StoreEnvelopeV
   };
 }
 
-function addValidCard(store: StoreEnvelopeV1): void {
-  const secondId = "33333333-3333-4333-8333-333333333333";
-  const source = store.cards[cardId];
-  if (!source.latest || source.latest.contractVersion !== "amex-benefits/3") throw new Error("Expected V3 fixture.");
-  store.cards[secondId] = {
-    ...source,
-    localCardId: secondId,
-    identity: { ...source.identity, sourceFingerprint: "b".repeat(64), endingDigits: "5678" },
-    latest: {
-      ...source.latest,
-      localCardId: secondId,
-      endingDigits: "5678",
-      benefits: [benefit("$300 lululemon Credit", "benefit-fedcba0987654321")],
-    },
-  };
-  store.lastScan!.discoveredCardCount = 2;
-  store.lastScan!.attemptedCardCount = 2;
-  store.lastScan!.cards.push({ localCardId: secondId, result: "complete", issueCode: null });
-}
-
 describe("Amex sync transport contract", () => {
   it("canonicalizes keys and produces a stable envelope digest", async () => {
     const value = envelope();
@@ -137,10 +121,10 @@ describe("Amex sync transport contract", () => {
     await expect(digestAmexSyncEnvelope({ ...value })).resolves.toBe(await digestAmexSyncEnvelope(value));
   });
 
-  it("requires V2 transport over V3 observations and rejects forbidden or invalid transport", () => {
+  it("requires V3 transport over V3 observations and rejects forbidden or invalid transport", () => {
     const value = envelope();
     expect(value).toMatchObject({
-      envelopeVersion: "amex-sync-envelope/2",
+      envelopeVersion: "amex-sync-envelope/3",
       observationContractVersion: "amex-benefits/3",
     });
     expect(() => parseAmexSyncEnvelope({ ...value, sourceFingerprint: "a".repeat(64) })).toThrow("forbidden field");
@@ -171,14 +155,11 @@ describe("Amex sync transport contract", () => {
     });
 
     for (const [productName, title] of [
-      ["Morgan Stanley Platinum", "$400 Resy Credit"],
       ["Hilton Honors Card", "$400 Resy Credit"],
       ["Delta SkyMiles Gold Business Card", "$150 Delta Stays Credit"],
       ["American Express Platinum Card Extra", "$400 Resy Credit"],
-      ["American Express Platinum Card", "$401 Resy Credit"],
       ["American Express Platinum Card", "$219 CLEAR+ Credit"],
       ["American Express Platinum Card", "$300 Equinox Credit"],
-      ["American Express Platinum Card", "$200 Airline Fee Credit"],
     ]) {
       const store = v3Store(productName);
       const latest = store.cards[cardId].latest;
@@ -188,20 +169,25 @@ describe("Amex sync transport contract", () => {
     }
   });
 
-  it("excludes the whole source card when exact titles collide on one destination family", () => {
+  it("excludes colliding source benefits without suppressing another unambiguous benefit on the card", () => {
     const store = v3Store();
-    addValidCard(store);
     const latest = store.cards[cardId].latest;
     if (!latest || latest.contractVersion !== "amex-benefits/3") throw new Error("Expected V3 fixture.");
     latest.benefits = [
       benefit("Resy Credit", "benefit-aaaaaaaaaaaaaaaa"),
       benefit("$400 Resy Credit", "benefit-bbbbbbbbbbbbbbbb"),
+      benefit("$300 lululemon Credit", "benefit-cccccccccccccccc"),
     ];
 
     const projected = projectLatestV3SyncEnvelope(store);
     expect(projected.reason).toBe("ready");
-    expect(projected.envelope?.cards.map((card) => card.sourceLocalCardId)).toEqual([
-      "33333333-3333-4333-8333-333333333333",
+    expect(projected.envelope?.cards).toEqual([
+      expect.objectContaining({
+        sourceLocalCardId: cardId,
+        rows: [expect.objectContaining({
+          sourceCreditKey: "american-express-platinum-card:lululemon",
+        })],
+      }),
     ]);
     expect(projected.envelope?.exclusions).toContainEqual({ reason: "source_mapping_ambiguous", count: 2 });
   });

@@ -1,5 +1,6 @@
 import {
   classifyCatalogKeyBackfill,
+  executeCatalogKeyBackfill,
   type CatalogBackfillBenefitShape,
   type CatalogBackfillCardShape,
   type CatalogBackfillTemplateCardShape,
@@ -85,6 +86,24 @@ describe("catalog key backfill classifier", () => {
     } else {
       expect(result.proposals[0]?.benefits ?? []).toEqual([]);
     }
+  });
+
+  it("defaults to dry-run and requires explicit additive writer authority for apply", async () => {
+    const writer = {
+      fillNullCardProductKey: jest.fn().mockResolvedValue(true),
+      fillNullBenefitKeys: jest.fn().mockResolvedValue(true),
+      materializeMissingStatuses: jest.fn().mockResolvedValue(2),
+    };
+    await expect(executeCatalogKeyBackfill({ cards: [card()], templates: [template], writer })).resolves.toMatchObject({
+      mode: "dry-run",
+      applied: { cards: 0, benefits: 0, statusesMaterialized: 0 },
+    });
+    expect(writer.fillNullCardProductKey).not.toHaveBeenCalled();
+    await expect(executeCatalogKeyBackfill({ cards: [card()], templates: [template], mode: "apply" })).rejects.toThrow("authorized");
+    await expect(executeCatalogKeyBackfill({ cards: [card()], templates: [template], mode: "apply", writer })).resolves.toMatchObject({
+      mode: "apply",
+      applied: { cards: 1, benefits: 1, statusesMaterialized: 2 },
+    });
   });
 
   it("does not propose writes for records whose exact keys are already populated", () => {

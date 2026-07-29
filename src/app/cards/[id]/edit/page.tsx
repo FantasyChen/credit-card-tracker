@@ -152,7 +152,7 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
   const placeholder = isAmex ? "12345" : "1234";
   const label = isAmex ? "Last 5 Digits" : "Last 4 Digits";
   const helperText = isAmex
-    ? "Enter the last 5 digits from your AMEX card (4 digits also accepted)"
+    ? "Enter exactly 5 digits to enable AMEX sync; legacy 4-digit entries remain supported for display"
     : "Helps identify your specific card if you have multiple of the same type";
 
   return (
@@ -203,6 +203,7 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
                       <Tooltip content={helperText} />
                     </label>
                     <input
+                      id="lastFourDigits"
                       type="text"
                       name="lastFourDigits"
                       maxLength={maxLength}

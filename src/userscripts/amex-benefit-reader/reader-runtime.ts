@@ -1,4 +1,5 @@
 import { AmexApiClient } from "@/lib/amex-benefit-reader/amex-api-client";
+import type { AmexSyncHandoffTargetName } from "@/lib/amex-benefit-reader/handoff-target";
 import { AmexBenefitScanEngine, type ScanReporter } from "@/lib/amex-benefit-reader/scan-engine";
 import {
   amexSyncHandoffUrl,
@@ -22,7 +23,10 @@ function markMountedReaderVersion(version: string): void {
   document.getElementById(AMEX_READER_HOST_ID)?.setAttribute("data-reader-version", version);
 }
 
-export async function mountAmexBenefitReader(version: string): Promise<void> {
+export async function mountAmexBenefitReader(
+  version: string,
+  handoffTargetName: AmexSyncHandoffTargetName = "production",
+): Promise<void> {
   if (!isSupportedAmexOrigin() || document.getElementById(AMEX_READER_HOST_ID)) return;
 
   const initiallyCollapsed = !isPrimaryAmexBenefitsRoute();
@@ -53,7 +57,7 @@ export async function mountAmexBenefitReader(version: string): Promise<void> {
           const mailboxStorage = new TampermonkeyMailboxStorage();
           const mailbox = await createAmexSyncMailbox(projection.envelope);
           await storeAmexSyncMailbox(mailboxStorage, mailbox);
-          popup.location.replace(amexSyncHandoffUrl(mailbox.transferId));
+          popup.location.replace(amexSyncHandoffUrl(mailbox.transferId, handoffTargetName));
         } catch (error) {
           popup.close();
           throw error;

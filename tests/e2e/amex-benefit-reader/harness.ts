@@ -7,8 +7,10 @@ export const SYNTHETIC_AMEX_URL = "https://global.americanexpress.com/card-benef
 export const SYNTHETIC_AMEX_NON_BENEFITS_URL = "https://global.americanexpress.com/account-overview";
 export const SYNTHETIC_HANDOFF_TRANSFER_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 export const SYNTHETIC_HANDOFF_URL = `https://www.perks-reminder.com/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
+export const SYNTHETIC_LOCAL_HANDOFF_URL = `http://localhost:3000/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
 export type SyntheticAmexDocumentUrl = typeof SYNTHETIC_AMEX_URL | typeof SYNTHETIC_AMEX_NON_BENEFITS_URL;
-export type SyntheticDocumentUrl = SyntheticAmexDocumentUrl | typeof SYNTHETIC_HANDOFF_URL;
+export type SyntheticHandoffDocumentUrl = typeof SYNTHETIC_HANDOFF_URL | typeof SYNTHETIC_LOCAL_HANDOFF_URL;
+export type SyntheticDocumentUrl = SyntheticAmexDocumentUrl | SyntheticHandoffDocumentUrl;
 export const STORE_KEY = "perksReminder.amexBenefitReader.store.v1";
 export const IDENTITY_SECRET_KEY = "perksReminder.amexBenefitReader.identitySecret.v1";
 export const LEGACY_SYNC_MAILBOX_KEY = "perksReminder.amexBenefitReader.syncMailbox.v1";
@@ -23,6 +25,7 @@ const TRACKER_URL = "https://functions.americanexpress.com/ReadBestLoyaltyBenefi
 const CATALOG_URL = "https://functions.americanexpress.com/ReadLoyaltyBenefits.v2";
 const DENIED_PROBE_URL = "https://unapproved.invalid/blocked-by-synthetic-harness";
 const BUNDLE_PATH = resolve(process.cwd(), "build/amex-benefit-reader.user.js");
+const LOCAL_BUNDLE_PATH = resolve(process.cwd(), "public/local-development/amex-benefit-reader.local.user.js");
 
 const PRIMARY_TOKEN = "invented-e2e-primary-token";
 const SECONDARY_TOKEN = "invented-e2e-secondary-primary-token";
@@ -112,13 +115,32 @@ const syntheticHandoffDocument = `<!doctype html>
     <main><h1>Synthetic Perks Reminder handoff</h1></main>
     <script>
       const transferId = ${JSON.stringify(SYNTHETIC_HANDOFF_TRANSFER_ID)};
-      const announce = setInterval(() => {
-        window.postMessage({ type: "perks-reminder:amex-sync-ready", transferId }, window.location.origin);
-      }, 50);
+      let announcedFromMainWindow = false;
+      let announce = null;
+      window.addEventListener("amex-e2e-bundle-injected", () => {
+        const ready = { type: "perks-reminder:amex-sync-ready", transferId };
+        window.dispatchEvent(new MessageEvent("message", {
+          data: ready,
+          origin: window.location.origin,
+          source: null,
+        }));
+        window.dispatchEvent(new MessageEvent("message", {
+          data: ready,
+          origin: "https://unapproved.invalid",
+          source: window,
+        }));
+        window.setTimeout(() => {
+          announcedFromMainWindow = true;
+          document.body.dataset.readyAnnounced = "true";
+          window.postMessage(ready, window.location.origin);
+          announce = setInterval(() => window.postMessage(ready, window.location.origin), 50);
+        }, 50);
+      }, { once: true });
       window.addEventListener("message", (event) => {
         if (event.source !== window || event.origin !== window.location.origin) return;
         const payload = event.data;
         if (!payload || payload.type !== "perks-reminder:amex-sync-payload" || payload.transferId !== transferId) return;
+        if (!announcedFromMainWindow) document.body.dataset.prematurePayload = "true";
         window.__syntheticHandoffPayload = payload;
         history.replaceState(null, "", "/integrations/amex-sync");
         window.postMessage({
@@ -127,7 +149,7 @@ const syntheticHandoffDocument = `<!doctype html>
           nonce: payload.nonce,
         }, window.location.origin);
         document.body.dataset.handoffState = "accepted";
-        clearInterval(announce);
+        if (announce !== null) clearInterval(announce);
       });
     </script>
   </body>
@@ -137,6 +159,7 @@ const syntheticDocuments = new Map<SyntheticDocumentUrl, string>([
   [SYNTHETIC_AMEX_URL, syntheticBenefitsDocument],
   [SYNTHETIC_AMEX_NON_BENEFITS_URL, syntheticNonBenefitsDocument],
   [SYNTHETIC_HANDOFF_URL, syntheticHandoffDocument],
+  [SYNTHETIC_LOCAL_HANDOFF_URL, syntheticHandoffDocument],
 ]);
 
 const primaryTrackers = [{
@@ -714,7 +737,7 @@ export class SyntheticAmexHarness {
   private expectedDeniedProbeFailure = false;
   private verifiedDeniedProbeCount = 0;
   private expectedMainFrameNavigationUrl: SyntheticDocumentUrl | null = null;
-  private expectedHandoffHistoryCleanup = false;
+  private expectedHandoffHistoryCleanupOrigin: string | null = null;
   private currentDocumentUrl: SyntheticDocumentUrl = SYNTHETIC_AMEX_URL;
   private expectedConfirmation: string | null = null;
   private activeScanNumber = 0;
@@ -805,11 +828,11 @@ export class SyntheticAmexHarness {
         this.expectedMainFrameNavigationUrl = null;
         return;
       }
-      if (this.expectedHandoffHistoryCleanup
-        && url.origin === "https://www.perks-reminder.com"
+      if (this.expectedHandoffHistoryCleanupOrigin !== null
+        && url.origin === this.expectedHandoffHistoryCleanupOrigin
         && url.pathname === "/integrations/amex-sync"
         && url.search === "") {
-        this.expectedHandoffHistoryCleanup = false;
+        this.expectedHandoffHistoryCleanupOrigin = null;
         return;
       }
       this.runtimeErrors.push(`The main frame navigated unexpectedly to ${url.origin}${url.pathname}.`);
@@ -904,16 +927,25 @@ export class SyntheticAmexHarness {
     await Promise.all([this.injectBundle(), this.injectBundle()]);
   }
 
-  async openHandoffAndInject(mailbox: unknown): Promise<void> {
-    await access(BUNDLE_PATH);
+  async openHandoffAndInject(
+    mailbox: unknown,
+    target: "production" | "local" = "production",
+    documentTarget: "production" | "local" = target,
+  ): Promise<void> {
+    const bundlePath = target === "local" ? LOCAL_BUNDLE_PATH : BUNDLE_PATH;
+    const handoffUrl = documentTarget === "local" ? SYNTHETIC_LOCAL_HANDOFF_URL : SYNTHETIC_HANDOFF_URL;
+    await access(bundlePath);
     this.storage.set(SYNC_MAILBOX_KEY, clone(mailbox));
-    this.currentDocumentUrl = SYNTHETIC_HANDOFF_URL;
+    this.currentDocumentUrl = handoffUrl;
     await this.runExpectedNavigation(
-      SYNTHETIC_HANDOFF_URL,
-      () => this.page.goto(SYNTHETIC_HANDOFF_URL, { waitUntil: "domcontentloaded" }),
+      handoffUrl,
+      () => this.page.goto(handoffUrl, { waitUntil: "domcontentloaded" }),
     );
-    this.expectedHandoffHistoryCleanup = true;
-    await this.page.addScriptTag({ path: BUNDLE_PATH });
+    this.expectedHandoffHistoryCleanupOrigin = target === documentTarget
+      ? new URL(handoffUrl).origin
+      : null;
+    await this.page.addScriptTag({ path: bundlePath });
+    await this.page.evaluate(() => window.dispatchEvent(new Event("amex-e2e-bundle-injected")));
   }
 
   async reloadAndInject(): Promise<void> {
@@ -988,10 +1020,15 @@ export class SyntheticAmexHarness {
     assert.equal(this.expectedDeniedProbeConsoleError, false);
     assert.equal(this.expectedDeniedProbeFailure, false);
     assert.equal(this.expectedMainFrameNavigationUrl, null);
-    if (this.expectedHandoffHistoryCleanup && this.page.url() === "https://www.perks-reminder.com/integrations/amex-sync") {
-      this.expectedHandoffHistoryCleanup = false;
+    if (this.expectedHandoffHistoryCleanupOrigin !== null) {
+      const pageUrl = new URL(this.page.url());
+      if (pageUrl.origin === this.expectedHandoffHistoryCleanupOrigin
+        && pageUrl.pathname === "/integrations/amex-sync"
+        && pageUrl.search === "") {
+        this.expectedHandoffHistoryCleanupOrigin = null;
+      }
     }
-    assert.equal(this.expectedHandoffHistoryCleanup, false);
+    assert.equal(this.expectedHandoffHistoryCleanupOrigin, null);
     assert.equal(this.expectedConfirmation, null);
     assert.equal(this.operationRequests("blocked").length, this.verifiedDeniedProbeCount);
     const allowedByOperation = new Map<SafeRequestRecord["operation"], ReadonlySet<string>>([
@@ -1064,7 +1101,7 @@ export class SyntheticAmexHarness {
     const request = route.request();
     const url = request.url();
 
-    const syntheticDocument = syntheticDocuments.get(url as SyntheticAmexDocumentUrl);
+    const syntheticDocument = syntheticDocuments.get(url as SyntheticDocumentUrl);
     if (syntheticDocument && request.method() === "GET" && request.resourceType() === "document") {
       this.record(route, "document");
       await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: syntheticDocument });

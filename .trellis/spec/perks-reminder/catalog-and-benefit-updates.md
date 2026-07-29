@@ -5,6 +5,7 @@
 - Verify card terms against issuer terms and recent trustworthy community evidence. Record provenance where public surfaces depend on freshness.
 - Track cyclical value such as recurring credits and free nights. Exclude always-on lounge access, insurance, uncapped earning multipliers, elite status, and sign-up bonuses from recurring-benefit modeling unless product requirements explicitly change.
 - `src/lib/static-catalog.ts` is the DB-free public catalog source; `prisma/seed.ts` imports catalog data for persistence. Keep them aligned rather than maintaining competing catalogs.
+- AMEX catalog rows additionally follow [AMEX Sync Reconciliation](amex-sync-reconciliation.md): all 12 products and 56 benefit rows have stable destination identity and explicit source semantics, while only provider `usage` credits receive write authority.
 - `card-templates/` is the contributor intake format. Validate it with `npm run card-template:validate`.
 
 ## Existing-user contract

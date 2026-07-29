@@ -1,6 +1,7 @@
 import { parseAmexSyncEnvelope, type AmexSyncEnvelope } from "@/lib/amex-benefit-reader/sync-contract";
 import {
   periodKeyForExactRange,
+  periodKeysForExactRange,
   planAmexSync,
   planReviewedAmexCompensation,
   syncIdempotencyKey,
@@ -16,6 +17,9 @@ const now = new Date("2026-07-15T12:00:00.000Z");
 
 function source(overrides: Record<string, unknown> = {}): AmexSyncEnvelope {
   const baseRow = {
+    providerTitle: "Resy Credit",
+    providerCategory: "usage",
+    sourceCreditKey: "american-express-platinum-card:resy",
     creditFamilyKey: "american-express-platinum-card:resy",
     sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },
     enrollmentState: "enrolled",
@@ -25,14 +29,15 @@ function source(overrides: Record<string, unknown> = {}): AmexSyncEnvelope {
     ...overrides,
   };
   return parseAmexSyncEnvelope({
-    envelopeVersion: "amex-sync-envelope/2",
+    envelopeVersion: "amex-sync-envelope/3",
     observationContractVersion: "amex-benefits/3",
     scanId: "22222222-2222-4222-8222-222222222222",
     scanFinishedAt: now.toISOString(),
     cards: [{
       sourceLocalCardId: sourceCardId,
+      providerProductName: "American Express Platinum Card",
       productKey: "american-express-platinum-card",
-      endingDigits: "1234",
+      endingDigits: "12345",
       observedAt,
       parserVersion: "amex-api-us/3.0.0",
       rows: [baseRow],
@@ -52,6 +57,9 @@ function destination(options: {
   periodKey?: string | null;
   provenance?: { observedAt: Date; sourceObservationIdentity: string; sourceObservationDigest: string } | null;
   duplicateBenefit?: boolean;
+  ownerId?: string;
+  issuer?: string;
+  lifecycleStatus?: "ACTIVE" | "CLOSED" | "PRODUCT_CHANGED";
 } = {}): AmexSyncDestinationContext {
   const status = {
     id: statusId,
@@ -78,19 +86,19 @@ function destination(options: {
   return {
     cards: [{
       id: cardId,
-      userId,
-      displayName: "Synthetic Platinum ending 1234",
+      userId: options.ownerId ?? userId,
+      displayName: "Synthetic Platinum ending 12345",
+      issuer: options.issuer ?? "American Express",
       productKey: "american-express-platinum-card",
-      lastFourDigits: options.lastFour === undefined ? "1234" : options.lastFour,
-      lifecycleStatus: "ACTIVE",
+      lastFourDigits: options.lastFour === undefined ? "12345" : options.lastFour,
+      lifecycleStatus: options.lifecycleStatus ?? "ACTIVE",
       benefits: options.duplicateBenefit ? [benefit, { ...benefit, id: "benefit-2" }] : [benefit],
     }],
-    savedMappings: [],
   };
 }
 
-function plan(envelope = source(), context = destination(), manualMappings: Array<{ sourceLocalCardId: string; destinationCardId: string }> = []) {
-  return planAmexSync({ envelope, context, manualMappings, userId, now, transitionTime: now });
+function plan(envelope = source(), context = destination()) {
+  return planAmexSync({ envelope, context, userId, now, transitionTime: now });
 }
 
 describe("Amex sync authority", () => {
@@ -99,6 +107,17 @@ describe("Amex sync authority", () => {
     expect(periodKeyForExactRange("2026-07-01", "2026-09-30")).toBe("calendar-quarter-q3");
     expect(periodKeyForExactRange("2026-07-02", "2026-09-30")).toBeNull();
     expect(periodKeyForExactRange("2026-07-01", "2026-10-01")).toBeNull();
+  });
+
+  it("recognizes every closed calendar and anniversary period shape", () => {
+    expect(periodKeysForExactRange("2026-07-01", "2026-07-31")).toEqual(["calendar-month"]);
+    expect(periodKeysForExactRange("2026-12-01", "2026-12-31")).toEqual(expect.arrayContaining(["calendar-month", "calendar-month-december"]));
+    expect(periodKeysForExactRange("2026-04-01", "2026-06-30")).toEqual(expect.arrayContaining(["calendar-quarter", "calendar-quarter-q2", "card-anniversary-quarter"]));
+    expect(periodKeysForExactRange("2026-01-01", "2026-06-30")).toContain("calendar-half-h1");
+    expect(periodKeysForExactRange("2026-07-01", "2026-12-31")).toContain("calendar-half-h2");
+    expect(periodKeysForExactRange("2026-01-01", "2026-12-31")).toEqual(expect.arrayContaining(["calendar-year", "card-anniversary-year"]));
+    expect(periodKeysForExactRange("2026-02-15", "2026-05-14")).toContain("card-anniversary-quarter");
+    expect(periodKeysForExactRange("2026-02-15", "2027-02-14")).toContain("card-anniversary-year");
   });
 
   it("plans an absolute amount update without adding to the existing value", () => {
@@ -110,6 +129,103 @@ describe("Amex sync authority", () => {
       after: { usedAmount: 25, isCompleted: false },
       changes: { amountIncrease: true, amountDecrease: false },
     });
+  });
+
+  it("splits a Platinum December Uber aggregate into one atomic $15/$20 group", () => {
+    const decemberNow = new Date("2026-12-15T12:00:00.000Z");
+    const decemberEnvelope = source({
+      providerTitle: "Uber Cash",
+      sourceCreditKey: "american-express-platinum-card:uber-cash",
+      creditFamilyKey: "american-express-platinum-card:uber-cash",
+      sourcePeriod: { kind: "calendar_date_range", startDate: "2026-12-01", endDate: "2026-12-31", timeZone: "UTC" },
+      earnedOrUsed: { value: "30.00", unit: "USD", currency: "USD" },
+      completionState: null,
+    });
+    decemberEnvelope.scanFinishedAt = decemberNow.toISOString();
+    decemberEnvelope.cards[0].observedAt = "2026-12-15T11:59:00.000Z";
+    const decemberContext = destination();
+    const monthlyStatus = {
+      ...decemberContext.cards[0].benefits[0].statuses[0],
+      id: "status-monthly",
+      cycleStartDate: new Date("2026-12-01T00:00:00.000Z"),
+      cycleEndDate: new Date("2026-12-31T00:00:00.000Z"),
+    };
+    decemberContext.cards[0].benefits = [{
+      ...decemberContext.cards[0].benefits[0],
+      id: "benefit-monthly",
+      creditFamilyKey: "american-express-platinum-card:uber-cash",
+      periodKey: "calendar-month",
+      statuses: [monthlyStatus],
+    }, {
+      ...decemberContext.cards[0].benefits[0],
+      id: "benefit-december-bonus",
+      creditFamilyKey: "american-express-platinum-card:uber-cash-december-bonus",
+      periodKey: "calendar-month-december",
+      statuses: [{ ...monthlyStatus, id: "status-december-bonus" }],
+    }];
+
+    const split = planAmexSync({
+      envelope: decemberEnvelope,
+      context: decemberContext,
+      userId,
+      now: decemberNow,
+      transitionTime: decemberNow,
+    }).rows;
+    expect(split).toHaveLength(2);
+    expect(new Set(split.map((row) => row.atomicGroupIdentity))).toHaveProperty("size", 1);
+    expect(new Set(split.map((row) => row.sourceRowIdentity))).toHaveProperty("size", 2);
+    expect(split).toEqual([
+      expect.objectContaining({
+        creditFamilyKey: "american-express-platinum-card:uber-cash",
+        disposition: "proposed",
+        after: expect.objectContaining({ usedAmount: 15, isCompleted: true }),
+      }),
+      expect.objectContaining({
+        creditFamilyKey: "american-express-platinum-card:uber-cash-december-bonus",
+        disposition: "proposed",
+        after: expect.objectContaining({ usedAmount: 15, isCompleted: false }),
+      }),
+    ]);
+
+    decemberEnvelope.cards[0].rows[0].earnedOrUsed = { value: "35.01", unit: "USD", currency: "USD" };
+    expect(planAmexSync({
+      envelope: decemberEnvelope,
+      context: decemberContext,
+      userId,
+      now: decemberNow,
+      transitionTime: decemberNow,
+    }).rows).toEqual([
+      expect.objectContaining({ disposition: "skipped", reason: "amount_incompatible" }),
+      expect.objectContaining({ disposition: "skipped", reason: "amount_incompatible" }),
+    ]);
+  });
+
+  it("preserves each omitted authoritative field while applying the other", () => {
+    const amountOnly = plan(source({ completionState: null, earnedOrUsed: { value: "0", unit: "USD", currency: "USD" } }), destination({ usedAmount: 25, completed: true, completedAt: new Date("2026-07-10T00:00:00.000Z") })).rows[0];
+    expect(amountOnly.after).toMatchObject({ usedAmount: 0, isCompleted: true, completedAt: "2026-07-10T00:00:00.000Z" });
+    const completionOnly = plan(source({ completionState: "incomplete", earnedOrUsed: null }), destination({ usedAmount: 25, completed: true, completedAt: new Date("2026-07-10T00:00:00.000Z") })).rows[0];
+    expect(completionOnly.after).toMatchObject({ usedAmount: 25, isCompleted: false, completedAt: null });
+  });
+
+  it("rejects duplicate source-credit claims without suppressing another source benefit", () => {
+    const envelope = source();
+    const resy = envelope.cards[0].rows[0];
+    envelope.cards[0].rows = [
+      resy,
+      { ...resy, providerTitle: "$400 Resy Credit" },
+      {
+        ...resy,
+        providerTitle: "lululemon Credit",
+        sourceCreditKey: "american-express-platinum-card:lululemon",
+        creditFamilyKey: "american-express-platinum-card:lululemon",
+      },
+    ];
+
+    expect(plan(envelope).rows.map((row) => row.reason)).toEqual([
+      "source_mapping_ambiguous",
+      "source_mapping_ambiguous",
+      "destination_benefit_missing",
+    ]);
   });
 
   it("supports a newer refund decrease and conservative completion clearing", () => {
@@ -138,17 +254,20 @@ describe("Amex sync authority", () => {
   });
 
   it.each([
-    [{ creditFamilyKey: "american-express-platinum-card:saks" }, "credit_family_not_allowlisted"],
+    [{ creditFamilyKey: "american-express-platinum-card:saks" }, "source_evidence_mismatch"],
     [{ sourcePeriod: null }, "period_not_structured"],
     [{ enrollmentState: "required" }, "enrollment_required"],
-    [{ completionState: "complete", earnedOrUsed: { value: "10.00", unit: "USD", currency: "USD" } }, "completion_conflict"],
   ])("fails closed for source authority case %#", (overrides, reason) => {
     expect(plan(source(overrides)).rows[0]).toMatchObject({ disposition: "skipped", reason });
   });
 
-  it("requires one exact owned active card, benefit, and status", () => {
-    expect(plan(source(), destination({ lastFour: "9999" })).rows[0].reason).toBe("manual_mapping_required");
-    expect(plan(source(), destination({ lastFour: "9999" }), [{ sourceLocalCardId: sourceCardId, destinationCardId: cardId }]).rows[0].disposition).toBe("proposed");
+  it("requires one exact owned active card, benefit, and status without a manual bypass", () => {
+    expect(plan(source(), destination({ lastFour: "9999" })).rows[0].reason).toBe("destination_last_five_required");
+    expect(plan(source(), destination({ lastFour: "99999" })).rows[0].reason).toBe("destination_card_missing");
+    expect(plan(source(), destination({ ownerId: "other-user" })).rows[0].reason).toBe("destination_card_missing");
+    expect(plan(source(), destination({ issuer: "Other Issuer" })).rows[0].reason).toBe("destination_card_missing");
+    expect(plan(source(), destination({ lifecycleStatus: "CLOSED" })).rows[0].reason).toBe("destination_card_missing");
+    expect(plan(source(), destination({ productKey: "american-express-gold-card" })).rows[0].reason).toBe("destination_benefit_missing");
     expect(plan(source(), destination({ familyKey: null })).rows[0].reason).toBe("destination_benefit_missing");
     expect(plan(source(), destination({ duplicateBenefit: true })).rows[0].reason).toBe("destination_benefit_ambiguous");
     expect(plan(source(), destination({ notUsable: true })).rows[0].reason).toBe("destination_not_usable");

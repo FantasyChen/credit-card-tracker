@@ -103,7 +103,7 @@ const V3_SELECTION_COMPATIBILITY_KEY =
 const V3_SELECTION_COMPATIBILITY_VALUE = "v3-selection/1";
 ```
 
-Local provider observation and destination synchronization are separate boundaries:
+Local provider observation and destination synchronization are separate boundaries. The current writable boundary is specified in [AMEX Sync Reconciliation](amex-sync-reconciliation.md). The narrow matcher signature below records the historical envelope-V2 Platinum-only baseline; do not use it as the current envelope-V3 mapping or write-authority contract.
 
 ```ts
 function normalizeAmexSelectionText(value: string): string;
@@ -551,11 +551,13 @@ return projectSyncRow(benefit, mapping);
 
 Local-only rows remain visible but produce no envelope row. Browser mapping and server write authority are separate closed checks; neither uses fuzzy matching, amounts, cadence, endings, or product resemblance.
 
-## Scenario: reviewed observation handoff and confirmed AMEX synchronization
+## Historical scenario: envelope-V2 reviewed handoff and confirmed AMEX synchronization
+
+> **Superseded:** This section records the original Platinum-only `amex-sync-envelope/2` contract. The current production userscript `0.5.1`, envelope V3, full catalog identity, exact-last-five matching, status reconciliation, grouped persistence, and backfill contracts live in [AMEX Sync Reconciliation](amex-sync-reconciliation.md). Preserve the reusable privacy, authentication, proposal, provenance, idempotency, and audit principles below, but do not reintroduce V2 manual mappings or its narrow allowlist.
 
 ### 1. Scope / Trigger
 
-Use this contract when locally reviewed provider observations cross from a browser-session reader into an authenticated first-party preview and may later update durable benefit state. Scanning, local review, handoff, preview, and confirmation are separate explicit actions. Preview is read-only; only effective `write` mode plus a separate confirmation may persist.
+Use this historical contract to understand the original boundary through which locally reviewed provider observations crossed from a browser-session reader into an authenticated first-party preview and confirmed write.
 
 The initial writable policy is deliberately finite: product `american-express-platinum-card`, credit families `american-express-platinum-card:lululemon` and `american-express-platinum-card:resy`, a valid current structured UTC source range, and exactly one existing destination cycle/occurrence. Every broader or locally unmapped product/family, legacy V1/V2 record, invalid period, stale/partial/failed observation, duplicate-family projection, or ambiguous mapping remains review-only. Raw provider responses, browser-session material, source fingerprints, and installation secrets never cross the handoff.
 

@@ -8,16 +8,18 @@ These specifications are the durable project context for Perks Reminder, a Next.
 2. Read the [Frontend Engineering Specifications](../frontend/index.md) before changing App Router pages, Client Components, shared UI, hooks, browser state, frontend types, or UI tests.
 3. Read [Database and Data Safety](database-and-data-safety.md) before running any command that can connect to a database or changing Prisma schema, migrations, seed data, or scripts.
 4. Read [Browser-Side Authenticated Read Integrations](browser-read-integrations.md) before adding a userscript, extension, or browser flow that reads a provider through the user's existing session.
-5. For card, benefit, guide, or catalog changes, follow [Catalog and Benefit Updates](catalog-and-benefit-updates.md); template changes alone do not update existing users.
-6. Read [Deployment and External Effects](deployment-and-external-effects.md) before builds, deployments, cron calls, email/notification work, Vercel changes, or production-domain checks.
-7. Choose checks from [Verification](verification.md). Never substitute a production-affecting command for a safe static check.
-8. Do not read, create, copy, or modify `.env`; secrets and runtime configuration stay outside Git and in provider dashboards or existing local state.
+5. Read [AMEX Sync Reconciliation](amex-sync-reconciliation.md) before changing AMEX catalog identity, product/benefit matching, sync envelopes, card resolution, status reconciliation, handoff UI, or backfill behavior.
+6. For card, benefit, guide, or catalog changes, follow [Catalog and Benefit Updates](catalog-and-benefit-updates.md); template changes alone do not update existing users.
+7. Read [Deployment and External Effects](deployment-and-external-effects.md) before builds, deployments, cron calls, email/notification work, Vercel changes, or production-domain checks.
+8. Choose checks from [Verification](verification.md). Never substitute a production-affecting command for a safe static check.
+9. Do not read, create, copy, or modify `.env`; secrets and runtime configuration stay outside Git and in provider dashboards or existing local state.
 
 ## Topics
 
 - [Architecture and Domain Invariants](architecture-and-domain.md) — package layout, business-logic owners, public DB-free behavior, auth/PWA constraints, and free-product rules.
 - [Browser-Side Authenticated Read Integrations](browser-read-integrations.md) — manual session-bound reads, conservative normalization, private first-party handoff, confirmed synchronization, replay safety, and synthetic browser validation.
-- [Database and Data Safety](database-and-data-safety.md) — target verification, forbidden commands, migration/seed policy, schema-dependent deployment completeness, fallback caveats, and rollback.
+- [AMEX Sync Reconciliation](amex-sync-reconciliation.md) — current envelope V3, full catalog identity, bounded product/benefit mapping, exact-last-five authority, explicit-field status overwrite, atomic December Uber split, and dry-run-first backfill contracts.
+- [Database and Data Safety](database-and-data-safety.md) — target verification, forbidden commands, migration/seed policy, schema-dependent deployment completeness, sanitized single-user production-to-development cloning, fallback caveats, and rollback.
 - [Catalog and Benefit Updates](catalog-and-benefit-updates.md) — verified sources, template validation, existing-user migration, status materialization, and usage-guide coverage.
 - [Deployment and External Effects](deployment-and-external-effects.md) — automatic production deployment, build side effects, cron limits, email safety, domains, and secrets.
 - [Verification](verification.md) — safe check matrix and truthful reporting requirements.

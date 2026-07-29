@@ -1,20 +1,12 @@
+import { type AmexSyncEnvelope } from "@/lib/amex-benefit-reader/sync-contract";
 import {
-  amexProductKeySchema,
-  type AmexProductKey,
-} from "@/lib/amex-benefit-reader/contract";
-import {
-  AMEX_SYNC_MAX_ROWS,
-  type AmexSyncEnvelope,
-} from "@/lib/amex-benefit-reader/sync-contract";
-import {
-  canonicalManualMappings,
   planAmexSync,
   syncIdempotencyKey,
   type AmexSyncPlan,
-  type ManualCardSelection,
 } from "./authority";
 import { createAmexSyncProposal, verifyAmexSyncProposal } from "./proposal";
 import {
+  applyAmexSyncGroup,
   applyAmexSyncRow,
   completeAmexSyncAttempt,
   createAmexSyncAttempt,
@@ -23,12 +15,12 @@ import {
   recordCurrentAmexSyncRow,
   recordFailedAmexSyncRow,
   recordNonAppliedAmexSyncRow,
-  saveConfirmedManualMappings,
   type StoredRowResult,
 } from "./repository";
 
 export interface PublicAmexSyncRowResult {
   sourceRowIdentity: string;
+  atomicGroupIdentity: string;
   sourceLocalCardId: string;
   productKey: string;
   creditFamilyKey: string;
@@ -43,6 +35,7 @@ export interface PublicAmexSyncRowResult {
 function publicPreviewRows(plan: AmexSyncPlan): PublicAmexSyncRowResult[] {
   return plan.rows.map((row) => ({
     sourceRowIdentity: row.sourceRowIdentity,
+    atomicGroupIdentity: row.atomicGroupIdentity,
     sourceLocalCardId: row.sourceLocalCardId,
     productKey: row.productKey,
     creditFamilyKey: row.creditFamilyKey,
@@ -55,21 +48,31 @@ function publicPreviewRows(plan: AmexSyncPlan): PublicAmexSyncRowResult[] {
   }));
 }
 
-const MAX_MAPPING_LABEL_LENGTH = 200;
+export interface AmexSyncCardSkip {
+  destinationCardId: string;
+  reason: "destination_last_five_required";
+  label: string;
+  editHref: string;
+}
 
-function mappingOptionLabel(displayName: string | undefined, lastFourDigits: string | null): string {
-  const suffix = lastFourDigits ? ` ending ${lastFourDigits}` : "";
-  const name = displayName?.trim() || "Card";
-  const availableNameLength = MAX_MAPPING_LABEL_LENGTH - suffix.length;
-  if (name.length <= availableNameLength) return `${name}${suffix}`;
-  const truncatedName = `${name.slice(0, Math.max(1, availableNameLength - 1)).trimEnd()}…`;
-  return `${truncatedName}${suffix}`;
+function missingLastFiveCardSkips(context: Awaited<ReturnType<typeof loadAmexSyncDestinationContext>>, userId: string): AmexSyncCardSkip[] {
+  return context.cards
+    .filter((card) => card.userId === userId
+      && card.issuer === "American Express"
+      && card.lifecycleStatus === "ACTIVE"
+      && !/^\d{5}$/.test(card.lastFourDigits ?? ""))
+    .map((card) => ({
+      destinationCardId: card.id,
+      reason: "destination_last_five_required" as const,
+      label: (card.displayName?.trim() || "American Express card").slice(0, 200),
+      editHref: `/cards/${encodeURIComponent(card.id)}/edit#lastFourDigits`,
+    }))
+    .sort((left, right) => left.destinationCardId.localeCompare(right.destinationCardId));
 }
 
 export async function previewAmexSync(input: {
   userId: string;
   envelope: AmexSyncEnvelope;
-  manualMappings: ManualCardSelection[];
   mode: "preview" | "write";
   hmacKey: string;
   now?: Date;
@@ -78,14 +81,13 @@ export async function previewAmexSync(input: {
   rows: PublicAmexSyncRowResult[];
   proposalToken: string;
   proposalExpiresAt: string;
-  mappingOptions: Array<{ id: string; productKey: AmexProductKey; label: string }>;
+  cardSkips: AmexSyncCardSkip[];
 }> {
   const now = input.now ?? new Date();
   const context = await loadAmexSyncDestinationContext(input.userId);
   const plan = planAmexSync({
     envelope: input.envelope,
     context,
-    manualMappings: input.manualMappings,
     userId: input.userId,
     now,
     transitionTime: now,
@@ -98,29 +100,12 @@ export async function previewAmexSync(input: {
     now,
     scanFinishedAt: input.envelope.scanFinishedAt,
   });
-  const sourceProductKeys = new Set(input.envelope.cards.map((card) => card.productKey));
   return {
     mode: input.mode,
     rows: publicPreviewRows(plan),
     proposalToken: proposal.token,
     proposalExpiresAt: proposal.body.expiresAt,
-    mappingOptions: context.cards
-      .flatMap((card) => {
-        const productKey = amexProductKeySchema.safeParse(card.productKey);
-        if (card.userId !== input.userId
-          || card.lifecycleStatus !== "ACTIVE"
-          || !productKey.success
-          || !sourceProductKeys.has(productKey.data)) {
-          return [];
-        }
-        return [{
-          id: card.id,
-          productKey: productKey.data,
-          label: mappingOptionLabel(card.displayName, card.lastFourDigits),
-        }];
-      })
-      .sort((left, right) => left.id.localeCompare(right.id))
-      .slice(0, AMEX_SYNC_MAX_ROWS),
+    cardSkips: missingLastFiveCardSkips(context, input.userId),
   };
 }
 
@@ -140,6 +125,7 @@ function replayResults(
           : "skipped";
     return {
       sourceRowIdentity: row.sourceRowIdentity,
+      atomicGroupIdentity: row.atomicGroupIdentity,
       sourceLocalCardId: row.sourceLocalCardId,
       productKey: row.productKey,
       creditFamilyKey: row.creditFamilyKey,
@@ -158,16 +144,16 @@ function proposalMatchesPlan(
   plan: AmexSyncPlan,
 ): boolean {
   return proposal.envelopeDigest === plan.envelopeDigest
-    && proposal.manualMappingsDigest === plan.manualMappingsDigest
     && proposal.beforeStateDigest === plan.beforeStateDigest
     && proposal.sourceRowIdentities.length === plan.rows.length
-    && proposal.sourceRowIdentities.every((identity, index) => identity === plan.rows[index].sourceRowIdentity);
+    && proposal.atomicGroupIdentities.length === plan.rows.length
+    && proposal.sourceRowIdentities.every((identity, index) => identity === plan.rows[index].sourceRowIdentity)
+    && proposal.atomicGroupIdentities.every((identity, index) => identity === plan.rows[index].atomicGroupIdentity);
 }
 
 export async function confirmAmexSync(input: {
   userId: string;
   envelope: AmexSyncEnvelope;
-  manualMappings: ManualCardSelection[];
   proposalToken: string;
   hmacKey: string;
   now?: Date;
@@ -189,7 +175,6 @@ export async function confirmAmexSync(input: {
   const plan = planAmexSync({
     envelope: input.envelope,
     context,
-    manualMappings: input.manualMappings,
     userId: input.userId,
     now,
     transitionTime: new Date(proposal.transitionTime),
@@ -224,36 +209,52 @@ export async function confirmAmexSync(input: {
     }
   }
 
-  const validSelectedCards = new Set(plan.rows
-    .filter((row) => row.destinationCardId && row.disposition !== "skipped")
-    .map((row) => `${row.sourceLocalCardId}:${row.destinationCardId}`));
-  const selections = canonicalManualMappings(input.manualMappings).filter((selection) =>
-    validSelectedCards.has(`${selection.sourceLocalCardId}:${selection.destinationCardId}`));
-  await saveConfirmedManualMappings({
-    userId: input.userId,
-    selections,
-    productKeyBySourceCard: new Map(input.envelope.cards.map((card) => [card.sourceLocalCardId, card.productKey])),
-    endingBySourceCard: new Map(input.envelope.cards.map((card) => [card.sourceLocalCardId, card.endingDigits])),
-  });
-
   const results: StoredRowResult[] = [];
-  for (const row of plan.rows) {
-    try {
-      if (row.disposition === "skipped" || row.reason === "unchanged_replay") {
-        results.push(await recordNonAppliedAmexSyncRow(attemptId, row));
-      } else {
-        results.push(row.disposition === "proposed"
-          ? await applyAmexSyncRow({ attemptId, userId: input.userId, row })
-          : await recordCurrentAmexSyncRow({ attemptId, userId: input.userId, row }));
-      }
-    } catch (error) {
-      const reason = error instanceof Error && error.message === "conflict_repreview_required"
-        ? "conflict_repreview_required" as const
-        : "persistence_failed" as const;
+  const groups = new Map<string, AmexSyncPlan["rows"]>();
+  plan.rows.forEach((row) => {
+    const group = groups.get(row.atomicGroupIdentity) ?? [];
+    group.push(row);
+    groups.set(row.atomicGroupIdentity, group);
+  });
+  for (const groupRows of Array.from(groups.values())) {
+    const isAtomicWriteGroup = groupRows.length > 1 && groupRows.every((row) =>
+      row.disposition === "proposed" || (row.disposition === "unchanged" && row.reason === "already_current"));
+    if (isAtomicWriteGroup) {
       try {
-        results.push(await recordFailedAmexSyncRow(attemptId, row, reason));
-      } catch {
-        results.push({ sourceRowIdentity: row.sourceRowIdentity, disposition: "FAILED", reasonCode: reason });
+        results.push(...await applyAmexSyncGroup({ attemptId, userId: input.userId, rows: groupRows }));
+      } catch (error) {
+        const reason = error instanceof Error && error.message === "conflict_repreview_required"
+          ? "conflict_repreview_required" as const
+          : "persistence_failed" as const;
+        for (const row of groupRows) {
+          try {
+            results.push(await recordFailedAmexSyncRow(attemptId, row, reason));
+          } catch {
+            results.push({ sourceRowIdentity: row.sourceRowIdentity, disposition: "FAILED", reasonCode: reason });
+          }
+        }
+      }
+      continue;
+    }
+
+    for (const row of groupRows) {
+      try {
+        if (row.disposition === "skipped" || row.reason === "unchanged_replay") {
+          results.push(await recordNonAppliedAmexSyncRow(attemptId, row));
+        } else {
+          results.push(row.disposition === "proposed"
+            ? await applyAmexSyncRow({ attemptId, userId: input.userId, row })
+            : await recordCurrentAmexSyncRow({ attemptId, userId: input.userId, row }));
+        }
+      } catch (error) {
+        const reason = error instanceof Error && error.message === "conflict_repreview_required"
+          ? "conflict_repreview_required" as const
+          : "persistence_failed" as const;
+        try {
+          results.push(await recordFailedAmexSyncRow(attemptId, row, reason));
+        } catch {
+          results.push({ sourceRowIdentity: row.sourceRowIdentity, disposition: "FAILED", reasonCode: reason });
+        }
       }
     }
   }
