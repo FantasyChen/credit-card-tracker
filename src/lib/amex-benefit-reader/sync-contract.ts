@@ -12,7 +12,7 @@ import {
 } from "./contract";
 import { matchAmexBrowserSyncCredit } from "./supported-card-credits";
 
-export const AMEX_SYNC_ENVELOPE_VERSION = "amex-sync-envelope/2" as const;
+export const AMEX_SYNC_ENVELOPE_VERSION = "amex-sync-envelope/3" as const;
 export const AMEX_SYNC_MAX_BYTES = 256 * 1024;
 export const AMEX_SYNC_MAX_CARDS = 50;
 export const AMEX_SYNC_MAX_ROWS = 300;
@@ -34,10 +34,14 @@ export const syncExclusionReasonSchema = z.enum([
   "prerequisite_only",
   "status_unavailable",
   "source_mapping_ambiguous",
+  "source_last_five_required",
 ]);
 export type SyncExclusionReason = z.infer<typeof syncExclusionReasonSchema>;
 
 export const amexSyncRowSchema = z.object({
+  providerTitle: z.string().trim().min(1).max(200),
+  providerCategory: z.literal("usage"),
+  sourceCreditKey: creditFamilyKeySchema,
   creditFamilyKey: creditFamilyKeySchema,
   sourcePeriod: sourcePeriodV2Schema.nullable(),
   enrollmentState: z.enum(["enrolled", "required", "linking_required", "not_required"]).nullable(),
@@ -49,8 +53,9 @@ export type AmexSyncRow = z.infer<typeof amexSyncRowSchema>;
 
 export const amexSyncCardSchema = z.object({
   sourceLocalCardId: z.string().uuid(),
+  providerProductName: z.string().trim().min(1).max(200),
   productKey: amexProductKeySchema,
-  endingDigits: z.string().regex(/^\d{4,5}$/),
+  endingDigits: z.string().regex(/^\d{5}$/),
   observedAt: z.string().datetime({ offset: true }),
   parserVersion: z.literal(PARSER_VERSION),
   rows: z.array(amexSyncRowSchema).max(AMEX_SYNC_MAX_ROWS),
@@ -138,10 +143,13 @@ function observedValue<T>(field: { state: string; value?: T }): T | null {
 
 function projectRow(
   benefit: NormalizedBenefitObservationV3,
-  creditFamilyKey: AmexSyncRow["creditFamilyKey"],
+  match: { creditFamilyKey: string; sourceCreditKey: string },
 ): AmexSyncRow {
   return {
-    creditFamilyKey,
+    providerTitle: benefit.title,
+    providerCategory: "usage",
+    sourceCreditKey: match.sourceCreditKey,
+    creditFamilyKey: match.creditFamilyKey,
     sourcePeriod: observedValue(benefit.sourcePeriod),
     enrollmentState: observedValue(benefit.enrollmentState),
     completionState: observedValue(benefit.completionState),
@@ -197,29 +205,45 @@ export function projectLatestV3SyncEnvelope(store: StoreEnvelopeV1): SyncEnvelop
       continue;
     }
 
-    const mapped = latest.benefits.flatMap((benefit) => {
-      if (benefit.category.state !== "observed" || benefit.category.value !== "usage") return [];
-      const match = matchAmexBrowserSyncCredit(latest.productName, benefit.title);
-      return match ? [{ benefit, match }] : [];
-    });
-    const familyCounts = new Map<string, number>();
-    mapped.forEach(({ match }) => familyCounts.set(
-      match.creditFamilyKey,
-      (familyCounts.get(match.creditFamilyKey) ?? 0) + 1,
-    ));
-    if (Array.from(familyCounts.values()).some((count) => count > 1)) {
-      exclude("source_mapping_ambiguous", mapped.length);
+    if (!/^\d{5}$/.test(latest.endingDigits)) {
+      exclude("source_last_five_required", latest.benefits.length || 1);
       continue;
     }
-    if (!mapped.length) continue;
+    const mapped = latest.benefits.flatMap((benefit) => {
+      if (benefit.category.state !== "observed" || benefit.category.value !== "usage") return [];
+      const match = matchAmexBrowserSyncCredit(latest.productName, benefit.title, {
+        sourcePeriod: benefit.sourcePeriod.state === "observed" ? benefit.sourcePeriod.value : null,
+        earnedOrUsed: benefit.earnedOrUsed.state === "observed" ? benefit.earnedOrUsed.value : null,
+      });
+      return match ? [{ benefit, match }] : [];
+    });
+    const sourceMappingKey = ({
+      benefit,
+      match,
+    }: typeof mapped[number]): string => {
+      const period = benefit.sourcePeriod.state === "observed"
+        ? `${benefit.sourcePeriod.value.startDate}|${benefit.sourcePeriod.value.endDate}`
+        : "unstructured";
+      return `${match.sourceCreditKey}|${period}`;
+    };
+    const sourceCounts = new Map<string, number>();
+    mapped.forEach((candidate) => {
+      const key = sourceMappingKey(candidate);
+      sourceCounts.set(key, (sourceCounts.get(key) ?? 0) + 1);
+    });
+    const unambiguous = mapped.filter((candidate) => sourceCounts.get(sourceMappingKey(candidate)) === 1);
+    const ambiguousCount = mapped.length - unambiguous.length;
+    if (ambiguousCount > 0) exclude("source_mapping_ambiguous", ambiguousCount);
+    if (!unambiguous.length) continue;
 
     cards.push({
       sourceLocalCardId: latest.localCardId,
-      productKey: mapped[0].match.productKey,
+      providerProductName: latest.productName,
+      productKey: amexProductKeySchema.parse(unambiguous[0].match.productKey),
       endingDigits: latest.endingDigits,
       observedAt: latest.observedAt,
       parserVersion: latest.parserVersion,
-      rows: mapped.map(({ benefit, match }) => projectRow(benefit, match.creditFamilyKey)),
+      rows: unambiguous.map(({ benefit, match }) => projectRow(benefit, match)),
     });
   }
 

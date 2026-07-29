@@ -1,11 +1,21 @@
 import { createHash } from "node:crypto";
 import { canonicalJson, isSyncEnvelopeFresh, type AmexSyncEnvelope, type AmexSyncRow } from "@/lib/amex-benefit-reader/sync-contract";
 
-export const WRITABLE_AMEX_PRODUCT_KEY = "american-express-platinum-card" as const;
-export const WRITABLE_AMEX_CREDIT_FAMILIES = new Set([
-  "american-express-platinum-card:lululemon",
-  "american-express-platinum-card:resy",
-]);
+import { AMEX_WRITABLE_DESTINATIONS } from "./catalog-registry";
+import {
+  resolveServerAmexCredit,
+  resolveServerAmexProduct,
+  SERVER_AMEX_SOURCE_CREDITS,
+} from "./server-evidence";
+import { periodKeysForExactRange } from "./period-resolution";
+
+export { periodKeyForExactRange, periodKeysForExactRange } from "./period-resolution";
+
+// Destination tuples come from the reviewed catalog, while provider evidence
+// authority is separately enumerated by the server and never trusts browser claims.
+export const WRITABLE_AMEX_PRODUCT_KEYS = new Set(SERVER_AMEX_SOURCE_CREDITS.map((entry) => entry.productKey));
+export const WRITABLE_AMEX_CREDIT_FAMILIES = new Set(AMEX_WRITABLE_DESTINATIONS.map((entry) => entry.creditFamilyKey));
+export const WRITABLE_AMEX_SOURCE_CREDITS = new Set(SERVER_AMEX_SOURCE_CREDITS.map((entry) => `${entry.productKey}:${entry.sourceCreditKey}`));
 
 export type AmexSyncReason =
   | "proposed_update"
@@ -16,7 +26,11 @@ export type AmexSyncReason =
   | "scan_expired"
   | "product_not_allowlisted"
   | "credit_family_not_allowlisted"
-  | "manual_mapping_required"
+  | "source_evidence_mismatch"
+  | "source_mapping_ambiguous"
+  | "source_last_five_required"
+  | "destination_last_five_required"
+  | "destination_card_missing"
   | "ambiguous_card"
   | "mapping_invalid"
   | "destination_key_missing"
@@ -35,11 +49,6 @@ export type AmexSyncReason =
   | "destination_not_usable"
   | "conflict_repreview_required"
   | "persistence_failed";
-
-export interface ManualCardSelection {
-  sourceLocalCardId: string;
-  destinationCardId: string;
-}
 
 export interface DestinationStatusSnapshot {
   id: string;
@@ -73,22 +82,15 @@ export interface DestinationCardSnapshot {
   id: string;
   userId: string;
   displayName?: string;
+  issuer: string;
   productKey: string | null;
   lastFourDigits: string | null;
   lifecycleStatus: "ACTIVE" | "CLOSED" | "PRODUCT_CHANGED";
   benefits: DestinationBenefitSnapshot[];
 }
 
-export interface SavedCardMappingSnapshot {
-  sourceLocalCardId: string;
-  sourceProductKey: string;
-  creditCardId: string;
-  inactiveAt: Date | null;
-}
-
 export interface AmexSyncDestinationContext {
   cards: DestinationCardSnapshot[];
-  savedMappings: SavedCardMappingSnapshot[];
 }
 
 export interface StatusStateProjection {
@@ -100,9 +102,11 @@ export interface StatusStateProjection {
 
 export interface AmexSyncPlanRow {
   sourceRowIdentity: string;
+  atomicGroupIdentity: string;
   sourceObservationIdentity: string;
   sourceObservationDigest: string;
   sourceLocalCardId: string;
+  sourceEndingDigits: string;
   productKey: string;
   creditFamilyKey: string;
   observedAt: string;
@@ -128,7 +132,6 @@ export interface AmexSyncPlanRow {
 export interface AmexSyncPlan {
   rows: AmexSyncPlanRow[];
   envelopeDigest: string;
-  manualMappingsDigest: string;
   beforeStateDigest: string;
 }
 
@@ -136,24 +139,8 @@ function hash(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
-export function canonicalManualMappings(selections: ManualCardSelection[]): ManualCardSelection[] {
-  return [...selections]
-    .map((selection) => ({ ...selection }))
-    .sort((left, right) => left.sourceLocalCardId.localeCompare(right.sourceLocalCardId));
-}
-
 function dateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
-}
-
-export function periodKeyForExactRange(startDate: string, endDate: string): string | null {
-  const year = Number(startDate.slice(0, 4));
-  const starts = ["01-01", "04-01", "07-01", "10-01"];
-  const ends = ["03-31", "06-30", "09-30", "12-31"];
-  const startSuffix = startDate.slice(5);
-  const quarter = starts.indexOf(startSuffix);
-  if (!Number.isInteger(year) || quarter < 0 || endDate !== `${year}-${ends[quarter]}`) return null;
-  return `calendar-quarter-q${quarter + 1}`;
 }
 
 function snapshot(status: DestinationStatusSnapshot): StatusStateProjection {
@@ -167,9 +154,11 @@ function snapshot(status: DestinationStatusSnapshot): StatusStateProjection {
 
 function skippedRow(input: {
   sourceRowIdentity: string;
+  atomicGroupIdentity: string;
   sourceObservationIdentity: string;
   sourceObservationDigest: string;
   sourceLocalCardId: string;
+  sourceEndingDigits: string;
   productKey: string;
   creditFamilyKey: string;
   observedAt: string;
@@ -217,25 +206,20 @@ function resolveTransition(
 
   const usedMinor = parseUsdMinorUnits(row.earnedOrUsed);
   if (row.earnedOrUsed && usedMinor === null) return "amount_incompatible";
-  const targetMinor = parseUsdMinorUnits(row.targetOrLimit);
-  if (row.targetOrLimit && targetMinor === null) return "amount_incompatible";
+  if (row.targetOrLimit && parseUsdMinorUnits(row.targetOrLimit) === null) return "amount_incompatible";
 
-  const amountCompletion = usedMinor !== null && targetMinor !== null && targetMinor > 0
-    ? usedMinor >= targetMinor
-    : null;
   const explicitCompletion = row.completionState === "complete"
     ? true
     : row.completionState === "incomplete" ? false : null;
-  if (explicitCompletion !== null && amountCompletion !== null && explicitCompletion !== amountCompletion) {
-    return "completion_conflict";
-  }
-  const completion = explicitCompletion ?? amountCompletion;
-  if (completion === null) return "status_unavailable";
+  if (usedMinor === null && explicitCompletion === null) return "status_unavailable";
 
   const usedAmount = usedMinor === null ? status.usedAmount : usedMinor / 100;
-  const completedAt = completion
-    ? status.isCompleted && status.completedAt ? status.completedAt.toISOString() : transitionTime.toISOString()
-    : null;
+  const completion = explicitCompletion ?? status.isCompleted;
+  const completedAt = explicitCompletion === null
+    ? status.completedAt?.toISOString() ?? null
+    : completion
+      ? status.isCompleted && status.completedAt ? status.completedAt.toISOString() : transitionTime.toISOString()
+      : null;
   const after: StatusStateProjection = {
     usedAmount,
     isCompleted: completion,
@@ -256,24 +240,23 @@ function resolveTransition(
 function resolveCard(
   sourceCard: AmexSyncEnvelope["cards"][number],
   context: AmexSyncDestinationContext,
-  selectionBySourceId: ReadonlyMap<string, string>,
+  userId: string,
 ): DestinationCardSnapshot | AmexSyncReason {
-  const activeCompatible = context.cards.filter((card) =>
-    card.userId
+  if (!/^\d{5}$/.test(sourceCard.endingDigits)) return "source_last_five_required";
+  const productCards = context.cards.filter((card) =>
+    card.userId === userId
+    && card.issuer === "American Express"
     && card.lifecycleStatus === "ACTIVE"
     && card.productKey === sourceCard.productKey);
-  const selectedId = selectionBySourceId.get(sourceCard.sourceLocalCardId);
-  if (selectedId) {
-    return activeCompatible.find((card) => card.id === selectedId) ?? "mapping_invalid";
+  if (productCards.some((card) => !/^\d{5}$/.test(card.lastFourDigits ?? ""))
+    && !productCards.some((card) => card.lastFourDigits === sourceCard.endingDigits)) {
+    return "destination_last_five_required";
   }
-  const saved = context.savedMappings.find((mapping) =>
-    mapping.sourceLocalCardId === sourceCard.sourceLocalCardId
-    && mapping.sourceProductKey === sourceCard.productKey
-    && mapping.inactiveAt === null);
-  if (saved) return activeCompatible.find((card) => card.id === saved.creditCardId) ?? "mapping_invalid";
-  const automatic = activeCompatible.filter((card) => card.lastFourDigits === sourceCard.endingDigits);
-  if (automatic.length === 1) return automatic[0];
-  return automatic.length > 1 ? "ambiguous_card" : "manual_mapping_required";
+  const exact = productCards.filter((card) =>
+    /^\d{5}$/.test(card.lastFourDigits ?? "")
+    && card.lastFourDigits === sourceCard.endingDigits);
+  if (exact.length === 1) return exact[0];
+  return exact.length > 1 ? "ambiguous_card" : "destination_card_missing";
 }
 
 function rowIdentityParts(
@@ -283,6 +266,7 @@ function rowIdentityParts(
   rowIndex: number,
 ): {
   sourceRowIdentity: string;
+  atomicGroupIdentity: string;
   sourceObservationIdentity: string;
   sourceObservationDigest: string;
 } {
@@ -294,35 +278,212 @@ function rowIdentityParts(
     parserVersion: card.parserVersion,
     row,
   };
+  const sourceRowIdentity = hash({ ...observation, rowIndex });
   return {
-    sourceRowIdentity: hash({ ...observation, rowIndex }),
+    sourceRowIdentity,
+    atomicGroupIdentity: hash({ sourceRowIdentity, groupVersion: 1 }),
     sourceObservationIdentity: hash({ ...observation, identityVersion: 1 }),
     sourceObservationDigest: hash({ ...observation, digestVersion: 1 }),
   };
 }
 
+const PLATINUM_PRODUCT_KEY = "american-express-platinum-card";
+const PLATINUM_UBER_FAMILY = `${PLATINUM_PRODUCT_KEY}:uber-cash`;
+const PLATINUM_UBER_DECEMBER_BONUS_FAMILY = `${PLATINUM_PRODUCT_KEY}:uber-cash-december-bonus`;
+
+function expandPlatinumDecemberUber(input: {
+  sourceCard: AmexSyncEnvelope["cards"][number];
+  sourceRow: AmexSyncRow;
+  baseRow: AmexSyncPlanRow;
+  context: AmexSyncDestinationContext;
+  userId: string;
+  transitionTime: Date;
+}): AmexSyncPlanRow[] {
+  const { sourceCard, sourceRow, baseRow, context, userId, transitionTime } = input;
+  if (sourceCard.productKey !== PLATINUM_PRODUCT_KEY
+    || sourceRow.sourceCreditKey !== PLATINUM_UBER_FAMILY
+    || sourceRow.creditFamilyKey !== PLATINUM_UBER_FAMILY
+    || sourceRow.sourcePeriod?.startDate.slice(5) !== "12-01"
+    || periodKeysForExactRange(
+      sourceRow.sourcePeriod.startDate,
+      sourceRow.sourcePeriod.endDate,
+    ).includes("calendar-month-december") === false
+    || !baseRow.destinationCardId) return [baseRow];
+
+  const groupIdentity = hash({
+    splitVersion: 1,
+    sourceObservationIdentity: baseRow.sourceObservationIdentity,
+    destinationFamilies: [PLATINUM_UBER_FAMILY, PLATINUM_UBER_DECEMBER_BONUS_FAMILY],
+  });
+  const aggregateMinor = parseUsdMinorUnits(sourceRow.earnedOrUsed);
+  const variants = [
+    {
+      creditFamilyKey: PLATINUM_UBER_FAMILY,
+      periodKey: "calendar-month",
+      targetMinor: 1_500,
+      usedMinor: aggregateMinor === null ? null : Math.min(aggregateMinor, 1_500),
+    },
+    {
+      creditFamilyKey: PLATINUM_UBER_DECEMBER_BONUS_FAMILY,
+      periodKey: "calendar-month-december",
+      targetMinor: 2_000,
+      usedMinor: aggregateMinor === null ? null : Math.min(Math.max(aggregateMinor - 1_500, 0), 2_000),
+    },
+  ] as const;
+  const splitBase = (variant: typeof variants[number]) => ({
+    ...baseRow,
+    sourceRowIdentity: hash({
+      splitVersion: 1,
+      sourceRowIdentity: baseRow.sourceRowIdentity,
+      creditFamilyKey: variant.creditFamilyKey,
+      periodKey: variant.periodKey,
+    }),
+    atomicGroupIdentity: groupIdentity,
+    creditFamilyKey: variant.creditFamilyKey,
+    periodKey: variant.periodKey,
+    destinationBenefitId: null,
+    destinationStatusId: null,
+    before: null,
+    after: null,
+    changes: { amountDecrease: false, amountIncrease: false, completionSet: false, completionCleared: false },
+  });
+  const skippedVariants = (reason: AmexSyncReason): AmexSyncPlanRow[] => variants.map((variant) => ({
+    ...splitBase(variant),
+    disposition: "skipped" as const,
+    reason,
+  }));
+
+  // The provider row is an aggregate for two fixed destinations. Truncating an
+  // out-of-range or omitted value would silently lose authority, so fail closed.
+  if (aggregateMinor === null || aggregateMinor > 3_500) return skippedVariants("amount_incompatible");
+
+  const card = context.cards.find((candidate) => candidate.id === baseRow.destinationCardId);
+  if (!card || card.userId !== userId) return skippedVariants("destination_card_missing");
+
+  const resolved: Array<{
+    variant: typeof variants[number];
+    benefit: DestinationBenefitSnapshot;
+    status: DestinationStatusSnapshot;
+  }> = [];
+  for (const variant of variants) {
+    const benefits = card.benefits.filter((benefit) => benefit.productKey === PLATINUM_PRODUCT_KEY
+      && benefit.creditFamilyKey === variant.creditFamilyKey
+      && benefit.periodKey === variant.periodKey);
+    if (benefits.length !== 1) {
+      return skippedVariants(benefits.length ? "destination_benefit_ambiguous" : "destination_benefit_missing");
+    }
+    const benefit = benefits[0];
+    const statuses = benefit.statuses.filter((status) => status.userId === userId
+      && status.occurrenceIndex === 0
+      && dateOnly(status.cycleStartDate) === sourceRow.sourcePeriod!.startDate
+      && dateOnly(status.cycleEndDate) === sourceRow.sourcePeriod!.endDate);
+    if (statuses.length !== 1) {
+      return skippedVariants(statuses.length ? "destination_status_ambiguous" : "destination_status_missing");
+    }
+    resolved.push({ variant, benefit, status: statuses[0] });
+  }
+
+  let exactReplayCount = 0;
+  for (const { status } of resolved) {
+    if (!status.provenance) continue;
+    const observedAt = Date.parse(sourceCard.observedAt);
+    const previousAt = status.provenance.observedAt.getTime();
+    if (observedAt < previousAt) return skippedVariants("stale_replay");
+    if (observedAt === previousAt
+      && status.provenance.sourceObservationDigest !== baseRow.sourceObservationDigest) {
+      return skippedVariants("source_conflict");
+    }
+    if (observedAt === previousAt) exactReplayCount += 1;
+  }
+  if (exactReplayCount && exactReplayCount !== resolved.length) {
+    return skippedVariants("source_conflict");
+  }
+  if (exactReplayCount === resolved.length) {
+    return resolved.map(({ variant, benefit, status }) => {
+      const before = snapshot(status);
+      return {
+        ...splitBase(variant),
+        disposition: "unchanged",
+        reason: "unchanged_replay",
+        destinationBenefitId: benefit.id,
+        destinationStatusId: status.id,
+        before,
+        after: before,
+      };
+    });
+  }
+
+  const transitions: Array<{
+    variant: typeof variants[number];
+    benefit: DestinationBenefitSnapshot;
+    before: StatusStateProjection;
+    transition: Exclude<ReturnType<typeof resolveTransition>, AmexSyncReason>;
+  }> = [];
+  for (const { variant, benefit, status } of resolved) {
+    const before = snapshot(status);
+    const usedMinor = variant.usedMinor!;
+    const splitSourceRow: AmexSyncRow = {
+      ...sourceRow,
+      creditFamilyKey: variant.creditFamilyKey,
+      earnedOrUsed: { value: (usedMinor / 100).toFixed(2), unit: "USD", currency: "USD" },
+      targetOrLimit: { value: (variant.targetMinor / 100).toFixed(2), unit: "USD", currency: "USD" },
+      completionState: usedMinor >= variant.targetMinor ? "complete" : "incomplete",
+    };
+    const transition = resolveTransition(splitSourceRow, status, transitionTime);
+    if (typeof transition === "string") return skippedVariants(transition);
+    transitions.push({ variant, benefit, before, transition });
+  }
+
+  return transitions.map(({ variant, benefit, before, transition }) => {
+    const unchanged = canonicalJson(before) === canonicalJson(transition.after);
+    return {
+      ...splitBase(variant),
+      disposition: unchanged ? "unchanged" : "proposed",
+      reason: unchanged ? "already_current" : "proposed_update",
+      destinationBenefitId: benefit.id,
+      destinationStatusId: resolved.find((entry) => entry.variant === variant)!.status.id,
+      before,
+      after: transition.after,
+      changes: transition.changes,
+    };
+  });
+}
+
 export function planAmexSync(input: {
   envelope: AmexSyncEnvelope;
   context: AmexSyncDestinationContext;
-  manualMappings: ManualCardSelection[];
   userId: string;
   now: Date;
   transitionTime: Date;
 }): AmexSyncPlan {
   const { envelope, context, userId, now, transitionTime } = input;
-  const manualMappings = canonicalManualMappings(input.manualMappings);
-  const selectionBySourceId = new Map(manualMappings.map((mapping) => [mapping.sourceLocalCardId, mapping.destinationCardId]));
   const envelopeDigest = hash(envelope);
-  const manualMappingsDigest = hash(manualMappings);
   const rows: AmexSyncPlanRow[] = [];
+  const sourceByRowIdentity = new Map<string, {
+    sourceCard: AmexSyncEnvelope["cards"][number];
+    sourceRow: AmexSyncRow;
+  }>();
 
   envelope.cards.forEach((sourceCard) => {
-    const cardResolution = resolveCard(sourceCard, context, selectionBySourceId);
+    const cardResolution = resolveCard(sourceCard, context, userId);
+    const sourceMappingKey = (row: AmexSyncRow): string => {
+      const period = row.sourcePeriod
+        ? `${row.sourcePeriod.startDate}|${row.sourcePeriod.endDate}`
+        : "unstructured";
+      return `${row.sourceCreditKey}|${period}`;
+    };
+    const sourceCreditCounts = new Map<string, number>();
+    sourceCard.rows.forEach((row) => {
+      const key = sourceMappingKey(row);
+      sourceCreditCounts.set(key, (sourceCreditCounts.get(key) ?? 0) + 1);
+    });
     sourceCard.rows.forEach((row, rowIndex) => {
       const identities = rowIdentityParts(envelope, sourceCard, row, rowIndex);
+      sourceByRowIdentity.set(identities.sourceRowIdentity, { sourceCard, sourceRow: row });
       const base = {
         ...identities,
         sourceLocalCardId: sourceCard.sourceLocalCardId,
+        sourceEndingDigits: sourceCard.endingDigits,
         productKey: sourceCard.productKey,
         creditFamilyKey: row.creditFamilyKey,
         observedAt: sourceCard.observedAt,
@@ -334,12 +495,37 @@ export function planAmexSync(input: {
         rows.push(skippedRow({ ...base, reason: "scan_expired" }));
         return;
       }
-      if (sourceCard.productKey !== WRITABLE_AMEX_PRODUCT_KEY) {
+      if ((sourceCreditCounts.get(sourceMappingKey(row)) ?? 0) > 1) {
+        rows.push(skippedRow({ ...base, reason: "source_mapping_ambiguous" }));
+        return;
+      }
+      if (!WRITABLE_AMEX_PRODUCT_KEYS.has(sourceCard.productKey)) {
         rows.push(skippedRow({ ...base, reason: "product_not_allowlisted" }));
         return;
       }
-      if (!WRITABLE_AMEX_CREDIT_FAMILIES.has(row.creditFamilyKey)) {
+      if (!WRITABLE_AMEX_CREDIT_FAMILIES.has(row.creditFamilyKey)
+        || !WRITABLE_AMEX_SOURCE_CREDITS.has(`${sourceCard.productKey}:${row.sourceCreditKey}`)) {
         rows.push(skippedRow({ ...base, reason: "credit_family_not_allowlisted" }));
+        return;
+      }
+      const resolvedProduct = resolveServerAmexProduct(sourceCard.providerProductName);
+      const resolvedBenefit = resolvedProduct
+        ? resolveServerAmexCredit(resolvedProduct, row.providerTitle, {
+          sourcePeriod: row.sourcePeriod,
+          // December Uber aggregate bounds are validated by the split planner so
+          // it can return two destination-specific, atomic skip rows.
+          earnedOrUsed: row.sourceCreditKey === PLATINUM_UBER_FAMILY
+            ? null
+            : row.earnedOrUsed,
+        })
+        : null;
+      if (row.providerCategory !== "usage"
+        || resolvedProduct !== sourceCard.productKey
+        || !resolvedBenefit
+        || resolvedBenefit.productKey !== sourceCard.productKey
+        || resolvedBenefit.sourceCreditKey !== row.sourceCreditKey
+        || resolvedBenefit.creditFamilyKey !== row.creditFamilyKey) {
+        rows.push(skippedRow({ ...base, reason: "source_evidence_mismatch" }));
         return;
       }
       if (typeof cardResolution === "string") {
@@ -354,30 +540,31 @@ export function planAmexSync(input: {
         rows.push(skippedRow({ ...base, reason: "period_not_structured", destinationCardId: cardResolution.id }));
         return;
       }
-      const periodKey = periodKeyForExactRange(row.sourcePeriod.startDate, row.sourcePeriod.endDate);
-      if (!periodKey) {
+      const periodKeys = periodKeysForExactRange(row.sourcePeriod.startDate, row.sourcePeriod.endDate);
+      if (!periodKeys.length) {
         rows.push(skippedRow({ ...base, reason: "period_key_mismatch", destinationCardId: cardResolution.id }));
         return;
       }
       const today = dateOnly(now);
       if (today < row.sourcePeriod.startDate || today > row.sourcePeriod.endDate) {
-        rows.push(skippedRow({ ...base, periodKey, reason: "period_not_current", destinationCardId: cardResolution.id }));
+        rows.push(skippedRow({ ...base, reason: "period_not_current", destinationCardId: cardResolution.id }));
         return;
       }
       const benefits = cardResolution.benefits.filter((benefit) =>
         benefit.productKey === sourceCard.productKey
         && benefit.creditFamilyKey === row.creditFamilyKey
-        && benefit.periodKey === periodKey);
+        && benefit.periodKey !== null
+        && periodKeys.some((periodKey) => periodKey === benefit.periodKey));
       if (benefits.length !== 1) {
         rows.push(skippedRow({
           ...base,
-          periodKey,
           reason: benefits.length ? "destination_benefit_ambiguous" : "destination_benefit_missing",
           destinationCardId: cardResolution.id,
         }));
         return;
       }
       const benefit = benefits[0];
+      const periodKey = benefit.periodKey!;
       const statuses = benefit.statuses.filter((status) =>
         status.userId === userId
         && status.occurrenceIndex === 0
@@ -436,19 +623,30 @@ export function planAmexSync(input: {
     });
   });
 
-  const beforeStateDigest = hash(rows.map((row) => ({
+  const plannedRows = rows.flatMap((row) => {
+    const source = sourceByRowIdentity.get(row.sourceRowIdentity);
+    return source ? expandPlatinumDecemberUber({
+      ...source,
+      baseRow: row,
+      context,
+      userId,
+      transitionTime,
+    }) : [row];
+  });
+  const beforeStateDigest = hash(plannedRows.map((row) => ({
     sourceRowIdentity: row.sourceRowIdentity,
+    atomicGroupIdentity: row.atomicGroupIdentity,
     destinationStatusId: row.destinationStatusId,
     disposition: row.disposition,
     reason: row.reason,
     before: row.before,
     after: row.after,
   })));
-  return { rows, envelopeDigest, manualMappingsDigest, beforeStateDigest };
+  return { rows: plannedRows, envelopeDigest, beforeStateDigest };
 }
 
 export function syncIdempotencyKey(userId: string, plan: AmexSyncPlan): string {
-  return hash({ userId, envelopeDigest: plan.envelopeDigest, manualMappingsDigest: plan.manualMappingsDigest });
+  return hash({ userId, envelopeDigest: plan.envelopeDigest });
 }
 
 export type AmexCompensationReason =

@@ -8,9 +8,11 @@ const key = "synthetic-hmac-key-that-is-at-least-32-characters";
 const plan: AmexSyncPlan = {
   rows: [{
     sourceRowIdentity: "a".repeat(64),
+    atomicGroupIdentity: "e".repeat(64),
     sourceObservationIdentity: "b".repeat(64),
     sourceObservationDigest: "c".repeat(64),
     sourceLocalCardId: "11111111-1111-4111-8111-111111111111",
+    sourceEndingDigits: "12345",
     productKey: "american-express-platinum-card",
     creditFamilyKey: "american-express-platinum-card:resy",
     observedAt: "2026-07-15T11:59:00.000Z",
@@ -28,19 +30,19 @@ const plan: AmexSyncPlan = {
     changes: { amountDecrease: false, amountIncrease: true, completionSet: false, completionCleared: false },
   }],
   envelopeDigest: "d".repeat(64),
-  manualMappingsDigest: "e".repeat(64),
   beforeStateDigest: "f".repeat(64),
 };
 
 const envelope = {
-  envelopeVersion: "amex-sync-envelope/2",
+  envelopeVersion: "amex-sync-envelope/3",
   observationContractVersion: "amex-benefits/3",
   scanId: "22222222-2222-4222-8222-222222222222",
   scanFinishedAt: now.toISOString(),
   cards: [{
     sourceLocalCardId: "11111111-1111-4111-8111-111111111111",
+    providerProductName: "American Express Platinum Card",
     productKey: "american-express-platinum-card",
-    endingDigits: "1234",
+    endingDigits: "12345",
     observedAt: "2026-07-15T11:59:00.000Z",
     parserVersion: "amex-api-us/3.0.0",
     rows: [],
@@ -76,8 +78,9 @@ describe("HMAC-bound Amex sync proposal", () => {
       userId: "user-1",
       mode: "write",
       envelopeDigest: plan.envelopeDigest,
-      manualMappingsDigest: plan.manualMappingsDigest,
       beforeStateDigest: plan.beforeStateDigest,
+      sourceRowIdentities: [plan.rows[0].sourceRowIdentity],
+      atomicGroupIdentities: [plan.rows[0].atomicGroupIdentity],
       transitionTime: now.toISOString(),
     });
     expect(() => verifyAmexSyncProposal({ token: proposal.token, key, userId: "user-2", expectedMode: "write", now })).toThrow("proposal_invalid");
@@ -108,8 +111,9 @@ describe("same-origin sync request boundary", () => {
     } as unknown as Request;
   }
 
-  it("accepts a strict bounded same-origin preview", async () => {
-    await expect(parsePreviewRequest(request({ envelope, manualMappings: [] }))).resolves.toMatchObject({ manualMappings: [] });
+  it("accepts a strict bounded same-origin preview and rejects manual authority", async () => {
+    await expect(parsePreviewRequest(request({ envelope }))).resolves.toEqual({ envelope });
+    await expect(parsePreviewRequest(request({ envelope, manualMappings: [] }))).rejects.toThrow("request_invalid");
   });
 
   it.each([

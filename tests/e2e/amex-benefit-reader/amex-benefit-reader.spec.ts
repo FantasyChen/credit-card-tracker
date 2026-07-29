@@ -117,6 +117,45 @@ async function waitForFinalReader(page: import("@playwright/test").Page): Promis
   await expect(page.getByRole("status")).toHaveCount(0);
 }
 
+async function createSyntheticHandoffMailbox() {
+  const now = new Date();
+  const handoffEnvelope = parseAmexSyncEnvelope({
+    envelopeVersion: "amex-sync-envelope/3",
+    observationContractVersion: "amex-benefits/3",
+    scanId: "22222222-2222-4222-8222-222222222222",
+    scanFinishedAt: now.toISOString(),
+    cards: [{
+      sourceLocalCardId: "11111111-1111-4111-8111-111111111111",
+      providerProductName: "American Express Platinum Card",
+      productKey: "american-express-platinum-card",
+      endingDigits: "12345",
+      observedAt: now.toISOString(),
+      parserVersion: "amex-api-us/3.0.0",
+      rows: [{
+        providerTitle: "Resy Credit",
+        providerCategory: "usage",
+        sourceCreditKey: "american-express-platinum-card:resy",
+        creditFamilyKey: "american-express-platinum-card:resy",
+        sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },
+        enrollmentState: "enrolled",
+        completionState: "incomplete",
+        earnedOrUsed: { value: "25.00", unit: "USD", currency: "USD" },
+        targetOrLimit: { value: "100.00", unit: "USD", currency: "USD" },
+      }],
+    }],
+    exclusions: [],
+  });
+  return {
+    mailboxVersion: "amex-sync-mailbox/2" as const,
+    transferId: SYNTHETIC_HANDOFF_TRANSFER_ID,
+    nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    createdAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
+    digest: await digestAmexSyncEnvelope(handoffEnvelope),
+    envelope: handoffEnvelope,
+  };
+}
+
 test("invalidates one role-unverified snapshot and mailbox without reading Amex", async ({ context, page }) => {
   const harness = new SyntheticAmexHarness(context, page, "complete");
   const identitySecret = "f".repeat(64);
@@ -145,7 +184,7 @@ test("shows only real scan progress until the built reader reaches a terminal re
   await harness.openAndInject();
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.4.0");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.5.1");
   const scanButton = page.getByRole("button", { name: "Scan all cards" });
   expect(harness.apiRequests()).toHaveLength(0);
   await scanButton.click();
@@ -361,46 +400,53 @@ test("mounts once and scans manually from a selector-free non-benefits route", a
   harness.assertNetworkStayedSynthetic();
 });
 
-test("bridges one strict storage-only mailbox on the exact first-party handoff branch", async ({ context, page }) => {
+test("bridges one strict storage-only mailbox on the exact production handoff branch", async ({ context, page }) => {
   const harness = new SyntheticAmexHarness(context, page, "complete");
   await harness.installBeforeNavigation();
-  const now = new Date();
-  const envelope = parseAmexSyncEnvelope({
-    envelopeVersion: "amex-sync-envelope/2",
-    observationContractVersion: "amex-benefits/3",
-    scanId: "22222222-2222-4222-8222-222222222222",
-    scanFinishedAt: now.toISOString(),
-    cards: [{
-      sourceLocalCardId: "11111111-1111-4111-8111-111111111111",
-      productKey: "american-express-platinum-card",
-      endingDigits: "1234",
-      observedAt: now.toISOString(),
-      parserVersion: "amex-api-us/3.0.0",
-      rows: [{
-        creditFamilyKey: "american-express-platinum-card:resy",
-        sourcePeriod: { kind: "calendar_date_range", startDate: "2026-07-01", endDate: "2026-09-30", timeZone: "UTC" },
-        enrollmentState: "enrolled",
-        completionState: "incomplete",
-        earnedOrUsed: { value: "25.00", unit: "USD", currency: "USD" },
-        targetOrLimit: { value: "100.00", unit: "USD", currency: "USD" },
-      }],
-    }],
-    exclusions: [],
-  });
-  const mailbox = {
-    mailboxVersion: "amex-sync-mailbox/2" as const,
-    transferId: SYNTHETIC_HANDOFF_TRANSFER_ID,
-    nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    createdAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
-    digest: await digestAmexSyncEnvelope(envelope),
-    envelope,
-  };
 
-  await harness.openHandoffAndInject(mailbox);
+  await harness.openHandoffAndInject(await createSyntheticHandoffMailbox());
   await expect(page.locator("body")).toHaveAttribute("data-handoff-state", "accepted");
+  await expect(page.locator("body")).not.toHaveAttribute("data-premature-payload", "true");
   expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(false);
   await expect(page.locator("#perks-reminder-amex-reader")).toHaveCount(0);
+  expect(harness.apiRequests()).toHaveLength(0);
+  harness.assertNetworkStayedSynthetic();
+});
+
+test("bridges the local artifact only on the exact localhost handoff branch", async ({ context, page }) => {
+  const harness = new SyntheticAmexHarness(context, page, "complete");
+  await harness.installBeforeNavigation();
+
+  await harness.openHandoffAndInject(await createSyntheticHandoffMailbox(), "local");
+  await expect(page.locator("body")).toHaveAttribute("data-handoff-state", "accepted");
+  await expect(page.locator("body")).not.toHaveAttribute("data-premature-payload", "true");
+  expect(new URL(page.url()).origin).toBe("http://localhost:3000");
+  expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(false);
+  await expect(page.locator("#perks-reminder-amex-reader")).toHaveCount(0);
+  expect(harness.apiRequests()).toHaveLength(0);
+  harness.assertNetworkStayedSynthetic();
+});
+
+test("does not activate the local artifact on the production handoff origin", async ({ context, page }) => {
+  const harness = new SyntheticAmexHarness(context, page, "complete");
+  await harness.installBeforeNavigation();
+
+  await harness.openHandoffAndInject(await createSyntheticHandoffMailbox(), "local", "production");
+  await expect(page.locator("body")).toHaveAttribute("data-ready-announced", "true");
+  await expect(page.locator("body")).toHaveAttribute("data-handoff-state", "waiting");
+  expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(true);
+  expect(harness.apiRequests()).toHaveLength(0);
+  harness.assertNetworkStayedSynthetic();
+});
+
+test("does not activate the production artifact on the local handoff origin", async ({ context, page }) => {
+  const harness = new SyntheticAmexHarness(context, page, "complete");
+  await harness.installBeforeNavigation();
+
+  await harness.openHandoffAndInject(await createSyntheticHandoffMailbox(), "production", "local");
+  await expect(page.locator("body")).toHaveAttribute("data-ready-announced", "true");
+  await expect(page.locator("body")).toHaveAttribute("data-handoff-state", "waiting");
+  expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(true);
   expect(harness.apiRequests()).toHaveLength(0);
   harness.assertNetworkStayedSynthetic();
 });

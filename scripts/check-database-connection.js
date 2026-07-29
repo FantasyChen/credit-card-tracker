@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const dotenv = require('dotenv');
-const { execFileSync } = require('child_process');
+import dotenv from 'dotenv';
+import { execFileSync } from 'node:child_process';
 
 dotenv.config();
 
@@ -15,8 +15,19 @@ const colors = {
   dim: '\x1b[2m',
 };
 
-function mask(url) {
-  return url ? url.replace(/\/\/[^@]+@/, '//****@') : '(not set)';
+function mask(value) {
+  if (!value) return '(not set)';
+  try {
+    const url = new URL(value);
+    const database = url.pathname.replace(/^\//, '');
+    const queryKeys = [...new Set(url.searchParams.keys())];
+    const maskedQuery = queryKeys.length > 0
+      ? `?${queryKeys.map(key => `${encodeURIComponent(key)}=****`).join('&')}`
+      : '';
+    return `${url.protocol}//****@${url.host}/${database}${maskedQuery}`;
+  } catch {
+    return '(configured, invalid URL format)';
+  }
 }
 
 function directUrlFor(url, explicitDirectUrl) {

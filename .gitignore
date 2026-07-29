@@ -23,6 +23,9 @@
 # production
 /build
 
+# Local-only generated userscript served by the development Next app
+/public/local-development/amex-benefit-reader.local.user.js
+
 # misc
 .DS_Store
 *.pem
