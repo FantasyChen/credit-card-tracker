@@ -1,0 +1,11 @@
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Preserve domain ownership, authentication, benefit-cycle, and public-route invariants while changing end-to-end sync flow."}
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Normative AMEX reader, private handoff, conservative normalization, sync authority, replay, and audit contracts."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Required for catalog key propagation, Prisma-aware code, dry-run backfill design, and avoiding unsafe database commands."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Defines shared catalog identity, period/cycle modeling, existing-user propagation, and benefit update requirements."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Select safe validation commands and avoid production-affecting checks."}
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Place handoff UI, shared types, domain modules, and route-owned code consistently."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Implement actionable card-level skip and confirmation UI accessibly."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Preserve preview/confirmation state ownership while removing manual mapping state."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Keep strict Zod and TypeScript wire boundaries synchronized across browser, API, and UI."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Follow project test and accessibility patterns for changed client and API behavior."}
+{"file":".trellis/tasks/07-28-complete-amex-sync-reconciliation/research/amex-card-benefit-mapping-matrix.md","reason":"Complete 12-card/56-benefit inventory, evidence anchors, proposed keys, exclusions, period gaps, and mapping ambiguities."}

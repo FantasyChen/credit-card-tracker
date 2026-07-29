@@ -1,0 +1,9 @@
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Review ownership, lifecycle, benefit-cycle, authentication, and data-flow invariants."}
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Verify the browser/server trust split, privacy boundary, strict handoff, replay safety, provenance, and audit behavior."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Check schema/catalog/backfill safety and ensure no unsafe database action or artifact was introduced."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Verify complete stable keys, existing-user disposition, period modeling, and status materialization behavior."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Run and report the project-approved safe check matrix."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review missing-last-five and handoff UI semantics, accessibility, and interaction behavior."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Verify strict browser/API/UI contract agreement and no unsafe type widening."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply frontend test, mutation-matrix, accessibility, and full-check conventions."}
+{"file":".trellis/tasks/07-28-complete-amex-sync-reconciliation/research/amex-card-benefit-mapping-matrix.md","reason":"Cross-check full catalog coverage, exclusions, source evidence, and unresolved ambiguity handling."}
