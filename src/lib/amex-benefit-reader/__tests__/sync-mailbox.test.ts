@@ -1,3 +1,4 @@
+import { LOCAL_AMEX_SYNC_HANDOFF_TARGET } from "../handoff-target";
 import {
   AMEX_SYNC_HANDOFF_ORIGIN,
   AMEX_SYNC_MAILBOX_KEY,
@@ -19,14 +20,15 @@ class MemoryStorage implements MailboxStorage {
 
 const now = new Date("2026-07-15T12:00:00.000Z");
 const envelope = parseAmexSyncEnvelope({
-  envelopeVersion: "amex-sync-envelope/2",
+  envelopeVersion: "amex-sync-envelope/3",
   observationContractVersion: "amex-benefits/3",
   scanId: "22222222-2222-4222-8222-222222222222",
   scanFinishedAt: now.toISOString(),
   cards: [{
     sourceLocalCardId: "11111111-1111-4111-8111-111111111111",
+    providerProductName: "American Express Platinum Card",
     productKey: "american-express-platinum-card",
-    endingDigits: "1234",
+    endingDigits: "12345",
     observedAt: now.toISOString(),
     parserVersion: "amex-api-us/3.0.0",
     rows: [],
@@ -46,6 +48,11 @@ describe("private Amex sync mailbox", () => {
     expect(url.origin).toBe(AMEX_SYNC_HANDOFF_ORIGIN);
     expect(url.pathname).toBe("/integrations/amex-sync");
     expect(Array.from(url.searchParams.keys())).toEqual(["transfer"]);
+
+    const localUrl = new URL(amexSyncHandoffUrl(mailbox.transferId, "local"));
+    expect(localUrl.origin).toBe(LOCAL_AMEX_SYNC_HANDOFF_TARGET.origin);
+    expect(localUrl.pathname).toBe("/integrations/amex-sync");
+    expect(localUrl.searchParams.get("transfer")).toBe(mailbox.transferId);
   });
 
   it("stores one entry, verifies integrity, and clears it explicitly", async () => {

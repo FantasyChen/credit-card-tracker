@@ -21,7 +21,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     const preview = await previewAmexSync({
       userId: session.user.id,
       envelope: parsed.envelope,
-      manualMappings: parsed.manualMappings,
       mode: configuration.mode,
       hmacKey: configuration.hmacKey,
     });

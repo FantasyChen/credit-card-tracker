@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -8,10 +8,10 @@ import {
 } from "@heroicons/react/24/outline";
 import { z } from "zod";
 import {
-  AMEX_SYNC_HANDOFF_ORIGIN,
   AMEX_SYNC_HANDOFF_PATH,
-  handoffPayloadMessageSchema,
-} from "@/lib/amex-benefit-reader/sync-mailbox";
+  resolveAmexSyncHandoffTargetForOrigin,
+} from "@/lib/amex-benefit-reader/handoff-target";
+import { handoffPayloadMessageSchema } from "@/lib/amex-benefit-reader/sync-mailbox";
 import {
   AMEX_SYNC_MAX_ROWS,
   digestAmexSyncEnvelope,
@@ -23,11 +23,6 @@ import {
 } from "@/lib/amex-benefit-reader/contract";
 import type { AmexSyncMode } from "@/lib/amex-sync/mode";
 import { Button } from "@/components/ui/button";
-
-interface MappingSelection {
-  sourceLocalCardId: string;
-  destinationCardId: string;
-}
 
 const statusProjectionSchema = z.object({
   usedAmount: z.number().finite().nonnegative(),
@@ -42,7 +37,11 @@ const nonAppliedReasonSchema = z.enum([
   "scan_expired",
   "product_not_allowlisted",
   "credit_family_not_allowlisted",
-  "manual_mapping_required",
+  "source_evidence_mismatch",
+  "source_mapping_ambiguous",
+  "source_last_five_required",
+  "destination_last_five_required",
+  "destination_card_missing",
   "ambiguous_card",
   "mapping_invalid",
   "destination_key_missing",
@@ -63,6 +62,7 @@ const nonAppliedReasonSchema = z.enum([
 
 const syncRowResultFields = {
   sourceRowIdentity: z.string().regex(/^[a-f0-9]{64}$/),
+  atomicGroupIdentity: z.string().regex(/^[a-f0-9]{64}$/),
   sourceLocalCardId: z.string().uuid(),
   productKey: amexProductKeySchema,
   creditFamilyKey: creditFamilyKeySchema,
@@ -128,10 +128,11 @@ const previewResponseSchema = z.object({
   rows: z.array(previewSyncRowResultSchema).max(AMEX_SYNC_MAX_ROWS),
   proposalToken: z.string().min(1).max(16_384),
   proposalExpiresAt: z.string().datetime({ offset: true }),
-  mappingOptions: z.array(z.object({
-    id: z.string().min(1).max(128),
-    productKey: amexProductKeySchema,
+  cardSkips: z.array(z.object({
+    destinationCardId: z.string().min(1).max(128),
+    reason: z.literal("destination_last_five_required"),
     label: z.string().min(1).max(200),
+    editHref: z.string().regex(/^\/cards\/[A-Za-z0-9_-]{1,128}\/edit#lastFourDigits$/),
   }).strict()).max(AMEX_SYNC_MAX_ROWS),
 }).strict();
 type PreviewResponse = z.infer<typeof previewResponseSchema>;
@@ -156,13 +157,10 @@ type ConfirmationResponse = z.infer<typeof confirmationResponseSchema>;
 type HandoffState =
   | "waiting"
   | "previewing"
-  | "mapping"
   | "preview"
   | "confirming"
   | "result"
   | "invalid";
-
-const MAPPING_REASONS = new Set(["manual_mapping_required", "ambiguous_card", "mapping_invalid"]);
 
 function reasonText(reason: string): string {
   const labels: Record<string, string> = {
@@ -174,9 +172,13 @@ function reasonText(reason: string): string {
     scan_expired: "The reviewed scan expired",
     product_not_allowlisted: "This card product is not enabled for sync",
     credit_family_not_allowlisted: "This benefit is not enabled for sync",
-    manual_mapping_required: "Choose the matching card",
-    ambiguous_card: "More than one matching card was found",
-    mapping_invalid: "The saved card mapping is no longer valid",
+    source_evidence_mismatch: "The provider evidence did not independently resolve to this benefit",
+    source_mapping_ambiguous: "More than one source row claimed the same reviewed benefit",
+    source_last_five_required: "The Amex observation did not expose exactly five ending digits",
+    destination_last_five_required: "Add exactly five ending digits to this Perks Reminder card",
+    destination_card_missing: "No owned active Amex card matched this product and exact last five",
+    ambiguous_card: "More than one exact card match was found",
+    mapping_invalid: "The destination card identity is no longer valid",
     destination_key_missing: "The destination card is missing reviewed sync keys",
     destination_benefit_missing: "No exact destination benefit was found",
     destination_benefit_ambiguous: "More than one destination benefit matched",
@@ -214,6 +216,7 @@ function exclusionText(reason: AmexSyncEnvelope["exclusions"][number]["reason"])
     prerequisite_only: "Enrollment or linking is still required",
     status_unavailable: "Usable source status was not exposed",
     source_mapping_ambiguous: "More than one source row mapped to the same reviewed benefit",
+    source_last_five_required: "The source card did not expose exactly five ending digits",
   };
   return labels[reason];
 }
@@ -282,33 +285,47 @@ export function AmexSyncHandoffClient({
   const [envelope, setEnvelope] = useState<AmexSyncEnvelope | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [result, setResult] = useState<ConfirmationResponse | null>(null);
-  const [manualMappings, setManualMappings] = useState<MappingSelection[]>([]);
   const acceptedPayload = useRef(false);
+  const actionInFlight = useRef(false);
 
-  const runPreview = useCallback(async (nextEnvelope: AmexSyncEnvelope, mappings: MappingSelection[]): Promise<boolean> => {
-    setState("previewing");
-    setMessage("Checking exact card, benefit, and period matches…");
-    const response = await postJson("/api/integrations/amex-sync/preview", { envelope: nextEnvelope, manualMappings: mappings });
-    const parsed = previewResponseSchema.safeParse(response.value);
-    if (!response.ok || !parsed.success) {
-      setState("invalid");
-      setMessage(response.status === 503
-        ? "Amex sync is currently turned off. No data was changed."
-        : "The reviewed handoff could not be previewed. Return to Amex, scan again, and retry.");
-      return false;
-    }
-    setPreview(parsed.data);
+  const runPreview = useCallback(async (nextEnvelope: AmexSyncEnvelope): Promise<boolean> => {
+    if (actionInFlight.current) return false;
+    actionInFlight.current = true;
     setResult(null);
-    const requiresMapping = parsed.data.rows.some((row) => MAPPING_REASONS.has(row.reason));
-    setState(requiresMapping ? "mapping" : "preview");
-    setMessage(requiresMapping
-      ? "Choose a destination card, then create a new preview."
-      : "Review every row below. Nothing has been written.");
-    return true;
+    setState("previewing");
+    setMessage("Checking exact card, benefit, period, and last-five matches…");
+    try {
+      const response = await postJson("/api/integrations/amex-sync/preview", { envelope: nextEnvelope });
+      const parsed = previewResponseSchema.safeParse(response.value);
+      if (!response.ok || !parsed.success) {
+        setState("invalid");
+        setMessage(response.status === 503
+          ? "Amex sync is currently turned off. No data was changed."
+          : "The reviewed handoff could not be previewed. Return to Amex, run a fresh scan, then choose Sync reviewed again.");
+        return false;
+      }
+      setPreview(parsed.data);
+      setState("preview");
+      setMessage("Review every row and card prerequisite below. Nothing has been written.");
+      return true;
+    } catch {
+      setState("invalid");
+      setMessage("The reviewed handoff could not be previewed. Return to Amex, run a fresh scan, then choose Sync reviewed again.");
+      return false;
+    } finally {
+      actionInFlight.current = false;
+    }
   }, []);
 
   useEffect(() => {
     if (!transferId) return;
+    const handoffTarget = resolveAmexSyncHandoffTargetForOrigin(window.location.origin);
+    if (!handoffTarget) {
+      setState("invalid");
+      setMessage("This Amex sync handoff is not available on the current origin.");
+      return;
+    }
+
     let active = true;
     const timeout = window.setTimeout(() => {
       if (!active || acceptedPayload.current) return;
@@ -317,7 +334,7 @@ export function AmexSyncHandoffClient({
     }, 15_000);
 
     const receivePayload = (event: MessageEvent<unknown>) => {
-      if (!active || acceptedPayload.current || event.source !== window || event.origin !== AMEX_SYNC_HANDOFF_ORIGIN) return;
+      if (!active || acceptedPayload.current || event.source !== window || event.origin !== handoffTarget.origin) return;
       const parsed = handoffPayloadMessageSchema.safeParse(event.data);
       if (!parsed.success || parsed.data.transferId !== transferId) return;
       void (async () => {
@@ -336,13 +353,13 @@ export function AmexSyncHandoffClient({
           setMessage("Amex sync is currently turned off. No data was changed.");
           return;
         }
-        const previewAccepted = await runPreview(parsed.data.envelope, []);
+        const previewAccepted = await runPreview(parsed.data.envelope);
         if (active && previewAccepted) {
           window.postMessage({
             type: "perks-reminder:amex-sync-accepted",
             transferId,
             nonce: parsed.data.nonce,
-          }, AMEX_SYNC_HANDOFF_ORIGIN);
+          }, handoffTarget.origin);
         }
       })().catch(() => {
         setState("invalid");
@@ -352,7 +369,7 @@ export function AmexSyncHandoffClient({
 
     const announceReady = () => {
       if (!acceptedPayload.current) {
-        window.postMessage({ type: "perks-reminder:amex-sync-ready", transferId }, AMEX_SYNC_HANDOFF_ORIGIN);
+        window.postMessage({ type: "perks-reminder:amex-sync-ready", transferId }, handoffTarget.origin);
       }
     };
     window.addEventListener("message", receivePayload);
@@ -366,50 +383,44 @@ export function AmexSyncHandoffClient({
     };
   }, [initialMode, runPreview, transferId]);
 
-  const mappingCards = useMemo(() => {
-    if (!preview) return [];
-    const products = new Map(preview.rows.map((row) => [row.sourceLocalCardId, row.productKey]));
-    return preview.rows
-      .filter((row) => MAPPING_REASONS.has(row.reason))
-      .filter((row, index, rows) => rows.findIndex((candidate) => candidate.sourceLocalCardId === row.sourceLocalCardId) === index)
-      .map((row) => ({
-        sourceLocalCardId: row.sourceLocalCardId,
-        options: preview.mappingOptions.filter((option) => option.productKey === products.get(row.sourceLocalCardId)),
-      }));
-  }, [preview]);
-
-  const updateMapping = (sourceLocalCardId: string, destinationCardId: string) => {
-    setManualMappings((current) => [
-      ...current.filter((mapping) => mapping.sourceLocalCardId !== sourceLocalCardId),
-      ...(destinationCardId ? [{ sourceLocalCardId, destinationCardId }] : []),
-    ]);
-  };
-
   const confirm = async () => {
-    if (!envelope || !preview || preview.mode !== "write" || state !== "preview") return;
+    if (actionInFlight.current || !envelope || !preview || preview.mode !== "write" || state !== "preview") return;
+    actionInFlight.current = true;
     setState("confirming");
     setMessage("Applying each approved row independently…");
-    const response = await postJson("/api/integrations/amex-sync/confirm", {
-      envelope,
-      manualMappings,
-      proposalToken: preview.proposalToken,
-    });
-    if (response.status === 409) {
-      setMessage("Your saved benefits changed after the preview. Create a fresh preview before confirming.");
-      await runPreview(envelope, manualMappings);
-      return;
-    }
-    const parsed = confirmationResponseSchema.safeParse(response.value);
-    if (!response.ok || !parsed.success) {
+    try {
+      const response = await postJson("/api/integrations/amex-sync/confirm", {
+        envelope,
+        proposalToken: preview.proposalToken,
+      });
+      if (response.status === 409) {
+        setMessage("Your saved benefits changed after the preview. Creating a fresh preview now.");
+        actionInFlight.current = false;
+        await runPreview(envelope);
+        return;
+      }
+      const parsed = confirmationResponseSchema.safeParse(response.value);
+      if (!response.ok || !parsed.success) {
+        setState("preview");
+        setMessage("Confirmation failed safely. No unreported row is assumed to be updated. Retry only while this preview remains valid, or return to Amex and run a fresh scan.");
+        return;
+      }
+      setResult(parsed.data);
+      setState("result");
+      setMessage(parsed.data.replayed
+        ? "This exact confirmation was already processed. The recorded result is shown below."
+        : `Sync finished. ${parsed.data.updatedCount} row${parsed.data.updatedCount === 1 ? "" : "s"} updated.`);
+    } catch {
       setState("preview");
-      setMessage("Confirmation failed safely. No unreported row is assumed to be updated.");
-      return;
+      setMessage("Confirmation failed safely. No unreported row is assumed to be updated. Retry only while this preview remains valid, or return to Amex and run a fresh scan.");
+    } finally {
+      actionInFlight.current = false;
     }
-    setResult(parsed.data);
-    setState("result");
-    setMessage(parsed.data.replayed
-      ? "This exact confirmation was already processed. The recorded result is shown below."
-      : `Sync finished. ${parsed.data.updatedCount} row${parsed.data.updatedCount === 1 ? "" : "s"} updated.`);
+  };
+
+  const refreshPreview = () => {
+    if (!envelope || !preview || (state !== "preview" && state !== "result")) return;
+    void runPreview(envelope);
   };
 
   const rows = result?.rows ?? preview?.rows ?? [];
@@ -418,10 +429,6 @@ export function AmexSyncHandoffClient({
     return current;
   }, {} as Record<string, number>);
   const hasProposedRows = rows.some((row) => row.disposition === "proposed");
-  const hasConfirmableManualMapping = manualMappings.some((mapping) => rows.some((row) =>
-    row.sourceLocalCardId === mapping.sourceLocalCardId
-      && row.destinationCardId === mapping.destinationCardId
-      && row.disposition !== "skipped"));
 
   return (
     <div className="mx-auto max-w-3xl" data-amex-sync-state={state}>
@@ -458,31 +465,38 @@ export function AmexSyncHandoffClient({
         </section>
       )}
 
-      {state === "mapping" && preview && (
-        <section className="mt-6 rounded-2xl border border-border bg-card p-6" aria-labelledby="mapping-heading">
-          <h2 id="mapping-heading" className="text-lg font-semibold text-foreground">Match Amex cards</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Select only the Perks Reminder card that represents each Amex card. This choice is not saved until a write is confirmed.</p>
-          <div className="mt-5 grid gap-4">
-            {mappingCards.map((card) => (
-              <label key={card.sourceLocalCardId} className="grid gap-2 text-sm font-medium text-foreground">
-                Amex card from this scan
-                <select
-                  className="h-11 rounded-lg border border-border bg-background px-3 text-foreground"
-                  value={manualMappings.find((mapping) => mapping.sourceLocalCardId === card.sourceLocalCardId)?.destinationCardId ?? ""}
-                  onChange={(event) => updateMapping(card.sourceLocalCardId, event.target.value)}
+      {preview && preview.cardSkips.length > 0 && state !== "invalid" && (
+        <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900 dark:bg-amber-950/30" aria-labelledby="card-prerequisites-heading">
+          <h2 id="card-prerequisites-heading" className="text-lg font-semibold text-foreground">Card details needed for Amex sync</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Exactly five ending digits are required. Card names and manual selections cannot bypass this identity check.</p>
+          <p id="card-edit-guidance" className="mt-2 text-sm text-muted-foreground">
+            Editing opens in a new tab. Save the card there, return to this page, then refresh the preview.
+          </p>
+          <ul className="mt-4 grid gap-3">
+            {preview.cardSkips.map((skip) => (
+              <li key={skip.destinationCardId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-background p-3 dark:border-amber-900">
+                <span className="text-sm font-medium text-foreground">{skip.label}</span>
+                <a
+                  className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                  href={skip.editHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Add five ending digits for ${skip.label}`}
+                  aria-describedby="card-edit-guidance"
                 >
-                  <option value="">Choose a matching card</option>
-                  {card.options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-                </select>
-              </label>
+                  Add five ending digits
+                </a>
+              </li>
             ))}
-          </div>
+          </ul>
           <Button
-            className="mt-5"
-            disabled={!envelope || mappingCards.some((card) => !manualMappings.some((mapping) => mapping.sourceLocalCardId === card.sourceLocalCardId))}
-            onClick={() => envelope && void runPreview(envelope, manualMappings)}
+            type="button"
+            variant="outline"
+            className="mt-4"
+            disabled={!envelope || state === "previewing" || state === "confirming"}
+            onClick={refreshPreview}
           >
-            Create new preview
+            {state === "previewing" ? "Refreshing preview…" : "Refresh after editing cards"}
           </Button>
         </section>
       )}
@@ -510,10 +524,10 @@ export function AmexSyncHandoffClient({
             <>
               <h2 className="text-lg font-semibold text-foreground">Confirm separately</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Only rows marked proposed can change benefit status. A compatible card match you selected will also be remembered. Unchanged and skipped benefit statuses remain untouched. You can close this page to cancel.
+                Only rows marked proposed can change benefit status. Cards are matched by owned active Amex product and exact last five; there is no manual override. Unchanged and skipped benefit statuses remain untouched. You can close this page to cancel.
               </p>
-              <Button className="mt-5" disabled={!hasProposedRows && !hasConfirmableManualMapping} onClick={() => void confirm()}>
-                {hasProposedRows ? "Confirm proposed updates" : "Confirm selected card mapping"}
+              <Button className="mt-5" disabled={!hasProposedRows} onClick={() => void confirm()}>
+                Confirm proposed updates
               </Button>
             </>
           ) : (
@@ -531,7 +545,7 @@ export function AmexSyncHandoffClient({
 
       {state === "invalid" && (
         <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-          No benefit data was changed. Return to the Amex reader and create a fresh handoff when ready.
+          No benefit data was changed. Return to Amex, run a fresh scan, then choose Sync reviewed again when ready.
         </section>
       )}
     </div>
