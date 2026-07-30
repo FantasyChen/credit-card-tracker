@@ -59,8 +59,8 @@
 
 ## 5. Production legacy bridge and parity
 
-- [ ] Run the new complete bounded legacy dry-run twice; record only aggregate standard/custom/unresolved/blocked reasons.
-- [ ] Privately review every stop class; do not widen matching or expose row values.
+- [x] Run the new complete bounded legacy dry-run twice; record only aggregate standard/custom/unresolved/blocked reasons.
+- [x] Privately review every stop class; no unresolved/blocked class occurred, matching was not widened, and no row values were exposed.
 - [ ] Obtain separate bridge authorization and apply bounded exact plans with per-batch fingerprint/CAS checks.
 - [ ] After each batch, verify no status creation/deletion/state/timestamp/audit/provenance rewrite and no custom/unresolved mutation.
 - [ ] Complete hybrid projection parity and idempotent zero-plan rerun.
@@ -125,11 +125,12 @@ The database-backed usage-guide audit was inadvertently invoked during final sou
 ## Historical evidence handling
 
 - [x] Reference the parent research only as historical scale/diagnostic context and explicitly non-authorizing.
-- [ ] Generate fresh new-model counts, fingerprints, parity, and stop evidence.
+- [x] Generate fresh new-model catalog and legacy dry-run counts/fingerprints/stop evidence.
+- [ ] Generate bridge preservation/parity evidence after separate apply authorization.
 - [ ] State every future operation as passed, failed, blocked, or skipped and record the resulting effective AMEX mode exactly.
 
 The earlier production read-only inspection and per-user-key dry-run are preserved only in the parent historical ledger. They do not satisfy any development or production prerequisite in this plan.
 
 ## Current status
 
-Implementation and verified-development prerequisites are complete. Production application/database/provider targets and recovery were verified; the additive migration succeeded and the global catalog applied the separately authorized exact adoption plan. The immediate post-apply dry-run reported all 34 cards and 129 benefits unchanged with zero conflicts. Production AMEX remains effectively `off`. The next independent boundary is the complete bounded read-only legacy migration dry-run. Legacy bridge apply, push/deployment, cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
+Implementation and verified-development prerequisites are complete. Production application/database/provider targets and recovery were verified; the additive migration succeeded and the global catalog applied the separately authorized exact adoption plan. The immediate post-apply dry-run reported all 34 cards and 129 benefits unchanged with zero conflicts. Two complete 19-page legacy dry-run passes deterministically classified 11,922 exact standard and 813 preserved custom benefits, with zero unresolved benefits or blocked units. Production AMEX remains effectively `off`. The next independent boundary is separately authorized, fingerprint-gated legacy bridge apply with preservation and idempotency verification. Push/deployment, cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
