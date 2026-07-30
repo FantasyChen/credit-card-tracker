@@ -1,0 +1,7 @@
+{"file":".trellis/spec/perks-reminder/index.md","reason":"Entry point for AMEX, domain, database, and verification contracts."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Authoritative V3, matching, proposal, transaction, audit, provenance, and atomicity contract."}
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Defines physical-card identity and authenticated user-owned mutation requirements."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Defines schema-dependent rollout, migration, and external database safety boundaries."}
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Preserves local product-independent observations, mailbox privacy, and browser/server separation."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Authority crosses provider evidence, registry, repository, service, persistence, and DTO layers."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/design.md","reason":"Parent design defines global-only destination authority and production-off sequencing."}

@@ -107,6 +107,7 @@ describe('buildBenefitDashboardProjection', () => {
     productChangedTo: null,
     lifecycleNotes: null,
     productKey: null,
+    predefinedCardId: null,
   };
 
   function rawStatus(
@@ -119,6 +120,8 @@ describe('buildBenefitDashboardProjection', () => {
     return {
       id,
       benefitId: `benefit-${id}`,
+      creditCardId: card.id,
+      predefinedBenefitId: null,
       userId: 'user-1',
       cycleStartDate: date('2026-05-01'),
       cycleEndDate: date('2026-05-31'),
@@ -130,6 +133,10 @@ describe('buildBenefitDashboardProjection', () => {
       occurrenceIndex: 0,
       createdAt: date('2026-05-01'),
       updatedAt: date('2026-05-01'),
+      source: { kind: 'legacy', benefitId: `benefit-${id}`, creditCardId: card.id },
+      usageWaySlug: null,
+      isCustomBenefit: false,
+      canMutateDefinition: false,
       ...overrides,
       benefit: {
         id: `benefit-${id}`,
@@ -199,6 +206,29 @@ describe('buildBenefitDashboardProjection', () => {
     expect(projection.upcomingBenefits[0].benefit.creditCard?.displayName).toBe('Test Card');
     expect(projection.upcomingBenefits[0].usageWaySlug).toBe('monthly-travel-credit');
     expect(projection.cardLevelRoi.map((row) => row.cardName)).toContain(CUSTOM_BENEFITS_CARD_NAME);
+  });
+
+  it('uses authoritative global card terms instead of stale copied names', () => {
+    const currentCard = {
+      ...card,
+      name: 'Current Global Card Name',
+      issuer: 'Current Issuer',
+    };
+    const projection = buildBenefitDashboardProjection({
+      statuses: [rawStatus('current-terms', {
+        benefit: { creditCard: currentCard } as never,
+      })],
+      userCards: [card],
+      usageWays: [],
+      predefinedCardFees: [{ name: 'Current Global Card Name', annualFee: 125 }],
+      now: date('2026-05-15'),
+    });
+
+    expect(projection.upcomingBenefits[0].benefit.creditCard).toMatchObject({
+      name: 'Current Global Card Name',
+      issuer: 'Current Issuer',
+      displayName: 'Current Global Card Name',
+    });
   });
 
   it('keeps duplicate-card ROI separate by physical card identity', () => {

@@ -1,6 +1,11 @@
 import type { AmexSyncPlan } from "../authority";
 import { resolveAmexSyncConfiguration } from "../mode";
-import { createAmexSyncProposal, verifyAmexSyncProposal } from "../proposal";
+import {
+  AMEX_SYNC_PROPOSAL_MAX_LENGTH,
+  createAmexSyncProposal,
+  digestAmexSyncProposalIdentities,
+  verifyAmexSyncProposal,
+} from "../proposal";
 import { AmexSyncRequestError, assertSameOriginAmexSyncRequest, parsePreviewRequest } from "../request";
 
 const now = new Date("2026-07-15T12:00:00.000Z");
@@ -13,6 +18,7 @@ const plan: AmexSyncPlan = {
     sourceObservationDigest: "c".repeat(64),
     sourceLocalCardId: "11111111-1111-4111-8111-111111111111",
     sourceEndingDigits: "12345",
+    sourceCreditKey: "american-express-platinum-card:resy",
     productKey: "american-express-platinum-card",
     creditFamilyKey: "american-express-platinum-card:resy",
     observedAt: "2026-07-15T11:59:00.000Z",
@@ -23,13 +29,23 @@ const plan: AmexSyncPlan = {
     disposition: "proposed",
     reason: "proposed_update",
     destinationCardId: "card-1",
-    destinationBenefitId: "benefit-1",
+    destinationPredefinedCardId: "global-card-1",
+    destinationProductCatalogKey: "card:american-express-platinum-card",
+    destinationBenefitId: "legacy-benefit-1",
+    destinationPredefinedBenefitId: "global-benefit-1",
+    destinationBenefitCatalogKey: "benefit:american-express-platinum-card:resy:calendar-quarter-q3",
+    destinationDefinitionFingerprint: "1".repeat(64),
     destinationStatusId: "status-1",
+    destinationOccurrenceIndex: 0,
+    destinationCycleStartInstant: "2026-07-01T00:00:00.000Z",
+    destinationCycleEndInstant: "2026-09-30T23:59:59.999Z",
+    beforeProvenance: null,
     before: { usedAmount: 0, isCompleted: false, completedAt: null, isNotUsable: false },
     after: { usedAmount: 25, isCompleted: false, completedAt: null, isNotUsable: false },
     changes: { amountDecrease: false, amountIncrease: true, completionSet: false, completionCleared: false },
   }],
   envelopeDigest: "d".repeat(64),
+  destinationAuthorityDigest: "e".repeat(64),
   beforeStateDigest: "f".repeat(64),
 };
 
@@ -78,15 +94,44 @@ describe("HMAC-bound Amex sync proposal", () => {
       userId: "user-1",
       mode: "write",
       envelopeDigest: plan.envelopeDigest,
+      destinationAuthorityDigest: plan.destinationAuthorityDigest,
       beforeStateDigest: plan.beforeStateDigest,
-      sourceRowIdentities: [plan.rows[0].sourceRowIdentity],
-      atomicGroupIdentities: [plan.rows[0].atomicGroupIdentity],
+      sourceRowIdentitiesDigest: digestAmexSyncProposalIdentities([plan.rows[0].sourceRowIdentity]),
+      atomicGroupIdentitiesDigest: digestAmexSyncProposalIdentities([plan.rows[0].atomicGroupIdentity]),
+      rowCount: 1,
       transitionTime: now.toISOString(),
     });
     expect(() => verifyAmexSyncProposal({ token: proposal.token, key, userId: "user-2", expectedMode: "write", now })).toThrow("proposal_invalid");
     expect(() => verifyAmexSyncProposal({ token: proposal.token, key: `${key}x`, userId: "user-1", expectedMode: "write", now })).toThrow("proposal_invalid");
     expect(() => verifyAmexSyncProposal({ token: `${proposal.token.slice(0, -1)}x`, key, userId: "user-1", expectedMode: "write", now })).toThrow("proposal_invalid");
     expect(() => verifyAmexSyncProposal({ token: proposal.token, key, userId: "user-1", expectedMode: "write", now: new Date(proposal.body.expiresAt) })).toThrow("proposal_invalid");
+  });
+
+  it("keeps a valid maximum-row proposal within the public response bound", () => {
+    const maximumPlan: AmexSyncPlan = {
+      ...plan,
+      rows: Array.from({ length: 300 }, (_, index) => ({
+        ...plan.rows[0],
+        sourceRowIdentity: index.toString(16).padStart(64, "0"),
+        atomicGroupIdentity: (index + 300).toString(16).padStart(64, "0"),
+      })),
+    };
+    const proposal = createAmexSyncProposal({
+      userId: "u".repeat(128),
+      mode: "write",
+      plan: maximumPlan,
+      key,
+      now,
+      scanFinishedAt: now.toISOString(),
+    });
+    expect(proposal.token.length).toBeLessThanOrEqual(AMEX_SYNC_PROPOSAL_MAX_LENGTH);
+    expect(verifyAmexSyncProposal({
+      token: proposal.token,
+      key,
+      userId: "u".repeat(128),
+      expectedMode: "write",
+      now,
+    })).toEqual(proposal.body);
   });
 
   it("does not allow a preview-mode proposal to authorize a write", () => {

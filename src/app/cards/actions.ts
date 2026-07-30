@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { Prisma } from '@/generated/prisma';
 
 // Define schema for input validation
 const deleteCardSchema = z.object({
@@ -41,13 +42,39 @@ export async function deleteCardAction(formData: FormData) {
       return { success: false, error: 'Card not found or you do not have permission to delete it.' };
     }
 
-    // Proceed with deletion (Prisma will handle cascading deletes based on schema)
-    await prisma.creditCard.delete({
-      where: { id: cardId },
+    await prisma.$transaction(async (transaction) => {
+      // Preserve migration audit rows while releasing their optional restrictive
+      // physical-card reference. The legacy definition ID remains in the ledger.
+      await transaction.$executeRaw(Prisma.sql`
+        UPDATE "CatalogMigrationLedger"
+        SET "creditCardId" = NULL, "updatedAt" = NOW()
+        WHERE "creditCardId" = ${cardId}
+          AND "userId" = ${session.user.id}
+      `);
+
+      // Global statuses restrict card deletion, so remove only this user's card
+      // occurrences first. Custom definitions remain covered by card cascade.
+      await transaction.benefitStatus.deleteMany({
+        where: {
+          userId: session.user.id,
+          OR: [
+            { creditCardId: cardId },
+            { benefit: { creditCardId: cardId } },
+          ],
+        },
+      } as never);
+      const deleted = await transaction.creditCard.deleteMany({
+        where: { id: cardId, userId: session.user.id },
+      });
+      if (deleted.count === 0) {
+        throw new Error('Card not found or permission denied.');
+      }
     });
 
-    // Revalidate the path to refresh the card list
+    revalidatePath('/');
     revalidatePath('/cards');
+    revalidatePath('/cards/calendar');
+    revalidatePath('/benefits');
 
     return { success: true };
 

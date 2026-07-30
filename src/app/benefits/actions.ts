@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
+import { BenefitFrequency, BenefitCycleAlignment, Prisma } from '@/generated/prisma';
 import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
 import {
   transitionAddPartialCompletion,
@@ -16,14 +16,69 @@ import {
 } from '@/lib/benefit-status-transitions';
 import { z } from 'zod';
 import { redirect } from 'next/navigation';
+import { findEffectiveBenefitStatus } from '@/lib/effective-benefit';
+
+interface StatusTransitionRecord {
+  id: string;
+  userId: string;
+  isCompleted: boolean;
+  isNotUsable: boolean;
+  completedAt: Date | null;
+  usedAmount: number | null;
+  benefit: { maxAmount: number | null; category: string };
+}
+
+async function loadOwnedStatusForTransition(
+  userId: string,
+  benefitStatusId: string
+): Promise<StatusTransitionRecord | null> {
+  const status = await findEffectiveBenefitStatus(prisma, userId, benefitStatusId);
+  if (!status) return null;
+
+  return {
+    id: status.id,
+    userId: status.userId,
+    isCompleted: status.isCompleted,
+    isNotUsable: status.isNotUsable,
+    completedAt: status.completedAt,
+    usedAmount: status.usedAmount,
+    benefit: {
+      category: status.benefit.category,
+      maxAmount: status.benefit.maxAmount,
+    },
+  };
+}
 
 // Validation schema for custom benefit creation
+const benefitCategorySchema = z.enum([
+  'Travel',
+  'Dining',
+  'Shopping',
+  'Entertainment',
+  'Transportation',
+  'Other',
+]);
+const benefitFrequencySchema = z.nativeEnum(BenefitFrequency);
+
 const customBenefitSchema = z.object({
   description: z.string().min(1, 'Description is required').max(200),
-  category: z.enum(['Travel', 'Dining', 'Shopping', 'Entertainment', 'Transportation', 'Other']),
-  maxAmount: z.number().min(0, 'Value must be 0 or greater'),
-  frequency: z.enum(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_TIME']),
+  category: benefitCategorySchema,
+  maxAmount: z.number().finite().min(0, 'Value must be 0 or greater'),
+  frequency: benefitFrequencySchema,
   startDate: z.date(),
+  creditCardId: z.string().cuid().nullable().optional(),
+});
+
+const updateCustomBenefitSchema = z.object({
+  benefitId: z.string().cuid(),
+  description: z.string().min(1).max(200),
+  category: benefitCategorySchema,
+  maxAmount: z.number().finite().min(0),
+  frequency: benefitFrequencySchema,
+});
+
+const deleteCustomBenefitSchema = z.object({
+  benefitId: z.string().cuid(),
 });
 
 export async function toggleBenefitStatusAction(formData: FormData) {
@@ -44,15 +99,10 @@ export async function toggleBenefitStatusAction(formData: FormData) {
 
   try {
     // Fetch the status with its benefit to get maxAmount
-    const existingStatus = await prisma.benefitStatus.findFirst({
-      where: {
-        id: benefitStatusId,
-        userId: session.user.id,
-      },
-      include: {
-        benefit: true,
-      },
-    });
+    const existingStatus = await loadOwnedStatusForTransition(
+      session.user.id,
+      benefitStatusId
+    );
 
     if (!existingStatus) {
       throw new Error('Benefit status not found or permission denied.');
@@ -116,15 +166,10 @@ export async function addPartialCompletionAction(formData: FormData) {
 
   try {
     // Fetch the existing status with benefit details
-    const existingStatus = await prisma.benefitStatus.findFirst({
-      where: {
-        id: benefitStatusId,
-        userId: session.user.id,
-      },
-      include: {
-        benefit: true,
-      },
-    });
+    const existingStatus = await loadOwnedStatusForTransition(
+      session.user.id,
+      benefitStatusId
+    );
 
     if (!existingStatus) {
       throw new Error('Benefit status not found or permission denied.');
@@ -132,14 +177,17 @@ export async function addPartialCompletionAction(formData: FormData) {
 
     const transition = transitionAddPartialCompletion(existingStatus, amount);
 
-    await prisma.benefitStatus.update({
-      where: { id: benefitStatusId },
+    const updatedStatus = await prisma.benefitStatus.updateMany({
+      where: { id: benefitStatusId, userId: session.user.id },
       data: {
         usedAmount: transition.usedAmount,
         isCompleted: transition.isCompleted,
         completedAt: transition.completedAt,
       },
     });
+    if (updatedStatus.count === 0) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
 
     console.log(`Added partial completion: ${amount} to benefit ${benefitStatusId}. Total: ${transition.usedAmount}/${existingStatus.benefit.maxAmount ?? 0}. Complete: ${transition.isCompleted}`);
 
@@ -176,15 +224,10 @@ export async function markFullCompletionAction(formData: FormData) {
 
   try {
     // Fetch the status with benefit to get maxAmount
-    const existingStatus = await prisma.benefitStatus.findFirst({
-      where: {
-        id: benefitStatusId,
-        userId: session.user.id,
-      },
-      include: {
-        benefit: true,
-      },
-    });
+    const existingStatus = await loadOwnedStatusForTransition(
+      session.user.id,
+      benefitStatusId
+    );
 
     if (!existingStatus) {
       throw new Error('Benefit status not found or permission denied.');
@@ -192,14 +235,17 @@ export async function markFullCompletionAction(formData: FormData) {
 
     const transition = transitionFullCompletion(existingStatus);
 
-    await prisma.benefitStatus.update({
-      where: { id: benefitStatusId },
+    const updatedStatus = await prisma.benefitStatus.updateMany({
+      where: { id: benefitStatusId, userId: session.user.id },
       data: {
         usedAmount: transition.usedAmount,
         isCompleted: transition.isCompleted,
         completedAt: transition.completedAt,
       },
     });
+    if (updatedStatus.count === 0) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
 
     console.log(`Marked full completion for benefit ${benefitStatusId}. usedAmount set to ${transition.usedAmount}`);
 
@@ -285,15 +331,10 @@ export async function updateUsedAmountAction(formData: FormData) {
 
   try {
     // Fetch the status with benefit to get maxAmount
-    const existingStatus = await prisma.benefitStatus.findFirst({
-      where: {
-        id: benefitStatusId,
-        userId: session.user.id,
-      },
-      include: {
-        benefit: true,
-      },
-    });
+    const existingStatus = await loadOwnedStatusForTransition(
+      session.user.id,
+      benefitStatusId
+    );
 
     if (!existingStatus) {
       throw new Error('Benefit status not found or permission denied.');
@@ -301,14 +342,17 @@ export async function updateUsedAmountAction(formData: FormData) {
 
     const transition = transitionSetUsedAmount(existingStatus, newAmount);
 
-    await prisma.benefitStatus.update({
-      where: { id: benefitStatusId },
+    const updatedStatus = await prisma.benefitStatus.updateMany({
+      where: { id: benefitStatusId, userId: session.user.id },
       data: {
         usedAmount: transition.usedAmount,
         isCompleted: transition.isCompleted,
         completedAt: transition.completedAt,
       },
     });
+    if (updatedStatus.count === 0) {
+      throw new Error('Benefit status not found or permission denied.');
+    }
 
     console.log(`Updated used amount for benefit ${benefitStatusId} to ${transition.usedAmount}. Complete: ${transition.isCompleted}`);
 
@@ -342,15 +386,10 @@ export async function markBenefitAsNotUsableAction(formData: FormData) {
   const newIsNotUsable = !currentIsNotUsable;
 
   try {
-    const existingStatus = await prisma.benefitStatus.findFirst({
-      where: {
-        id: benefitStatusId,
-        userId: session.user.id,
-      },
-      include: {
-        benefit: true,
-      },
-    });
+    const existingStatus = await loadOwnedStatusForTransition(
+      session.user.id,
+      benefitStatusId
+    );
 
     if (!existingStatus) {
       throw new Error('Benefit status not found or permission denied.');
@@ -430,48 +469,39 @@ export async function batchCompleteBenefitsByCategoryAction(category: string, be
 
   try {
     const now = new Date();
-    
-    // First, fetch all the benefit statuses with their benefits to get maxAmount values
-    const statusesToComplete = await prisma.benefitStatus.findMany({
-      where: {
-        id: { in: benefitStatusIds },
-        userId: session.user.id,
-        isCompleted: false,
-        isNotUsable: false,
-        benefit: {
-          category: category,
-        },
-      },
-      include: {
-        benefit: true,
-      },
-    });
-
-    // Update each status with its specific maxAmount
-    const updatePromises = statusesToComplete.map((status) => {
+    const loadedStatuses = await Promise.all(
+      benefitStatusIds.map((id) => loadOwnedStatusForTransition(session.user.id, id))
+    );
+    const eligibleStatuses = loadedStatuses.filter((status): status is StatusTransitionRecord =>
+      status !== null &&
+      !status.isCompleted &&
+      !status.isNotUsable &&
+      status.benefit.category === category
+    );
+    const updatePromises = eligibleStatuses.map((status) => {
       const maxAmount = status.benefit.maxAmount ?? 0;
-      // Calculate new usedAmount: remaining amount to reach max
       const currentUsed = status.usedAmount ?? 0;
-      const newUsedAmount = maxAmount > 0 ? maxAmount : currentUsed;
-      
-      return prisma.benefitStatus.update({
-        where: { id: status.id },
+      return prisma.benefitStatus.updateMany({
+        where: { id: status.id, userId: session.user.id },
         data: {
           isCompleted: true,
           completedAt: now,
-          usedAmount: newUsedAmount,
+          usedAmount: maxAmount > 0 ? maxAmount : currentUsed,
         },
       });
     });
 
-    await Promise.all(updatePromises);
+    const updates = await Promise.all(updatePromises);
+    if (updates.some((update) => update.count === 0)) {
+      throw new Error('One or more benefit statuses were not found or permission denied.');
+    }
 
-    console.log(`Batch completed ${statusesToComplete.length} benefits in category: ${category}`);
+    console.log(`Batch completed ${eligibleStatuses.length} benefits in category: ${category}`);
 
     // Revalidate the benefits page to show the changes
     revalidatePath('/benefits');
 
-    return { success: true, updatedCount: statusesToComplete.length };
+    return { success: true, updatedCount: eligibleStatuses.length };
 
   } catch (error) {
     console.error('Error batch completing benefits by category:', error);
@@ -498,6 +528,7 @@ export async function createCustomBenefitAction(formData: FormData) {
   const maxAmountStr = formData.get('maxAmount') as string;
   const frequencyStr = formData.get('frequency') as string;
   const startDateStr = formData.get('startDate') as string;
+  const creditCardIdValue = formData.get('creditCardId');
 
   // Validate input
   const parseResult = customBenefitSchema.safeParse({
@@ -506,6 +537,9 @@ export async function createCustomBenefitAction(formData: FormData) {
     maxAmount: parseFloat(maxAmountStr),
     frequency: frequencyStr,
     startDate: startDateStr ? new Date(startDateStr) : new Date(),
+    creditCardId: typeof creditCardIdValue === 'string' && creditCardIdValue
+      ? creditCardIdValue
+      : null,
   });
 
   if (!parseResult.success) {
@@ -513,52 +547,63 @@ export async function createCustomBenefitAction(formData: FormData) {
     throw new Error(parseResult.error.errors.map(e => e.message).join(', '));
   }
 
-  const { description: desc, category: cat, maxAmount, frequency, startDate } = parseResult.data;
+  const { description: desc, category: cat, maxAmount, frequency, startDate, creditCardId } = parseResult.data;
 
   try {
-    // Create the benefit
-    const benefit = await prisma.benefit.create({
-      data: {
-        description: desc,
-        category: cat,
-        maxAmount,
-        percentage: 0, // Custom benefits don't use percentage
-        frequency: frequency as BenefitFrequency,
-        startDate,
-        userId, // Standalone benefit - tied to user, not card
-        creditCardId: null,
-        cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
-        occurrencesInCycle: 1,
-      },
-    });
-
-    const materialized = materializeBenefitStatusRows(
-      {
-        id: benefit.id,
-        userId,
-        frequency: frequency as BenefitFrequency,
-        startDate,
-        description: desc,
-        cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
-        occurrencesInCycle: 1,
-      },
-      {
-        referenceDate: startDate,
+    await prisma.$transaction(async (transaction) => {
+      let cardOpenedDate: Date | null = null;
+      if (creditCardId) {
+        const ownedCard = await transaction.creditCard.findFirst({
+          where: { id: creditCardId, userId },
+          select: { openedDate: true },
+        });
+        if (!ownedCard) {
+          throw new Error('Credit card not found or permission denied.');
+        }
+        cardOpenedDate = ownedCard.openedDate;
       }
-    );
-    const initialStatus = materialized.rows[0];
 
-    // Create the initial benefit status
-    await prisma.benefitStatus.create({
-      data: {
-        benefitId: initialStatus.benefitId,
-        userId: initialStatus.userId,
-        cycleStartDate: initialStatus.cycleStartDate,
-        cycleEndDate: initialStatus.cycleEndDate,
-        isCompleted: false,
-        usedAmount: 0,
-        occurrenceIndex: initialStatus.occurrenceIndex,
-      },
+      // userId marks both standalone and card-linked rows as custom by construction.
+      const benefit = await transaction.benefit.create({
+        data: {
+          description: desc,
+          category: cat,
+          maxAmount,
+          percentage: 0,
+          frequency: frequency as BenefitFrequency,
+          startDate,
+          userId,
+          creditCardId: creditCardId ?? null,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          occurrencesInCycle: 1,
+        },
+      });
+
+      const materialized = materializeBenefitStatusRows(
+        {
+          id: benefit.id,
+          userId,
+          frequency: frequency as BenefitFrequency,
+          startDate,
+          description: desc,
+          cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+          occurrencesInCycle: 1,
+        },
+        {
+          referenceDate: startDate,
+          cardOpenedDate,
+        }
+      );
+
+      if (materialized.rows.length > 0) {
+        await transaction.benefitStatus.createMany({
+          data: materialized.rows.map((row) => ({
+            ...row,
+            isCompleted: false,
+            usedAmount: 0,
+          })),
+        });
+      }
     });
 
     console.log(`Created custom benefit: ${desc} for user ${userId}`);
@@ -583,39 +628,67 @@ export async function updateCustomBenefitAction(formData: FormData) {
     throw new Error('User not authenticated.');
   }
 
-  const benefitId = formData.get('benefitId') as string;
-  const description = formData.get('description') as string;
-  const category = formData.get('category') as string;
-  const maxAmountStr = formData.get('maxAmount') as string;
-  const frequencyStr = formData.get('frequency') as string;
-
-  if (!benefitId) {
-    throw new Error('Benefit ID is required.');
-  }
-
-  // Validate the benefit belongs to the user and is a custom benefit
-  const existingBenefit = await prisma.benefit.findFirst({
-    where: {
-      id: benefitId,
-      userId: session.user.id,
-      creditCardId: null, // Must be a standalone benefit
-    },
+  const maxAmountValue = formData.get('maxAmount');
+  const parsed = updateCustomBenefitSchema.safeParse({
+    benefitId: formData.get('benefitId'),
+    description: formData.get('description'),
+    category: formData.get('category'),
+    maxAmount:
+      typeof maxAmountValue === 'string' && maxAmountValue.trim() !== ''
+        ? Number(maxAmountValue)
+        : Number.NaN,
+    frequency: formData.get('frequency'),
   });
-
-  if (!existingBenefit) {
-    throw new Error('Custom benefit not found or you do not have permission to edit it.');
+  if (!parsed.success) {
+    throw new Error('Invalid custom benefit input.');
   }
+  const { benefitId, description, category, maxAmount, frequency } = parsed.data;
 
   try {
-    await prisma.benefit.update({
-      where: { id: benefitId },
-      data: {
-        description,
-        category,
-        maxAmount: parseFloat(maxAmountStr),
-        frequency: frequencyStr as BenefitFrequency,
-      },
-    });
+    // Keep the capability check in the write predicate. A user-owned legacy row
+    // classified or bridged as standard is never mutable through this endpoint.
+    const updatedCount = await prisma.$executeRaw(Prisma.sql`
+      UPDATE "Benefit" AS b
+      SET
+        "description" = ${description},
+        "category" = ${category},
+        "maxAmount" = ${maxAmount},
+        "frequency" = ${frequency}::"BenefitFrequency",
+        "updatedAt" = NOW()
+      WHERE b."id" = ${benefitId}
+        AND (
+          b."userId" = ${session.user.id}
+          OR (
+            b."userId" IS NULL
+            AND EXISTS (
+              SELECT 1 FROM "CreditCard" owner_card
+              WHERE owner_card."id" = b."creditCardId"
+                AND owner_card."userId" = ${session.user.id}
+            )
+            AND EXISTS (
+              SELECT 1 FROM "CatalogMigrationLedger" custom_ledger
+              WHERE custom_ledger."legacyBenefitId" = b."id"
+                AND custom_ledger."userId" = ${session.user.id}
+                AND custom_ledger."classification" = 'CUSTOM'
+            )
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "BenefitStatus" bs
+          WHERE bs."benefitId" = b."id"
+            AND bs."predefinedBenefitId" IS NOT NULL
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "CatalogMigrationLedger" ledger
+          WHERE ledger."legacyBenefitId" = b."id"
+            AND ledger."classification" = 'STANDARD'
+        )
+    `);
+    if (updatedCount === 0) {
+      throw new Error('Custom benefit not found or permission denied.');
+    }
 
     console.log(`Updated custom benefit: ${benefitId}`);
 
@@ -639,30 +712,53 @@ export async function deleteCustomBenefitAction(formData: FormData) {
     throw new Error('User not authenticated.');
   }
 
-  const benefitId = formData.get('benefitId') as string;
-
-  if (!benefitId) {
-    throw new Error('Benefit ID is required.');
-  }
-
-  // Validate the benefit belongs to the user and is a custom benefit
-  const existingBenefit = await prisma.benefit.findFirst({
-    where: {
-      id: benefitId,
-      userId: session.user.id,
-      creditCardId: null, // Must be a standalone benefit
-    },
+  const parsed = deleteCustomBenefitSchema.safeParse({
+    benefitId: formData.get('benefitId'),
   });
-
-  if (!existingBenefit) {
-    throw new Error('Custom benefit not found or you do not have permission to delete it.');
+  if (!parsed.success) {
+    throw new Error('Invalid custom benefit ID.');
   }
+  const { benefitId } = parsed.data;
 
   try {
-    // Delete the benefit (cascade will delete related BenefitStatus records)
-    await prisma.benefit.delete({
-      where: { id: benefitId },
-    });
+    // Delete only a definition that remains custom at the instant of the write.
+    // Custom statuses retain their existing ON DELETE CASCADE behavior.
+    const deletedCount = await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM "Benefit" AS b
+      WHERE b."id" = ${benefitId}
+        AND (
+          b."userId" = ${session.user.id}
+          OR (
+            b."userId" IS NULL
+            AND EXISTS (
+              SELECT 1 FROM "CreditCard" owner_card
+              WHERE owner_card."id" = b."creditCardId"
+                AND owner_card."userId" = ${session.user.id}
+            )
+            AND EXISTS (
+              SELECT 1 FROM "CatalogMigrationLedger" custom_ledger
+              WHERE custom_ledger."legacyBenefitId" = b."id"
+                AND custom_ledger."userId" = ${session.user.id}
+                AND custom_ledger."classification" = 'CUSTOM'
+            )
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "BenefitStatus" bs
+          WHERE bs."benefitId" = b."id"
+            AND bs."predefinedBenefitId" IS NOT NULL
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "CatalogMigrationLedger" ledger
+          WHERE ledger."legacyBenefitId" = b."id"
+            AND ledger."classification" = 'STANDARD'
+        )
+    `);
+    if (deletedCount === 0) {
+      throw new Error('Custom benefit not found or permission denied.');
+    }
 
     console.log(`Deleted custom benefit: ${benefitId}`);
 

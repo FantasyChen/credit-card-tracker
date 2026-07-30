@@ -5,6 +5,10 @@
 import { GET } from '../route';
 import { getServerSession } from 'next-auth/next';
 import { prisma } from '@/lib/prisma';
+import {
+  fetchEffectiveBenefitStatuses,
+  fetchEffectiveCardTerms,
+} from '@/lib/effective-benefit';
 
 jest.mock('next-auth/next', () => ({
   getServerSession: jest.fn(),
@@ -22,20 +26,24 @@ jest.mock('@/lib/prisma', () => ({
     creditCard: {
       findMany: jest.fn(),
     },
-    predefinedCard: {
-      findMany: jest.fn(),
-    },
   },
+}));
+jest.mock('@/lib/effective-benefit', () => ({
+  fetchEffectiveBenefitStatuses: jest.fn(),
+  fetchEffectiveCardTerms: jest.fn(),
 }));
 
 const mockGetServerSession = jest.mocked(getServerSession);
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 const creditCardMock = mockPrisma.creditCard as unknown as { findMany: jest.Mock };
-const predefinedCardMock = mockPrisma.predefinedCard as unknown as { findMany: jest.Mock };
+const mockFetchEffectiveBenefitStatuses = jest.mocked(fetchEffectiveBenefitStatuses);
+const mockFetchEffectiveCardTerms = jest.mocked(fetchEffectiveCardTerms);
 
 describe('GET /api/user-cards', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFetchEffectiveBenefitStatuses.mockResolvedValue([]);
+    mockFetchEffectiveCardTerms.mockResolvedValue([]);
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -62,9 +70,22 @@ describe('GET /api/user-cards', () => {
         updatedAt: new Date(),
       },
     ]);
-    predefinedCardMock.findMany.mockResolvedValue([
-      { name: 'Test Card', issuer: 'Test', imageUrl: 'https://example.com/img.png' },
-    ]);
+    mockFetchEffectiveCardTerms.mockResolvedValue([{
+      creditCardId: 'card-1',
+      name: 'Current Global Card Name',
+      issuer: 'Current Issuer',
+      annualFee: 95,
+      imageUrl: 'https://example.com/img.png',
+    }]);
+    mockFetchEffectiveBenefitStatuses.mockResolvedValue([{
+      benefit: {
+        id: 'global-benefit-1',
+        category: 'Travel',
+        description: 'Current global travel credit',
+        maxAmount: 100,
+        creditCard: { id: 'card-1' },
+      },
+    } as never]);
 
     const response = await GET();
     const data = await response.json();
@@ -74,20 +95,24 @@ describe('GET /api/user-cards', () => {
     expect(data).toHaveLength(1);
     expect(data[0]).toMatchObject({
       id: 'card-1',
-      name: 'Test Card',
+      name: 'Current Global Card Name',
+      issuer: 'Current Issuer',
       userId: 'user-1',
       imageUrl: 'https://example.com/img.png',
+      benefits: [expect.objectContaining({
+        id: 'global-benefit-1',
+        description: 'Current global travel credit',
+      })],
     });
     expect(creditCardMock.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: 'user-1' },
-        include: expect.objectContaining({
-          benefits: true,
+        include: {
           events: expect.objectContaining({
             take: 1,
             orderBy: { eventDate: 'desc' },
           }),
-        }),
+        },
       })
     );
   });
@@ -95,8 +120,6 @@ describe('GET /api/user-cards', () => {
   it('returns 200 and empty array when user has no cards', async () => {
     mockGetServerSession.mockResolvedValue({ user: { id: 'user-1' } });
     creditCardMock.findMany.mockResolvedValue([]);
-    predefinedCardMock.findMany.mockResolvedValue([]);
-
     const response = await GET();
     const data = await response.json();
 

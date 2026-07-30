@@ -22,7 +22,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:devdb": "node scripts/with-dev-db.js next dev",
-    "build": "prisma generate && (prisma migrate deploy || echo 'Migration deploy skipped — check DIRECT_URL') && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
@@ -37,6 +37,8 @@
     "test:e2e:amex:visual": "npm run build:amex-userscript && npm run build:amex-userscript:local && AMEX_READER_E2E_VISUAL=1 playwright test --config playwright.amex.config.ts --headed --grep @visual",
     "usage-guides:audit": "node scripts/audit-usage-guide-links.cjs",
     "backfill:amex-catalog": "tsx scripts/backfill-amex-catalog-keys.ts",
+    "sync:global-catalog": "tsx scripts/sync-global-catalog.ts",
+    "migrate:global-benefits": "tsx scripts/migrate-global-benefits.ts",
     "clone:amex-user:dev": "tsx scripts/clone-amex-user-to-development.ts",
     "postinstall": "prisma generate",
     "db:check": "node scripts/check-database-connection.js",
@@ -45,6 +47,7 @@
     "db:dev:seed": "node scripts/with-dev-db.js npx prisma db seed",
     "db:dev:reset": "node scripts/with-dev-db.js npx prisma migrate reset",
     "db:prod:status": "npx prisma migrate status",
+    "db:prod:migrate": "npx prisma migrate deploy",
     "migrate:diff": "npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios"

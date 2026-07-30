@@ -1,6 +1,7 @@
 import type { UserCloneSnapshot } from "../single-user-clone";
 import {
   countUserCloneSnapshot,
+  planCloneGlobalCatalogRebindings,
   runSingleUserCloneOperator,
   userCloneApplyConfirmation,
   userCloneReplacementConfirmation,
@@ -231,6 +232,43 @@ describe("single-user production-to-development clone policy", () => {
     expect(() => validateUserCloneSnapshot(invalidAudit, EMAIL)).toThrow("audit graph");
   });
 
+  it("accepts a standard status only when its null legacy link has an owned global binding", () => {
+    const standard = snapshot();
+    standard.benefitStatuses[0].benefitId = null;
+    standard.globalCatalogBindings = {
+      cards: [],
+      statuses: [{
+        benefitStatusId: "status-1",
+        creditCardId: "card-1",
+        catalogKey: "catalog-benefit",
+      }],
+      audits: [],
+      ledger: [],
+    };
+
+    expect(() => validateUserCloneSnapshot(standard, EMAIL)).not.toThrow();
+
+    standard.globalCatalogBindings.statuses = [];
+    expect(() => validateUserCloneSnapshot(standard, EMAIL)).toThrow("BenefitStatus graph");
+  });
+
+  it("rejects an invalid legacy benefit link even when the status also has a global binding", () => {
+    const invalidBridge = snapshot();
+    invalidBridge.benefitStatuses[0].benefitId = "foreign-benefit";
+    invalidBridge.globalCatalogBindings = {
+      cards: [],
+      statuses: [{
+        benefitStatusId: "status-1",
+        creditCardId: "card-1",
+        catalogKey: "catalog-benefit",
+      }],
+      audits: [],
+      ledger: [],
+    };
+
+    expect(() => validateUserCloneSnapshot(invalidBridge, EMAIL)).toThrow("BenefitStatus graph");
+  });
+
   it("returns only target roles and table counts without identity hashes or cloned payloads", async () => {
     const { source, destination } = ports();
     const report = await runSingleUserCloneOperator({ email: EMAIL, source, destination });
@@ -266,5 +304,66 @@ describe("single-user production-to-development clone policy", () => {
       source: "production",
       destination: "development",
     });
+  });
+});
+
+describe("single-user clone global catalog rebinding", () => {
+  const bindings = {
+    cards: [{ creditCardId: "card-1", catalogKey: "catalog-card" }],
+    statuses: [{ benefitStatusId: "status-1", creditCardId: "card-1", catalogKey: "catalog-benefit" }],
+    audits: [{ auditId: "audit-1", catalogKey: "catalog-benefit", definitionFingerprint: "definition-fingerprint" }],
+    ledger: [{
+      id: "ledger-1",
+      legacyBenefitId: "benefit-card",
+      userId: "user-source",
+      creditCardId: "card-1",
+      predefinedCardCatalogKey: "catalog-card",
+      predefinedBenefitCatalogKey: "catalog-benefit",
+      classification: "STANDARD" as const,
+      phase: "BRIDGED" as const,
+      sourceFingerprint: "source-fingerprint",
+      destinationFingerprint: "definition-fingerprint",
+      classifiedAt: new Date("2026-01-01T00:00:00Z"),
+      bridgedAt: new Date("2026-01-01T00:00:00Z"),
+      cleanedAt: null,
+      rolledBackAt: null,
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      updatedAt: new Date("2026-01-01T00:00:00Z"),
+    }],
+  };
+
+  it("rebinds every global relationship by immutable catalog key, never source IDs", () => {
+    const plan = planCloneGlobalCatalogRebindings(bindings, {
+      cards: [{ id: "destination-card-definition", catalogKey: "catalog-card" }],
+      benefits: [{ id: "destination-benefit-definition", catalogKey: "catalog-benefit" }],
+    });
+    expect(plan.cards).toEqual([{ creditCardId: "card-1", predefinedCardId: "destination-card-definition" }]);
+    expect(plan.statuses).toEqual([{
+      benefitStatusId: "status-1",
+      creditCardId: "card-1",
+      predefinedBenefitId: "destination-benefit-definition",
+    }]);
+    expect(plan.audits[0]).toMatchObject({
+      destinationPredefinedBenefitId: "destination-benefit-definition",
+      definitionFingerprint: "definition-fingerprint",
+    });
+    expect(plan.ledger[0]).toMatchObject({
+      predefinedCardId: "destination-card-definition",
+      predefinedBenefitId: "destination-benefit-definition",
+      classification: "STANDARD",
+      phase: "BRIDGED",
+    });
+  });
+
+  it("fails closed when a key is missing or duplicated", () => {
+    expect(() => planCloneGlobalCatalogRebindings(bindings, { cards: [], benefits: [] }))
+      .toThrow("exact destination catalog-key match");
+    expect(() => planCloneGlobalCatalogRebindings(bindings, {
+      cards: [
+        { id: "one", catalogKey: "catalog-card" },
+        { id: "two", catalogKey: "catalog-card" },
+      ],
+      benefits: [{ id: "benefit", catalogKey: "catalog-benefit" }],
+    })).toThrow("not unique");
   });
 });

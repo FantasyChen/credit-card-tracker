@@ -553,7 +553,7 @@ Local-only rows remain visible but produce no envelope row. Browser mapping and 
 
 ## Historical scenario: envelope-V2 reviewed handoff and confirmed AMEX synchronization
 
-> **Superseded:** This section records the original Platinum-only `amex-sync-envelope/2` contract. The current production userscript `0.5.1`, envelope V3, full catalog identity, exact-last-five matching, status reconciliation, grouped persistence, and backfill contracts live in [AMEX Sync Reconciliation](amex-sync-reconciliation.md). Preserve the reusable privacy, authentication, proposal, provenance, idempotency, and audit principles below, but do not reintroduce V2 manual mappings or its narrow allowlist.
+> **Superseded:** This section records the original Platinum-only `amex-sync-envelope/2` contract. The current production userscript `0.5.1`, envelope V3, global-definition catalog authority, exact-last-five matching, status reconciliation, and grouped persistence live in [AMEX Sync Reconciliation](amex-sync-reconciliation.md); global catalog and legacy transition contracts live in [Global Benefit Definitions and Migration](global-benefit-definitions-and-migration.md). Preserve the reusable privacy, authentication, proposal, provenance, idempotency, and audit principles below, but do not reintroduce V2 manual mappings, its narrow allowlist, or per-user destination-key authority.
 
 ### 1. Scope / Trigger
 

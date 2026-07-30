@@ -3,6 +3,7 @@ import { sendEmail } from '@/lib/email';
 import { SITE_NAME } from '@/lib/site';
 import { getEffectiveExpirationDays, getEffectiveTier, TIER_LIMITS } from '@/lib/subscription';
 import { BenefitFrequency, type SubscriptionTier } from '@/generated/prisma';
+import { fetchEffectiveBenefitStatuses } from '@/lib/effective-benefit';
 
 const MIN_EMAILABLE_BENEFIT_CYCLE_MS = 28 * 24 * 60 * 60 * 1000 - 1;
 
@@ -83,24 +84,22 @@ export async function runNotificationDigest({
 
     const [newStatuses, expiringStatuses, expiringLoyalty, expiringCertificates] = await Promise.all([
       newBenefitUserIds.length > 0
-        ? prisma.benefitStatus.findMany({
-            where: {
-              userId: { in: newBenefitUserIds },
-              isCompleted: false,
-              cycleStartDate: { gte: today, lt: tomorrow },
-            },
-            include: { benefit: { include: { creditCard: true } }, user: true },
+        ? fetchEffectiveBenefitStatuses(prisma, {
+            userIds: newBenefitUserIds,
+            completed: false,
+            notUsable: false,
+            cycleStartOnOrAfter: today,
+            cycleStartOnOrBefore: new Date(tomorrow.getTime() - 1),
           })
         : Promise.resolve([]),
 
       expirationUserIds.length > 0 && maxExpirationDays > 0
-        ? prisma.benefitStatus.findMany({
-            where: {
-              userId: { in: expirationUserIds },
-              isCompleted: false,
-              cycleEndDate: { gte: today, lte: maxWindow },
-            },
-            include: { benefit: { include: { creditCard: true } }, user: true },
+        ? fetchEffectiveBenefitStatuses(prisma, {
+            userIds: expirationUserIds,
+            completed: false,
+            notUsable: false,
+            cycleEndOnOrAfter: today,
+            cycleEndOnOrBefore: maxWindow,
           })
         : Promise.resolve([]),
 
@@ -341,12 +340,12 @@ function buildDigestEmailTasks({
     if (hasNew && newBenefits) {
       sectionLabels.push('New Benefits');
       const items = newBenefits.map((status) =>
-        `<li><strong>${status.benefit.description}</strong> on your ${status.benefit.creditCard?.name ?? 'card'}. Cycle: ${fmtDate(status.cycleStartDate)} – ${fmtDate(status.cycleEndDate)}.</li>`
+        `<li><strong>${escapeHtml(status.benefit.description)}</strong> on your ${escapeHtml(status.benefit.creditCard?.name ?? 'card')}. Cycle: ${fmtDate(status.cycleStartDate)} – ${fmtDate(status.cycleEndDate)}.</li>`
       ).join('');
       sections.push(
         `<h2 style="color:#4F46E5;margin:24px 0 8px;">New Benefit Cycles</h2>` +
         `<p>The following benefit cycles have started:</p><ul>${items}</ul>` +
-        `<p><a href="${baseUrl}/benefits" style="color:#4F46E5;">View Your Benefits &rarr;</a></p>`
+        `<p><a href="${escapeHtml(baseUrl)}/benefits" style="color:#4F46E5;">View Your Benefits &rarr;</a></p>`
       );
     }
 
@@ -354,12 +353,12 @@ function buildDigestEmailTasks({
       sectionLabels.push('Expiring Benefits');
       const effectiveExpirationDays = effectiveExpirationDaysByUser.get(user.id) ?? user.notifyExpirationDays;
       const items = expiring.map((status) =>
-        `<li><strong>${status.benefit.description}</strong> on your ${status.benefit.creditCard?.name ?? 'card'}, expiring on ${fmtDate(status.cycleEndDate)} (in ${effectiveExpirationDays} day(s)).</li>`
+        `<li><strong>${escapeHtml(status.benefit.description)}</strong> on your ${escapeHtml(status.benefit.creditCard?.name ?? 'card')}, expiring on ${fmtDate(status.cycleEndDate)} (in ${effectiveExpirationDays} day(s)).</li>`
       ).join('');
       sections.push(
         `<h2 style="color:#DC2626;margin:24px 0 8px;">Benefits Expiring Soon</h2>` +
         `<p>Don't miss out on these benefits:</p><ul>${items}</ul>` +
-        `<p><a href="${baseUrl}/benefits" style="color:#4F46E5;">View Your Benefits &rarr;</a></p>`
+        `<p><a href="${escapeHtml(baseUrl)}/benefits" style="color:#4F46E5;">View Your Benefits &rarr;</a></p>`
       );
     }
 
@@ -367,12 +366,12 @@ function buildDigestEmailTasks({
       sectionLabels.push('Expiring Points');
       const items = loyalty.map((account) => {
         const expDate = account.expirationDate ? fmtDate(account.expirationDate) : 'Unknown';
-        return `<li><strong>${account.loyaltyProgram.displayName}</strong> points expiring on ${expDate} (in ${user.pointsExpirationDays} day(s)).${account.accountNumber ? ` Account: ${account.accountNumber}` : ''}</li>`;
+        return `<li><strong>${escapeHtml(account.loyaltyProgram.displayName)}</strong> points expiring on ${expDate} (in ${user.pointsExpirationDays} day(s)).${account.accountNumber ? ` Account: ${escapeHtml(account.accountNumber)}` : ''}</li>`;
       }).join('');
       sections.push(
         `<h2 style="color:#D97706;margin:24px 0 8px;">Loyalty Points Expiring Soon</h2>` +
         `<p>Consider earning or redeeming to prevent expiration:</p><ul>${items}</ul>` +
-        `<p><a href="${baseUrl}/loyalty" style="color:#4F46E5;">Manage Loyalty Accounts &rarr;</a></p>`
+        `<p><a href="${escapeHtml(baseUrl)}/loyalty" style="color:#4F46E5;">Manage Loyalty Accounts &rarr;</a></p>`
       );
     }
 
@@ -380,15 +379,15 @@ function buildDigestEmailTasks({
       sectionLabels.push('Expiring Certificates');
       const items = certificates.map((certificate) => {
         const expDate = fmtDate(certificate.expirationDate);
-        const programName = certificate.loyaltyAccount.loyaltyProgram.displayName;
-        const label = certificate.label || 'Free night certificate';
+        const programName = escapeHtml(certificate.loyaltyAccount.loyaltyProgram.displayName);
+        const label = escapeHtml(certificate.label || 'Free night certificate');
         const quantity = certificate.quantity > 1 ? ` (${certificate.quantity} available)` : '';
         return `<li><strong>${label}</strong>${quantity} for ${programName}, expiring on ${expDate} (in ${user.pointsExpirationDays} day(s)).</li>`;
       }).join('');
       sections.push(
         `<h2 style="color:#D97706;margin:24px 0 8px;">Free Night Certificates Expiring Soon</h2>` +
         `<p>Use these certificates before their expiration dates:</p><ul>${items}</ul>` +
-        `<p><a href="${baseUrl}/loyalty" style="color:#4F46E5;">Manage Loyalty Accounts &rarr;</a></p>`
+        `<p><a href="${escapeHtml(baseUrl)}/loyalty" style="color:#4F46E5;">Manage Loyalty Accounts &rarr;</a></p>`
       );
     }
 
@@ -487,16 +486,28 @@ function digestSubjectForSection(label: string): string {
 function buildDigestHtml(name: string, sections: string[], baseUrl: string): string {
   return [
     `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1F2937;">`,
-    `<h1 style="color:#4F46E5;border-bottom:2px solid #E5E7EB;padding-bottom:12px;">${SITE_NAME} Update</h1>`,
-    `<p>Hi ${name},</p>`,
+    `<h1 style="color:#4F46E5;border-bottom:2px solid #E5E7EB;padding-bottom:12px;">${escapeHtml(SITE_NAME)} Update</h1>`,
+    `<p>Hi ${escapeHtml(name)},</p>`,
     `<p>Here's what needs your attention today:</p>`,
     sections.join('<hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0;">'),
     `<hr style="border:none;border-top:2px solid #E5E7EB;margin:32px 0 16px;">`,
     `<p style="color:#6B7280;font-size:13px;">You're receiving this because you enabled notifications in your ` +
-      `<a href="${baseUrl}/settings" style="color:#4F46E5;">${SITE_NAME} settings</a>.</p>`,
+      `<a href="${escapeHtml(baseUrl)}/settings" style="color:#4F46E5;">${escapeHtml(SITE_NAME)} settings</a>.</p>`,
     `</div>`,
   ].join('');
 }
+
+export function escapeNotificationHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]!);
+}
+
+const escapeHtml = escapeNotificationHtml;
 
 function fmtDate(d: Date): string {
   return d.toLocaleDateString('en-US', { timeZone: 'UTC' });

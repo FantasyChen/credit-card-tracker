@@ -1,0 +1,7 @@
+{"file":".trellis/spec/perks-reminder/index.md","reason":"Provides the final package quality and safety checklist across all children."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Defines safe checks, complete diff review, and truthful pass/fail/skip reporting."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Check global source consistency, existing-card propagation, and status disposition."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Check additive migration, exact target, preservation, cleanup recovery, and forbidden effects."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Check global-only AMEX authority while preserving preview, confirmation, audit, and userscript contracts."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Check production remains off until each separately authorized rollout boundary passes."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/research/production-backfill-review.md","reason":"Check historical per-user-key evidence is preserved but never reused as new-model acceptance or authorization."}

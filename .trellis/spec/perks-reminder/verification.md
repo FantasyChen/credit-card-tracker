@@ -38,7 +38,7 @@ Choose changed test files rather than the entire suite when a narrow result is s
 ## Conditional checks
 
 - Next build, Prisma generate/migrate/seed/status/reset/push, database-backed audits, Vercel commands, cron calls, email/notification commands, and browser/live production checks are not generic validation. Run only when the task explicitly permits them and all target/side-effect prerequisites are satisfied.
-- `npm run build` can attempt a production migration and must not be used as a routine pre-commit check.
+- `npm run build` must remain migration-free, but it still performs Prisma client generation and a production Next build; do not use it as a routine pre-commit check.
 - `npm run usage-guides:audit` directly creates a Prisma client using the current process environment; it does not use `scripts/with-dev-db.js`. Verify the non-production database target first.
 - Frontend behavior should be rendered when practical, but never by weakening auth, caching, database, or external-effect safeguards.
 
@@ -47,5 +47,5 @@ Choose changed test files rather than the entire suite when a narrow result is s
 - Inspect the complete diff and all untracked paths, not only summary output.
 - Scan for credentials, tokens, authorization headers, OAuth/session material, email addresses from runtime data, database URLs/hostnames, provider project state, browser data, migration backups, and `.env` content.
 - Confirm public/static paths do not introduce Prisma imports or DB calls.
-- For database changes, inspect migration SQL and current-user compatibility; for catalog changes, review template, existing-user, and status-materialization paths together.
+- For database changes, inspect migration SQL and current-user compatibility; for catalog changes, review immutable static keys/parents, key-preserving synchronization, retirement/reactivation, existing-card propagation, status materialization, and guide linkage together.
 - Residual `.cursor`, Context Harness, or retired-script references must be either removed or explicitly classified as historical prose; no live command may depend on a removed path.

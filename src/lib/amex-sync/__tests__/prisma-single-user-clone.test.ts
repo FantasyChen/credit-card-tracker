@@ -30,6 +30,8 @@ function snapshot(): UserCloneSnapshot {
 function operations(order: string[]): CloneWriteOperations & { loyaltyRows: unknown[] } {
   const result = {
     loyaltyRows: [] as unknown[],
+    deleteCatalogMigrationLedger: jest.fn(async () => { order.push("delete:CatalogMigrationLedger"); }),
+    deleteBenefitStatuses: jest.fn(async () => { order.push("delete:BenefitStatus"); }),
     deleteCreditCards: jest.fn(async () => { order.push("delete:CreditCard"); }),
     deleteUser: jest.fn(async () => { order.push("delete:User"); }),
     createUser: jest.fn(async () => { order.push("create:User"); }),
@@ -91,6 +93,7 @@ describe("Prisma single-user clone source snapshot", () => {
     ]);
     const transaction = {
       $executeRawUnsafe: jest.fn().mockResolvedValue(0),
+      $queryRaw: jest.fn().mockResolvedValue([]),
       user: { findMany: jest.fn().mockResolvedValue([{ id: "user-1", email: "owner@example.test" }]) },
       creditCard: { findMany: jest.fn().mockResolvedValue(graph.creditCards) },
       benefit: { findMany: jest.fn().mockResolvedValue(graph.benefits) },
@@ -138,6 +141,8 @@ describe("Prisma single-user clone write orchestration", () => {
       operations: write,
     });
     expect(order).toEqual([
+      "delete:CatalogMigrationLedger",
+      "delete:BenefitStatus",
       "delete:CreditCard",
       "delete:User",
       "create:User",

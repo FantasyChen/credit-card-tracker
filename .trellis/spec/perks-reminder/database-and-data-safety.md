@@ -16,7 +16,7 @@
 4. Production `migrate deploy` or seed/upsert is allowed only when the user explicitly requests that production operation and the target has been verified immediately beforehand.
 5. Preserve completed, not-usable, and partially used benefit statuses during repair/migration work. Use dry-run and transaction/backup support where provided.
 
-`npm run build` is not a harmless compile check: it runs `prisma generate`, attempts `prisma migrate deploy`, and then runs Next build. Do not use it without authorization and a verified database target.
+`npm run build` runs Prisma client generation and Next build, but it must never deploy migrations. Migration deployment is an explicit, separately authorized operation (`npm run db:prod:migrate`) performed only after immediate target and recovery verification. A generic local, CI, preview, or production build must have no database mutation authority.
 
 ### Schema-dependent deployment completeness
 
@@ -28,7 +28,7 @@ A feature is not deployment-ready merely because `schema.prisma`, TypeScript, `p
 4. verify the intended target's migration status and apply only under target-specific authorization; and
 5. keep the feature's server capability `off` until every prerequisite has evidence.
 
-`prisma generate` creates no database object. A generated client plus a schema diff without a checked-in migration leaves deployment blocked. Likewise, this repository's build can continue after `prisma migrate deploy` fails because that command is followed by `|| echo`; a completed build is therefore not proof that a migration was applied. Report generation, SQL review, client validation, target verification, and deployment as distinct passed/failed/skipped gates.
+`prisma generate` creates no database object. A generated client plus a schema diff without a checked-in migration leaves deployment blocked. The generic build deliberately does not run `prisma migrate deploy`, so a completed build is never proof that a migration was applied. Report generation, SQL review, client validation, target verification, and deployment as distinct passed/failed/skipped gates.
 
 ## Migration-history caveat
 
