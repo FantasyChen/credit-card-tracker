@@ -8,7 +8,7 @@
 - [x] Exact targets, stop conditions, point-in-time recovery, and a provider-native recovery branch without compute are verified before production migration.
 - [x] The superseded `backfill:amex-catalog --apply` is disabled and will not be invoked.
 
-**Current gate:** The user authorized starting the controlled rollout. Read-only production preflight is complete except recovery-point verification; no production mutation, push, deployment, or activation may occur until that gate passes.
+**Current gate:** Production target/recovery, additive schema, and global-catalog gates have passed under separate authorizations. Production AMEX remains `off`; legacy migration, push/deployment, cleanup, preview, and activation remain separately gated.
 
 ## 1. Review implementation evidence
 
@@ -51,9 +51,9 @@
 
 - [x] Obtain separate migration-deploy authorization and apply only the reviewed additive SQL after immediate target/mode/recovery verification.
 - [x] Verify migration state independently of build output; status is up to date and all required additive columns are present.
-- [ ] Run complete bounded catalog dry-run and review fresh aggregate plan/fingerprint.
-- [ ] Obtain separate catalog-apply authorization; apply bounded key-based upserts/retirement.
-- [ ] Rerun dry-run to prove deterministic zero remaining plan and stable global IDs.
+- [x] Run complete bounded catalog dry-run and review fresh aggregate plan/fingerprint.
+- [x] Obtain separate catalog-apply authorization; apply bounded key-based upserts/retirement.
+- [x] Rerun dry-run to prove deterministic zero remaining plan and stable global IDs.
 
 **Stop:** Any target, key, tuple, ID, retirement, or unexpected data drift.
 
@@ -113,7 +113,8 @@ git diff --check
 - [ ] `npm run build` or any production build — unperformed.
 - [x] Read-only production environment, migration status, and database-identity checks — completed with sanitized aggregate output.
 - [x] Production additive schema migration deploy — completed after explicit authorization; post-status is up to date and required columns are present.
-- [ ] Production catalog apply, bridge apply, cleanup/rollback, seed, reset, or other database mutation — unperformed.
+- [x] Production catalog apply — completed after separate authorization; 34 cards and 129 benefits were adopted, and the immediate dry-run reported all rows unchanged with zero conflicts.
+- [ ] Production legacy bridge apply, cleanup/rollback, seed, reset, or other database mutation — unperformed.
 - [x] Verified development-database migration/catalog/runtime/bridge/rollback-re-bridge/synthetic-AMEX validation — completed.
 - [ ] Browser/live AMEX, userscript installation/publication, production preview, or confirmation — unperformed.
 - [ ] Production configuration change or deployment — unperformed.
@@ -131,4 +132,4 @@ The earlier production read-only inspection and per-user-key dry-run are preserv
 
 ## Current status
 
-Implementation and verified-development prerequisites are complete. Production application/database/provider targets and recovery were verified immediately before the separately authorized additive migration; migration deploy succeeded, Prisma reports the schema up to date, all required columns are present, and AMEX remains effectively `off`. The next boundary is the complete read-only global-catalog dry-run. Catalog apply, legacy bridge, push/deployment, cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
+Implementation and verified-development prerequisites are complete. Production application/database/provider targets and recovery were verified; the additive migration succeeded and the global catalog applied the separately authorized exact adoption plan. The immediate post-apply dry-run reported all 34 cards and 129 benefits unchanged with zero conflicts. Production AMEX remains effectively `off`. The next independent boundary is the complete bounded read-only legacy migration dry-run. Legacy bridge apply, push/deployment, cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
