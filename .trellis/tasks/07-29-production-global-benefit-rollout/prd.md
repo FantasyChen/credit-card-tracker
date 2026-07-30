@@ -30,10 +30,10 @@ Operationally migrate and validate the global-benefit model in development and p
 - [x] Children 1–4 completion and safe checks are reviewed before any operation.
 - [x] Development migration, catalog sync, bridge, hybrid parity, pre-cleanup rollback/re-bridge rehearsal, propagation, and AMEX synthetic service validation pass on a verified non-production target; deletion cleanup remains separately gated.
 - [x] Fresh production dry-runs reconcile every row to exact standard or preserved custom outcomes with no unresolved unit and no fuzzy inference.
-- [ ] Production bridge preserves every pre-existing status/state/cycle/timestamp/audit/provenance field and is deterministic/idempotent.
+- [x] Production bridge preserves every pre-existing status/state/cycle/timestamp/audit/provenance field and is deterministic/idempotent.
 - [ ] Cleanup, if authorized, removes only ledger-proven standard copies and has a tested recovery point.
 - [ ] Standard definitions are read-only, latest global terms are visible, and catalog additions reach existing active cards without state resets.
-- [ ] The old per-user AMEX key apply is not executed and user keys have no runtime authority.
+- [x] The old per-user AMEX key apply is not executed and user keys have no runtime authority.
 - [ ] Preview is authenticated and zero-write; userscript installation/live scan are separately authorized and audited.
 - [ ] Write, if authorized, is bounded and reconciles expected attempts/audits/provenance/status changes with no unrelated account effects.
 - [ ] Rollback to mode `off` and pre-cleanup bridge rollback are operationally verified; evidence is sanitized.
