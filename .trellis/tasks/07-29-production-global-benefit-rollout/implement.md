@@ -49,8 +49,8 @@
 
 ## 4. Production schema and global catalog
 
-- [ ] Obtain separate migration-deploy authorization; apply only reviewed additive SQL.
-- [ ] Verify migration state independently of build output.
+- [x] Obtain separate migration-deploy authorization and apply only the reviewed additive SQL after immediate target/mode/recovery verification.
+- [x] Verify migration state independently of build output; status is up to date and all required additive columns are present.
 - [ ] Run complete bounded catalog dry-run and review fresh aggregate plan/fingerprint.
 - [ ] Obtain separate catalog-apply authorization; apply bounded key-based upserts/retirement.
 - [ ] Rerun dry-run to prove deterministic zero remaining plan and stable global IDs.
@@ -112,7 +112,8 @@ git diff --check
 
 - [ ] `npm run build` or any production build — unperformed.
 - [x] Read-only production environment, migration status, and database-identity checks — completed with sanitized aggregate output.
-- [ ] Production migration deploy, catalog apply, bridge apply, cleanup/rollback, seed, reset, or other database mutation — unperformed.
+- [x] Production additive schema migration deploy — completed after explicit authorization; post-status is up to date and required columns are present.
+- [ ] Production catalog apply, bridge apply, cleanup/rollback, seed, reset, or other database mutation — unperformed.
 - [x] Verified development-database migration/catalog/runtime/bridge/rollback-re-bridge/synthetic-AMEX validation — completed.
 - [ ] Browser/live AMEX, userscript installation/publication, production preview, or confirmation — unperformed.
 - [ ] Production configuration change or deployment — unperformed.
@@ -130,4 +131,4 @@ The earlier production read-only inspection and per-user-key dry-run are preserv
 
 ## Current status
 
-Implementation and verified-development prerequisites are complete. Production preflight proves the intended application/database/provider targets match, the expected additive migration is pending, AMEX is effectively `off`, generic builds cannot deploy migrations, point-in-time recovery is configured, and a recovery branch exists without compute. The next boundary is the separately authorized additive schema migration. Push/deployment, cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
+Implementation and verified-development prerequisites are complete. Production application/database/provider targets and recovery were verified immediately before the separately authorized additive migration; migration deploy succeeded, Prisma reports the schema up to date, all required columns are present, and AMEX remains effectively `off`. The next boundary is the complete read-only global-catalog dry-run. Catalog apply, legacy bridge, push/deployment, cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
