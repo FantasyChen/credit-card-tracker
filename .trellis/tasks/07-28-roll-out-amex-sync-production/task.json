@@ -1,0 +1,32 @@
+{
+  "id": "roll-out-amex-sync-production",
+  "name": "roll-out-amex-sync-production",
+  "title": "Roll out AMEX sync to production",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "fantasyc",
+  "assignee": "fantasyc",
+  "createdAt": "2026-07-28",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-29-global-catalog-foundation",
+    "07-29-global-benefit-runtime",
+    "07-29-legacy-global-benefit-migration",
+    "07-29-amex-global-definition-authority",
+    "07-29-production-global-benefit-rollout"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

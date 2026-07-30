@@ -1,10 +1,13 @@
 import { PrismaClient, LoyaltyProgramType } from '../src/generated/prisma';
 import { inferBenefitUsageWaySlug } from '../src/lib/benefit-usage-matching';
 import {
+  GLOBAL_CATALOG_SYNC_CONFIRMATION,
+  runGlobalCatalogSyncOperator,
+  type CatalogPrismaClient,
+} from '../src/lib/catalog/prisma-synchronizer';
+import {
   benefitUsageWays,
   predefinedCardsData,
-  type StaticPredefinedBenefit,
-  type StaticPredefinedCard,
 } from '../src/lib/static-catalog';
 
 const prisma = new PrismaClient();
@@ -15,90 +18,23 @@ async function main() {
 
 
 
-  // --- Upsert Logic (ensure benefits are deleted/recreated or updated properly) ---
-  console.log('Starting upsert process...');
-  for (const rawCardData of predefinedCardsData) {
-    const cardData = rawCardData as StaticPredefinedCard;
-    const benefits = cardData.benefits as readonly StaticPredefinedBenefit[];
-    console.log(`Processing card: ${cardData.name}`);
-    const existingCard = await prisma.predefinedCard.findUnique({
-        where: { name: cardData.name },
-        include: { benefits: true },
-    });
-
-    if (existingCard) {
-        console.log(`Updating existing card: ${cardData.name}`);
-        // Update card details
-        await prisma.predefinedCard.update({
-            where: { id: existingCard.id },
-            data: {
-                issuer: cardData.issuer,
-                annualFee: cardData.annualFee,
-                imageUrl: cardData.imageUrl,
-                ...(cardData.productKey ? { productKey: cardData.productKey } : {}),
-            },
-        });
-
-        // Simple approach: Delete existing benefits and recreate them
-        console.log(`Deleting ${existingCard.benefits.length} old benefits for ${cardData.name}`);
-        await prisma.predefinedBenefit.deleteMany({
-            where: { predefinedCardId: existingCard.id },
-        });
-
-        console.log(`Creating ${benefits.length} new benefits for ${cardData.name}`);
-        if (benefits.length > 0) {
-          await prisma.predefinedBenefit.createMany({
-              data: benefits.map(benefit => ({
-                  // Explicitly map all fields for PredefinedBenefit
-                  predefinedCardId: existingCard.id,
-                  category: benefit.category,
-                  description: benefit.description,
-                  percentage: benefit.percentage,
-                  maxAmount: benefit.maxAmount,
-                  frequency: benefit.frequency,
-                  cycleAlignment: benefit.cycleAlignment, // Explicitly map
-                  fixedCycleStartMonth: benefit.fixedCycleStartMonth, // Explicitly map
-                  fixedCycleDurationMonths: benefit.fixedCycleDurationMonths, // Explicitly map
-                  occurrencesInCycle: benefit.occurrencesInCycle,
-                  ...(benefit.productKey ? { productKey: benefit.productKey } : {}),
-                  ...(benefit.creditFamilyKey ? { creditFamilyKey: benefit.creditFamilyKey } : {}),
-                  ...(benefit.periodKey ? { periodKey: benefit.periodKey } : {}),
-              })),
-          });
-        }
-    } else {
-        console.log(`Creating new card: ${cardData.name}`);
-        // Create card and benefits together
-        await prisma.predefinedCard.create({
-            data: {
-              name: cardData.name,
-              issuer: cardData.issuer,
-              annualFee: cardData.annualFee,
-              imageUrl: cardData.imageUrl,
-              ...(cardData.productKey ? { productKey: cardData.productKey } : {}),
-              benefits: {
-                create: benefits.map(benefit => ({
-                  // Ensure all fields are explicitly mapped here too for consistency
-                  category: benefit.category,
-                  description: benefit.description,
-                  percentage: benefit.percentage,
-                  maxAmount: benefit.maxAmount,
-                  frequency: benefit.frequency,
-                  cycleAlignment: benefit.cycleAlignment,
-                  fixedCycleStartMonth: benefit.fixedCycleStartMonth,
-                  fixedCycleDurationMonths: benefit.fixedCycleDurationMonths,
-                  occurrencesInCycle: benefit.occurrencesInCycle,
-                  ...(benefit.productKey ? { productKey: benefit.productKey } : {}),
-                  ...(benefit.creditFamilyKey ? { creditFamilyKey: benefit.creditFamilyKey } : {}),
-                  ...(benefit.periodKey ? { periodKey: benefit.periodKey } : {}),
-                })),
-              },
-            },
-        });
-    }
-     console.log(`Finished processing card: ${cardData.name}`);
+  const args = process.argv.slice(2);
+  const confirmApply = args.find((argument) => argument.startsWith('--confirm='))?.slice('--confirm='.length);
+  if (!args.includes('--target-verified') || confirmApply !== GLOBAL_CATALOG_SYNC_CONFIRMATION) {
+    throw new Error(
+      `Seed requires --target-verified --confirm=${GLOBAL_CATALOG_SYNC_CONFIRMATION} before any database write.`,
+    );
   }
-  console.log('Upsert process finished.');
+
+  console.log('Synchronizing the global card catalog by immutable key...');
+  const catalogReport = await runGlobalCatalogSyncOperator({
+    source: predefinedCardsData,
+    database: prisma as unknown as CatalogPrismaClient,
+    mode: 'apply',
+    targetVerified: true,
+    confirmApply,
+  });
+  console.log(JSON.stringify(catalogReport));
 
   // === Seed Benefit Usage Ways ===
   console.log('Seeding benefit usage ways...');

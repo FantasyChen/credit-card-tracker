@@ -9,8 +9,9 @@
 
 ## Business-logic owners
 
-- `src/lib/benefit-dashboard.ts` shapes benefit statuses into dashboard tabs, totals, usage-guide links, and per-card ROI. Do not duplicate that projection in pages/components.
-- `src/lib/benefit-cycle-materialization.ts` creates normalized `BenefitStatus` rows from benefit/card/date context. Cron, card creation, migrations, and custom-benefit creation should share it.
+- `src/lib/effective-benefit.ts` owns the standard/bridge/custom/legacy source union and projects global or custom definitions plus user status state into the compatible server DTO. Dashboard, home, authenticated APIs, notifications, calendar, and guide consumers must not reimplement source selection.
+- `src/lib/benefit-dashboard.ts` shapes effective benefit statuses into dashboard tabs, totals, usage-guide links, and per-card ROI. Do not duplicate that projection in pages/components.
+- `src/lib/benefit-cycle-materialization.ts` owns cycle coordinates; `src/lib/global-benefit-materialization.ts` adapts global-standard and custom sources into insert-only status plans. Cron, card creation, and custom-benefit creation share these owners.
 - `src/lib/benefit-status-transitions.ts` owns completion, partial completion, reset, direct amount edits, and not-usable transitions. Server actions validate through it before persistence.
 - `src/lib/notification-digest.ts` owns notification selection, user reminder windows, digest assembly, quota checks, batching, and delivery. Cron routes should stay limited to authorization/date parsing and response handling.
 - Physical cards are keyed by `CreditCard.id`; display names may include nickname/last digits. Never group duplicate products solely by product name.
@@ -18,9 +19,11 @@
 ## Durable product invariants
 
 - Perks Reminder is free: all accounts receive unlimited cards and reminders, custom reminder windows, loyalty tracking, and import/export. Legacy `subscriptionTier` and `isBetaUser` fields may remain for compatibility but must not restore paid gates or badges.
-- Template benefit changes affect future card additions only unless existing user cards are migrated and benefit statuses are materialized.
+- `PredefinedCard` / `PredefinedBenefit` are canonical shared standard definitions keyed by explicit immutable `catalogKey`; `CreditCard` is an owned physical card, `Benefit` is a user-owned custom definition, and `BenefitStatus` holds user/cycle state. New standard cards create no copied `Benefit` rows.
+- Standard status identity is the owned physical card plus global benefit; custom status identity is the owned custom benefit. Bridge rows may temporarily retain both links, but global terms are authoritative and legacy user-row keys never become new write authority.
+- A checked-in catalog change is incomplete until key-preserving global synchronization and existing-active-card status propagation are dispositioned. New active definitions materialize missing standard statuses insert-only; retired definitions create no future statuses while prior statuses remain visible and unchanged.
 - Important recurring credits should link to practical Benefit Usage Guides with caveats and provenance. Keep claimed ROI separate from subjective value assumptions.
-- Public anonymous marketing/catalog routes must not query Prisma. `src/lib/static-catalog.ts` is the shared DB-free catalog source and `prisma/seed.ts` consumes the same data.
+- Public anonymous marketing/catalog routes must not query Prisma. `src/lib/static-catalog.ts` is the shared DB-free catalog source; persistence uses its validated key-based synchronizer, while `prisma/seed.ts` consumes the same data without becoming an existing-user rollout mechanism.
 - Multi-year benefits use `YEARLY` plus `CARD_ANNIVERSARY` and `fixedCycleDurationMonths`; cycle calculation and materialization must preserve the full duration.
 
 ## Authentication and PWA safety

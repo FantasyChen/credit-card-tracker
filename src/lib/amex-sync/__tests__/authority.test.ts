@@ -63,6 +63,9 @@ function destination(options: {
 } = {}): AmexSyncDestinationContext {
   const status = {
     id: statusId,
+    benefitId: "legacy-benefit-1",
+    creditCardId: cardId,
+    predefinedBenefitId: "global-benefit-1",
     userId,
     cycleStartDate: new Date("2026-07-01T00:00:00.000Z"),
     cycleEndDate: new Date("2026-09-30T00:00:00.000Z"),
@@ -75,12 +78,22 @@ function destination(options: {
     provenance: options.provenance ?? null,
   };
   const benefit = {
-    id: "benefit-1",
+    id: "global-benefit-1",
+    catalogKey: "benefit:american-express-platinum-card:resy:calendar-quarter-q3",
+    predefinedCardId: "global-card-1",
+    category: "Dining",
+    description: "Synthetic Resy credit",
+    percentage: 100,
+    maxAmount: 100,
+    frequency: "QUARTERLY",
+    cycleAlignment: "CALENDAR_FIXED",
+    fixedCycleDurationMonths: null,
+    fixedCycleStartMonth: 7,
+    occurrencesInCycle: 1,
     productKey: options.productKey === undefined ? "american-express-platinum-card" : options.productKey,
     creditFamilyKey: options.familyKey === undefined ? "american-express-platinum-card:resy" : options.familyKey,
     periodKey: options.periodKey === undefined ? "calendar-quarter-q3" : options.periodKey,
-    startDate: new Date("2026-07-01T00:00:00.000Z"),
-    endDate: new Date("2026-09-30T00:00:00.000Z"),
+    retiredAt: null,
     statuses: [status],
   };
   return {
@@ -89,10 +102,19 @@ function destination(options: {
       userId: options.ownerId ?? userId,
       displayName: "Synthetic Platinum ending 12345",
       issuer: options.issuer ?? "American Express",
-      productKey: "american-express-platinum-card",
       lastFourDigits: options.lastFour === undefined ? "12345" : options.lastFour,
       lifecycleStatus: options.lifecycleStatus ?? "ACTIVE",
-      benefits: options.duplicateBenefit ? [benefit, { ...benefit, id: "benefit-2" }] : [benefit],
+      predefinedCard: {
+        id: "global-card-1",
+        catalogKey: "card:american-express-platinum-card",
+        name: "American Express Platinum Card",
+        issuer: "American Express",
+        productKey: "american-express-platinum-card",
+        retiredAt: null,
+        benefits: options.duplicateBenefit
+          ? [benefit, { ...benefit, id: "global-benefit-2", statuses: [{ ...status, predefinedBenefitId: "global-benefit-2" }] }]
+          : [benefit],
+      },
     }],
   };
 }
@@ -145,23 +167,25 @@ describe("Amex sync authority", () => {
     decemberEnvelope.cards[0].observedAt = "2026-12-15T11:59:00.000Z";
     const decemberContext = destination();
     const monthlyStatus = {
-      ...decemberContext.cards[0].benefits[0].statuses[0],
+      ...decemberContext.cards[0].predefinedCard!.benefits[0].statuses[0],
       id: "status-monthly",
       cycleStartDate: new Date("2026-12-01T00:00:00.000Z"),
       cycleEndDate: new Date("2026-12-31T00:00:00.000Z"),
     };
-    decemberContext.cards[0].benefits = [{
-      ...decemberContext.cards[0].benefits[0],
+    decemberContext.cards[0].predefinedCard!.benefits = [{
+      ...decemberContext.cards[0].predefinedCard!.benefits[0],
       id: "benefit-monthly",
+      catalogKey: "benefit:american-express-platinum-card:uber-cash:calendar-month",
       creditFamilyKey: "american-express-platinum-card:uber-cash",
       periodKey: "calendar-month",
-      statuses: [monthlyStatus],
+      statuses: [{ ...monthlyStatus, predefinedBenefitId: "benefit-monthly" }],
     }, {
-      ...decemberContext.cards[0].benefits[0],
+      ...decemberContext.cards[0].predefinedCard!.benefits[0],
       id: "benefit-december-bonus",
+      catalogKey: "benefit:american-express-platinum-card:uber-cash-december-bonus:calendar-month-december",
       creditFamilyKey: "american-express-platinum-card:uber-cash-december-bonus",
       periodKey: "calendar-month-december",
-      statuses: [{ ...monthlyStatus, id: "status-december-bonus" }],
+      statuses: [{ ...monthlyStatus, id: "status-december-bonus", predefinedBenefitId: "benefit-december-bonus" }],
     }];
 
     const split = planAmexSync({
@@ -261,6 +285,64 @@ describe("Amex sync authority", () => {
     expect(plan(source(overrides)).rows[0]).toMatchObject({ disposition: "skipped", reason });
   });
 
+  it("authorizes only the physical-card global relation and standard status links", () => {
+    const authorized = plan();
+    expect(authorized.rows[0]).toMatchObject({
+      disposition: "proposed",
+      destinationCardId: cardId,
+      destinationPredefinedCardId: "global-card-1",
+      destinationPredefinedBenefitId: "global-benefit-1",
+      destinationBenefitId: "legacy-benefit-1",
+      destinationDefinitionFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      destinationOccurrenceIndex: 0,
+      destinationCycleStartInstant: "2026-07-01T00:00:00.000Z",
+      destinationCycleEndInstant: "2026-09-30T00:00:00.000Z",
+    });
+
+    const userKeyOnly = destination();
+    userKeyOnly.cards[0].predefinedCard = null;
+    expect(plan(source(), userKeyOnly).rows[0].reason).toBe("destination_card_missing");
+
+    const customOnly = destination();
+    customOnly.cards[0].predefinedCard!.benefits[0].statuses[0].predefinedBenefitId = null;
+    expect(plan(source(), customOnly).rows[0].reason).toBe("destination_status_missing");
+
+    const wrongGlobalKey = destination();
+    wrongGlobalKey.cards[0].predefinedCard!.benefits[0].catalogKey = "benefit:american-express-platinum-card:saks:calendar-half-h1";
+    expect(plan(source(), wrongGlobalKey).rows[0].reason).toBe("destination_benefit_missing");
+
+    const wrongGlobalParent = destination();
+    wrongGlobalParent.cards[0].predefinedCard!.benefits[0].predefinedCardId = "other-global-card";
+    expect(plan(source(), wrongGlobalParent).rows[0].reason).toBe("destination_benefit_missing");
+  });
+
+  it("binds global definition terms and permits a retired definition only with its existing status", () => {
+    const firstContext = destination();
+    const first = plan(source(), firstContext);
+    const firstFingerprint = first.rows[0].destinationDefinitionFingerprint;
+
+    const reboundContext = destination();
+    reboundContext.cards[0].predefinedCard!.id = "rebound-global-card";
+    reboundContext.cards[0].predefinedCard!.benefits[0].predefinedCardId = "rebound-global-card";
+    const rebound = plan(source(), reboundContext);
+    expect(rebound.rows[0].destinationDefinitionFingerprint).toBe(firstFingerprint);
+    expect(rebound.destinationAuthorityDigest).not.toBe(first.destinationAuthorityDigest);
+
+    firstContext.cards[0].predefinedCard!.benefits[0].description = "Updated global terms";
+    const changed = plan(source(), firstContext);
+    expect(changed.rows[0].destinationDefinitionFingerprint).not.toBe(firstFingerprint);
+    expect(changed.destinationAuthorityDigest).not.toBe(first.destinationAuthorityDigest);
+
+    const retiredContext = destination();
+    retiredContext.cards[0].predefinedCard!.benefits[0].retiredAt = new Date("2026-07-10T00:00:00.000Z");
+    const retiredFingerprint = plan(source(), retiredContext).rows[0].destinationDefinitionFingerprint;
+    expect(plan(source(), retiredContext).rows[0].disposition).toBe("proposed");
+    retiredContext.cards[0].predefinedCard!.benefits[0].retiredAt = new Date("2026-07-11T00:00:00.000Z");
+    expect(plan(source(), retiredContext).rows[0].destinationDefinitionFingerprint).not.toBe(retiredFingerprint);
+    retiredContext.cards[0].predefinedCard!.benefits[0].statuses = [];
+    expect(plan(source(), retiredContext).rows[0].reason).toBe("destination_status_missing");
+  });
+
   it("requires one exact owned active card, benefit, and status without a manual bypass", () => {
     expect(plan(source(), destination({ lastFour: "9999" })).rows[0].reason).toBe("destination_last_five_required");
     expect(plan(source(), destination({ lastFour: "99999" })).rows[0].reason).toBe("destination_card_missing");
@@ -293,7 +375,7 @@ describe("Amex sync authority", () => {
   });
 
   it("plans reviewed compensation only when no newer manual or Amex edit exists", () => {
-    const status = destination({ usedAmount: 25 }).cards[0].benefits[0].statuses[0];
+    const status = destination({ usedAmount: 25 }).cards[0].predefinedCard!.benefits[0].statuses[0];
     status.updatedAt = new Date("2026-07-15T12:00:00.000Z");
     const input = {
       auditDisposition: "UPDATED" as const,

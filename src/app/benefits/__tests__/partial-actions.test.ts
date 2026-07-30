@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { Session } from 'next-auth';
 
 // Mock the cache functions - Prisma is mocked globally in jest.setup.ts
@@ -10,6 +10,10 @@ jest.mock('@/lib/auth', () => ({
   authOptions: {},
 }));
 
+jest.mock('@/lib/effective-benefit', () => ({
+  findEffectiveBenefitStatus: jest.fn(),
+}));
+
 import {
   addPartialCompletionAction,
   markFullCompletionAction,
@@ -19,10 +23,13 @@ import {
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { revalidatePath } from 'next/cache';
+import { findEffectiveBenefitStatus } from '@/lib/effective-benefit';
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const mockBenefitStatusUpdateMany = prisma.benefitStatus.updateMany as jest.Mock;
 const mockGetServerSession = jest.mocked(getServerSession);
 const mockRevalidatePath = jest.mocked(revalidatePath);
+const mockFindEffectiveBenefitStatus = findEffectiveBenefitStatus as jest.Mock;
 
 // Helper to create FormData
 function createFormData(data: Record<string, string>): FormData {
@@ -81,14 +88,11 @@ describe('addPartialCompletionAction', () => {
 
   it('adds partial amount to existing usedAmount', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue({
+    mockFindEffectiveBenefitStatus.mockResolvedValue({
       ...mockBenefitStatus,
       usedAmount: 30,
     });
-    mockPrisma.benefitStatus.update.mockResolvedValue({
-      ...mockBenefitStatus,
-      usedAmount: 50,
-    });
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -100,8 +104,8 @@ describe('addPartialCompletionAction', () => {
     expect(result.success).toBe(true);
     expect(result.newUsedAmount).toBe(50);
     expect(result.isComplete).toBe(false);
-    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledWith({
-      where: { id: 'status-1' },
+    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenCalledWith({
+      where: { id: 'status-1', userId: 'test-user-id' },
       data: {
         usedAmount: 50,
         isCompleted: false,
@@ -113,14 +117,11 @@ describe('addPartialCompletionAction', () => {
 
   it('keeps isCompleted false for partial completion', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue({
+    mockFindEffectiveBenefitStatus.mockResolvedValue({
       ...mockBenefitStatus,
       usedAmount: 0,
     });
-    mockPrisma.benefitStatus.update.mockResolvedValue({
-      ...mockBenefitStatus,
-      usedAmount: 50,
-    });
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -130,7 +131,7 @@ describe('addPartialCompletionAction', () => {
     const result = await addPartialCompletionAction(formData);
 
     expect(result.isComplete).toBe(false);
-    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledWith(
+    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           isCompleted: false,
@@ -141,15 +142,11 @@ describe('addPartialCompletionAction', () => {
 
   it('auto-completes when partial amount reaches maxAmount', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue({
+    mockFindEffectiveBenefitStatus.mockResolvedValue({
       ...mockBenefitStatus,
       usedAmount: 80,
     });
-    mockPrisma.benefitStatus.update.mockResolvedValue({
-      ...mockBenefitStatus,
-      usedAmount: 100,
-      isCompleted: true,
-    });
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -161,7 +158,7 @@ describe('addPartialCompletionAction', () => {
     expect(result.success).toBe(true);
     expect(result.newUsedAmount).toBe(100);
     expect(result.isComplete).toBe(true);
-    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledWith(
+    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           isCompleted: true,
@@ -173,15 +170,11 @@ describe('addPartialCompletionAction', () => {
 
   it('caps usedAmount at maxAmount when exceeding', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue({
+    mockFindEffectiveBenefitStatus.mockResolvedValue({
       ...mockBenefitStatus,
       usedAmount: 80,
     });
-    mockPrisma.benefitStatus.update.mockResolvedValue({
-      ...mockBenefitStatus,
-      usedAmount: 100,
-      isCompleted: true,
-    });
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -206,13 +199,13 @@ describe('addPartialCompletionAction', () => {
       'User not authenticated.'
     );
 
-    expect(mockPrisma.benefitStatus.findFirst).not.toHaveBeenCalled();
+    expect(mockFindEffectiveBenefitStatus).not.toHaveBeenCalled();
     expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 
   it('validates user owns the benefit status', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue(null);
+    mockFindEffectiveBenefitStatus.mockResolvedValue(null);
 
     const formData = createFormData({
       benefitStatusId: 'status-not-owned',
@@ -259,12 +252,8 @@ describe('markFullCompletionAction', () => {
 
   it('sets usedAmount to maxAmount on full completion', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue(mockBenefitStatus);
-    mockPrisma.benefitStatus.update.mockResolvedValue({
-      ...mockBenefitStatus,
-      usedAmount: 100,
-      isCompleted: true,
-    });
+    mockFindEffectiveBenefitStatus.mockResolvedValue(mockBenefitStatus);
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -274,8 +263,8 @@ describe('markFullCompletionAction', () => {
 
     expect(result.success).toBe(true);
     expect(result.usedAmount).toBe(100);
-    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledWith({
-      where: { id: 'status-1' },
+    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenCalledWith({
+      where: { id: 'status-1', userId: 'test-user-id' },
       data: {
         usedAmount: 100,
         isCompleted: true,
@@ -287,11 +276,8 @@ describe('markFullCompletionAction', () => {
 
   it('sets isCompleted to true on full completion', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue(mockBenefitStatus);
-    mockPrisma.benefitStatus.update.mockResolvedValue({
-      ...mockBenefitStatus,
-      isCompleted: true,
-    });
+    mockFindEffectiveBenefitStatus.mockResolvedValue(mockBenefitStatus);
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -299,7 +285,7 @@ describe('markFullCompletionAction', () => {
 
     await markFullCompletionAction(formData);
 
-    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledWith(
+    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           isCompleted: true,
@@ -310,11 +296,8 @@ describe('markFullCompletionAction', () => {
 
   it('sets completedAt timestamp on full completion', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue(mockBenefitStatus);
-    mockPrisma.benefitStatus.update.mockResolvedValue({
-      ...mockBenefitStatus,
-      completedAt: new Date(),
-    });
+    mockFindEffectiveBenefitStatus.mockResolvedValue(mockBenefitStatus);
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -322,7 +305,7 @@ describe('markFullCompletionAction', () => {
 
     await markFullCompletionAction(formData);
 
-    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledWith(
+    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           completedAt: expect.any(Date),
@@ -333,7 +316,7 @@ describe('markFullCompletionAction', () => {
 
   it('returns a friendly failure instead of throwing for stale status rows', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue(null);
+    mockFindEffectiveBenefitStatus.mockResolvedValue(null);
 
     const formData = createFormData({
       benefitStatusId: 'missing-status',
@@ -345,7 +328,7 @@ describe('markFullCompletionAction', () => {
       success: false,
       error: 'Failed to mark benefit as complete.',
     });
-    expect(mockPrisma.benefitStatus.update).not.toHaveBeenCalled();
+    expect(mockPrisma.benefitStatus.updateMany).not.toHaveBeenCalled();
   });
 
   it('requires authentication', async () => {
@@ -368,7 +351,7 @@ describe('resetBenefitCompletionAction', () => {
 
   it('sets usedAmount to 0 when resetting', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.updateMany.mockResolvedValue({ count: 1 });
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -393,7 +376,7 @@ describe('resetBenefitCompletionAction', () => {
 
   it('sets isCompleted to false when resetting', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.updateMany.mockResolvedValue({ count: 1 });
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -412,7 +395,7 @@ describe('resetBenefitCompletionAction', () => {
 
   it('clears completedAt when resetting', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.updateMany.mockResolvedValue({ count: 1 });
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -443,7 +426,7 @@ describe('resetBenefitCompletionAction', () => {
 
   it('validates user owns the benefit status', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.updateMany.mockResolvedValue({ count: 0 });
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 0 });
 
     const formData = createFormData({
       benefitStatusId: 'status-not-owned',
@@ -463,15 +446,12 @@ describe('updateUsedAmountAction', () => {
 
   it('allows reducing usedAmount', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue({
+    mockFindEffectiveBenefitStatus.mockResolvedValue({
       ...mockBenefitStatus,
       usedAmount: 80,
       isCompleted: false,
     });
-    mockPrisma.benefitStatus.update.mockResolvedValue({
-      ...mockBenefitStatus,
-      usedAmount: 50,
-    });
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -487,17 +467,13 @@ describe('updateUsedAmountAction', () => {
 
   it('sets isCompleted to false when reducing from full', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue({
+    mockFindEffectiveBenefitStatus.mockResolvedValue({
       ...mockBenefitStatus,
       usedAmount: 100,
       isCompleted: true,
       completedAt: new Date(),
     });
-    mockPrisma.benefitStatus.update.mockResolvedValue({
-      ...mockBenefitStatus,
-      usedAmount: 50,
-      isCompleted: false,
-    });
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -507,7 +483,7 @@ describe('updateUsedAmountAction', () => {
     const result = await updateUsedAmountAction(formData);
 
     expect(result.isComplete).toBe(false);
-    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledWith(
+    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           isCompleted: false,
@@ -519,12 +495,8 @@ describe('updateUsedAmountAction', () => {
 
   it('caps amount at maxAmount', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue(mockBenefitStatus);
-    mockPrisma.benefitStatus.update.mockResolvedValue({
-      ...mockBenefitStatus,
-      usedAmount: 100,
-      isCompleted: true,
-    });
+    mockFindEffectiveBenefitStatus.mockResolvedValue(mockBenefitStatus);
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
 
     const formData = createFormData({
       benefitStatusId: 'status-1',
@@ -565,7 +537,7 @@ describe('updateUsedAmountAction', () => {
 
   it('validates user owns the benefit status', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
-    mockPrisma.benefitStatus.findFirst.mockResolvedValue(null);
+    mockFindEffectiveBenefitStatus.mockResolvedValue(null);
 
     const formData = createFormData({
       benefitStatusId: 'status-not-owned',

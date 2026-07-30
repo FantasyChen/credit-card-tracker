@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Defines the current physical-card, global catalog, materialization, and authenticated ownership boundaries coordinated by the parent."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Defines source, existing-user propagation, and status-materialization requirements for the child sequence."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Defines additive migration, development-before-production, target verification, and rollback gates."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Defines AMEX authority and off-preview-write contracts that the global-definition cutover must preserve."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Defines separately authorized production deployment/configuration boundaries owned by the final child."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/research/production-backfill-review.md","reason":"Preserves sanitized per-user-key evidence strictly as historical context, not as the new migration plan or apply authority."}

@@ -1,0 +1,9 @@
+{"file":".trellis/spec/perks-reminder/index.md","reason":"Entry point for database, deployment, AMEX, and verification safety contracts."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Defines Vercel ownership, production authorization, configuration, and external-effect gates."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Defines target verification, migration/apply authorization, recovery, and forbidden production actions."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Defines production off/preview/write, userscript, audit, and confirmation contracts."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Defines safe checks and truthful pass/fail/skip reporting."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/research/production-backfill-review.md","reason":"Preserved historical evidence informs scale/diagnostics but is explicitly not the new apply plan."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/prd.md","reason":"Parent requirements are the final product and production gate."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/design.md","reason":"Parent design defines sequencing, authority, historical-evidence limits, and rollback shape."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/implement.md","reason":"Parent plan defines child completion and cross-child integration prerequisites."}

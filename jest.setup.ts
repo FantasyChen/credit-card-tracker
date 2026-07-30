@@ -31,25 +31,32 @@ jest.mock('next-auth/next', () => ({
 }));
 
 // Mock Prisma client globally
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
+jest.mock('@/lib/prisma', () => {
+  const prisma: any = {
     benefitStatus: {
       updateMany: jest.fn(),
+      deleteMany: jest.fn(),
       findMany: jest.fn(),
       findFirst: jest.fn(),
       findUnique: jest.fn(),
       upsert: jest.fn(),
       create: jest.fn(),
+      createMany: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
     },
     creditCard: {
+      count: jest.fn(),
       findMany: jest.fn(),
       findFirst: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    creditCardEvent: {
+      create: jest.fn(),
     },
     user: {
       findMany: jest.fn(),
@@ -63,10 +70,13 @@ jest.mock('@/lib/prisma', () => ({
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       delete: jest.fn(),
+      deleteMany: jest.fn(),
     },
     predefinedCard: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
     },
     benefitUsageWay: {
       findMany: jest.fn(),
@@ -86,18 +96,16 @@ jest.mock('@/lib/prisma', () => ({
       createMany: jest.fn(),
       deleteMany: jest.fn(),
     },
-    $transaction: jest.fn(async (callback: any) => callback({
-      loyaltyAccount: {
-        create: jest.fn(),
-        update: jest.fn(),
-      },
-      loyaltyCertificate: {
-        createMany: jest.fn(),
-        deleteMany: jest.fn(),
-      },
-    })),
-  },
-}));
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    $executeRaw: jest.fn().mockResolvedValue(0),
+    $executeRawUnsafe: jest.fn().mockResolvedValue(0),
+  };
+  prisma.$transaction = jest.fn(async (operation: any) => {
+    if (typeof operation === 'function') return operation(prisma);
+    return Promise.all(operation);
+  });
+  return { prisma };
+});
 
 // Mock Vercel Analytics
 jest.mock('@vercel/analytics', () => ({

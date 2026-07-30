@@ -1,4 +1,8 @@
-import type { Benefit, BenefitStatus, CreditCard as PrismaCreditCard } from '@/generated/prisma';
+import type { CreditCard as PrismaCreditCard } from '@/generated/prisma';
+import type {
+  EffectiveBenefitStatus,
+  EffectiveCreditCard,
+} from '@/lib/effective-benefit';
 import { createCardDisplayNameMap } from '@/lib/cardDisplayUtils';
 
 export type BenefitDashboardFrequency =
@@ -11,23 +15,38 @@ export type BenefitDashboardFrequency =
 
 export const CUSTOM_BENEFITS_CARD_NAME = '⭐ Custom Benefits';
 
-export interface CreditCardWithDisplayName extends PrismaCreditCard {
-  displayName: string;
-}
+export type DashboardCreditCard = Pick<
+  PrismaCreditCard,
+  'id' | 'name' | 'issuer' | 'lastFourDigits' | 'nickname'
+> & Partial<PrismaCreditCard>;
 
-export interface DisplayBenefitStatus extends BenefitStatus {
-  benefit: Benefit & {
+export type CreditCardWithDisplayName = Omit<EffectiveCreditCard, 'predefinedCardId'> & {
+  predefinedCardId?: string | null;
+  displayName: string;
+};
+
+export interface DisplayBenefitStatus extends Omit<
+  EffectiveBenefitStatus,
+  | 'benefit'
+  | 'creditCardId'
+  | 'predefinedBenefitId'
+  | 'source'
+  | 'usageWaySlug'
+  | 'isCustomBenefit'
+  | 'canMutateDefinition'
+> {
+  benefit: Omit<EffectiveBenefitStatus['benefit'], 'creditCard'> & {
     creditCard: CreditCardWithDisplayName | null;
   };
+  creditCardId?: string | null;
+  predefinedBenefitId?: string | null;
+  source?: EffectiveBenefitStatus['source'];
   usageWaySlug?: string | null;
   isCustomBenefit?: boolean;
+  canMutateDefinition?: boolean;
 }
 
-export type RawDisplayBenefitStatus = BenefitStatus & {
-  benefit: Benefit & {
-    creditCard: PrismaCreditCard | null;
-  };
-};
+export type RawDisplayBenefitStatus = EffectiveBenefitStatus;
 
 export interface UsageWayForDashboard {
   slug: string;
@@ -180,12 +199,26 @@ export function augmentBenefitStatusesForDashboard(
   userCards: PrismaCreditCard[],
   usageWays: UsageWayForDashboard[]
 ): DisplayBenefitStatus[] {
-  const cardDisplayNameMap = createCardDisplayNameMap(userCards);
+  const authoritativeCards = new Map<string, {
+    id: string;
+    name: string;
+    issuer: string;
+    lastFourDigits: string | null;
+    nickname: string | null;
+  }>(userCards.map((card) => [card.id, card]));
+  for (const status of statuses) {
+    const card = status.benefit.creditCard;
+    if (card) authoritativeCards.set(card.id, card);
+  }
+  const cardDisplayNameMap = createCardDisplayNameMap(
+    Array.from(authoritativeCards.values())
+  );
   const usageWayMap = buildUsageWaySlugMap(usageWays);
 
   return statuses.map((status) => {
     const cardOriginal = status.benefit.creditCard;
     const usageWaySlug =
+      status.usageWaySlug ??
       (cardOriginal
         ? usageWayMap.get(`${cardOriginal.name}:${status.benefit.category}:${status.benefit.description}`)
         : null) ??
@@ -199,7 +232,6 @@ export function augmentBenefitStatusesForDashboard(
           creditCard: null,
         },
         usageWaySlug,
-        isCustomBenefit: true,
       };
     }
 
@@ -213,7 +245,6 @@ export function augmentBenefitStatusesForDashboard(
         },
       },
       usageWaySlug,
-      isCustomBenefit: false,
     };
   });
 }
@@ -225,7 +256,9 @@ export function deduplicateBenefitStatusesForDashboard(
 
   for (const status of statuses) {
     const dateOnly = new Date(status.cycleStartDate).toISOString().split('T')[0];
-    const key = `${status.benefitId}|${dateOnly}|${status.occurrenceIndex}`;
+    const definitionId = status.predefinedBenefitId ?? status.benefitId;
+    const cardId = status.creditCardId ?? 'standalone';
+    const key = `${cardId}|${definitionId}|${dateOnly}|${status.occurrenceIndex}`;
     const group = groups.get(key) ?? [];
     group.push(status);
     groups.set(key, group);

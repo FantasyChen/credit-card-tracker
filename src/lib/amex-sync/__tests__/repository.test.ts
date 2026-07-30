@@ -5,14 +5,21 @@ import {
   applyAmexSyncRow,
   deactivateAmexCardMapping,
   deleteExpiredAmexSyncRowAudits,
+  loadAmexSyncDestinationContext,
   recordCurrentAmexSyncRow,
   recordNonAppliedAmexSyncRow,
 } from "../repository";
-import type { AmexSyncPlanRow } from "../authority";
+import {
+  amexDestinationDefinitionFingerprint,
+  resolveAmexGlobalDefinitionAuthority,
+  type AmexSyncPlanRow,
+  type DestinationPredefinedBenefitSnapshot,
+  type DestinationPredefinedCardSnapshot,
+} from "../authority";
 
 jest.mock("@/lib/prisma", () => {
   const database = {
-    creditCard: { findUnique: jest.fn() },
+    creditCard: { findMany: jest.fn(), findUnique: jest.fn() },
     benefitStatus: { findUnique: jest.fn(), updateMany: jest.fn() },
     benefitStatusSourceProvenance: { findUnique: jest.fn(), upsert: jest.fn() },
     amexSyncRowAudit: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), deleteMany: jest.fn() },
@@ -25,7 +32,7 @@ jest.mock("@/lib/prisma", () => {
 });
 
 const db = prisma as unknown as {
-  creditCard: { findUnique: jest.Mock };
+  creditCard: { findMany: jest.Mock; findUnique: jest.Mock };
   benefitStatus: { findUnique: jest.Mock; updateMany: jest.Mock };
   benefitStatusSourceProvenance: { findUnique: jest.Mock; upsert: jest.Mock };
   amexSyncRowAudit: { findUnique: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; deleteMany: jest.Mock };
@@ -34,6 +41,45 @@ const db = prisma as unknown as {
   $transaction: jest.Mock;
 };
 
+const globalProduct: DestinationPredefinedCardSnapshot = {
+  id: "global-card-1",
+  catalogKey: "card:american-express-platinum-card",
+  name: "American Express Platinum Card",
+  issuer: "American Express",
+  productKey: "american-express-platinum-card",
+  retiredAt: null,
+  benefits: [],
+};
+const globalBenefit: DestinationPredefinedBenefitSnapshot = {
+  id: "global-benefit-1",
+  catalogKey: "benefit:american-express-platinum-card:resy:calendar-quarter-q3",
+  predefinedCardId: globalProduct.id,
+  category: "Dining",
+  description: "Synthetic Resy credit",
+  percentage: 100,
+  maxAmount: 100,
+  frequency: "QUARTERLY",
+  cycleAlignment: "CALENDAR_FIXED",
+  fixedCycleDurationMonths: null,
+  fixedCycleStartMonth: 7,
+  occurrencesInCycle: 1,
+  productKey: "american-express-platinum-card",
+  creditFamilyKey: "american-express-platinum-card:resy",
+  periodKey: "calendar-quarter-q3",
+  retiredAt: null,
+  statuses: [],
+};
+const sourceIdentity = resolveAmexGlobalDefinitionAuthority({
+  product: globalProduct,
+  benefit: globalBenefit,
+  sourceCreditKey: "american-express-platinum-card:resy",
+})!;
+const definitionFingerprint = amexDestinationDefinitionFingerprint({
+  product: globalProduct,
+  benefit: globalBenefit,
+  sourceIdentity,
+});
+
 const row: AmexSyncPlanRow = {
   sourceRowIdentity: "a".repeat(64),
   atomicGroupIdentity: "e".repeat(64),
@@ -41,6 +87,7 @@ const row: AmexSyncPlanRow = {
   sourceObservationDigest: "c".repeat(64),
   sourceLocalCardId: "11111111-1111-4111-8111-111111111111",
   sourceEndingDigits: "12345",
+  sourceCreditKey: "american-express-platinum-card:resy",
   productKey: "american-express-platinum-card",
   creditFamilyKey: "american-express-platinum-card:resy",
   observedAt: "2026-07-15T11:59:00.000Z",
@@ -51,8 +98,17 @@ const row: AmexSyncPlanRow = {
   disposition: "proposed",
   reason: "proposed_update",
   destinationCardId: "card-1",
-  destinationBenefitId: "benefit-1",
+  destinationPredefinedCardId: globalProduct.id,
+  destinationProductCatalogKey: globalProduct.catalogKey,
+  destinationBenefitId: "legacy-benefit-1",
+  destinationPredefinedBenefitId: globalBenefit.id,
+  destinationBenefitCatalogKey: globalBenefit.catalogKey,
+  destinationDefinitionFingerprint: definitionFingerprint,
   destinationStatusId: "status-1",
+  destinationOccurrenceIndex: 0,
+  destinationCycleStartInstant: "2026-07-01T00:00:00.000Z",
+  destinationCycleEndInstant: "2026-09-30T23:59:59.999Z",
+  beforeProvenance: null,
   before: { usedAmount: 50, isCompleted: true, completedAt: "2026-07-10T00:00:00.000Z", isNotUsable: false },
   after: { usedAmount: 25, isCompleted: false, completedAt: null, isNotUsable: false },
   changes: { amountDecrease: true, amountIncrease: false, completionSet: false, completionCleared: true },
@@ -65,10 +121,12 @@ describe("Amex sync persistence boundary", () => {
     db.creditCard.findUnique.mockResolvedValue({
       id: "card-1",
       userId: "user-1",
-      productKey: row.productKey,
       lifecycleStatus: "ACTIVE",
     });
     db.benefitStatus.findUnique.mockResolvedValue({
+      benefitId: row.destinationBenefitId,
+      creditCardId: row.destinationCardId,
+      predefinedBenefitId: row.destinationPredefinedBenefitId,
       userId: "user-1",
       usedAmount: 50,
       isCompleted: true,
@@ -77,20 +135,19 @@ describe("Amex sync persistence boundary", () => {
       cycleStartDate: new Date("2026-07-01T00:00:00.000Z"),
       cycleEndDate: new Date("2026-09-30T23:59:59.999Z"),
       occurrenceIndex: 0,
-      benefit: {
-        id: "benefit-1",
-        creditCardId: "card-1",
-        productKey: row.productKey,
-        creditFamilyKey: row.creditFamilyKey,
-        periodKey: row.periodKey,
-        creditCard: {
-          id: "card-1",
-          userId: "user-1",
-          issuer: "American Express",
-          productKey: row.productKey,
-          lastFourDigits: "12345",
-          lifecycleStatus: "ACTIVE",
-        },
+      creditCard: {
+        id: "card-1",
+        userId: "user-1",
+        issuer: "American Express",
+        lastFourDigits: "12345",
+        lifecycleStatus: "ACTIVE",
+        predefinedCardId: globalProduct.id,
+        predefinedCard: { ...globalProduct, benefits: undefined },
+      },
+      predefinedBenefit: {
+        ...globalBenefit,
+        statuses: undefined,
+        predefinedCard: { ...globalProduct, benefits: undefined },
       },
     });
     db.benefitStatus.updateMany.mockResolvedValue({ count: 1 });
@@ -100,8 +157,67 @@ describe("Amex sync persistence boundary", () => {
     db.amexSyncRowAudit.update.mockResolvedValue({});
   });
 
+  it("loads only physical-card global definitions and standard status relations as authority", async () => {
+    db.creditCard.findMany.mockResolvedValue([{
+      id: "card-1",
+      userId: "user-1",
+      name: "Legacy mutable name",
+      nickname: "Synthetic",
+      issuer: "American Express",
+      lastFourDigits: "12345",
+      lifecycleStatus: "ACTIVE",
+      predefinedCard: {
+        ...globalProduct,
+        benefits: [{
+          ...globalBenefit,
+          benefitStatuses: [{
+            id: "status-1",
+            benefitId: "legacy-benefit-1",
+            creditCardId: "card-1",
+            predefinedBenefitId: globalBenefit.id,
+            userId: "user-1",
+            cycleStartDate: new Date("2026-07-01T00:00:00.000Z"),
+            cycleEndDate: new Date("2026-09-30T23:59:59.999Z"),
+            occurrenceIndex: 0,
+            usedAmount: 50,
+            isCompleted: true,
+            completedAt: new Date("2026-07-10T00:00:00.000Z"),
+            isNotUsable: false,
+            updatedAt: new Date("2026-07-14T00:00:00.000Z"),
+            sourceProvenance: [],
+          }],
+        }],
+      },
+    }]);
+
+    const context = await loadAmexSyncDestinationContext("user-1");
+    expect(db.creditCard.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: "user-1" },
+      select: expect.objectContaining({
+        predefinedCard: expect.any(Object),
+      }),
+    }));
+    const selectedCard = db.creditCard.findMany.mock.calls[0][0].select;
+    expect(selectedCard).not.toHaveProperty("productKey");
+    expect(selectedCard).not.toHaveProperty("benefits");
+    expect(context.cards[0]).toMatchObject({
+      id: "card-1",
+      displayName: "Synthetic (Legacy mutable name)",
+      predefinedCard: {
+        id: globalProduct.id,
+        benefits: [{
+          id: globalBenefit.id,
+          statuses: [{
+            creditCardId: "card-1",
+            predefinedBenefitId: globalBenefit.id,
+          }],
+        }],
+      },
+    });
+  });
+
   it("atomically writes one owned compare-and-set status, provenance, and audit", async () => {
-    await expect(applyAmexSyncRow({ attemptId: "attempt-1", userId: "user-1", row })).resolves.toEqual({
+    await expect(applyAmexSyncRow({ attemptId: "attempt-1", userId: "user-1", row })).resolves.toMatchObject({
       sourceRowIdentity: row.sourceRowIdentity,
       disposition: "UPDATED",
       reasonCode: "proposed_update",
@@ -111,8 +227,12 @@ describe("Amex sync persistence boundary", () => {
       where: expect.objectContaining({
         id: "status-1",
         userId: "user-1",
+        benefitId: "legacy-benefit-1",
+        creditCardId: "card-1",
+        predefinedBenefitId: globalBenefit.id,
         cycleStartDate: new Date("2026-07-01T00:00:00.000Z"),
         cycleEndDate: new Date("2026-09-30T23:59:59.999Z"),
+        occurrenceIndex: row.destinationOccurrenceIndex,
         usedAmount: 50,
         isCompleted: true,
       }),
@@ -123,6 +243,9 @@ describe("Amex sync persistence boundary", () => {
     }));
     expect(db.amexSyncRowAudit.create).toHaveBeenCalledWith({ data: expect.objectContaining({
       disposition: "UPDATED",
+      destinationBenefitId: "legacy-benefit-1",
+      destinationPredefinedBenefitId: globalBenefit.id,
+      destinationDefinitionFingerprint: definitionFingerprint,
       beforeUsedAmount: 50,
       afterUsedAmount: 25,
       beforeIsCompleted: true,
@@ -130,38 +253,32 @@ describe("Amex sync persistence boundary", () => {
     }) });
   });
 
-  it("applies both destinations in one serializable atomic-group transaction", async () => {
+  it("applies both destinations without requiring legacy benefit links in one serializable transaction", async () => {
+    const standardRow: AmexSyncPlanRow = { ...row, destinationBenefitId: null };
     const bonusRow: AmexSyncPlanRow = {
-      ...row,
+      ...standardRow,
       sourceRowIdentity: "d".repeat(64),
-      creditFamilyKey: "american-express-platinum-card:resy-bonus",
-      destinationBenefitId: "benefit-2",
       destinationStatusId: "status-2",
       before: { ...row.before!, usedAmount: 0, isCompleted: false, completedAt: null },
       after: { ...row.after!, usedAmount: 15 },
       changes: { amountDecrease: false, amountIncrease: true, completionSet: false, completionCleared: false },
     };
-    const firstStatus = await db.benefitStatus.findUnique();
+    const firstStatus = { ...await db.benefitStatus.findUnique(), benefitId: null };
     db.benefitStatus.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => where.id === "status-2"
       ? {
         ...firstStatus,
         usedAmount: 0,
         isCompleted: false,
         completedAt: null,
-        benefit: {
-          ...firstStatus.benefit,
-          id: "benefit-2",
-          creditFamilyKey: bonusRow.creditFamilyKey,
-        },
       }
       : firstStatus);
 
     await expect(applyAmexSyncGroup({
       attemptId: "attempt-1",
       userId: "user-1",
-      rows: [row, bonusRow],
+      rows: [standardRow, bonusRow],
     })).resolves.toEqual([
-      expect.objectContaining({ sourceRowIdentity: row.sourceRowIdentity, disposition: "UPDATED" }),
+      expect.objectContaining({ sourceRowIdentity: standardRow.sourceRowIdentity, disposition: "UPDATED" }),
       expect.objectContaining({ sourceRowIdentity: bonusRow.sourceRowIdentity, disposition: "UPDATED" }),
     ]);
     expect(db.$transaction).toHaveBeenCalledTimes(1);
@@ -188,20 +305,11 @@ describe("Amex sync persistence boundary", () => {
     const bonusRow: AmexSyncPlanRow = {
       ...row,
       sourceRowIdentity: "d".repeat(64),
-      creditFamilyKey: "american-express-platinum-card:resy-bonus",
-      destinationBenefitId: "benefit-2",
       destinationStatusId: "status-2",
     };
     const firstStatus = await db.benefitStatus.findUnique();
     db.benefitStatus.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => where.id === "status-2"
-      ? {
-        ...firstStatus,
-        benefit: {
-          ...firstStatus.benefit,
-          id: "benefit-2",
-          creditFamilyKey: bonusRow.creditFamilyKey,
-        },
-      }
+      ? { ...firstStatus }
       : firstStatus);
     db.benefitStatus.updateMany
       .mockResolvedValueOnce({ count: 1 })
@@ -228,10 +336,7 @@ describe("Amex sync persistence boundary", () => {
     const current = await db.benefitStatus.findUnique();
     db.benefitStatus.findUnique.mockResolvedValue({
       ...current,
-      benefit: {
-        ...current.benefit,
-        creditCard: { ...current.benefit.creditCard, lifecycleStatus: "CLOSED" },
-      },
+      creditCard: { ...current.creditCard, lifecycleStatus: "CLOSED" },
     });
     await expect(applyAmexSyncRow({
       attemptId: "attempt-1",
@@ -242,11 +347,49 @@ describe("Amex sync persistence boundary", () => {
     expect(db.benefitStatusSourceProvenance.upsert).not.toHaveBeenCalled();
   });
 
+  it("rejects transaction-time global definition drift before mutation", async () => {
+    const current = await db.benefitStatus.findUnique();
+    db.benefitStatus.findUnique.mockResolvedValue({
+      ...current,
+      predefinedBenefit: {
+        ...current.predefinedBenefit,
+        maxAmount: 125,
+      },
+    });
+
+    await expect(applyAmexSyncRow({
+      attemptId: "attempt-1",
+      userId: "user-1",
+      row,
+    })).rejects.toThrow("conflict_repreview_required");
+    expect(db.benefitStatus.updateMany).not.toHaveBeenCalled();
+    expect(db.benefitStatusSourceProvenance.findUnique).not.toHaveBeenCalled();
+    expect(db.amexSyncRowAudit.create).not.toHaveBeenCalled();
+  });
+
   it("rejects a different persisted cycle end date before mutation", async () => {
     const current = await db.benefitStatus.findUnique();
     db.benefitStatus.findUnique.mockResolvedValue({
       ...current,
       cycleEndDate: new Date("2026-10-01T23:59:59.999Z"),
+    });
+
+    await expect(applyAmexSyncRow({
+      attemptId: "attempt-1",
+      userId: "user-1",
+      row,
+    })).rejects.toThrow("conflict_repreview_required");
+    expect(db.benefitStatus.updateMany).not.toHaveBeenCalled();
+    expect(db.benefitStatusSourceProvenance.findUnique).not.toHaveBeenCalled();
+    expect(db.benefitStatusSourceProvenance.upsert).not.toHaveBeenCalled();
+    expect(db.amexSyncRowAudit.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a changed persisted occurrence before mutation", async () => {
+    const current = await db.benefitStatus.findUnique();
+    db.benefitStatus.findUnique.mockResolvedValue({
+      ...current,
+      occurrenceIndex: 1,
     });
 
     await expect(applyAmexSyncRow({
@@ -291,7 +434,7 @@ describe("Amex sync persistence boundary", () => {
       attemptId: "attempt-1",
       userId: "user-1",
       row: currentRow,
-    })).resolves.toEqual({
+    })).resolves.toMatchObject({
       sourceRowIdentity: row.sourceRowIdentity,
       disposition: "UNCHANGED",
       reasonCode: "already_current",
@@ -402,7 +545,7 @@ describe("Amex sync persistence boundary", () => {
       changes: { amountDecrease: false, amountIncrease: false, completionSet: false, completionCleared: false },
     };
 
-    await expect(recordNonAppliedAmexSyncRow("attempt-1", nonAppliedRow)).resolves.toEqual({
+    await expect(recordNonAppliedAmexSyncRow("attempt-1", nonAppliedRow)).resolves.toMatchObject({
       sourceRowIdentity: row.sourceRowIdentity,
       disposition: storedDisposition,
       reasonCode: reason,

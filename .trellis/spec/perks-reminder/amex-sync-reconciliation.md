@@ -8,7 +8,7 @@ Use this contract when complete local `amex-benefits/3` observations are project
 
 This is the current contract for production userscript `0.5.1` and `amex-sync-envelope/3`; envelope V3 began during development at userscript `0.5.0`, and the final production artifact increases that already-installed version strictly. It supersedes the historical Platinum-only envelope-V2 mapping contract in [Browser-Side Authenticated Read Integrations](browser-read-integrations.md). The local reader remains product-independent; destination identity is introduced only at the synchronization boundary.
 
-The shared AMEX catalog contains 12 products and 56 period-specific benefit rows. Every row has stable destination identity and source-semantics classification. Only provider `usage` credits receive write authority; `spend`, certificate, and status/access rows remain keyed but unwritable.
+The shared AMEX catalog contains 12 global products and 56 period-specific global benefit definitions. Every row has an immutable catalog key, exact parent, destination tuple, and source-semantics classification. Only 47 provider `usage` destinations receive write authority; `spend`, certificate, and status/access rows remain keyed but unwritable. Destination writes resolve through the owned physical `CreditCard.predefinedCard`, one global `PredefinedBenefit`, and one standard/bridge `BenefitStatus`; legacy user-row keys are diagnostic compatibility only. The complete catalog/status/migration model is specified in [Global Benefit Definitions and Migration](global-benefit-definitions-and-migration.md).
 
 ### 2. Signatures
 
@@ -113,6 +113,8 @@ type AmexSourceSemantics =
   | "status_or_access";
 
 interface AmexCatalogBenefitIdentity {
+  catalogKey: string;
+  parentCatalogKey: string;
   creditFamilyKey: string;
   periodKey: AmexPeriodKey;
   sourceSemantics: AmexSourceSemantics;
@@ -182,50 +184,49 @@ applyAmexSyncGroup({
 
 Ordinary source observations produce one-row atomic groups. Platinum December Uber produces one two-row group. The grouped write requires at least two rows with the same `atomicGroupIdentity` and applies every status/provenance/audit change in one serializable transaction.
 
-#### Backfill operator
+#### Global destination authority
 
 ```ts
-const AMEX_CATALOG_BACKFILL_CONFIRMATION =
-  "FILL_NULL_AMEX_CATALOG_KEYS";
+resolveAmexGlobalDefinitionAuthority({
+  product,
+  benefit,
+  sourceCreditKey,
+}): AmexCatalogBenefitIdentity | null;
 
-runAmexCatalogBackfillOperator({
-  mode?,                 // "dry-run" by default, or "apply"
-  confirmApply?,         // exact confirmation phrase for apply
-  targetVerified?,       // must be true for apply
-  limit?,                // 1..500, default 250
-  referenceDate?,
-  after?: { predefined?: string; user?: string },
-  database?,
-} = {}): Promise<AmexCatalogBackfillOperatorReport>;
+amexDestinationDefinitionFingerprint({
+  product,
+  benefit,
+  sourceIdentity,
+}): string;
+
+interface AmexSyncPlan {
+  rows: AmexSyncPlanRow[];
+  envelopeDigest: string;
+  destinationAuthorityDigest: string;
+  beforeStateDigest: string;
+}
 ```
 
-Operator command:
+The destination fingerprint covers the global product catalog/product/issuer/retirement identity; global benefit catalog/parent/canonical terms/cycle/AMEX tuple/retirement identity; and registry source semantics/source credit. The ordered destination-authority digest additionally binds physical/global/status IDs and keys, exact last five, exact persisted cycle instants, occurrence, source period/evidence, before/after state, provenance, transition, and atomic grouping. The HMAC proposal carries the digest while the public DTO remains unchanged.
 
-```bash
-npm run backfill:amex-catalog -- [--dry-run | --apply] \
-  [--confirm=FILL_NULL_AMEX_CATALOG_KEYS] \
-  [--target-verified] [--limit=N] \
-  [--after-predefined=ID] [--after-user=ID]
-```
-
-With no mode flag, the command is dry-run. `--apply` and `--dry-run` are mutually exclusive. Running either mode against a database remains a separately authorized operational action; implementation tests use injected fakes and do not connect to a database.
+The old `npm run backfill:amex-catalog -- --apply` path is superseded and exits before any writer; it must never repopulate per-user AMEX keys. Global catalog synchronization and exact legacy bridge/cleanup/rollback use the independently gated operators in [Global Benefit Definitions and Migration](global-benefit-definitions-and-migration.md). Running any database-backed mode, including dry-run, remains a separately authorized operation.
 
 ### 3. Contracts
 
-1. **Catalog completeness is not write authority.** All 12 products and 56 benefit rows have stable product/family/period identity and one source-semantics classification. Only `usage` entries with a non-null source credit may be browser-projected and server-authorized.
+1. **Catalog completeness is not write authority.** All 12 global products and 56 global benefit definitions have immutable catalog/parent identity, stable product/family/period identity, and one source-semantics classification. Only the 47 `usage` destinations with a non-null source credit may be browser-projected and server-authorized, and they still require one exact owned physical-card/global-benefit/standard-status graph.
 2. **Local observation stays product-independent.** The reader retains every eligible tracker-backed `usage` row for a top-level `BASIC` card without destination keys. Sync matching never changes local admission or persisted observation identity.
 3. **Provider evidence crosses a bounded V3 boundary.** Envelope V3 carries bounded provider product/title/category evidence, claimed source/destination semantic keys, explicit status fields, and exact five digits. It carries no raw response, provider token, cookie, authorization material, destination database ID, user ID, or manual mapping.
 4. **Browser and server both resolve evidence.** The browser may claim a product/source credit; the server independently resolves the same evidence and rejects claim mismatch, ambiguity, hard conflict, unsupported source, incompatible period, or amount constraint failure.
 5. **Product fuzzy matching is bounded.** Exact aliases win. Fuzzy acceptance requires score at least `0.88`, margin at least `0.10`, and no hard business/consumer, tier, affiliation, or cobrand conflict. There is no nearest-product fallback or manual confirmation.
 6. **Benefit matching is structured and product-scoped.** Exact title aliases win. Otherwise exactly one descriptor must satisfy required/forbidden token groups and evidence constraints. Duplicate rows for the same source-credit/period are excluded independently; they do not suppress unrelated benefits on the same card.
-7. **Card authority requires exact last five.** A destination card must be owned by the authenticated user, active, issued by AMEX, keyed to the resolved product, store exactly five digits, and equal the source digits. Exactly one match is required. Names, four-digit suffixes, manual selections, and retained `ExternalCardMapping` rows never authorize a write.
-8. **Preview and confirmation remain separate.** Preview is read-only. Confirmation requires effective `write` mode and a valid short-lived proposal bound to user, mode, envelope, ordered row/group identities, exact card identity, destination plan, before state, transition time, and expiry.
-9. **Transaction-time identity is mandatory.** Every status write reloads and rechecks owner, issuer, active lifecycle, product, exact five digits, destination card/benefit/status IDs, destination keys, cycle range, occurrence, before state, and monotonic provenance. Source period boundaries authorize by UTC calendar date; after that check passes, the final compare-and-set must use the exact persisted `cycleStartDate` and `cycleEndDate` instants loaded inside the same transaction. It must not reconstruct midnight timestamps because materialized inclusive cycle ends may be end-of-day instants. Any change returns `conflict_repreview_required` and writes no successful status/provenance/audit result.
+7. **Card authority requires exact last five and a global product relation.** A destination card must be owned by the authenticated user, active, issued by AMEX, link through `predefinedCardId` to the one registry-valid global product, store exactly five digits, and equal the source digits. Exactly one match is required. `CreditCard.productKey`, names, four-digit suffixes, manual selections, and retained `ExternalCardMapping` rows never authorize a write.
+8. **Preview and confirmation remain separate.** Preview is read-only. Confirmation requires effective `write` mode and a valid short-lived proposal bound to user, mode, envelope, ordered row/group identities, exact physical/global/status authority digest, definition fingerprint, before state/provenance, transition time, and expiry. A catalog or retirement change after preview requires re-preview.
+9. **Transaction-time global identity is mandatory.** Every status write reloads and rechecks owner, issuer, active lifecycle, physical card, exact five digits, global product ID/key/tuple, global benefit ID/key/parent/writable semantics/fingerprint, standard status ID/source links, cycle range, occurrence, before state, and monotonic provenance. User `Benefit` keys cannot substitute for a global destination; `destinationBenefitId` is bounded bridge audit metadata only. Source period boundaries authorize by UTC calendar date; after that check passes, the final compare-and-set must use the exact persisted `cycleStartDate` and `cycleEndDate` instants loaded inside the same transaction. It must not reconstruct midnight timestamps because materialized inclusive cycle ends may be end-of-day instants. Any change returns `conflict_repreview_required` and writes no successful status/provenance/audit result.
 10. **Explicit AMEX fields are authoritative.** Explicit `earnedOrUsed` replaces `usedAmount`, including decreases and zero. Explicit completion sets or clears completion. Omitted fields preserve local values; an omitted benefit produces no plan row. `isNotUsable` is never overwritten and causes a fail-closed skip.
 11. **Completion timestamps follow transitions.** Incomplete-to-complete uses the proposal transition time; complete-to-complete preserves the existing timestamp; complete-to-incomplete clears it; omitted completion preserves it.
 12. **December Platinum Uber is atomic.** For an exact December base-Platinum Uber observation, allocate `min(total,$15)` to monthly and `min(max(total-$15,$0),$20)` to the December bonus. Missing/invalid/non-USD/negative or greater-than-$35 aggregate evidence rejects both. Both destination rows update or neither does.
 13. **Period resolution is closed.** Calendar periods require exact UTC boundaries. Anniversary periods require exact equality with an already materialized destination status cycle. Missing, malformed, or mismatched periods remain unwritable.
-14. **Backfill is additive and dry-run-first.** The operator uses deterministic ID-ascending batches and independent cursors, fills only null keys through serializable compare-and-set writes, preserves non-null conflicts, limits materialization to 24 statuses per benefit, uses `skipDuplicates`, and never changes existing status amount/completion/usability. Apply additionally requires the exact phrase and `targetVerified === true`.
+14. **Global transition replaces per-user key backfill.** The old per-user AMEX key apply is permanently superseded and invokes no writer. Global catalog synchronization preserves keyed `PredefinedCard` / `PredefinedBenefit` IDs; exact legacy bridge adds global links while retaining copied rows and every status value; cleanup is a separate ledger/parity/recovery-gated deletion boundary. None of these operations is authorized by this specification or by a passing application test; follow [Global Benefit Definitions and Migration](global-benefit-definitions-and-migration.md).
 15. **Rollout stays gated.** Application and userscript envelope changes are coordinated at production userscript `0.5.1`, which strictly supersedes the previously installed `0.5.0`. Vercel does not distribute the ignored production artifact; publication/installation, live AMEX validation, database dry-run/apply, and production write-mode enablement remain separately authorized.
 16. **Local handoff is a separate compiled identity.** Production `0.5.1` remains fixed to `https://www.perks-reminder.com`. Local `0.5.0-local.3` has a different Tampermonkey name/namespace/output path, opens and activates only on exact `http://localhost:3000/integrations/amex-sync`, and never silently updates or replaces production. The localhost app requires `event.source === window`; the local Tampermonkey bridge compares against and posts through its granted `unsafeWindow`, which is that same localhost page-realm window rather than the userscript sandbox wrapper. Both sides still require the exact compiled/current approved origin. The production artifact retains its original grants and page-window handling. API requests additionally retain same-origin fetch and content-type guards. Local write testing requires `NEXTAUTH_URL` and `NEXT_PUBLIC_SITE_URL` set to exact localhost, an explicit `AMEX_SYNC_MODE`, a development-only HMAC key of at least 32 characters, and the verified development-database wrapper. Because both identities match AMEX and share one reader panel host, disable the production identity while the local identity is enabled, then reverse that choice during cleanup.
 17. **Card prerequisite edits preserve the accepted handoff in memory.** A server-projected card edit URL must pass the strict anchored internal `/cards/{id}/edit#lastFourDigits` response validator before the mailbox is acknowledged. The UI opens it in a separate `noopener noreferrer` tab and keeps the validated envelope only in the original page's React memory. After saving, an explicit refresh reuses that envelope for a new read-only preview, clears any prior confirmation result, and atomically replaces the old preview/proposal only after strict response validation. Refresh and confirmation share one in-flight guard and never run concurrently. No envelope or proposal is placed in a URL, browser storage, cookie, or durable resume record; invalid or expired refresh requires a fresh AMEX scan and handoff.
@@ -241,7 +242,9 @@ With no mode flag, the command is dry-run. `--apply` and `--dry-run` are mutuall
 | Refresh and confirmation overlap | Allow only the first action; disable or ignore the other until the in-flight request finishes |
 | Refreshed handoff is invalid or expired | Fail closed, remove confirmation controls, and require a fresh AMEX scan plus **Sync reviewed** handoff |
 | Card edit URL is external, malformed, or not the anchored internal route | Reject the preview before mailbox acknowledgement and render no edit link |
-| Zero or multiple exact destination cards | Skip as missing/ambiguous; names and saved mappings do not resolve it |
+| Zero or multiple exact destination cards | Skip as missing/ambiguous; names, user-row keys, and saved mappings do not resolve it |
+| Card has matching user `productKey` but no exact registry-valid `predefinedCard` relation | No destination authority; skip without consulting copied user benefits |
+| Global benefit/status is custom, legacy-only, cross-product, ambiguous, or missing its exact standard links | Fail closed; write no status/provenance/success audit |
 | Exact product alias | Resolve with score `1` |
 | Fuzzy score below `0.88`, margin below `0.10`, tie, or hard conflict | Reject product mapping; do not choose the nearest product |
 | One exact product-scoped benefit alias | Prefer it over structured non-exact candidates |
@@ -256,14 +259,13 @@ With no mode flag, the command is dry-run. `--apply` and `--dry-run` are mutuall
 | Destination is marked not usable | `destination_not_usable`; never clear the flag |
 | December Uber aggregate is `$0..$35` | Produce two destination rows in one atomic group with sequential `$15/$20` allocation |
 | December Uber amount is missing, invalid, non-USD, negative, or above `$35` | Reject both rows as `amount_incompatible`; never truncate |
-| Card/destination/before state changes after preview | `conflict_repreview_required`; write no status, provenance, or successful audit |
+| Physical card/global product/global benefit/fingerprint/status/before state changes after preview | `conflict_repreview_required`; write no status, provenance, or successful audit |
 | Authorized status has an inclusive end-of-day cycle end | Compare the proposal period by UTC calendar date, then use the transaction-loaded exact cycle instants in the final compare-and-set |
 | Persisted cycle resolves to a different UTC calendar date | `conflict_repreview_required` before mutation or provenance work |
+| Existing exact status points to a retired global definition | It may remain authorized only when the full registry tuple, status links, and bound fingerprint still match; create no replacement status |
 | Completed attempt is replayed | Return durable stored results; do not repeat writes |
-| Backfill runs with no mode | Dry-run only |
-| Backfill apply lacks exact phrase or verified-target attestation | Reject before any writer call |
-| Backfill sees non-null conflicting keys or runtime CAS conflict | Preserve existing values and report conflict |
-| Backfill has another bounded batch | Return `hasMore` and the appropriate next cursor |
+| Old per-user AMEX backfill receives `--apply` | Return the stable superseded result before any writer; never fill user-row keys |
+| Global catalog/legacy migration operation is needed | Use its independently gated dry-run/fingerprint/target workflow; this AMEX contract grants no operational authorization |
 | Production artifact runs on localhost or local artifact runs on production | Remain inactive; never read or acknowledge a mailbox |
 | Handoff page has an unsupported origin/path, wrong `event.source`, or cross-target message | Fail closed; do not preview, acknowledge, or clear the mailbox |
 | Local request uses a non-3000 port, non-HTTP scheme, or `NEXT_PUBLIC_SITE_URL` is not exact localhost | Reject the request origin |
@@ -274,35 +276,36 @@ Request boundary failures remain finite: `origin_rejected`, `content_type_invali
 
 ### 5. Good / Base / Bad Cases
 
-- **Good:** A five-digit base Platinum observation has one December Uber usage row. Browser and server independently resolve the product/source credit, preview resolves one owned active AMEX destination card, confirmation revalidates both destination statuses, and one serializable group applies monthly and bonus status/provenance/audits atomically.
-- **Good:** AMEX reports a lower used amount or explicit incompletion. The exact destination status is overwritten downward and completion is cleared; unrelated fields and benefits remain unchanged.
+- **Good:** A five-digit base Platinum observation has one December Uber usage row. Browser and server independently resolve the product/source credit, preview resolves one owned active physical card through its global product plus two global benefit/standard-status destinations, confirmation revalidates both definition fingerprints and statuses, and one serializable group applies monthly and bonus status/provenance/audits atomically.
+- **Good:** AMEX reports a lower used amount or explicit incompletion. The exact global-linked destination status is overwritten downward and completion is cleared; unrelated fields and benefits remain unchanged.
 - **Base:** One source benefit is duplicated while another is unique. The duplicate source-credit/period is excluded, while the unique row remains previewable and writable.
 - **Base:** A relevant owned destination card lacks five digits. Preview remains read-only, returns one actionable card skip, and offers no manual mapping. The edit link opens in a separate protected tab; after saving, the user returns to the retained sync page and explicitly refreshes to obtain a replacement preview/proposal.
 - **Base:** An authorized local manual test installs the separately named local artifact, launches the app with exact localhost site/auth origins and a development-only HMAC key through `dev:devdb`, then performs the same preview/confirm flow without changing production metadata or origin authority.
 - **Bad:** Navigate away from the only accepted handoff page, put the envelope/proposal into a URL or browser storage, accept an arbitrary `returnTo`, or confirm with the old proposal after card identity changes.
-- **Bad:** Fuzzy-match every source to its nearest catalog product, match benefits globally by merchant or amount, trust browser keys, or let a saved mapping bypass product/last-five equality.
+- **Bad:** Fuzzy-match every source to its nearest catalog product, match benefits globally by merchant or amount, trust browser keys, or let a user-row key/saved mapping bypass the global product relation and exact-last-five equality.
 - **Bad:** Treat a missing benefit or omitted completion as zero/incomplete, derive a destination reset from absence, or overwrite `isNotUsable`.
-- **Bad:** Run the backfill in apply mode because the command name contains `backfill`, without separately verifying the database target and supplying the exact confirmation phrase.
+- **Bad:** Restore the superseded per-user key backfill, authorize from copied `Benefit` keys, or run global catalog/bridge/cleanup operators merely because implementation tests passed.
 
 ### 6. Tests Required
 
 For every change to this contract, assert:
 
-- catalog count and key invariants: 12 products, 56 classified period rows, unique destination tuples, no source credit for excluded semantics, and server/browser writable-set agreement;
+- catalog/global identity invariants: 12 products, 56 keyed/parented period definitions, 47 writable usage destinations, unique destination tuples, no source credit for excluded semantics, static/registry parity, and server/browser writable-set agreement;
 - exact aliases, score `0.88`, immediately-below threshold, margin `0.10`, immediately-below margin, ties, and business/consumer/tier/cobrand hard conflicts on both browser and server;
 - product-scoped exact-first benefit resolution, one structured candidate, zero/multiple candidates, forbidden tokens, incompatible periods/amounts, and independent duplicate-group exclusion;
 - envelope V3 exact-five requirement, bounded payload limits, forbidden fields, V2/manual-field rejection, and local four-digit observation compatibility;
-- authenticated ownership, issuer, lifecycle, product, exact-last-five, zero/duplicate card behavior, saved-mapping non-authority, and card-skip edit links;
+- authenticated ownership, issuer, lifecycle, physical-card/global-product relation, exact-last-five, zero/duplicate card behavior, user-key/saved-mapping non-authority, and card-skip edit links;
+- exact global product/benefit catalog keys and parent, writable registry tuple, one standard/bridge status, custom/legacy-only/cross-product rejection, retired-existing-status behavior, and no new materialization from retirement;
 - complete period vocabulary, exact UTC calendar boundaries, and anniversary-cycle equality;
 - amount increase/decrease/zero, completion set/clear, field omission, whole-benefit omission, not-usable skip, unchanged/replay, stale/conflicting provenance, and unrelated-row isolation;
 - December allocation at `$0`, `$15`, between `$15` and `$35`, exactly `$35`, above `$35`, missing/invalid evidence, missing destination, preview conflict, and two-row transaction atomicity;
-- proposal binding, completed replay, partial retry, compare-and-set failure, audit/provenance atomicity, exact transaction-time card/destination revalidation, real inclusive end-of-day cycle timestamps in single/grouped writes, and different-calendar-cycle rejection before mutation;
+- proposal binding of ordered physical/global/status identity and definition fingerprint, catalog/retirement drift, completed replay, partial retry, compare-and-set failure, audit/provenance atomicity, exact transaction-time global graph revalidation, real inclusive end-of-day cycle timestamps in single/grouped writes, and different-calendar-cycle rejection before mutation;
 - handoff strict DTO validation, one card-level prerequisite per destination card, anchored internal edit-URL rejection before acknowledgement, card-specific accessible new-tab links with `noopener noreferrer`, memory-only envelope retention, explicit refresh loading/error states, refreshed preview/proposal replacement, stale-proposal non-use, refresh/confirm exclusion, no mapping controls, and distinct split rows;
-- backfill default dry-run, apply authorization, bounded cursors, null-only updates, conflict preservation, status materialization cap/defaults, idempotency, and no existing-status reset;
+- superseded per-user AMEX apply exits before any writer; global catalog synchronization and legacy bridge/cleanup/rollback contracts are covered independently by [Global Benefit Definitions and Migration](global-benefit-definitions-and-migration.md), with no existing-status reset;
 - isolated production/local userscript builds and metadata audit proving distinct names, namespaces, versions, output paths, exact match scopes, compiled targets, absence of unapproved origins/config markers, and no local-build mutation of the production artifact;
 - generated-bundle browser tests proving production/local cross-target inactivity, exact self-source/origin checks, local URL generation, mailbox acknowledgement/deletion parity, public DB invariant, strict TypeScript, targeted lint/Jest, sensitive-pattern scan, and `git diff --check`.
 
-Do not use production build, Prisma generation/migration/seed, database backfill execution, or live AMEX/browser actions as routine verification.
+Do not use production build, Prisma generation/migration/seed, database catalog/migration/backfill execution, or live AMEX/browser actions as routine verification.
 
 ### 7. Wrong vs Correct
 
@@ -334,13 +337,26 @@ if (!serverCredit || serverCredit.sourceCreditKey !== row.sourceCreditKey) {
 
 const destination = resolveExactlyOneOwnedActiveAmexCard({
   userId,
-  productKey: serverProduct,
+  predefinedProductKey: serverProduct,
   endingDigits: card.endingDigits, // exact /^\d{5}$/ equality
 });
-if (!destination) return cardNotAuthorized();
+const globalBenefit = destination?.predefinedCard?.benefits.find((benefit) =>
+  resolveAmexGlobalDefinitionAuthority({
+    product: destination.predefinedCard!,
+    benefit,
+    sourceCreditKey: row.sourceCreditKey,
+  }) !== null,
+);
+const status = globalBenefit?.statuses.find((candidate) =>
+  candidate.userId === userId
+  && candidate.creditCardId === destination!.id
+  && candidate.predefinedBenefitId === globalBenefit.id,
+);
+if (!destination || !globalBenefit || !status) return cardNotAuthorized();
 
-// Confirmation repeats exact identity, destination, before-state, and provenance
-// checks inside the serializable transaction before compare-and-set persistence.
+// Confirmation reloads the same physical/global/status graph, recomputes the
+// definition fingerprint, and rechecks before-state/provenance inside the
+// serializable transaction before compare-and-set persistence.
 ```
 
 #### Wrong prerequisite edit resume
@@ -387,24 +403,28 @@ cycleStartDate: currentStatus.cycleStartDate,
 cycleEndDate: currentStatus.cycleEndDate,
 ```
 
-#### Wrong backfill
+#### Wrong legacy authority
 
 ```ts
+// Copied user-row keys are repopulated and treated as write authority.
 await prisma.benefit.update({
   where: { id: candidate.id },
   data: inferredKeys,
 });
 ```
 
-#### Correct backfill
+#### Correct global transition
 
 ```ts
-const report = await runAmexCatalogBackfillOperator({
+// The old per-user apply is superseded. Review the exact global bridge instead.
+const report = await runGlobalBenefitMigrationOperator({
   mode: "dry-run",
-  limit: 250,
+  limit: 100,
+  database,
 });
-// Apply is a separate authorized operation requiring target verification and:
-// confirmApply: "FILL_NULL_AMEX_CATALOG_KEYS"
+// Any later bridge is a separately authorized operation bound to
+// report.sourceFingerprint, target verification, and:
+// confirmation: "BRIDGE_EXACT_GLOBAL_BENEFITS"
 ```
 
 #### Wrong local handoff

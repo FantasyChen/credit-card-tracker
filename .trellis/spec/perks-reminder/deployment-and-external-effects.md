@@ -3,7 +3,7 @@
 ## Deployment ownership
 
 - GitHub `main` deploys automatically through Vercel. Agents must not perform a manual production deployment unless the user explicitly requests it.
-- The build command includes `prisma migrate deploy`; therefore local or CI build execution can have database effects. See [Database and Data Safety](database-and-data-safety.md).
+- The generic build command must not include `prisma migrate deploy`. Local, CI, Vercel Preview, and production builds generate the client and compile only; migration deployment is a separately authorized, target-verified operation. See [Database and Data Safety](database-and-data-safety.md).
 - The production domains are served by the Vercel `coupon-cycle` project even though a local checkout may be linked to a different project. Never infer the production target from ignored `.vercel/project.json` alone.
 - Provider environment values are managed in Vercel or other provider dashboards. Do not write secret values, project-local copies, or command output containing them to tracked files.
 

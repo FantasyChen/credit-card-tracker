@@ -76,7 +76,8 @@ describe('deleteCardAction', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     } as any);
-    mockPrisma.creditCard.delete.mockResolvedValue({} as any);
+    mockPrisma.benefitStatus.deleteMany.mockResolvedValue({ count: 1 });
+    mockPrisma.creditCard.deleteMany.mockResolvedValue({ count: 1 });
 
     const formData = new FormData();
     formData.append('cardId', 'clxx1234567890123456789012');
@@ -84,10 +85,34 @@ describe('deleteCardAction', () => {
     const result = await deleteCardAction(formData);
 
     expect(result).toEqual({ success: true });
-    expect(mockPrisma.creditCard.delete).toHaveBeenCalledWith({
-      where: { id: 'clxx1234567890123456789012' },
+    expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
+    const ledgerSql = (mockPrisma.$executeRaw as jest.Mock).mock.calls[0][0] as {
+      strings: readonly string[];
+      values: unknown[];
+    };
+    expect(ledgerSql.strings.join('')).toContain('SET "creditCardId" = NULL');
+    expect(ledgerSql.values).toEqual([
+      'clxx1234567890123456789012',
+      'user-1',
+    ]);
+    expect(mockPrisma.benefitStatus.deleteMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        OR: [
+          { creditCardId: 'clxx1234567890123456789012' },
+          { benefit: { creditCardId: 'clxx1234567890123456789012' } },
+        ],
+      },
     });
-    expect(mockRevalidatePath).toHaveBeenCalledWith('/cards');
+    expect(mockPrisma.creditCard.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'clxx1234567890123456789012', userId: 'user-1' },
+    });
+    expect(mockRevalidatePath.mock.calls.map(([path]) => path)).toEqual([
+      '/',
+      '/cards',
+      '/cards/calendar',
+      '/benefits',
+    ]);
   });
 
   it('returns error when delete throws', async () => {
@@ -96,7 +121,7 @@ describe('deleteCardAction', () => {
       id: 'clxx1234567890123456789012',
       userId: 'user-1',
     } as any);
-    mockPrisma.creditCard.delete.mockRejectedValue(new Error('DB error'));
+    mockPrisma.benefitStatus.deleteMany.mockRejectedValue(new Error('DB error'));
 
     const formData = new FormData();
     formData.append('cardId', 'clxx1234567890123456789012');

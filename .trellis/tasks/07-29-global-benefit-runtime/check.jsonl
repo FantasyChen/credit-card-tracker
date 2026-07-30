@@ -1,0 +1,7 @@
+{"file":".trellis/spec/perks-reminder/index.md","reason":"Provides package quality gates for runtime and catalog changes."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Defines safe TypeScript, test, public-DB, and review checks."}
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Check materialization ownership, physical-card identity, auth, and mutation behavior."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Check propagation, retirement, status materialization, and guide disposition."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check changed actions/routes/components with the required test matrix and safe commands."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check strict typed projection and serialized DTO boundaries."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/prd.md","reason":"Check no-override, latest-term, custom-preservation, and state-preservation decisions."}

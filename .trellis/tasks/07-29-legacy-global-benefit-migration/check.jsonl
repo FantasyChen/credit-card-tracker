@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Defines safe checks, complete diff review, and sensitive-pattern scanning."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Check zero-write dry-run, preservation, target gates, cleanup, clone, and rollback behavior."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Check exact existing-user disposition and no unsupported migration claim."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Check superseded operator behavior and retained AMEX safety invariants."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/research/production-backfill-review.md","reason":"Check historical conflicts are not widened, exposed, or mistaken for new apply evidence."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/prd.md","reason":"Check exact-full-shape-only mapping, custom preservation, and production-off decisions."}
