@@ -16,7 +16,7 @@ This project uses **Neon PostgreSQL** with two database branches:
 - **Never run destructive commands on production:**
   - `npx prisma migrate reset`
   - `npx prisma db push --force-reset`
-- Production migrations run automatically via `prisma migrate deploy` during Vercel builds.
+- Generic Vercel builds never run migrations. Production `prisma migrate deploy` is a separate attended operation after immediate target, recovery, and authorization checks.
 
 ## npm Scripts (Recommended)
 
@@ -30,8 +30,9 @@ npm run db:dev:migrate    # Apply pending migrations
 npm run db:dev:seed       # Seed with predefined data
 npm run db:dev:reset      # Reset dev DB (destroys dev data only)
 
-# Production database (read-only check)
-npm run db:prod:status    # Show migration status
+# Production database (separately authorized operations)
+npm run db:prod:status    # Read migration status after target verification
+npm run db:prod:migrate   # Deploy only after explicit authorization and recovery verification
 
 # Run dev server against dev database
 npm run dev:devdb
@@ -51,8 +52,11 @@ node scripts/with-dev-db.js npx prisma migrate dev --name your_migration_name
 # 4) Test locally against dev database
 npm run dev:devdb
 
-# 5) When satisfied, commit and push
-#    Vercel runs: prisma generate && (prisma migrate deploy || echo 'skipped') && next build
+# 5) Arrange the separately authorized migration deployment and verify it.
+#    Do not rely on a Preview or Production build to apply schema changes.
+
+# 6) When the schema gate is complete, commit and push.
+#    Vercel runs only: prisma generate && next build
 git add -A && git commit -m "feat: your changes" && git push
 ```
 
@@ -100,14 +104,16 @@ Typical causes:
 The build command in `package.json` is:
 
 ```
-prisma generate && (prisma migrate deploy || echo 'Migration deploy skipped') && next build
+prisma generate && next build
 ```
 
-This means every Vercel deployment:
-1. Generates the Prisma client
-2. Applies any pending migrations using `DIRECT_URL` (non-pooler endpoint)
-3. Falls back gracefully if the database is slow or `DIRECT_URL` is missing
-4. Builds the Next.js application
+This means every Vercel deployment generates the Prisma client and builds the application without database mutation authority. Production migrations are a separate attended gate:
+
+```bash
+npm run db:prod:migrate
+```
+
+Run that command only under explicit production authorization after immediately verifying the target, migration plan, and recovery point. A completed Vercel build is not migration evidence.
 
 The Prisma schema configures both endpoints:
 ```prisma
@@ -118,4 +124,4 @@ datasource db {
 }
 ```
 
-No manual migration steps are needed after pushing to main.
+Do not push schema-dependent application code until the separately authorized migration has been deployed and independently verified on the intended target.

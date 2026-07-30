@@ -1,0 +1,8 @@
+{"file":".trellis/spec/perks-reminder/index.md","reason":"Provides final package quality and safety checklist."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Check exact safe/conditional commands and truthful operational reporting."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Check every provider/deployment/configuration action had exact authorization and rollback."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Check targets, additive migrations, data preservation, cleanup recovery, and forbidden operations."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Check preview zero-write, write authorization, userscript, audit/provenance, and off rollback."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/research/production-backfill-review.md","reason":"Ensure historical per-user-key evidence is retained but never reused as new-model acceptance or authorization."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/prd.md","reason":"Check all parent decisions and final acceptance gates are satisfied."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/design.md","reason":"Check complete phase ordering, parity, and rollback boundaries."}

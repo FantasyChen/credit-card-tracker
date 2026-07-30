@@ -11,7 +11,9 @@ import {
   recordCurrentAmexSyncRow,
   recordFailedAmexSyncRow,
   recordNonAppliedAmexSyncRow,
+  type StoredRowResult,
 } from "../repository";
+import type { AmexSyncPlanRow } from "../authority";
 import { confirmAmexSync, previewAmexSync } from "../service";
 
 jest.mock("../repository", () => ({
@@ -62,18 +64,37 @@ function context(usedAmount = 0) {
       userId: "user-1",
       displayName: "Synthetic Platinum",
       issuer: "American Express",
-      productKey: "american-express-platinum-card",
       lastFourDigits: "12345",
       lifecycleStatus: "ACTIVE" as const,
-      benefits: [{
-        id: "benefit-1",
+      predefinedCard: {
+        id: "global-card-1",
+        catalogKey: "card:american-express-platinum-card",
+        name: "American Express Platinum Card",
+        issuer: "American Express",
         productKey: "american-express-platinum-card",
-        creditFamilyKey: "american-express-platinum-card:resy",
-        periodKey: "calendar-quarter-q3",
-        startDate: new Date("2026-07-01T00:00:00.000Z"),
-        endDate: new Date("2026-09-30T00:00:00.000Z"),
-        statuses: [{
+        retiredAt: null,
+        benefits: [{
+          id: "global-benefit-1",
+          catalogKey: "benefit:american-express-platinum-card:resy:calendar-quarter-q3",
+          predefinedCardId: "global-card-1",
+          category: "Dining",
+          description: "Synthetic Resy credit",
+          percentage: 100,
+          maxAmount: 100,
+          frequency: "QUARTERLY",
+          cycleAlignment: "CALENDAR_FIXED",
+          fixedCycleDurationMonths: null,
+          fixedCycleStartMonth: 7,
+          occurrencesInCycle: 1,
+          productKey: "american-express-platinum-card",
+          creditFamilyKey: "american-express-platinum-card:resy",
+          periodKey: "calendar-quarter-q3",
+          retiredAt: null,
+          statuses: [{
           id: "status-1",
+          benefitId: "legacy-benefit-1",
+          creditCardId: "card-1",
+          predefinedBenefitId: "global-benefit-1",
           userId: "user-1",
           cycleStartDate: new Date("2026-07-01T00:00:00.000Z"),
           cycleEndDate: new Date("2026-09-30T00:00:00.000Z"),
@@ -84,10 +105,50 @@ function context(usedAmount = 0) {
           isNotUsable: false,
           updatedAt: new Date("2026-07-14T00:00:00.000Z"),
           provenance: null,
+          }],
         }],
-      }],
+      },
     }],
   };
+}
+
+function storedRowResult(
+  sourceRowIdentity: string,
+  overrides: Partial<StoredRowResult> = {},
+): StoredRowResult {
+  return {
+    sourceRowIdentity,
+    disposition: "UPDATED",
+    reasonCode: "proposed_update",
+    destinationCardId: "card-1",
+    beforeUsedAmount: 0,
+    beforeIsCompleted: false,
+    beforeCompletedAt: null,
+    beforeIsNotUsable: false,
+    afterUsedAmount: 25,
+    afterIsCompleted: false,
+    afterCompletedAt: null,
+    afterIsNotUsable: false,
+    ...overrides,
+  };
+}
+
+function storedRowFromPlan(
+  row: AmexSyncPlanRow,
+  overrides: Partial<StoredRowResult> = {},
+): StoredRowResult {
+  return storedRowResult(row.sourceRowIdentity, {
+    destinationCardId: row.destinationCardId,
+    beforeUsedAmount: row.before?.usedAmount ?? null,
+    beforeIsCompleted: row.before?.isCompleted ?? null,
+    beforeCompletedAt: row.before?.completedAt ?? null,
+    beforeIsNotUsable: row.before?.isNotUsable ?? null,
+    afterUsedAmount: row.after?.usedAmount ?? null,
+    afterIsCompleted: row.after?.isCompleted ?? null,
+    afterCompletedAt: row.after?.completedAt ?? null,
+    afterIsNotUsable: row.after?.isNotUsable ?? null,
+    ...overrides,
+  });
 }
 
 const loadContext = loadAmexSyncDestinationContext as jest.Mock;
@@ -105,15 +166,27 @@ describe("Amex sync service orchestration", () => {
     loadContext.mockResolvedValue(context());
     findAttempt.mockResolvedValue(null);
     createAttempt.mockResolvedValue({ id: "attempt-1" });
-    applyGroup.mockImplementation(async ({ rows }) => rows.map((row: { sourceRowIdentity: string; reason: string; disposition: string }) => ({
-      sourceRowIdentity: row.sourceRowIdentity,
-      disposition: row.disposition === "proposed" ? "UPDATED" : "UNCHANGED",
+    applyGroup.mockImplementation(async ({ rows }) => rows.map((row: AmexSyncPlanRow) =>
+      storedRowFromPlan(row, {
+        disposition: row.disposition === "proposed" ? "UPDATED" : "UNCHANGED",
+        reasonCode: row.reason,
+      })));
+    applyRow.mockImplementation(async ({ row }) => storedRowFromPlan(row, {
+      disposition: "UPDATED",
       reasonCode: row.reason,
-    })));
-    applyRow.mockImplementation(async ({ row }) => ({ sourceRowIdentity: row.sourceRowIdentity, disposition: "UPDATED", reasonCode: row.reason }));
-    recordCurrent.mockImplementation(async ({ row }) => ({ sourceRowIdentity: row.sourceRowIdentity, disposition: "UNCHANGED", reasonCode: row.reason }));
-    recordFailed.mockImplementation(async (_attemptId, row, reasonCode) => ({ sourceRowIdentity: row.sourceRowIdentity, disposition: "FAILED", reasonCode }));
-    recordNonApplied.mockImplementation(async (_attemptId, row) => ({ sourceRowIdentity: row.sourceRowIdentity, disposition: "SKIPPED", reasonCode: row.reason }));
+    }));
+    recordCurrent.mockImplementation(async ({ row }) => storedRowFromPlan(row, {
+      disposition: "UNCHANGED",
+      reasonCode: row.reason,
+    }));
+    recordFailed.mockImplementation(async (_attemptId, row, reasonCode) => storedRowFromPlan(row, {
+      disposition: "FAILED",
+      reasonCode,
+    }));
+    recordNonApplied.mockImplementation(async (_attemptId, row) => storedRowFromPlan(row, {
+      disposition: "SKIPPED",
+      reasonCode: row.reason,
+    }));
   });
 
   it("previews with reads only and no manual mapping authority", async () => {
@@ -142,6 +215,23 @@ describe("Amex sync service orchestration", () => {
   it("requires the signed exact preview state before creating an attempt", async () => {
     const preview = await previewAmexSync({ userId: "user-1", envelope, mode: "write", hmacKey: key, now });
     loadContext.mockResolvedValue(context(5));
+    await expect(confirmAmexSync({
+      userId: "user-1",
+      envelope,
+      proposalToken: preview.proposalToken,
+      hmacKey: key,
+      now: new Date("2026-07-15T12:01:00.000Z"),
+    })).rejects.toThrow("conflict_repreview_required");
+    expect(createAttempt).not.toHaveBeenCalled();
+    expect(applyRow).not.toHaveBeenCalled();
+  });
+
+  it("requires re-preview when authoritative global definition terms drift", async () => {
+    const previewContext = context();
+    loadContext.mockResolvedValue(previewContext);
+    const preview = await previewAmexSync({ userId: "user-1", envelope, mode: "write", hmacKey: key, now });
+    previewContext.cards[0].predefinedCard.benefits[0].maxAmount = 125;
+
     await expect(confirmAmexSync({
       userId: "user-1",
       envelope,
@@ -182,22 +272,24 @@ describe("Amex sync service orchestration", () => {
     });
     const destinationContext = context();
     const status = {
-      ...destinationContext.cards[0].benefits[0].statuses[0],
+      ...destinationContext.cards[0].predefinedCard.benefits[0].statuses[0],
       cycleStartDate: new Date("2026-12-01T00:00:00.000Z"),
       cycleEndDate: new Date("2026-12-31T00:00:00.000Z"),
     };
-    destinationContext.cards[0].benefits = [{
-      ...destinationContext.cards[0].benefits[0],
+    destinationContext.cards[0].predefinedCard.benefits = [{
+      ...destinationContext.cards[0].predefinedCard.benefits[0],
       id: "benefit-monthly",
+      catalogKey: "benefit:american-express-platinum-card:uber-cash:calendar-month",
       creditFamilyKey: "american-express-platinum-card:uber-cash",
       periodKey: "calendar-month",
-      statuses: [{ ...status, id: "status-monthly" }],
+      statuses: [{ ...status, id: "status-monthly", predefinedBenefitId: "benefit-monthly" }],
     }, {
-      ...destinationContext.cards[0].benefits[0],
+      ...destinationContext.cards[0].predefinedCard.benefits[0],
       id: "benefit-december-bonus",
+      catalogKey: "benefit:american-express-platinum-card:uber-cash-december-bonus:calendar-month-december",
       creditFamilyKey: "american-express-platinum-card:uber-cash-december-bonus",
       periodKey: "calendar-month-december",
-      statuses: [{ ...status, id: "status-december-bonus" }],
+      statuses: [{ ...status, id: "status-december-bonus", predefinedBenefitId: "benefit-december-bonus" }],
     }];
     loadContext.mockResolvedValue(destinationContext);
 
@@ -266,11 +358,10 @@ describe("Amex sync service orchestration", () => {
     findAttempt.mockResolvedValue({
       id: "attempt-partial",
       state: "PARTIAL_FAILED",
-      rowAudits: [{
-        sourceRowIdentity: preview.rows[0].sourceRowIdentity,
+      rowAudits: [storedRowResult(preview.rows[0].sourceRowIdentity, {
         disposition: "FAILED",
         reasonCode: "persistence_failed",
-      }],
+      })],
     });
     const result = await confirmAmexSync({
       userId: "user-1",
@@ -290,17 +381,111 @@ describe("Amex sync service orchestration", () => {
     expect(completeAmexSyncAttempt).toHaveBeenCalled();
   });
 
-  it("replays a completed idempotent attempt without a second write", async () => {
+  it("resumes a partial attempt after a durable row changed destination state", async () => {
+    const preview = await previewAmexSync({ userId: "user-1", envelope, mode: "write", hmacKey: key, now });
+    const durable = storedRowResult(preview.rows[0].sourceRowIdentity);
+    findAttempt.mockResolvedValue({
+      id: "attempt-partial-success",
+      state: "PARTIAL_FAILED",
+      rowAudits: [durable],
+    });
+    loadContext.mockResolvedValue(context(25));
+    recordCurrent.mockResolvedValue(durable);
+
+    const result = await confirmAmexSync({
+      userId: "user-1",
+      envelope,
+      proposalToken: preview.proposalToken,
+      hmacKey: key,
+      now,
+    });
+
+    expect(result).toMatchObject({
+      attemptId: "attempt-partial-success",
+      replayed: false,
+      updatedCount: 1,
+      rows: [{ disposition: "updated", before: { usedAmount: 0 }, after: { usedAmount: 25 } }],
+    });
+    expect(createAttempt).not.toHaveBeenCalled();
+  });
+
+  it("rejects drift on a failed row when resuming a partial attempt", async () => {
+    const preview = await previewAmexSync({ userId: "user-1", envelope, mode: "write", hmacKey: key, now });
+    findAttempt.mockResolvedValue({
+      id: "attempt-partial-failed",
+      state: "PARTIAL_FAILED",
+      rowAudits: [storedRowResult(preview.rows[0].sourceRowIdentity, {
+        disposition: "FAILED",
+        reasonCode: "persistence_failed",
+      })],
+    });
+    loadContext.mockResolvedValue(context(5));
+
+    await expect(confirmAmexSync({
+      userId: "user-1",
+      envelope,
+      proposalToken: preview.proposalToken,
+      hmacKey: key,
+      now,
+    })).rejects.toThrow("conflict_repreview_required");
+    expect(applyRow).not.toHaveBeenCalled();
+    expect(recordCurrent).not.toHaveBeenCalled();
+  });
+
+  it("replays a completed idempotent attempt after its successful write changed destination state", async () => {
     const preview = await previewAmexSync({ userId: "user-1", envelope, mode: "write", hmacKey: key, now });
     const identity = preview.rows[0].sourceRowIdentity;
+    // A successful first confirmation changes the state covered by the proposal's
+    // authority digest. Exact replay must consult its durable attempt before
+    // treating that expected post-write state as preview drift.
+    loadContext.mockResolvedValue(context(25));
     findAttempt.mockResolvedValue({
       id: "attempt-existing",
       state: "COMPLETED",
-      rowAudits: [{ sourceRowIdentity: identity, disposition: "UPDATED", reasonCode: "proposed_update" }],
+      rowAudits: [storedRowResult(identity)],
     });
     const result = await confirmAmexSync({ userId: "user-1", envelope, proposalToken: preview.proposalToken, hmacKey: key, now });
-    expect(result).toMatchObject({ attemptId: "attempt-existing", replayed: true, updatedCount: 1 });
+    expect(result).toMatchObject({
+      attemptId: "attempt-existing",
+      replayed: true,
+      updatedCount: 1,
+      rows: [{
+        disposition: "updated",
+        destinationCardId: "card-1",
+        before: { usedAmount: 0, isCompleted: false },
+        after: { usedAmount: 25, isCompleted: false },
+        changes: { amountIncrease: true },
+      }],
+    });
     expect(createAttempt).not.toHaveBeenCalled();
+    expect(applyRow).not.toHaveBeenCalled();
+  });
+
+  it("replays the durable audited result when attempt creation loses a completion race", async () => {
+    const preview = await previewAmexSync({ userId: "user-1", envelope, mode: "write", hmacKey: key, now });
+    const identity = preview.rows[0].sourceRowIdentity;
+    findAttempt
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "attempt-raced",
+        state: "COMPLETED",
+        rowAudits: [storedRowResult(identity)],
+      });
+    createAttempt.mockRejectedValue(new Error("unique constraint"));
+
+    const result = await confirmAmexSync({
+      userId: "user-1",
+      envelope,
+      proposalToken: preview.proposalToken,
+      hmacKey: key,
+      now,
+    });
+
+    expect(result).toMatchObject({
+      attemptId: "attempt-raced",
+      replayed: true,
+      rows: [{ before: { usedAmount: 0 }, after: { usedAmount: 25 } }],
+    });
     expect(applyRow).not.toHaveBeenCalled();
   });
 });

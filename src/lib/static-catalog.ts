@@ -1,10 +1,13 @@
 import { inferBenefitUsageWaySlug } from './benefit-usage-matching';
 import { americanExpressCardCatalog } from './american-express-card-catalog';
+import { validateStaticCatalog } from './catalog/validation';
 
 export type StaticBenefitFrequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'ONE_TIME';
 export type StaticBenefitCycleAlignment = 'CARD_ANNIVERSARY' | 'CALENDAR_FIXED';
 
 export interface StaticPredefinedBenefit {
+  catalogKey: string;
+  parentCatalogKey: string;
   productKey?: string;
   creditFamilyKey?: string;
   periodKey?: string;
@@ -20,6 +23,7 @@ export interface StaticPredefinedBenefit {
 }
 
 export interface StaticPredefinedCard {
+  catalogKey: string;
   productKey?: string;
   name: string;
   issuer: string;
@@ -52,12 +56,15 @@ export const STATIC_CATALOG_UPDATED_AT = '2026-06-26';
 
 export const predefinedCardsData = [
     {
+      catalogKey: 'card:csp',
       name: 'Chase Sapphire Preferred',
       issuer: 'Chase',
       annualFee: 95,
       imageUrl: '/images/cards/chase-sapphire-preferred.png',
       benefits: [
         {
+          catalogKey: 'benefit:csp:100-annual-hotel-credit-booked-through-chase-travel',
+          parentCatalogKey: 'card:csp',
           description: '$100 Annual Hotel Credit (Booked through Chase Travel)',
           category: 'Travel',
           maxAmount: 100,
@@ -66,6 +73,8 @@ export const predefinedCardsData = [
           // cycleAlignment: 'CARD_ANNIVERSARY' (default)
         },
         {
+          catalogKey: 'benefit:csp:10-monthly-doordash-credit',
+          parentCatalogKey: 'card:csp',
           description: '$10 Monthly DoorDash Credit',
           category: 'Food Delivery',
           maxAmount: 10,
@@ -73,6 +82,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:csp:120-global-entry-tsa-precheck-or-nexus-credit-every-4-years',
+          parentCatalogKey: 'card:csp',
           description: '$120 Global Entry, TSA PreCheck, or NEXUS Credit (every 4 years)',
           category: 'Travel',
           maxAmount: 120,
@@ -85,12 +96,15 @@ export const predefinedCardsData = [
     },
     americanExpressCardCatalog["American Express Gold Card"],
     {
+      catalogKey: 'card:venture-x',
       name: 'Capital One Venture X',
       issuer: 'Capital One',
       annualFee: 395,
       imageUrl: '/images/cards/capital-one-venture-x.png',
       benefits: [
         {
+          catalogKey: 'benefit:venture-x:300-annual-travel-credit-via-capital-one-travel',
+          parentCatalogKey: 'card:venture-x',
           description: '$300 Annual Travel Credit (via Capital One Travel)',
           category: 'Travel',
           maxAmount: 300,
@@ -98,6 +112,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:venture-x:10-000-anniversary-bonus-miles',
+          parentCatalogKey: 'card:venture-x',
           description: '10,000 Anniversary Bonus Miles',
           category: 'Bonus',
           maxAmount: 0,
@@ -107,12 +123,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:csr',
       name: 'Chase Sapphire Reserve',
       issuer: 'Chase',
       annualFee: 795,
       imageUrl: '/images/cards/chase-sapphire-reserve.jpg',
       benefits: [
         {
+          catalogKey: 'benefit:csr:300-annual-travel-credit',
+          parentCatalogKey: 'card:csr',
           description: '$300 Annual Travel Credit',
           category: 'Travel',
           maxAmount: 300,
@@ -121,6 +140,8 @@ export const predefinedCardsData = [
           cycleAlignment: 'CARD_ANNIVERSARY',
         },
         {
+          catalogKey: 'benefit:csr:150-semi-annual-fine-dining-credit-select-restaurants-jan-jun',
+          parentCatalogKey: 'card:csr',
           description: '$150 Semi-Annual Fine Dining Credit (Select Restaurants - Jan-Jun)',
           category: 'Dining',
           maxAmount: 150,
@@ -131,6 +152,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 6,
         },
         {
+          catalogKey: 'benefit:csr:150-semi-annual-fine-dining-credit-select-restaurants-jul-dec',
+          parentCatalogKey: 'card:csr',
           description: '$150 Semi-Annual Fine Dining Credit (Select Restaurants - Jul-Dec)',
           category: 'Dining',
           maxAmount: 150,
@@ -141,6 +164,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 6,
         },
         {
+          catalogKey: 'benefit:csr:250-the-edit-credit-up-to-2-prepaid-bookings-annually',
+          parentCatalogKey: 'card:csr',
           description: '$250 The Edit Credit (up to 2 prepaid bookings annually)',
           category: 'Travel',
           maxAmount: 250,
@@ -150,6 +175,8 @@ export const predefinedCardsData = [
           occurrencesInCycle: 2,
         },
         {
+          catalogKey: 'benefit:csr:250-select-chase-travel-hotel-credit-through-12-31-2026',
+          parentCatalogKey: 'card:csr',
           description: '$250 Select Chase Travel Hotel Credit (through 12/31/2026)',
           category: 'Travel',
           maxAmount: 250,
@@ -160,6 +187,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 12,
         },
         {
+          catalogKey: 'benefit:csr:150-semi-annual-stubhub-credit-event-tickets-jan-jun',
+          parentCatalogKey: 'card:csr',
           description: '$150 Semi-Annual StubHub Credit (Event Tickets - Jan-Jun)',
           category: 'Entertainment',
           maxAmount: 150,
@@ -170,6 +199,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 6,
         },
         {
+          catalogKey: 'benefit:csr:150-semi-annual-stubhub-credit-event-tickets-jul-dec',
+          parentCatalogKey: 'card:csr',
           description: '$150 Semi-Annual StubHub Credit (Event Tickets - Jul-Dec)',
           category: 'Entertainment',
           maxAmount: 150,
@@ -180,6 +211,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 6,
         },
         {
+          catalogKey: 'benefit:csr:25-monthly-doordash-promo-credits',
+          parentCatalogKey: 'card:csr',
           description: '$25 Monthly DoorDash Promo Credits',
           category: 'Food Delivery',
           maxAmount: 25,
@@ -187,6 +220,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:csr:10-monthly-lyft-credit',
+          parentCatalogKey: 'card:csr',
           description: '$10 Monthly Lyft Credit',
           category: 'Transportation',
           maxAmount: 10,
@@ -194,6 +229,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:csr:20-83-monthly-apple-subscriptions-tv-and-music',
+          parentCatalogKey: 'card:csr',
           description: '$20.83 Monthly Apple Subscriptions (TV+ and Music)',
           category: 'Entertainment',
           maxAmount: 20.83,
@@ -201,6 +238,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:csr:10-monthly-peloton-credit',
+          parentCatalogKey: 'card:csr',
           description: '$10 Monthly Peloton Credit',
           category: 'Fitness',
           maxAmount: 10,
@@ -208,6 +247,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:csr:120-global-entry-tsa-precheck-or-nexus-credit-every-4-years',
+          parentCatalogKey: 'card:csr',
           description: '$120 Global Entry, TSA PreCheck, or NEXUS Credit (every 4 years)',
           category: 'Travel',
           maxAmount: 120,
@@ -217,6 +258,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 48,
         },
         {
+          catalogKey: 'benefit:csr:points-boost-up-to-2c-per-point-on-select-chase-travel-bookings',
+          parentCatalogKey: 'card:csr',
           description: 'Points Boost: Up to 2¢ per point on select Chase Travel bookings',
           category: 'Travel',
           maxAmount: 0, // Value varies based on usage
@@ -226,6 +269,7 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:ink-business-preferred',
       name: 'Chase Ink Business Preferred',
       issuer: 'Chase',
       annualFee: 95,
@@ -242,12 +286,15 @@ export const predefinedCardsData = [
     americanExpressCardCatalog["Delta SkyMiles Platinum American Express Card"],
     americanExpressCardCatalog["Delta SkyMiles Reserve American Express Card"],
     {
+      catalogKey: 'card:ihg-premier',
       name: 'IHG One Rewards Premier Credit Card',
       issuer: 'Chase',
       annualFee: 99,
       imageUrl: '/images/cards/ihg-one-rewards-premier-credit-card.jpg',
       benefits: [
         {
+          catalogKey: 'benefit:ihg-premier:annual-anniversary-free-night-up-to-40k-points',
+          parentCatalogKey: 'card:ihg-premier',
           description: 'Annual Anniversary Free Night (up to 40k points)',
           category: 'Travel',
           maxAmount: 0,
@@ -257,12 +304,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:ihg-premier-business',
       name: 'IHG One Rewards Premier Business Credit Card',
       issuer: 'Chase',
       annualFee: 99,
       imageUrl: '/images/cards/ihg-one-rewards-premier-business-credit-card.jpg',
       benefits: [
         {
+          catalogKey: 'benefit:ihg-premier-business:annual-anniversary-free-night-up-to-40k-points',
+          parentCatalogKey: 'card:ihg-premier-business',
           description: 'Annual Anniversary Free Night (up to 40k points)',
           category: 'Travel',
           maxAmount: 0,
@@ -273,12 +323,15 @@ export const predefinedCardsData = [
     },
     americanExpressCardCatalog["Marriott Bonvoy Brilliant American Express Card"],
     {
+      catalogKey: 'card:united-explorer',
       name: 'Chase United Explorer Card',
       issuer: 'Chase',
       annualFee: 150,
       imageUrl: '/images/cards/chase-united-explorer-card.avif',
       benefits: [
         {
+          catalogKey: 'benefit:united-explorer:2-united-club-one-time-passes',
+          parentCatalogKey: 'card:united-explorer',
           description: '2 United Club one-time passes',
           category: 'Travel',
           maxAmount: 100,
@@ -286,6 +339,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-explorer:50-united-hotels-credit',
+          parentCatalogKey: 'card:united-explorer',
           description: '$50 United Hotels credit',
           category: 'Travel',
           maxAmount: 50,
@@ -294,6 +349,8 @@ export const predefinedCardsData = [
           occurrencesInCycle: 2,
         },
         {
+          catalogKey: 'benefit:united-explorer:5-monthly-rideshare-credit',
+          parentCatalogKey: 'card:united-explorer',
           description: '$5 Monthly rideshare credit',
           category: 'Travel',
           maxAmount: 5,
@@ -301,6 +358,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-explorer:50-avis-budget-car-rental-credit',
+          parentCatalogKey: 'card:united-explorer',
           description: '$50 Avis/Budget car rental credit',
           category: 'Travel',
           maxAmount: 50,
@@ -308,6 +367,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-explorer:100-jsx-credit',
+          parentCatalogKey: 'card:united-explorer',
           description: '$100 JSX credit',
           category: 'Travel',
           maxAmount: 100,
@@ -315,6 +376,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-explorer:10-monthly-instacart-credit',
+          parentCatalogKey: 'card:united-explorer',
           description: '$10 Monthly Instacart credit',
           category: 'Food Delivery',
           maxAmount: 10,
@@ -324,12 +387,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:united-quest',
       name: 'Chase United Quest Card',
       issuer: 'Chase',
       annualFee: 250,
       imageUrl: '/images/cards/chase-united-quest-card.png',
       benefits: [
         {
+          catalogKey: 'benefit:united-quest:125-annual-united-purchase-credit',
+          parentCatalogKey: 'card:united-quest',
           description: '$125 annual United purchase credit',
           category: 'Travel',
           maxAmount: 125,
@@ -337,6 +403,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-quest:5-000-mile-anniversary-award-flight-credit',
+          parentCatalogKey: 'card:united-quest',
           description: '5,000-mile anniversary award flight credit',
           category: 'Bonus',
           maxAmount: 0,
@@ -344,6 +412,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-quest:150-renowned-hotels-credit',
+          parentCatalogKey: 'card:united-quest',
           description: '$150 Renowned Hotels credit',
           category: 'Travel',
           maxAmount: 150,
@@ -351,6 +421,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-quest:8-monthly-rideshare-credit',
+          parentCatalogKey: 'card:united-quest',
           description: '$8 Monthly rideshare credit',
           category: 'Travel',
           maxAmount: 8,
@@ -358,6 +430,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-quest:50-avis-budget-car-rental-credit',
+          parentCatalogKey: 'card:united-quest',
           description: '$50 Avis/Budget car rental credit',
           category: 'Travel',
           maxAmount: 50,
@@ -365,6 +439,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-quest:100-jsx-credit',
+          parentCatalogKey: 'card:united-quest',
           description: '$100 JSX credit',
           category: 'Travel',
           maxAmount: 100,
@@ -372,6 +448,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-quest:15-monthly-instacart-credit',
+          parentCatalogKey: 'card:united-quest',
           description: '$15 Monthly Instacart credit',
           category: 'Food Delivery',
           maxAmount: 15,
@@ -381,12 +459,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:southwest-plus',
       name: 'Chase Southwest Rapid Rewards Plus Card',
       issuer: 'Chase',
       annualFee: 69,
       imageUrl: '/images/cards/chase-southwest-rapid-rewards-plus-card.png',
       benefits: [
         {
+          catalogKey: 'benefit:southwest-plus:3-000-anniversary-bonus-points',
+          parentCatalogKey: 'card:southwest-plus',
           description: '3,000 anniversary bonus points',
           category: 'Bonus',
           maxAmount: 0,
@@ -394,6 +475,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:southwest-plus:two-earlybird-check-in-credits-per-year',
+          parentCatalogKey: 'card:southwest-plus',
           description: 'Two EarlyBird Check-In credits per year',
           category: 'Travel',
           maxAmount: 50,
@@ -403,12 +486,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:southwest-priority',
       name: 'Southwest Rapid Rewards Priority Credit Card',
       issuer: 'Chase',
       annualFee: 149,
       imageUrl: '/images/cards/chase-southwest-rapid-rewards-priority-card.png',
       benefits: [
         {
+          catalogKey: 'benefit:southwest-priority:75-southwest-annual-travel-credit',
+          parentCatalogKey: 'card:southwest-priority',
           description: '$75 Southwest annual travel credit',
           category: 'Travel',
           maxAmount: 75,
@@ -416,6 +502,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:southwest-priority:4-upgraded-boardings-per-year',
+          parentCatalogKey: 'card:southwest-priority',
           description: '4 Upgraded Boardings per year',
           category: 'Travel',
           maxAmount: 120,
@@ -425,12 +513,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:southwest-premier',
       name: 'Southwest Rapid Rewards Premier Credit Card',
       issuer: 'Chase',
       annualFee: 99,
       imageUrl: '/images/cards/chase-southwest-rapid-rewards-premier-card.png',
       benefits: [
         {
+          catalogKey: 'benefit:southwest-premier:6-000-anniversary-points',
+          parentCatalogKey: 'card:southwest-premier',
           description: '6,000 anniversary points',
           category: 'Travel',
           maxAmount: 78,
@@ -438,6 +529,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:southwest-premier:2-earlybird-check-in-credits-per-year',
+          parentCatalogKey: 'card:southwest-premier',
           description: '2 EarlyBird Check-In credits per year',
           category: 'Travel',
           maxAmount: 50,
@@ -447,12 +540,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:marriott-boundless',
       name: 'Marriott Bonvoy Boundless Credit Card',
       issuer: 'Chase',
       annualFee: 95,
       imageUrl: '/images/cards/chase-marriott-bonvoy-boundless.jpg',
       benefits: [
         {
+          catalogKey: 'benefit:marriott-boundless:annual-free-night-award-up-to-35k-points',
+          parentCatalogKey: 'card:marriott-boundless',
           description: 'Annual Free Night Award (up to 35k points)',
           category: 'Travel',
           maxAmount: 0,
@@ -462,12 +558,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:alaska-visa',
       name: 'Alaska Airlines Visa Signature® credit card',
       issuer: 'Bank of America',
       annualFee: 95,
       imageUrl: '/images/cards/alaska-airlines-visa-signature-credit-card.png',
       benefits: [
         {
+          catalogKey: 'benefit:alaska-visa:alaska-s-famous-companion-fare-from-122',
+          parentCatalogKey: 'card:alaska-visa',
           description: "Alaska\'s Famous Companion Fare™ (from $122)",
           category: 'Travel',
           maxAmount: 0,
@@ -477,12 +576,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:atmos-summit',
       name: 'Atmos Rewards Summit Visa Infinite Card',
       issuer: 'Bank of America',
       annualFee: 395,
       imageUrl: '/images/cards/atmos-rewards-summit-visa-infinite-card.png',
       benefits: [
         {
+          catalogKey: 'benefit:atmos-summit:8-alaska-lounge-passes-annual',
+          parentCatalogKey: 'card:atmos-summit',
           description: '8 Alaska Lounge Passes (Annual)',
           category: 'Travel',
           maxAmount: 0,
@@ -490,6 +592,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:atmos-summit:50-travel-delay-credit-per-qualifying-delay',
+          parentCatalogKey: 'card:atmos-summit',
           description: '$50 Travel Delay Credit (Per Qualifying Delay)',
           category: 'Travel',
           maxAmount: 50,
@@ -497,6 +601,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:atmos-summit:10-000-annual-bonus-atmos-points',
+          parentCatalogKey: 'card:atmos-summit',
           description: '10,000 Annual Bonus Atmos Points',
           category: 'Bonus',
           maxAmount: 0,
@@ -504,6 +610,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:atmos-summit:global-companion-award-annual',
+          parentCatalogKey: 'card:atmos-summit',
           description: 'Global Companion Award (Annual)',
           category: 'Travel',
           maxAmount: 0,
@@ -513,12 +621,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:atmos-ascent',
       name: 'Atmos Rewards Ascent Visa Signature Card',
       issuer: 'Bank of America',
       annualFee: 95,
       imageUrl: '/images/cards/atmos-rewards-ascent-visa-signature-card.png',
       benefits: [
         {
+          catalogKey: 'benefit:atmos-ascent:99-companion-fare-annual-plus-taxes-from-23',
+          parentCatalogKey: 'card:atmos-ascent',
           description: '$99 Companion Fare (Annual, plus taxes from $23)',
           category: 'Travel',
           maxAmount: 0,
@@ -528,12 +639,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:atmos-business',
       name: 'Atmos Rewards Visa Business Card',
       issuer: 'Bank of America',
       annualFee: 70,
       imageUrl: '/images/cards/atmos-rewards-visa-business-card.png',
       benefits: [
         {
+          catalogKey: 'benefit:atmos-business:99-companion-fare-annual-plus-taxes-from-23',
+          parentCatalogKey: 'card:atmos-business',
           description: '$99 Companion Fare (Annual, plus taxes from $23)',
           category: 'Travel',
           maxAmount: 0,
@@ -543,12 +657,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:hsbc-elite',
       name: 'HSBC Elite Credit Card',
       issuer: 'HSBC',
       annualFee: 495,
       imageUrl: '/images/cards/hsbc-elite-world-elite-mastercard.jpg',
       benefits: [
         {
+          catalogKey: 'benefit:hsbc-elite:400-annual-travel-credit-hsbc-travel-bookings',
+          parentCatalogKey: 'card:hsbc-elite',
           description: '$400 Annual Travel Credit (HSBC Travel bookings)',
           category: 'Travel',
           maxAmount: 400,
@@ -556,6 +673,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:hsbc-elite:10-monthly-rideshare-credit',
+          parentCatalogKey: 'card:hsbc-elite',
           description: '$10 Monthly Rideshare Credit',
           category: 'Transportation',
           maxAmount: 10,
@@ -563,6 +682,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:hsbc-elite:10-monthly-instacart-credit-second-order',
+          parentCatalogKey: 'card:hsbc-elite',
           description: '$10 Monthly Instacart+ Credit (second order)',
           category: 'Grocery',
           maxAmount: 10,
@@ -570,6 +691,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:hsbc-elite:5-monthly-lyft-credit-after-3-rides',
+          parentCatalogKey: 'card:hsbc-elite',
           description: '$5 Monthly Lyft Credit (after 3 rides)',
           category: 'Transportation',
           maxAmount: 5,
@@ -577,6 +700,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:hsbc-elite:120-security-screening-credit-global-entry-tsa-precheck-every-4-5-years',
+          parentCatalogKey: 'card:hsbc-elite',
           description: '$120 Security Screening Credit (Global Entry/TSA PreCheck, every 4.5 years)',
           category: 'Travel',
           maxAmount: 120,
@@ -588,12 +713,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:united-business',
       name: 'Chase United Business Card',
       issuer: 'Chase',
       annualFee: 99,
       imageUrl: '/images/cards/chase-united-business-card.png',
       benefits: [
         {
+          catalogKey: 'benefit:united-business:2-united-club-one-time-passes',
+          parentCatalogKey: 'card:united-business',
           description: '2 United Club one-time passes',
           category: 'Travel',
           maxAmount: 100,
@@ -601,6 +729,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-business:100-united-travel-credit',
+          parentCatalogKey: 'card:united-business',
           description: '$100 United travel credit',
           category: 'Travel',
           maxAmount: 100,
@@ -608,6 +738,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-business:50-united-hotels-credit',
+          parentCatalogKey: 'card:united-business',
           description: '$50 United Hotels credit',
           category: 'Travel',
           maxAmount: 50,
@@ -616,6 +748,8 @@ export const predefinedCardsData = [
           occurrencesInCycle: 2,
         },
         {
+          catalogKey: 'benefit:united-business:5-monthly-rideshare-credit',
+          parentCatalogKey: 'card:united-business',
           description: '$5 Monthly rideshare credit',
           category: 'Travel',
           maxAmount: 5,
@@ -623,6 +757,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-business:50-avis-budget-car-rental-credit',
+          parentCatalogKey: 'card:united-business',
           description: '$50 Avis/Budget car rental credit',
           category: 'Travel',
           maxAmount: 50,
@@ -630,6 +766,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-business:100-jsx-credit',
+          parentCatalogKey: 'card:united-business',
           description: '$100 JSX credit',
           category: 'Travel',
           maxAmount: 100,
@@ -637,6 +775,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-business:10-monthly-instacart-credit',
+          parentCatalogKey: 'card:united-business',
           description: '$10 Monthly Instacart credit',
           category: 'Food Delivery',
           maxAmount: 10,
@@ -644,6 +784,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:united-business:25-farelock-credit',
+          parentCatalogKey: 'card:united-business',
           description: '$25 FareLock credit',
           category: 'Travel',
           maxAmount: 25,
@@ -653,12 +795,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:ritz-carlton',
       name: 'The Ritz-Carlton Credit Card',
       issuer: 'Chase',
       annualFee: 450,
       imageUrl: '/images/cards/the-ritz-carlton-credit-card.jpg',
       benefits: [
         {
+          catalogKey: 'benefit:ritz-carlton:300-annual-travel-credit',
+          parentCatalogKey: 'card:ritz-carlton',
           description: '$300 Annual Travel Credit',
           category: 'Travel',
           maxAmount: 300,
@@ -666,6 +811,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:ritz-carlton:annual-free-night-award-up-to-85-000-points',
+          parentCatalogKey: 'card:ritz-carlton',
           description: 'Annual Free Night Award (up to 85,000 points)',
           category: 'Travel',
           maxAmount: 0,
@@ -673,6 +820,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:ritz-carlton:100-hotel-credit-the-ritz-carlton-and-st-regis-hotels',
+          parentCatalogKey: 'card:ritz-carlton',
           description: '$100 Hotel Credit (The Ritz-Carlton and St. Regis hotels)',
           category: 'Travel',
           maxAmount: 100,
@@ -680,6 +829,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:ritz-carlton:priority-pass-select-membership',
+          parentCatalogKey: 'card:ritz-carlton',
           description: 'Priority Pass Select Membership',
           category: 'Travel',
           maxAmount: 0,
@@ -687,6 +838,8 @@ export const predefinedCardsData = [
           percentage: 0,
         },
         {
+          catalogKey: 'benefit:ritz-carlton:global-entry-tsa-precheck-credit-every-4-years',
+          parentCatalogKey: 'card:ritz-carlton',
           description: 'Global Entry/TSA PreCheck Credit (every 4 years)',
           category: 'Travel',
           maxAmount: 120,
@@ -699,12 +852,15 @@ export const predefinedCardsData = [
     },
     americanExpressCardCatalog["Marriott Bonvoy Business American Express Card"],
     {
+      catalogKey: 'card:discover-it',
       name: 'Discover it Cash Back',
       issuer: 'Discover',
       annualFee: 0,
       imageUrl: '/images/cards/discover-it-cash-back.png',
       benefits: [
         {
+          catalogKey: 'benefit:discover-it:activate-5-quarterly-categories-up-to-1-500-spend',
+          parentCatalogKey: 'card:discover-it',
           description: 'Activate 5% Quarterly Categories (up to $1,500 spend)',
           category: 'Rewards',
           maxAmount: 75, // 5% of $1,500
@@ -714,12 +870,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:freedom-flex',
       name: 'Chase Freedom Flex',
       issuer: 'Chase',
       annualFee: 0,
       imageUrl: '/images/cards/chase-freedom-flex.png',
       benefits: [
         {
+          catalogKey: 'benefit:freedom-flex:activate-5-quarterly-categories-up-to-1-500-spend',
+          parentCatalogKey: 'card:freedom-flex',
           description: 'Activate 5% Quarterly Categories (up to $1,500 spend)',
           category: 'Rewards',
           maxAmount: 75, // 5% of $1,500
@@ -729,12 +888,15 @@ export const predefinedCardsData = [
       ],
     },
     {
+      catalogKey: 'card:citi-strata-elite',
       name: 'Citi Strata Elite',
       issuer: 'Citi',
       annualFee: 595,
       imageUrl: '/images/cards/citi-strata-elite.png',
       benefits: [
         {
+          catalogKey: 'benefit:citi-strata-elite:up-to-300-annual-hotel-benefit-2-nights-via-citi-travel',
+          parentCatalogKey: 'card:citi-strata-elite',
           description: 'Up to $300 Annual Hotel Benefit (2+ nights via Citi Travel)',
           category: 'Travel',
           maxAmount: 300,
@@ -745,6 +907,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 12, // Calendar year
         },
         {
+          catalogKey: 'benefit:citi-strata-elite:up-to-200-annual-splurge-credit-select-brands',
+          parentCatalogKey: 'card:citi-strata-elite',
           description: 'Up to $200 Annual Splurge Credit℠ (select brands)',
           category: 'Shopping',
           maxAmount: 200,
@@ -755,6 +919,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 12,
         },
         {
+          catalogKey: 'benefit:citi-strata-elite:up-to-100-blacklane-credit-jan-jun',
+          parentCatalogKey: 'card:citi-strata-elite',
           description: 'Up to $100 Blacklane® Credit (Jan-Jun)',
           category: 'Transportation',
           maxAmount: 100,
@@ -765,6 +931,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 6,
         },
         {
+          catalogKey: 'benefit:citi-strata-elite:up-to-100-blacklane-credit-jul-dec',
+          parentCatalogKey: 'card:citi-strata-elite',
           description: 'Up to $100 Blacklane® Credit (Jul-Dec)',
           category: 'Transportation',
           maxAmount: 100,
@@ -775,6 +943,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 6,
         },
         {
+          catalogKey: 'benefit:citi-strata-elite:4-admirals-club-citi-strata-elite-passes-american-airlines',
+          parentCatalogKey: 'card:citi-strata-elite',
           description: '4 Admirals Club® Citi Strata Elite℠ Passes (American Airlines)',
           category: 'Travel',
           maxAmount: 300, // Estimated value (~$75 per pass)
@@ -785,6 +955,8 @@ export const predefinedCardsData = [
           fixedCycleDurationMonths: 12,
         },
         {
+          catalogKey: 'benefit:citi-strata-elite:up-to-120-global-entry-or-tsa-precheck-application-fee-credit-every-4-years',
+          parentCatalogKey: 'card:citi-strata-elite',
           description: 'Up to $120 Global Entry or TSA PreCheck® Application Fee Credit (every 4 years)',
           category: 'Travel',
           maxAmount: 120,
@@ -796,6 +968,8 @@ export const predefinedCardsData = [
       ],
     },
   ] as const satisfies readonly StaticPredefinedCard[];
+
+export const STATIC_CATALOG_VALIDATION = validateStaticCatalog(predefinedCardsData);
 
 export const benefitUsageWays = [
     {
@@ -2498,13 +2672,6 @@ For benefits that do not reimburse a purchase, mark them complete when you redee
     }
   ] as const satisfies readonly StaticBenefitUsageWay[];
 
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 const usageWayBySlug: ReadonlyMap<string, StaticBenefitUsageWay> = new Map(
   benefitUsageWays.map((way) => [way.slug, way])
 );
@@ -2539,9 +2706,8 @@ export function getFrequencyLabel(frequency: StaticBenefitFrequency): string {
 
 export function getPublicStaticCards(): PublicStaticCard[] {
   return predefinedCardsData.map((card) => {
-    const cardId = slugify(card.name);
     const benefits = card.benefits
-      .map((benefit, index) => {
+      .map((benefit) => {
         const usageWaySlug = inferBenefitUsageWaySlug({
           category: benefit.category,
           description: benefit.description,
@@ -2551,7 +2717,7 @@ export function getPublicStaticCards(): PublicStaticCard[] {
 
         return {
           ...benefit,
-          id: cardId + '-benefit-' + (index + 1),
+          id: benefit.catalogKey,
           usageWay: usageWay ? { slug: usageWay.slug, title: usageWay.title } : null,
         };
       })
@@ -2559,7 +2725,7 @@ export function getPublicStaticCards(): PublicStaticCard[] {
 
     return {
       ...card,
-      id: cardId,
+      id: card.catalogKey,
       benefits,
       updatedAt: STATIC_CATALOG_UPDATED_AT,
     };

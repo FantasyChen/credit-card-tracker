@@ -1,0 +1,8 @@
+{"file":".trellis/spec/perks-reminder/index.md","reason":"Entry point for domain, catalog, database, and verification contracts."}
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Defines business-logic owners, physical-card identity, materialization, and authenticated mutation rules."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Defines existing-user propagation and status-materialization completeness."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Required for new relational reads/writes and schema-dependent deployment boundaries."}
+{"file":".trellis/spec/frontend/index.md","reason":"Runtime projection changes cross App Router, components, and browser DTO boundaries."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Defines ownership of Prisma, domain projection, and wire DTO types."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"One effective projection must remain consistent across database, domain, API, and UI consumers."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/design.md","reason":"Parent design defines the source union, latest-global-term behavior, and rollback compatibility."}

@@ -1,172 +1,102 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { Session } from 'next-auth';
 
-// Mock the cache functions - Prisma is mocked globally in jest.setup.ts
-jest.mock('next/cache', () => ({
-  revalidatePath: jest.fn(),
-}));
-
-jest.mock('@/lib/auth', () => ({
-  authOptions: {},
+jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
+jest.mock('@/lib/auth', () => ({ authOptions: {} }));
+jest.mock('@/lib/effective-benefit', () => ({
+  findEffectiveBenefitStatus: jest.fn(),
 }));
 
 import { batchCompleteBenefitsByCategoryAction } from '../actions';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { revalidatePath } from 'next/cache';
+import { findEffectiveBenefitStatus } from '@/lib/effective-benefit';
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const mockBenefitStatusUpdateMany = prisma.benefitStatus.updateMany as jest.Mock;
 const mockGetServerSession = jest.mocked(getServerSession);
 const mockRevalidatePath = jest.mocked(revalidatePath);
+const mockFindEffectiveBenefitStatus = findEffectiveBenefitStatus as jest.Mock;
+const session: Session = { user: { id: 'test-user-id' }, expires: '2026-12-31' };
+
+function status(id: string, category: string, maxAmount: number, usedAmount = 0) {
+  return {
+    id,
+    userId: 'test-user-id',
+    isCompleted: false,
+    isNotUsable: false,
+    completedAt: null,
+    usedAmount,
+    benefit: { category, maxAmount },
+  };
+}
 
 describe('batchCompleteBenefitsByCategoryAction', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetServerSession.mockResolvedValue(session);
+    mockBenefitStatusUpdateMany.mockResolvedValue({ count: 1 });
   });
 
-  it('should batch complete benefits successfully', async () => {
-    // Mock authenticated user
-    const mockSession: Session = {
-      user: { id: 'test-user-id' },
-      expires: '2024-12-31',
-    };
-    mockGetServerSession.mockResolvedValue(mockSession);
+  it('uses authoritative global definitions and user-scoped writes', async () => {
+    mockFindEffectiveBenefitStatus
+      .mockResolvedValueOnce(status('status-1', 'Travel', 100) as never)
+      .mockResolvedValueOnce(status('status-2', 'Travel', 50, 30) as never)
+      .mockResolvedValueOnce(status('status-3', 'Dining', 75) as never);
 
-    // Mock findMany to return statuses with benefits
-    const mockStatuses = [
-      { id: 'benefit-1', usedAmount: 0, benefit: { maxAmount: 100 } },
-      { id: 'benefit-2', usedAmount: 30, benefit: { maxAmount: 50 } },
-      { id: 'benefit-3', usedAmount: 0, benefit: { maxAmount: 75 } },
-    ];
-    mockPrisma.benefitStatus.findMany.mockResolvedValue(mockStatuses as never);
-    mockPrisma.benefitStatus.update.mockResolvedValue({} as never);
+    const result = await batchCompleteBenefitsByCategoryAction(
+      'Travel',
+      ['status-1', 'status-2', 'status-3']
+    );
 
-    const category = 'Travel';
-    const benefitStatusIds = ['benefit-1', 'benefit-2', 'benefit-3'];
-
-    const result = await batchCompleteBenefitsByCategoryAction(category, benefitStatusIds);
-
-    // Verify findMany was called to fetch statuses
-    expect(mockPrisma.benefitStatus.findMany).toHaveBeenCalledWith({
-      where: {
-        id: { in: benefitStatusIds },
-        userId: 'test-user-id',
-        isCompleted: false,
-        isNotUsable: false,
-        benefit: {
-          category: category,
-        },
-      },
-      include: {
-        benefit: true,
+    expect(result).toEqual({ success: true, updatedCount: 2 });
+    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.benefitStatus.updateMany).toHaveBeenNthCalledWith(1, {
+      where: { id: 'status-1', userId: 'test-user-id' },
+      data: {
+        isCompleted: true,
+        completedAt: expect.any(Date),
+        usedAmount: 100,
       },
     });
-
-    // Verify update was called for each status with usedAmount set to maxAmount
-    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledTimes(3);
-
-    // Verify revalidation was called
     expect(mockRevalidatePath).toHaveBeenCalledWith('/benefits');
-
-    // Verify return value
-    expect(result).toEqual({ success: true, updatedCount: 3 });
   });
 
-  it('should throw error when user is not authenticated', async () => {
+  it('performs no read or write without authentication', async () => {
     mockGetServerSession.mockResolvedValue(null);
 
     await expect(
-      batchCompleteBenefitsByCategoryAction('Travel', ['benefit-1'])
+      batchCompleteBenefitsByCategoryAction('Travel', ['status-1'])
     ).rejects.toThrow('User not authenticated.');
 
+    expect(mockFindEffectiveBenefitStatus).not.toHaveBeenCalled();
     expect(mockPrisma.benefitStatus.updateMany).not.toHaveBeenCalled();
-    expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 
-  it('should throw error when category is missing', async () => {
-    const mockSession: Session = {
-      user: { id: 'test-user-id' },
-      expires: '2024-12-31',
-    };
-    mockGetServerSession.mockResolvedValue(mockSession);
+  it('rejects missing category or status IDs before persistence', async () => {
+    await expect(batchCompleteBenefitsByCategoryAction('', ['status-1']))
+      .rejects.toThrow('Category and benefit status IDs are required.');
+    await expect(batchCompleteBenefitsByCategoryAction('Travel', []))
+      .rejects.toThrow('Category and benefit status IDs are required.');
+    expect(mockFindEffectiveBenefitStatus).not.toHaveBeenCalled();
+  });
 
-    await expect(
-      batchCompleteBenefitsByCategoryAction('', ['benefit-1'])
-    ).rejects.toThrow('Category and benefit status IDs are required.');
+  it('does not update statuses absent for the authenticated owner', async () => {
+    mockFindEffectiveBenefitStatus.mockResolvedValue(null);
 
+    const result = await batchCompleteBenefitsByCategoryAction('Travel', ['other-status']);
+
+    expect(result).toEqual({ success: true, updatedCount: 0 });
     expect(mockPrisma.benefitStatus.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not revalidate when persistence fails', async () => {
+    mockFindEffectiveBenefitStatus.mockResolvedValue(status('status-1', 'Travel', 100) as never);
+    mockBenefitStatusUpdateMany.mockRejectedValue(new Error('Database error'));
+
+    await expect(batchCompleteBenefitsByCategoryAction('Travel', ['status-1']))
+      .rejects.toThrow('Failed to batch complete benefits.');
     expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
-
-  it('should throw error when benefit status IDs are empty', async () => {
-    const mockSession: Session = {
-      user: { id: 'test-user-id' },
-      expires: '2024-12-31',
-    };
-    mockGetServerSession.mockResolvedValue(mockSession);
-
-    await expect(
-      batchCompleteBenefitsByCategoryAction('Travel', [])
-    ).rejects.toThrow('Category and benefit status IDs are required.');
-
-    expect(mockPrisma.benefitStatus.updateMany).not.toHaveBeenCalled();
-    expect(mockRevalidatePath).not.toHaveBeenCalled();
-  });
-
-  it('should handle database errors gracefully', async () => {
-    const mockSession: Session = {
-      user: { id: 'test-user-id' },
-      expires: '2024-12-31',
-    };
-    mockGetServerSession.mockResolvedValue(mockSession);
-
-    // Mock findMany to throw an error
-    mockPrisma.benefitStatus.findMany.mockRejectedValue(new Error('Database error'));
-
-    await expect(
-      batchCompleteBenefitsByCategoryAction('Travel', ['benefit-1'])
-    ).rejects.toThrow('Failed to batch complete benefits.');
-
-    expect(mockRevalidatePath).not.toHaveBeenCalled();
-  });
-
-  it('should only update uncompleted and usable benefits', async () => {
-    const mockSession: Session = {
-      user: { id: 'test-user-id' },
-      expires: '2024-12-31',
-    };
-    mockGetServerSession.mockResolvedValue(mockSession);
-
-    // Mock findMany to return only 2 eligible statuses (filtering out completed/not usable)
-    const mockStatuses = [
-      { id: 'benefit-1', usedAmount: 0, benefit: { maxAmount: 100 } },
-      { id: 'benefit-2', usedAmount: 20, benefit: { maxAmount: 50 } },
-    ];
-    mockPrisma.benefitStatus.findMany.mockResolvedValue(mockStatuses as never);
-    mockPrisma.benefitStatus.update.mockResolvedValue({} as never);
-
-    const category = 'Dining';
-    const benefitStatusIds = ['benefit-1', 'benefit-2', 'benefit-3'];
-
-    await batchCompleteBenefitsByCategoryAction(category, benefitStatusIds);
-
-    // Verify the where clause includes filters for uncompleted and usable benefits
-    expect(mockPrisma.benefitStatus.findMany).toHaveBeenCalledWith({
-      where: {
-        id: { in: benefitStatusIds },
-        userId: 'test-user-id',
-        isCompleted: false, // Only uncompleted benefits
-        isNotUsable: false, // Only usable benefits
-        benefit: {
-          category: category,
-        },
-      },
-      include: {
-        benefit: true,
-      },
-    });
-
-    // Verify update was called for each eligible status
-    expect(mockPrisma.benefitStatus.update).toHaveBeenCalledTimes(2);
-  });
-}); 
+});

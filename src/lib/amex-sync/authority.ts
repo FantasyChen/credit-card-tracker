@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 import { canonicalJson, isSyncEnvelopeFresh, type AmexSyncEnvelope, type AmexSyncRow } from "@/lib/amex-benefit-reader/sync-contract";
 
-import { AMEX_WRITABLE_DESTINATIONS } from "./catalog-registry";
+import {
+  AMEX_CATALOG_IDENTITY_REGISTRY,
+  AMEX_WRITABLE_DESTINATIONS,
+  type AmexCatalogBenefitIdentity,
+  type AmexCatalogProductIdentity,
+} from "./catalog-registry";
 import {
   resolveServerAmexCredit,
   resolveServerAmexProduct,
@@ -50,8 +55,17 @@ export type AmexSyncReason =
   | "conflict_repreview_required"
   | "persistence_failed";
 
+export interface DestinationProvenanceSnapshot {
+  observedAt: Date;
+  sourceObservationIdentity: string;
+  sourceObservationDigest: string;
+}
+
 export interface DestinationStatusSnapshot {
   id: string;
+  benefitId: string | null;
+  creditCardId: string | null;
+  predefinedBenefitId: string | null;
   userId: string;
   cycleStartDate: Date;
   cycleEndDate: Date;
@@ -61,21 +75,37 @@ export interface DestinationStatusSnapshot {
   completedAt: Date | null;
   isNotUsable: boolean;
   updatedAt: Date;
-  provenance: {
-    observedAt: Date;
-    sourceObservationIdentity: string;
-    sourceObservationDigest: string;
-  } | null;
+  provenance: DestinationProvenanceSnapshot | null;
 }
 
-export interface DestinationBenefitSnapshot {
+export interface DestinationPredefinedBenefitSnapshot {
   id: string;
+  catalogKey: string | null;
+  predefinedCardId: string;
+  category: string;
+  description: string;
+  percentage: number;
+  maxAmount: number | null;
+  frequency: string;
+  cycleAlignment: string | null;
+  fixedCycleDurationMonths: number | null;
+  fixedCycleStartMonth: number | null;
+  occurrencesInCycle: number;
   productKey: string | null;
   creditFamilyKey: string | null;
   periodKey: string | null;
-  startDate: Date;
-  endDate: Date | null;
+  retiredAt: Date | null;
   statuses: DestinationStatusSnapshot[];
+}
+
+export interface DestinationPredefinedCardSnapshot {
+  id: string;
+  catalogKey: string | null;
+  name: string;
+  issuer: string;
+  productKey: string | null;
+  retiredAt: Date | null;
+  benefits: DestinationPredefinedBenefitSnapshot[];
 }
 
 export interface DestinationCardSnapshot {
@@ -83,10 +113,9 @@ export interface DestinationCardSnapshot {
   userId: string;
   displayName?: string;
   issuer: string;
-  productKey: string | null;
   lastFourDigits: string | null;
   lifecycleStatus: "ACTIVE" | "CLOSED" | "PRODUCT_CHANGED";
-  benefits: DestinationBenefitSnapshot[];
+  predefinedCard: DestinationPredefinedCardSnapshot | null;
 }
 
 export interface AmexSyncDestinationContext {
@@ -107,6 +136,7 @@ export interface AmexSyncPlanRow {
   sourceObservationDigest: string;
   sourceLocalCardId: string;
   sourceEndingDigits: string;
+  sourceCreditKey: string;
   productKey: string;
   creditFamilyKey: string;
   observedAt: string;
@@ -117,8 +147,22 @@ export interface AmexSyncPlanRow {
   disposition: "proposed" | "unchanged" | "skipped";
   reason: AmexSyncReason;
   destinationCardId: string | null;
+  destinationPredefinedCardId: string | null;
+  destinationProductCatalogKey: string | null;
+  /** Legacy bridge metadata only. Never destination authority. */
   destinationBenefitId: string | null;
+  destinationPredefinedBenefitId: string | null;
+  destinationBenefitCatalogKey: string | null;
+  destinationDefinitionFingerprint: string | null;
   destinationStatusId: string | null;
+  destinationOccurrenceIndex: number | null;
+  destinationCycleStartInstant: string | null;
+  destinationCycleEndInstant: string | null;
+  beforeProvenance: {
+    observedAt: string;
+    sourceObservationIdentity: string;
+    sourceObservationDigest: string;
+  } | null;
   before: StatusStateProjection | null;
   after: StatusStateProjection | null;
   changes: {
@@ -132,6 +176,8 @@ export interface AmexSyncPlanRow {
 export interface AmexSyncPlan {
   rows: AmexSyncPlanRow[];
   envelopeDigest: string;
+  /** Ordered physical/global/status/cycle/provenance and transition binding. */
+  destinationAuthorityDigest: string;
   beforeStateDigest: string;
 }
 
@@ -139,8 +185,147 @@ function hash(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
+/**
+ * Binds one row independently so a partial attempt can replay already-durable
+ * rows while still requiring every failed or missing row to match its original
+ * signed authority graph before retrying.
+ */
+export function amexDestinationAuthorityRowDigest(row: AmexSyncPlanRow): string {
+  return hash(row);
+}
+
 function dateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+const AMEX_PRODUCT_IDENTITIES = Object.values(AMEX_CATALOG_IDENTITY_REGISTRY) as AmexCatalogProductIdentity[];
+
+function registryProductForDefinition(
+  definition: DestinationPredefinedCardSnapshot | null,
+): AmexCatalogProductIdentity | null {
+  if (!definition || definition.issuer !== "American Express" || !definition.catalogKey || !definition.productKey) return null;
+  const matches = AMEX_PRODUCT_IDENTITIES.filter((product) => product.catalogKey === definition.catalogKey
+    && product.productKey === definition.productKey);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function registryBenefitForDefinition(
+  product: AmexCatalogProductIdentity,
+  predefinedCardId: string,
+  definition: DestinationPredefinedBenefitSnapshot,
+): AmexCatalogBenefitIdentity | null {
+  if (!definition.catalogKey || definition.predefinedCardId !== predefinedCardId) return null;
+  const matches = product.benefits.filter((benefit) => benefit.catalogKey === definition.catalogKey
+    && benefit.parentCatalogKey === product.catalogKey
+    && definition.productKey === product.productKey
+    && definition.creditFamilyKey === benefit.creditFamilyKey
+    && definition.periodKey === benefit.periodKey);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+export function isGloballyAuthorizedAmexCard(card: DestinationCardSnapshot): boolean {
+  return card.issuer === "American Express"
+    && card.lifecycleStatus === "ACTIVE"
+    && registryProductForDefinition(card.predefinedCard) !== null;
+}
+
+export function resolveAmexGlobalDefinitionAuthority(input: {
+  product: DestinationPredefinedCardSnapshot;
+  benefit: DestinationPredefinedBenefitSnapshot;
+  sourceCreditKey: string;
+}): AmexCatalogBenefitIdentity | null {
+  const productIdentity = registryProductForDefinition(input.product);
+  if (!productIdentity || input.benefit.predefinedCardId !== input.product.id) return null;
+  const sourceIdentity = registryBenefitForDefinition(productIdentity, input.product.id, input.benefit);
+  return sourceIdentity?.sourceSemantics === "usage"
+    && sourceIdentity.sourceCreditKey === input.sourceCreditKey
+    ? sourceIdentity
+    : null;
+}
+
+export function amexDestinationDefinitionFingerprint(input: {
+  product: DestinationPredefinedCardSnapshot;
+  benefit: DestinationPredefinedBenefitSnapshot;
+  sourceIdentity: AmexCatalogBenefitIdentity;
+}): string {
+  const { product, benefit, sourceIdentity } = input;
+  return hash({
+    fingerprintVersion: 1,
+    product: {
+      catalogKey: product.catalogKey,
+      issuer: product.issuer,
+      productKey: product.productKey,
+      retiredAt: product.retiredAt?.toISOString() ?? null,
+    },
+    benefit: {
+      catalogKey: benefit.catalogKey,
+      parentCatalogKey: product.catalogKey,
+      category: benefit.category,
+      description: benefit.description,
+      percentage: benefit.percentage,
+      maxAmount: benefit.maxAmount,
+      frequency: benefit.frequency,
+      cycleAlignment: benefit.cycleAlignment,
+      fixedCycleDurationMonths: benefit.fixedCycleDurationMonths,
+      fixedCycleStartMonth: benefit.fixedCycleStartMonth,
+      occurrencesInCycle: benefit.occurrencesInCycle,
+      productKey: benefit.productKey,
+      creditFamilyKey: benefit.creditFamilyKey,
+      periodKey: benefit.periodKey,
+      retiredAt: benefit.retiredAt?.toISOString() ?? null,
+    },
+    sourceAuthority: {
+      parentCatalogKey: sourceIdentity.parentCatalogKey,
+      sourceSemantics: sourceIdentity.sourceSemantics,
+      sourceCreditKey: sourceIdentity.sourceCreditKey,
+    },
+  });
+}
+
+function provenanceSnapshot(provenance: DestinationProvenanceSnapshot | null): AmexSyncPlanRow["beforeProvenance"] {
+  return provenance ? {
+    observedAt: provenance.observedAt.toISOString(),
+    sourceObservationIdentity: provenance.sourceObservationIdentity,
+    sourceObservationDigest: provenance.sourceObservationDigest,
+  } : null;
+}
+
+function destinationBinding(input: {
+  card: DestinationCardSnapshot;
+  benefit?: DestinationPredefinedBenefitSnapshot | null;
+  status?: DestinationStatusSnapshot | null;
+  sourceIdentity?: AmexCatalogBenefitIdentity | null;
+}): Pick<AmexSyncPlanRow,
+  | "destinationCardId"
+  | "destinationPredefinedCardId"
+  | "destinationProductCatalogKey"
+  | "destinationBenefitId"
+  | "destinationPredefinedBenefitId"
+  | "destinationBenefitCatalogKey"
+  | "destinationDefinitionFingerprint"
+  | "destinationStatusId"
+  | "destinationOccurrenceIndex"
+  | "destinationCycleStartInstant"
+  | "destinationCycleEndInstant"
+  | "beforeProvenance"> {
+  const { card, benefit = null, status = null, sourceIdentity = null } = input;
+  const product = card.predefinedCard;
+  return {
+    destinationCardId: card.id,
+    destinationPredefinedCardId: product?.id ?? null,
+    destinationProductCatalogKey: product?.catalogKey ?? null,
+    destinationBenefitId: status?.benefitId ?? null,
+    destinationPredefinedBenefitId: benefit?.id ?? null,
+    destinationBenefitCatalogKey: benefit?.catalogKey ?? null,
+    destinationDefinitionFingerprint: product && benefit && sourceIdentity
+      ? amexDestinationDefinitionFingerprint({ product, benefit, sourceIdentity })
+      : null,
+    destinationStatusId: status?.id ?? null,
+    destinationOccurrenceIndex: status?.occurrenceIndex ?? null,
+    destinationCycleStartInstant: status?.cycleStartDate.toISOString() ?? null,
+    destinationCycleEndInstant: status?.cycleEndDate.toISOString() ?? null,
+    beforeProvenance: provenanceSnapshot(status?.provenance ?? null),
+  };
 }
 
 function snapshot(status: DestinationStatusSnapshot): StatusStateProjection {
@@ -159,6 +344,7 @@ function skippedRow(input: {
   sourceObservationDigest: string;
   sourceLocalCardId: string;
   sourceEndingDigits: string;
+  sourceCreditKey: string;
   productKey: string;
   creditFamilyKey: string;
   observedAt: string;
@@ -168,8 +354,17 @@ function skippedRow(input: {
   periodKey?: string | null;
   reason: AmexSyncReason;
   destinationCardId?: string | null;
+  destinationPredefinedCardId?: string | null;
+  destinationProductCatalogKey?: string | null;
   destinationBenefitId?: string | null;
+  destinationPredefinedBenefitId?: string | null;
+  destinationBenefitCatalogKey?: string | null;
+  destinationDefinitionFingerprint?: string | null;
   destinationStatusId?: string | null;
+  destinationOccurrenceIndex?: number | null;
+  destinationCycleStartInstant?: string | null;
+  destinationCycleEndInstant?: string | null;
+  beforeProvenance?: AmexSyncPlanRow["beforeProvenance"];
   before?: StatusStateProjection | null;
 }): AmexSyncPlanRow {
   return {
@@ -177,8 +372,17 @@ function skippedRow(input: {
     periodKey: input.periodKey ?? null,
     disposition: "skipped",
     destinationCardId: input.destinationCardId ?? null,
+    destinationPredefinedCardId: input.destinationPredefinedCardId ?? null,
+    destinationProductCatalogKey: input.destinationProductCatalogKey ?? null,
     destinationBenefitId: input.destinationBenefitId ?? null,
+    destinationPredefinedBenefitId: input.destinationPredefinedBenefitId ?? null,
+    destinationBenefitCatalogKey: input.destinationBenefitCatalogKey ?? null,
+    destinationDefinitionFingerprint: input.destinationDefinitionFingerprint ?? null,
     destinationStatusId: input.destinationStatusId ?? null,
+    destinationOccurrenceIndex: input.destinationOccurrenceIndex ?? null,
+    destinationCycleStartInstant: input.destinationCycleStartInstant ?? null,
+    destinationCycleEndInstant: input.destinationCycleEndInstant ?? null,
+    beforeProvenance: input.beforeProvenance ?? null,
     before: input.before ?? null,
     after: null,
     changes: { amountDecrease: false, amountIncrease: false, completionSet: false, completionCleared: false },
@@ -243,11 +447,13 @@ function resolveCard(
   userId: string,
 ): DestinationCardSnapshot | AmexSyncReason {
   if (!/^\d{5}$/.test(sourceCard.endingDigits)) return "source_last_five_required";
-  const productCards = context.cards.filter((card) =>
-    card.userId === userId
-    && card.issuer === "American Express"
-    && card.lifecycleStatus === "ACTIVE"
-    && card.productKey === sourceCard.productKey);
+  const productCards = context.cards.filter((card) => {
+    const product = registryProductForDefinition(card.predefinedCard);
+    return card.userId === userId
+      && card.issuer === "American Express"
+      && card.lifecycleStatus === "ACTIVE"
+      && product?.productKey === sourceCard.productKey;
+  });
   if (productCards.some((card) => !/^\d{5}$/.test(card.lastFourDigits ?? ""))
     && !productCards.some((card) => card.lastFourDigits === sourceCard.endingDigits)) {
     return "destination_last_five_required";
@@ -342,7 +548,14 @@ function expandPlatinumDecemberUber(input: {
     creditFamilyKey: variant.creditFamilyKey,
     periodKey: variant.periodKey,
     destinationBenefitId: null,
+    destinationPredefinedBenefitId: null,
+    destinationBenefitCatalogKey: null,
+    destinationDefinitionFingerprint: null,
     destinationStatusId: null,
+    destinationOccurrenceIndex: null,
+    destinationCycleStartInstant: null,
+    destinationCycleEndInstant: null,
+    beforeProvenance: null,
     before: null,
     after: null,
     changes: { amountDecrease: false, amountIncrease: false, completionSet: false, completionCleared: false },
@@ -360,27 +573,42 @@ function expandPlatinumDecemberUber(input: {
   const card = context.cards.find((candidate) => candidate.id === baseRow.destinationCardId);
   if (!card || card.userId !== userId) return skippedVariants("destination_card_missing");
 
+  const product = card.predefinedCard;
+  const productIdentity = registryProductForDefinition(product);
+  if (!product || !productIdentity || productIdentity.productKey !== PLATINUM_PRODUCT_KEY) {
+    return skippedVariants("destination_benefit_missing");
+  }
   const resolved: Array<{
     variant: typeof variants[number];
-    benefit: DestinationBenefitSnapshot;
+    benefit: DestinationPredefinedBenefitSnapshot;
+    sourceIdentity: AmexCatalogBenefitIdentity;
     status: DestinationStatusSnapshot;
   }> = [];
   for (const variant of variants) {
-    const benefits = card.benefits.filter((benefit) => benefit.productKey === PLATINUM_PRODUCT_KEY
-      && benefit.creditFamilyKey === variant.creditFamilyKey
-      && benefit.periodKey === variant.periodKey);
+    const benefits = product.benefits.flatMap((benefit) => {
+      const sourceIdentity = registryBenefitForDefinition(productIdentity, product.id, benefit);
+      return sourceIdentity
+        && sourceIdentity.sourceSemantics === "usage"
+        && sourceIdentity.sourceCreditKey === sourceRow.sourceCreditKey
+        && benefit.creditFamilyKey === variant.creditFamilyKey
+        && benefit.periodKey === variant.periodKey
+        ? [{ benefit, sourceIdentity }]
+        : [];
+    });
     if (benefits.length !== 1) {
       return skippedVariants(benefits.length ? "destination_benefit_ambiguous" : "destination_benefit_missing");
     }
-    const benefit = benefits[0];
+    const { benefit, sourceIdentity } = benefits[0];
     const statuses = benefit.statuses.filter((status) => status.userId === userId
+      && status.creditCardId === card.id
+      && status.predefinedBenefitId === benefit.id
       && status.occurrenceIndex === 0
       && dateOnly(status.cycleStartDate) === sourceRow.sourcePeriod!.startDate
       && dateOnly(status.cycleEndDate) === sourceRow.sourcePeriod!.endDate);
     if (statuses.length !== 1) {
       return skippedVariants(statuses.length ? "destination_status_ambiguous" : "destination_status_missing");
     }
-    resolved.push({ variant, benefit, status: statuses[0] });
+    resolved.push({ variant, benefit, sourceIdentity, status: statuses[0] });
   }
 
   let exactReplayCount = 0;
@@ -399,14 +627,13 @@ function expandPlatinumDecemberUber(input: {
     return skippedVariants("source_conflict");
   }
   if (exactReplayCount === resolved.length) {
-    return resolved.map(({ variant, benefit, status }) => {
+    return resolved.map(({ variant, benefit, sourceIdentity, status }) => {
       const before = snapshot(status);
       return {
         ...splitBase(variant),
+        ...destinationBinding({ card, benefit, status, sourceIdentity }),
         disposition: "unchanged",
         reason: "unchanged_replay",
-        destinationBenefitId: benefit.id,
-        destinationStatusId: status.id,
         before,
         after: before,
       };
@@ -415,11 +642,13 @@ function expandPlatinumDecemberUber(input: {
 
   const transitions: Array<{
     variant: typeof variants[number];
-    benefit: DestinationBenefitSnapshot;
+    benefit: DestinationPredefinedBenefitSnapshot;
+    sourceIdentity: AmexCatalogBenefitIdentity;
+    status: DestinationStatusSnapshot;
     before: StatusStateProjection;
     transition: Exclude<ReturnType<typeof resolveTransition>, AmexSyncReason>;
   }> = [];
-  for (const { variant, benefit, status } of resolved) {
+  for (const { variant, benefit, sourceIdentity, status } of resolved) {
     const before = snapshot(status);
     const usedMinor = variant.usedMinor!;
     const splitSourceRow: AmexSyncRow = {
@@ -431,17 +660,16 @@ function expandPlatinumDecemberUber(input: {
     };
     const transition = resolveTransition(splitSourceRow, status, transitionTime);
     if (typeof transition === "string") return skippedVariants(transition);
-    transitions.push({ variant, benefit, before, transition });
+    transitions.push({ variant, benefit, sourceIdentity, status, before, transition });
   }
 
-  return transitions.map(({ variant, benefit, before, transition }) => {
+  return transitions.map(({ variant, benefit, sourceIdentity, status, before, transition }) => {
     const unchanged = canonicalJson(before) === canonicalJson(transition.after);
     return {
       ...splitBase(variant),
+      ...destinationBinding({ card, benefit, status, sourceIdentity }),
       disposition: unchanged ? "unchanged" : "proposed",
       reason: unchanged ? "already_current" : "proposed_update",
-      destinationBenefitId: benefit.id,
-      destinationStatusId: resolved.find((entry) => entry.variant === variant)!.status.id,
       before,
       after: transition.after,
       changes: transition.changes,
@@ -484,6 +712,7 @@ export function planAmexSync(input: {
         ...identities,
         sourceLocalCardId: sourceCard.sourceLocalCardId,
         sourceEndingDigits: sourceCard.endingDigits,
+        sourceCreditKey: row.sourceCreditKey,
         productKey: sourceCard.productKey,
         creditFamilyKey: row.creditFamilyKey,
         observedAt: sourceCard.observedAt,
@@ -536,75 +765,91 @@ export function planAmexSync(input: {
         rows.push(skippedRow({ ...base, reason: "mapping_invalid" }));
         return;
       }
+      const product = cardResolution.predefinedCard;
+      const productIdentity = registryProductForDefinition(product);
+      if (!product || !productIdentity || productIdentity.productKey !== sourceCard.productKey) {
+        rows.push(skippedRow({ ...base, reason: "destination_benefit_missing" }));
+        return;
+      }
+      const cardBinding = destinationBinding({ card: cardResolution });
       if (!row.sourcePeriod) {
-        rows.push(skippedRow({ ...base, reason: "period_not_structured", destinationCardId: cardResolution.id }));
+        rows.push(skippedRow({ ...base, ...cardBinding, reason: "period_not_structured" }));
         return;
       }
       const periodKeys = periodKeysForExactRange(row.sourcePeriod.startDate, row.sourcePeriod.endDate);
       if (!periodKeys.length) {
-        rows.push(skippedRow({ ...base, reason: "period_key_mismatch", destinationCardId: cardResolution.id }));
+        rows.push(skippedRow({ ...base, ...cardBinding, reason: "period_key_mismatch" }));
         return;
       }
       const today = dateOnly(now);
       if (today < row.sourcePeriod.startDate || today > row.sourcePeriod.endDate) {
-        rows.push(skippedRow({ ...base, reason: "period_not_current", destinationCardId: cardResolution.id }));
+        rows.push(skippedRow({ ...base, ...cardBinding, reason: "period_not_current" }));
         return;
       }
-      const benefits = cardResolution.benefits.filter((benefit) =>
-        benefit.productKey === sourceCard.productKey
-        && benefit.creditFamilyKey === row.creditFamilyKey
-        && benefit.periodKey !== null
-        && periodKeys.some((periodKey) => periodKey === benefit.periodKey));
+      const benefits = product.benefits.flatMap((benefit) => {
+        const sourceIdentity = registryBenefitForDefinition(productIdentity, product.id, benefit);
+        return sourceIdentity
+          && sourceIdentity.sourceSemantics === "usage"
+          && sourceIdentity.sourceCreditKey === row.sourceCreditKey
+          && benefit.creditFamilyKey === row.creditFamilyKey
+          && benefit.periodKey !== null
+          && periodKeys.some((periodKey) => periodKey === benefit.periodKey)
+          ? [{ benefit, sourceIdentity }]
+          : [];
+      });
       if (benefits.length !== 1) {
         rows.push(skippedRow({
           ...base,
+          ...cardBinding,
           reason: benefits.length ? "destination_benefit_ambiguous" : "destination_benefit_missing",
-          destinationCardId: cardResolution.id,
         }));
         return;
       }
-      const benefit = benefits[0];
+      const { benefit, sourceIdentity } = benefits[0];
       const periodKey = benefit.periodKey!;
+      const benefitBinding = destinationBinding({ card: cardResolution, benefit, sourceIdentity });
       const statuses = benefit.statuses.filter((status) =>
         status.userId === userId
+        && status.creditCardId === cardResolution.id
+        && status.predefinedBenefitId === benefit.id
         && status.occurrenceIndex === 0
         && dateOnly(status.cycleStartDate) === row.sourcePeriod!.startDate
         && dateOnly(status.cycleEndDate) === row.sourcePeriod!.endDate);
       if (statuses.length !== 1) {
         rows.push(skippedRow({
           ...base,
+          ...benefitBinding,
           periodKey,
           reason: statuses.length ? "destination_status_ambiguous" : "destination_status_missing",
-          destinationCardId: cardResolution.id,
-          destinationBenefitId: benefit.id,
         }));
         return;
       }
       const status = statuses[0];
+      const binding = destinationBinding({ card: cardResolution, benefit, status, sourceIdentity });
       const before = snapshot(status);
       const observedAt = Date.parse(sourceCard.observedAt);
       if (status.provenance) {
         const previousAt = status.provenance.observedAt.getTime();
         if (observedAt < previousAt) {
-          rows.push(skippedRow({ ...base, periodKey, reason: "stale_replay", destinationCardId: cardResolution.id, destinationBenefitId: benefit.id, destinationStatusId: status.id, before }));
+          rows.push(skippedRow({ ...base, periodKey, reason: "stale_replay", ...binding, before }));
           return;
         }
         if (observedAt === previousAt && status.provenance.sourceObservationDigest === identities.sourceObservationDigest) {
           rows.push({
-            ...skippedRow({ ...base, periodKey, reason: "unchanged_replay", destinationCardId: cardResolution.id, destinationBenefitId: benefit.id, destinationStatusId: status.id, before }),
+            ...skippedRow({ ...base, periodKey, reason: "unchanged_replay", ...binding, before }),
             disposition: "unchanged",
             after: before,
           });
           return;
         }
         if (observedAt === previousAt) {
-          rows.push(skippedRow({ ...base, periodKey, reason: "source_conflict", destinationCardId: cardResolution.id, destinationBenefitId: benefit.id, destinationStatusId: status.id, before }));
+          rows.push(skippedRow({ ...base, periodKey, reason: "source_conflict", ...binding, before }));
           return;
         }
       }
       const transition = resolveTransition(row, status, transitionTime);
       if (typeof transition === "string") {
-        rows.push(skippedRow({ ...base, periodKey, reason: transition, destinationCardId: cardResolution.id, destinationBenefitId: benefit.id, destinationStatusId: status.id, before }));
+        rows.push(skippedRow({ ...base, periodKey, reason: transition, ...binding, before }));
         return;
       }
       const unchanged = canonicalJson(before) === canonicalJson(transition.after);
@@ -613,9 +858,7 @@ export function planAmexSync(input: {
         periodKey,
         disposition: unchanged ? "unchanged" : "proposed",
         reason: unchanged ? "already_current" : "proposed_update",
-        destinationCardId: cardResolution.id,
-        destinationBenefitId: benefit.id,
-        destinationStatusId: status.id,
+        ...binding,
         before,
         after: transition.after,
         changes: transition.changes,
@@ -633,6 +876,10 @@ export function planAmexSync(input: {
       transitionTime,
     }) : [row];
   });
+  // This ordered digest is the proposal's closed destination-authority binding.
+  // It includes physical/global identity, exact cycle instants, definition terms,
+  // before state, provenance, source period, and the derived transition.
+  const destinationAuthorityDigest = hash(plannedRows);
   const beforeStateDigest = hash(plannedRows.map((row) => ({
     sourceRowIdentity: row.sourceRowIdentity,
     atomicGroupIdentity: row.atomicGroupIdentity,
@@ -642,7 +889,7 @@ export function planAmexSync(input: {
     before: row.before,
     after: row.after,
   })));
-  return { rows: plannedRows, envelopeDigest, beforeStateDigest };
+  return { rows: plannedRows, envelopeDigest, destinationAuthorityDigest, beforeStateDigest };
 }
 
 export function syncIdempotencyKey(userId: string, plan: AmexSyncPlan): string {

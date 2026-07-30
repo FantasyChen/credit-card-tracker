@@ -1,0 +1,7 @@
+{"file":".trellis/spec/perks-reminder/index.md","reason":"Entry point for catalog, database, and safe verification requirements."}
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Defines static catalog ownership, materialization ownership, and physical-card identity invariants."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Defines source alignment, existing-user disposition, and catalog validation expectations."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Required for additive Prisma schema, migration SQL, seed, and operator safety."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Defines AMEX catalog counts, tuple identity, writable semantics, and rollout gates that global keys must preserve."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"The source-to-schema-to-seed identity contract spans multiple layers."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/design.md","reason":"Parent architecture defines the target global model, sequencing, and production-off boundary."}

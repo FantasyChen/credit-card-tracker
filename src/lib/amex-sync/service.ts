@@ -1,10 +1,17 @@
 import { type AmexSyncEnvelope } from "@/lib/amex-benefit-reader/sync-contract";
 import {
+  amexDestinationAuthorityRowDigest,
+  isGloballyAuthorizedAmexCard,
   planAmexSync,
   syncIdempotencyKey,
   type AmexSyncPlan,
 } from "./authority";
-import { createAmexSyncProposal, verifyAmexSyncProposal } from "./proposal";
+import {
+  amexSyncProposalAuthorityRowDigest,
+  createAmexSyncProposal,
+  digestAmexSyncProposalIdentities,
+  verifyAmexSyncProposal,
+} from "./proposal";
 import {
   applyAmexSyncGroup,
   applyAmexSyncRow,
@@ -58,8 +65,7 @@ export interface AmexSyncCardSkip {
 function missingLastFiveCardSkips(context: Awaited<ReturnType<typeof loadAmexSyncDestinationContext>>, userId: string): AmexSyncCardSkip[] {
   return context.cards
     .filter((card) => card.userId === userId
-      && card.issuer === "American Express"
-      && card.lifecycleStatus === "ACTIVE"
+      && isGloballyAuthorizedAmexCard(card)
       && !/^\d{5}$/.test(card.lastFourDigits ?? ""))
     .map((card) => ({
       destinationCardId: card.id,
@@ -109,6 +115,51 @@ export async function previewAmexSync(input: {
   };
 }
 
+function failedStoredResult(
+  row: AmexSyncPlan["rows"][number],
+  reasonCode: "conflict_repreview_required" | "persistence_failed",
+): StoredRowResult {
+  return {
+    sourceRowIdentity: row.sourceRowIdentity,
+    disposition: "FAILED",
+    reasonCode,
+    destinationCardId: row.destinationCardId,
+    beforeUsedAmount: row.before?.usedAmount ?? null,
+    beforeIsCompleted: row.before?.isCompleted ?? null,
+    beforeCompletedAt: row.before?.completedAt ?? null,
+    beforeIsNotUsable: row.before?.isNotUsable ?? null,
+    afterUsedAmount: row.after?.usedAmount ?? null,
+    afterIsCompleted: row.after?.isCompleted ?? null,
+    afterCompletedAt: row.after?.completedAt ?? null,
+    afterIsNotUsable: row.after?.isNotUsable ?? null,
+  };
+}
+
+function storedStatusProjection(
+  result: StoredRowResult,
+  prefix: "before" | "after",
+): AmexSyncPlan["rows"][number]["before"] {
+  const usedAmount = prefix === "before" ? result.beforeUsedAmount : result.afterUsedAmount;
+  const isCompleted = prefix === "before" ? result.beforeIsCompleted : result.afterIsCompleted;
+  const completedAt = prefix === "before" ? result.beforeCompletedAt : result.afterCompletedAt;
+  const isNotUsable = prefix === "before" ? result.beforeIsNotUsable : result.afterIsNotUsable;
+  if (usedAmount === null && isCompleted === null && completedAt === null && isNotUsable === null) return null;
+  if (usedAmount === null || isCompleted === null || isNotUsable === null) {
+    throw new Error("conflict_repreview_required");
+  }
+  const completedAtInstant = completedAt === null
+    ? null
+    : completedAt instanceof Date
+      ? completedAt.toISOString()
+      : new Date(completedAt).toISOString();
+  return {
+    usedAmount: Number(usedAmount),
+    isCompleted,
+    completedAt: completedAtInstant,
+    isNotUsable,
+  };
+}
+
 function replayResults(
   plan: AmexSyncPlan,
   stored: StoredRowResult[],
@@ -116,13 +167,16 @@ function replayResults(
   const byIdentity = new Map(stored.map((result) => [result.sourceRowIdentity, result]));
   return plan.rows.map((row) => {
     const result = byIdentity.get(row.sourceRowIdentity);
-    const disposition = result?.disposition === "UPDATED"
+    if (!result) throw new Error("conflict_repreview_required");
+    const disposition = result.disposition === "UPDATED"
       ? "updated"
-      : result?.disposition === "UNCHANGED"
+      : result.disposition === "UNCHANGED"
         ? "unchanged"
-        : result?.disposition === "FAILED"
+        : result.disposition === "FAILED"
           ? "failed"
           : "skipped";
+    const before = storedStatusProjection(result, "before");
+    const after = storedStatusProjection(result, "after");
     return {
       sourceRowIdentity: row.sourceRowIdentity,
       atomicGroupIdentity: row.atomicGroupIdentity,
@@ -130,25 +184,76 @@ function replayResults(
       productKey: row.productKey,
       creditFamilyKey: row.creditFamilyKey,
       disposition,
-      reason: result?.reasonCode ?? "persistence_failed",
-      destinationCardId: row.destinationCardId,
-      before: row.before,
-      after: row.after,
-      changes: row.changes,
+      reason: result.reasonCode,
+      destinationCardId: result.destinationCardId,
+      before,
+      after,
+      changes: {
+        amountDecrease: before !== null && after !== null && after.usedAmount < before.usedAmount,
+        amountIncrease: before !== null && after !== null && after.usedAmount > before.usedAmount,
+        completionSet: before !== null && after !== null && !before.isCompleted && after.isCompleted,
+        completionCleared: before !== null && after !== null && before.isCompleted && !after.isCompleted,
+      },
     };
   });
+}
+
+function replayCompletedAttempt(
+  plan: AmexSyncPlan,
+  attempt: { id: string; rowAudits: StoredRowResult[] },
+) {
+  const auditedIdentities = new Set(attempt.rowAudits.map((row) => row.sourceRowIdentity));
+  if (attempt.rowAudits.length !== plan.rows.length
+    || auditedIdentities.size !== plan.rows.length
+    || plan.rows.some((row) => !auditedIdentities.has(row.sourceRowIdentity))) {
+    throw new Error("conflict_repreview_required");
+  }
+  const rows = replayResults(plan, attempt.rowAudits);
+  return {
+    attemptId: attempt.id,
+    replayed: true as const,
+    rows,
+    updatedCount: rows.filter((row) => row.disposition === "updated").length,
+  };
+}
+
+function proposalMatchesRowIdentities(
+  proposal: ReturnType<typeof verifyAmexSyncProposal>,
+  plan: AmexSyncPlan,
+): boolean {
+  return proposal.envelopeDigest === plan.envelopeDigest
+    && proposal.rowCount === plan.rows.length
+    && proposal.sourceRowIdentitiesDigest === digestAmexSyncProposalIdentities(
+      plan.rows.map((row) => row.sourceRowIdentity),
+    )
+    && proposal.atomicGroupIdentitiesDigest === digestAmexSyncProposalIdentities(
+      plan.rows.map((row) => row.atomicGroupIdentity),
+    );
 }
 
 function proposalMatchesPlan(
   proposal: ReturnType<typeof verifyAmexSyncProposal>,
   plan: AmexSyncPlan,
 ): boolean {
-  return proposal.envelopeDigest === plan.envelopeDigest
-    && proposal.beforeStateDigest === plan.beforeStateDigest
-    && proposal.sourceRowIdentities.length === plan.rows.length
-    && proposal.atomicGroupIdentities.length === plan.rows.length
-    && proposal.sourceRowIdentities.every((identity, index) => identity === plan.rows[index].sourceRowIdentity)
-    && proposal.atomicGroupIdentities.every((identity, index) => identity === plan.rows[index].atomicGroupIdentity);
+  return proposalMatchesRowIdentities(proposal, plan)
+    && proposal.rowCount === plan.rows.length
+    && proposal.destinationAuthorityDigest === plan.destinationAuthorityDigest
+    && proposal.beforeStateDigest === plan.beforeStateDigest;
+}
+
+function proposalMatchesRetryablePlan(
+  proposal: ReturnType<typeof verifyAmexSyncProposal>,
+  plan: AmexSyncPlan,
+  stored: StoredRowResult[],
+): boolean {
+  if (proposal.rowCount !== plan.rows.length) return false;
+  const terminalIdentities = new Set(
+    stored
+      .filter((result) => result.disposition !== "FAILED")
+      .map((result) => result.sourceRowIdentity),
+  );
+  return plan.rows.every((row, index) => terminalIdentities.has(row.sourceRowIdentity)
+    || amexSyncProposalAuthorityRowDigest(proposal, index) === amexDestinationAuthorityRowDigest(row));
 }
 
 export async function confirmAmexSync(input: {
@@ -179,14 +284,21 @@ export async function confirmAmexSync(input: {
     now,
     transitionTime: new Date(proposal.transitionTime),
   });
-  if (!proposalMatchesPlan(proposal, plan)) throw new Error("conflict_repreview_required");
+  // A completed attempt necessarily changed destination state/provenance, so its
+  // original authority digest no longer matches a fresh plan. Authenticate the
+  // exact envelope and ordered row/group identities first, then return the durable
+  // result before applying the confirmation-time drift checks used by new/retry
+  // writes. This keeps completed replay idempotent without allowing a changed
+  // envelope or changed row expansion to bypass proposal binding.
+  if (!proposalMatchesRowIdentities(proposal, plan)) throw new Error("conflict_repreview_required");
 
   const idempotencyKey = syncIdempotencyKey(input.userId, plan);
   const existing = await findAmexSyncAttempt(input.userId, idempotencyKey);
-  if (existing?.state === "COMPLETED") {
-    const rows = replayResults(plan, existing.rowAudits);
-    return { attemptId: existing.id, replayed: true, rows, updatedCount: rows.filter((row) => row.disposition === "updated").length };
-  }
+  if (existing?.state === "COMPLETED") return replayCompletedAttempt(plan, existing);
+  const proposalMatches = existing
+    ? proposalMatchesRetryablePlan(proposal, plan, existing.rowAudits)
+    : proposalMatchesPlan(proposal, plan);
+  if (!proposalMatches) throw new Error("conflict_repreview_required");
 
   let attemptId = existing?.id;
   if (!attemptId) {
@@ -201,10 +313,7 @@ export async function confirmAmexSync(input: {
     } catch {
       const raced = await findAmexSyncAttempt(input.userId, idempotencyKey);
       if (!raced) throw new Error("attempt_unavailable");
-      if (raced.state === "COMPLETED") {
-        const rows = replayResults(plan, raced.rowAudits);
-        return { attemptId: raced.id, replayed: true, rows, updatedCount: rows.filter((row) => row.disposition === "updated").length };
-      }
+      if (raced.state === "COMPLETED") return replayCompletedAttempt(plan, raced);
       attemptId = raced.id;
     }
   }
@@ -230,7 +339,7 @@ export async function confirmAmexSync(input: {
           try {
             results.push(await recordFailedAmexSyncRow(attemptId, row, reason));
           } catch {
-            results.push({ sourceRowIdentity: row.sourceRowIdentity, disposition: "FAILED", reasonCode: reason });
+            results.push(failedStoredResult(row, reason));
           }
         }
       }
@@ -253,7 +362,7 @@ export async function confirmAmexSync(input: {
         try {
           results.push(await recordFailedAmexSyncRow(attemptId, row, reason));
         } catch {
-          results.push({ sourceRowIdentity: row.sourceRowIdentity, disposition: "FAILED", reasonCode: reason });
+          results.push(failedStoredResult(row, reason));
         }
       }
     }

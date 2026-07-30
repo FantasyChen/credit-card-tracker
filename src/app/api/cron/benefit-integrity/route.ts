@@ -148,6 +148,7 @@ async function checkBenefitIntegrity() {
   });
   
   quarterlyIssues.forEach(status => {
+    if (!status.benefitId || !status.benefit) return;
     issues.push({
       type: 'QUARTERLY_MISMATCH',
       description: `Quarterly benefit has wrong cycle dates`,
@@ -194,6 +195,7 @@ async function checkBenefitIntegrity() {
   });
   
   decemberIssues.forEach(status => {
+    if (!status.benefitId || !status.benefit) return;
     issues.push({
       type: 'DECEMBER_MISMATCH',
       description: `December benefit has wrong cycle dates`,

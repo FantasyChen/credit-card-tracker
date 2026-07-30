@@ -106,76 +106,19 @@ describe("Prisma-backed AMEX catalog backfill operator", () => {
     }));
   });
 
-  it("requires both exact apply confirmation and verified target attestation", async () => {
+  it("fails the superseded user-key apply path closed before database access", async () => {
     const client = database();
-    await expect(runAmexCatalogBackfillOperator({ mode: "apply", database: client }))
-      .rejects.toThrow("confirmation phrase");
     await expect(runAmexCatalogBackfillOperator({
       mode: "apply",
       confirmApply: AMEX_CATALOG_BACKFILL_APPLY_CONFIRMATION,
+      targetVerified: true,
       database: client,
-    })).rejects.toThrow("database target");
+      limit: 0,
+    })).rejects.toThrow("superseded by global catalog migration");
     expect(client.predefinedCard.findMany).not.toHaveBeenCalled();
-  });
-
-  it("fills only null keys and materializes only missing writable user statuses", async () => {
-    const client = database();
-    const report = await runAmexCatalogBackfillOperator({
-      mode: "apply",
-      confirmApply: AMEX_CATALOG_BACKFILL_APPLY_CONFIRMATION,
-      targetVerified: true,
-      database: client,
-      limit: 10,
-      referenceDate: new Date("2026-07-15T00:00:00.000Z"),
-    });
-    expect(report.predefined.applied).toEqual({ cards: 1, benefits: 1, statusesMaterialized: 0 });
-    expect(report.user.applied).toEqual({ cards: 1, benefits: 1, statusesMaterialized: 1 });
-    expect(client.predefinedCard.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ productKey: null }) }));
-    expect(client.creditCard.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ productKey: null }) }));
-    expect(client.benefit.updateMany).toHaveBeenCalledTimes(3);
-    for (const call of client.benefit.updateMany.mock.calls) {
-      expect(Object.values(call[0].where)).toContain(null);
-    }
-    expect(client.benefitStatus.createMany).toHaveBeenCalledWith(expect.objectContaining({
-      skipDuplicates: true,
-      data: [expect.objectContaining({
-        userId: "user-1",
-        usedAmount: 0,
-        isCompleted: false,
-        isNotUsable: false,
-      })],
-    }));
-    expect(client.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
-  });
-
-  it("reports a compare-and-set conflict without materializing statuses", async () => {
-    const client = database();
-    client.benefit.updateMany
-      .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 0 });
-    const report = await runAmexCatalogBackfillOperator({
-      mode: "apply",
-      confirmApply: AMEX_CATALOG_BACKFILL_APPLY_CONFIRMATION,
-      targetVerified: true,
-      database: client,
-      limit: 10,
-    });
-    expect(report.user.applied).toEqual({ cards: 1, benefits: 0, statusesMaterialized: 0 });
-    expect(report.runtimeConflicts.user).toEqual(["benefit:card-1-benefit"]);
-    expect(client.benefitStatus.createMany).not.toHaveBeenCalled();
-  });
-
-  it("is idempotent when all deterministic keys are already populated", async () => {
-    const client = database(true);
-    const report = await runAmexCatalogBackfillOperator({
-      mode: "apply",
-      confirmApply: AMEX_CATALOG_BACKFILL_APPLY_CONFIRMATION,
-      targetVerified: true,
-      database: client,
-      limit: 10,
-    });
-    expect(report.predefined.applied).toEqual({ cards: 0, benefits: 0, statusesMaterialized: 0 });
-    expect(report.user.applied).toEqual({ cards: 0, benefits: 0, statusesMaterialized: 0 });
+    expect(client.creditCard.findMany).not.toHaveBeenCalled();
+    expect(client.predefinedCard.updateMany).not.toHaveBeenCalled();
+    expect(client.creditCard.updateMany).not.toHaveBeenCalled();
     expect(client.benefitStatus.createMany).not.toHaveBeenCalled();
   });
 });
