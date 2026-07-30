@@ -61,10 +61,10 @@
 
 - [x] Run the new complete bounded legacy dry-run twice; record only aggregate standard/custom/unresolved/blocked reasons.
 - [x] Privately review every stop class; no unresolved/blocked class occurred, matching was not widened, and no row values were exposed.
-- [ ] Obtain separate bridge authorization and apply bounded exact plans with per-batch fingerprint/CAS checks.
-- [ ] After each batch, verify no status creation/deletion/state/timestamp/audit/provenance rewrite and no custom/unresolved mutation.
-- [ ] Complete hybrid projection parity and idempotent zero-plan rerun.
-- [ ] Keep legacy copied rows and links through the observation window.
+- [x] Obtain separate bridge authorization and apply bounded exact plans with per-batch fingerprint/CAS checks.
+- [x] After each batch, verify no status creation/deletion/state/timestamp/audit/provenance rewrite and no custom/unresolved mutation.
+- [x] Complete hybrid projection parity and a full idempotent 12,735-classification apply replay.
+- [x] Keep legacy copied rows and links through the observation window; cleanup remains deferred.
 
 ## 6. Cleanup/global-first boundary
 
@@ -114,7 +114,8 @@ git diff --check
 - [x] Read-only production environment, migration status, and database-identity checks — completed with sanitized aggregate output.
 - [x] Production additive schema migration deploy — completed after explicit authorization; post-status is up to date and required columns are present.
 - [x] Production catalog apply — completed after separate authorization; 34 cards and 129 benefits were adopted, and the immediate dry-run reported all rows unchanged with zero conflicts.
-- [ ] Production legacy bridge apply, cleanup/rollback, seed, reset, or other database mutation — unperformed.
+- [x] Production legacy bridge apply — completed under separate authorization; preservation, hybrid parity, and complete idempotent replay passed.
+- [ ] Production cleanup/rollback, seed, reset, or other database mutation — unperformed.
 - [x] Verified development-database migration/catalog/runtime/bridge/rollback-re-bridge/synthetic-AMEX validation — completed.
 - [ ] Browser/live AMEX, userscript installation/publication, production preview, or confirmation — unperformed.
 - [ ] Production configuration change or deployment — unperformed.
@@ -126,11 +127,11 @@ The database-backed usage-guide audit was inadvertently invoked during final sou
 
 - [x] Reference the parent research only as historical scale/diagnostic context and explicitly non-authorizing.
 - [x] Generate fresh new-model catalog and legacy dry-run counts/fingerprints/stop evidence.
-- [ ] Generate bridge preservation/parity evidence after separate apply authorization.
+- [x] Generate bridge preservation/parity evidence after separate apply authorization.
 - [ ] State every future operation as passed, failed, blocked, or skipped and record the resulting effective AMEX mode exactly.
 
 The earlier production read-only inspection and per-user-key dry-run are preserved only in the parent historical ledger. They do not satisfy any development or production prerequisite in this plan.
 
 ## Current status
 
-Implementation and verified-development prerequisites are complete. Production application/database/provider targets and recovery were verified; the additive migration succeeded and the global catalog applied the separately authorized exact adoption plan. The immediate post-apply dry-run reported all 34 cards and 129 benefits unchanged with zero conflicts. Two complete 19-page legacy dry-run passes deterministically classified 11,922 exact standard and 813 preserved custom benefits, with zero unresolved benefits or blocked units. Production AMEX remains effectively `off`. The next independent boundary is separately authorized, fingerprint-gated legacy bridge apply with preservation and idempotency verification. Push/deployment, cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
+Implementation and verified-development prerequisites are complete. Production target/recovery, additive schema, and global catalog gates passed. The separately authorized 19-page legacy bridge classified 11,922 exact standards and 813 preserved customs with zero unresolved or blocked units; protected-state preservation, hybrid parity, and the complete 12,735-classification idempotent replay passed. Legacy rows and links remain, cleanup is deferred, and production AMEX remains effectively `off`. The next independent boundary is publishing the reviewed release branch and deploying the application with AMEX still off, followed by core read-only smoke tests. Cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
