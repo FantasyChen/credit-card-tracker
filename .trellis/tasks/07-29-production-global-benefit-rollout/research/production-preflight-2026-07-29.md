@@ -2,7 +2,7 @@
 
 ## Result
 
-The controlled rollout may proceed through local commit preparation, but production migration and remote push remain stopped until a database recovery point is authenticated and verified. Production AMEX is effectively `off`. No production mutation, deployment, configuration change, userscript action, browser action, or provider call occurred.
+The controlled rollout may proceed to the separately authorized additive schema migration. Production application/database/provider targets and recovery are verified. Production AMEX is effectively `off`. The only production-side change so far is a provider-native recovery branch without compute; no application-database mutation, deployment, configuration change, userscript action, browser action, or provider call occurred.
 
 ## Verified read-only gates
 
@@ -29,9 +29,10 @@ npm run db:prod:migrate -> explicit attended Prisma migration deployment
 
 ## Recovery gate
 
-- Local Neon CLI authentication state exists, but it is not currently authenticated to the production provider project.
-- Provider project/branch matching and point-in-time recovery availability therefore could not be verified through the provider control plane.
-- Do not apply the schema migration, catalog synchronization, legacy bridge, or push an automatically deployed branch until authentication is refreshed and a recovery branch/point is created and verified.
+- Neon CLI authentication was refreshed through the provider OAuth flow.
+- The provider project/default branch matches the database-side production identity, and point-in-time recovery is configured.
+- A recovery branch was created from the exact production parent without provisioning a compute; parentage and branch creation were verified without retaining provider identifiers.
+- The recovery gate is passed. Schema migration remains a separate explicit authorization boundary; catalog synchronization, legacy bridge, push/deployment, cleanup, preview, and write remain later boundaries.
 
 ## Stop conditions
 

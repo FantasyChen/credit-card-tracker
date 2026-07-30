@@ -5,7 +5,7 @@
 - [x] Children 1–4 are code-complete and their safe static/unit checks have been reviewed.
 - [x] Children 1–4 passed separately authorized verified development-database validation.
 - [x] Production AMEX remains effectively off.
-- [ ] Exact targets and stop conditions are verified, but the database recovery point remains blocked on refreshed Neon CLI authentication before any production mutation.
+- [x] Exact targets, stop conditions, point-in-time recovery, and a provider-native recovery branch without compute are verified before production migration.
 - [x] The superseded `backfill:amex-catalog --apply` is disabled and will not be invoked.
 
 **Current gate:** The user authorized starting the controlled rollout. Read-only production preflight is complete except recovery-point verification; no production mutation, push, deployment, or activation may occur until that gate passes.
@@ -35,7 +35,7 @@
 
 - [x] Obtain explicit authorization for read-only target/migration/config inspection.
 - [x] Verify the production domain, linked Vercel project/deployment, and matching application/direct database identities without retaining or emitting values.
-- [ ] Establish and verify the approved database recovery point; Neon CLI authentication requires refresh before branch/recovery inspection or creation.
+- [x] Verify point-in-time recovery and create a provider-native recovery branch from the exact production parent without provisioning a compute.
 - [x] Confirm effective production AMEX mode is `off`, no HMAC is configured, and this rollout initiated no userscript/provider action.
 
 ### Sanitized read-only preflight evidence
@@ -45,7 +45,7 @@
 - The additive global-catalog migration is the only newly expected pending migration and no failure/divergence marker was observed.
 - Vercel Preview and Production currently reuse the same database targets. The generic build previously had migration authority, so push was stopped. `npm run build` now performs generation/compilation only; `npm run db:prod:migrate` is the separate attended migration command, and `check:public-db` enforces this boundary.
 - Production remains effectively `off` with no HMAC. No production mutation, push, deployment, configuration change, provider action, or browser action occurred.
-- Recovery remains the only pre-migration blocker: local Neon CLI credentials exist but are not authenticated to the production provider project.
+- Neon CLI authentication was refreshed. The provider project/default branch matches the read-only production database identity, point-in-time recovery is configured, and a recovery branch was created from that exact parent without a compute.
 
 ## 4. Production schema and global catalog
 
@@ -130,4 +130,4 @@ The earlier production read-only inspection and per-user-key dry-run are preserv
 
 ## Current status
 
-Implementation and verified-development prerequisites are complete. The controlled rollout has started with read-only production preflight: the intended application/database targets match, the expected additive migration is pending, AMEX is effectively `off`, and generic builds no longer deploy migrations. Production mutation and push remain blocked until a Neon recovery point is authenticated and verified. Cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
+Implementation and verified-development prerequisites are complete. Production preflight proves the intended application/database/provider targets match, the expected additive migration is pending, AMEX is effectively `off`, generic builds cannot deploy migrations, point-in-time recovery is configured, and a recovery branch exists without compute. The next boundary is the separately authorized additive schema migration. Push/deployment, cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
