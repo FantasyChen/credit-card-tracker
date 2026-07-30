@@ -4,19 +4,21 @@
 
 - Verify card terms against issuer terms and recent trustworthy community evidence. Record provenance where public surfaces depend on freshness.
 - Track cyclical value such as recurring credits and free nights. Exclude always-on lounge access, insurance, uncapped earning multipliers, elite status, and sign-up bonuses from recurring-benefit modeling unless product requirements explicitly change.
-- `src/lib/static-catalog.ts` is the DB-free public catalog source; `prisma/seed.ts` imports catalog data for persistence. Keep them aligned rather than maintaining competing catalogs.
-- AMEX catalog rows additionally follow [AMEX Sync Reconciliation](amex-sync-reconciliation.md): all 12 products and 56 benefit rows have stable destination identity and explicit source semantics, while only provider `usage` credits receive write authority.
+- `src/lib/static-catalog.ts` is the checked-in DB-free public catalog source. Every card/benefit has an explicit immutable `catalogKey` and every benefit has an exact parent key; follow [Global Benefit Definitions and Migration](global-benefit-definitions-and-migration.md) for validation and key-preserving persistence synchronization.
+- `prisma/seed.ts` consumes the same static source but is not the routine catalog synchronization or existing-user propagation path. Never restore delete/recreate seeding for referenced global definitions.
+- AMEX catalog rows additionally follow [AMEX Sync Reconciliation](amex-sync-reconciliation.md): all 12 products and 56 benefit rows have stable global destination identity and explicit source semantics, while only 47 provider `usage` destinations receive write authority.
 - `card-templates/` is the contributor intake format. Validate it with `npm run card-template:validate`.
 
 ## Existing-user contract
 
-A catalog benefit change is incomplete until all three dispositions are explicit:
+A catalog benefit change is incomplete until all four dispositions are explicit:
 
-1. update the shared template/static source for new card additions;
-2. migrate matching existing user cards when the change should apply to current users;
-3. materialize the required `BenefitStatus` rows so the dashboard can display the changed benefit.
+1. update the shared static source while preserving existing keys and assigning a new explicit key only to a genuinely new definition;
+2. validate and plan non-destructive global synchronization (`create | adopt | update | retire | unchanged`);
+3. disposition propagation of missing standard statuses to every existing active physical card linked to the global product;
+4. disposition guide linkage and prior statuses for updated/retired definitions.
 
-Never claim an existing-user rollout from a seed/template edit alone. Prefer `scripts/update-card-benefits.js`, always inspect `--dry-run` first, and execute `--force` only after target verification and explicit authorization. Complex migrations use the migration framework, dry-run first, with transaction and backup support for approved production work.
+Never claim an existing-user rollout from a static/seed edit alone. `npm run sync:global-catalog` defaults to a database-reading dry-run and remains a separately authorized operation even in dry-run mode; apply additionally requires verified target identity and `SYNC_GLOBAL_CATALOG`. Materialization is insert-only and must not reset existing cycles or user state. Legacy copied definitions use the separately gated exact migration in [Global Benefit Definitions and Migration](global-benefit-definitions-and-migration.md), never `scripts/update-card-benefits.js` or the superseded per-user AMEX key apply.
 
 ## Modeling rules
 

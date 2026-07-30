@@ -38,13 +38,13 @@ All domains point to the same Vercel deployment. The `loyalty` subdomain is dete
 ## Build Command
 
 ```bash
-prisma generate && (prisma migrate deploy || echo 'Migration deploy skipped — check DIRECT_URL') && next build
+prisma generate && next build
 ```
 
-- `prisma generate` — regenerates the Prisma client
-- `prisma migrate deploy` — applies pending migrations using `DIRECT_URL` (non-pooler endpoint)
-- Falls back gracefully if the DB is unreachable (e.g. Neon cold start)
+- `prisma generate` — regenerates the Prisma client without creating database objects
 - `next build` — builds the Next.js application
+- Generic Preview and Production builds do not run migrations
+- `npm run db:prod:migrate` is the separate attended migration command and requires explicit authorization plus immediate target and recovery verification
 
 ## Required Vercel Environment Variables
 
@@ -111,8 +111,8 @@ vercel env pull .env.vercel
 
 | Cause | What you see | Fix |
 |-------|-------------|-----|
-| **DB timeout (advisory lock)** | `P1002: Timed out trying to acquire a postgres advisory lock` | Ensure `DIRECT_URL` env var is set to the non-pooler endpoint. The build command falls back gracefully, so this may not block the build. |
-| **Missing DIRECT_URL** | `Environment variable not found: DIRECT_URL` during `prisma migrate deploy` | Add `DIRECT_URL` to Vercel env vars (direct Neon endpoint, no `-pooler`). Migration will be skipped but build continues. |
+| **DB timeout (advisory lock)** | `P1002: Timed out trying to acquire a postgres advisory lock` during the attended migration gate | Stop the migration, re-verify the direct target and recovery plan, and do not treat an application build as a retry. |
+| **Missing DIRECT_URL** | `Environment variable not found: DIRECT_URL` during the attended migration gate | Stop before deployment and restore the approved direct migration configuration without copying its value into project files. |
 | **Wrong workspace root** | "multiple lockfiles" warning | Fixed with `outputFileTracingRoot` in `next.config.ts`. |
 | **Missing env vars** | Build or runtime fails on missing variables | Add all variables from the table above in Vercel Settings → Environment Variables. |
 | **Prisma client issues** | Errors about `@prisma/client` or generated client | Build command already runs `prisma generate` first. |

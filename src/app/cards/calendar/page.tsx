@@ -5,6 +5,10 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import PageHeader from '@/components/ui/PageHeader';
 import { buildCardCalendarEvents } from '@/lib/card-lifecycle';
+import {
+  fetchEffectiveBenefitStatuses,
+  fetchEffectiveCardTerms,
+} from '@/lib/effective-benefit';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,40 +71,70 @@ export default async function CardCalendarPage() {
   const referenceDate = new Date();
   const horizonDate = new Date(referenceDate.getTime() + 120 * 24 * 60 * 60 * 1000);
 
-  const cards = await prisma.creditCard.findMany({
-    where: { userId: session.user.id },
-    orderBy: [{ annualFeeDueDate: 'asc' }, { createdAt: 'desc' }],
-    include: {
-      events: {
-        orderBy: { eventDate: 'asc' },
-      },
-      benefits: {
-        select: {
-          id: true,
-          description: true,
-          benefitStatuses: {
-            where: {
-              cycleEndDate: {
-                gte: referenceDate,
-                lte: horizonDate,
-              },
-              isCompleted: false,
-              isNotUsable: false,
-            },
-            orderBy: { cycleEndDate: 'asc' },
-            select: {
-              id: true,
-              cycleEndDate: true,
-              isCompleted: true,
-              isNotUsable: true,
-            },
-          },
+  const [cards, benefitStatuses, cardTerms] = await Promise.all([
+    prisma.creditCard.findMany({
+      where: { userId: session.user.id },
+      orderBy: [{ annualFeeDueDate: 'asc' }, { createdAt: 'desc' }],
+      include: {
+        events: {
+          orderBy: { eventDate: 'asc' },
         },
       },
-    },
-  });
+    }),
+    fetchEffectiveBenefitStatuses(prisma, {
+      userId: session.user.id,
+      completed: false,
+      notUsable: false,
+      cycleEndOnOrAfter: referenceDate,
+      cycleEndOnOrBefore: horizonDate,
+    }),
+    fetchEffectiveCardTerms(prisma, session.user.id),
+  ]);
 
-  const events = buildCardCalendarEvents(cards, { referenceDate, daysAhead: 120 });
+  const benefitsByCard = new Map<string, Array<{
+    id: string;
+    description: string;
+    benefitStatuses: Array<{
+      id: string;
+      cycleEndDate: Date;
+      isCompleted: boolean;
+      isNotUsable: boolean;
+    }>;
+  }>>();
+  for (const status of benefitStatuses) {
+    const cardId = status.benefit.creditCard?.id;
+    if (!cardId) continue;
+    const cardBenefits = benefitsByCard.get(cardId) ?? [];
+    let benefit = cardBenefits.find((item) => item.id === status.benefit.id);
+    if (!benefit) {
+      benefit = {
+        id: status.benefit.id,
+        description: status.benefit.description,
+        benefitStatuses: [],
+      };
+      cardBenefits.push(benefit);
+    }
+    benefit.benefitStatuses.push({
+      id: status.id,
+      cycleEndDate: status.cycleEndDate,
+      isCompleted: status.isCompleted,
+      isNotUsable: status.isNotUsable,
+    });
+    benefitsByCard.set(cardId, cardBenefits);
+  }
+
+  const termsByCardId = new Map(cardTerms.map((card) => [card.creditCardId, card]));
+  const calendarCards = cards.map((card) => {
+    const terms = termsByCardId.get(card.id);
+    return {
+      ...card,
+      name: terms?.name ?? card.name,
+      issuer: terms?.issuer ?? card.issuer,
+      annualFeeAmount: terms?.annualFee ?? card.annualFeeAmount,
+      benefits: benefitsByCard.get(card.id) ?? [],
+    };
+  });
+  const events = buildCardCalendarEvents(calendarCards, { referenceDate, daysAhead: 120 });
   const annualFeeCount = events.filter((event) => event.kind === 'annual_fee').length;
   const benefitExpirationCount = events.filter((event) => event.kind === 'benefit_expires').length;
   const groupedEvents = events.reduce<Record<string, typeof events>>((groups, event) => {

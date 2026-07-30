@@ -27,6 +27,7 @@ export const USER_CLONE_TABLES = [
   "AmexSyncAttempt",
   "BenefitStatusSourceProvenance",
   "AmexSyncRowAudit",
+  "CatalogMigrationLedger",
 ] as const;
 
 export type UserCloneTable = (typeof USER_CLONE_TABLES)[number];
@@ -38,6 +39,96 @@ export type CloneLoyaltyAccount = Omit<LoyaltyAccount, "accountNumber" | "loyalt
   accountNumber: null;
   loyaltyProgramName: string;
 };
+
+export interface CloneCatalogMigrationLedgerBinding {
+  id: string;
+  legacyBenefitId: string;
+  userId: string;
+  creditCardId: string | null;
+  predefinedCardCatalogKey: string | null;
+  predefinedBenefitCatalogKey: string | null;
+  classification: "STANDARD" | "CUSTOM";
+  phase: "CLASSIFIED" | "BRIDGED" | "CLEANED" | "ROLLED_BACK";
+  sourceFingerprint: string;
+  destinationFingerprint: string | null;
+  classifiedAt: Date;
+  bridgedAt: Date | null;
+  cleanedAt: Date | null;
+  rolledBackAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CloneGlobalCatalogBindings {
+  cards: Array<{ creditCardId: string; catalogKey: string }>;
+  statuses: Array<{ benefitStatusId: string; creditCardId: string; catalogKey: string }>;
+  audits: Array<{ auditId: string; catalogKey: string; definitionFingerprint: string | null }>;
+  ledger: CloneCatalogMigrationLedgerBinding[];
+}
+
+export interface CloneGlobalCatalogRebindingPlan {
+  cards: Array<{ creditCardId: string; predefinedCardId: string }>;
+  statuses: Array<{ benefitStatusId: string; creditCardId: string; predefinedBenefitId: string }>;
+  audits: Array<{ auditId: string; destinationPredefinedBenefitId: string; definitionFingerprint: string | null }>;
+  ledger: Array<Omit<CloneCatalogMigrationLedgerBinding, "predefinedCardCatalogKey" | "predefinedBenefitCatalogKey"> & {
+    predefinedCardId: string | null;
+    predefinedBenefitId: string | null;
+  }>;
+}
+
+export function planCloneGlobalCatalogRebindings(
+  bindings: CloneGlobalCatalogBindings,
+  destination: {
+    cards: Array<{ id: string; catalogKey: string }>;
+    benefits: Array<{ id: string; catalogKey: string }>;
+  },
+): CloneGlobalCatalogRebindingPlan {
+  const unique = (rows: Array<{ id: string; catalogKey: string }>, kind: string): Map<string, string> => {
+    const result = new Map<string, string>();
+    for (const row of rows) {
+      if (!row.catalogKey || result.has(row.catalogKey)) {
+        throw new UserCloneOperatorError(`Destination ${kind} catalog keys are not unique.`);
+      }
+      result.set(row.catalogKey, row.id);
+    }
+    return result;
+  };
+  const cards = unique(destination.cards, "card");
+  const benefits = unique(destination.benefits, "benefit");
+  const cardId = (key: string | null): string | null => {
+    if (key === null) return null;
+    const id = cards.get(key);
+    if (!id) throw new UserCloneOperatorError("A global card has no exact destination catalog-key match.");
+    return id;
+  };
+  const benefitId = (key: string | null): string | null => {
+    if (key === null) return null;
+    const id = benefits.get(key);
+    if (!id) throw new UserCloneOperatorError("A global benefit has no exact destination catalog-key match.");
+    return id;
+  };
+  return {
+    cards: bindings.cards.map((row) => ({
+      creditCardId: row.creditCardId,
+      predefinedCardId: cardId(row.catalogKey)!,
+    })),
+    statuses: bindings.statuses.map((row) => ({
+      benefitStatusId: row.benefitStatusId,
+      creditCardId: row.creditCardId,
+      predefinedBenefitId: benefitId(row.catalogKey)!,
+    })),
+    audits: bindings.audits.map((row) => ({
+      auditId: row.auditId,
+      destinationPredefinedBenefitId: benefitId(row.catalogKey)!,
+      definitionFingerprint: row.definitionFingerprint,
+    })),
+    ledger: bindings.ledger.map(({ predefinedCardCatalogKey, predefinedBenefitCatalogKey, ...row }) => ({
+      ...row,
+      predefinedCardId: cardId(predefinedCardCatalogKey),
+      predefinedBenefitId: benefitId(predefinedBenefitCatalogKey),
+    })),
+  };
+}
 
 export interface UserCloneSnapshot {
   user: CloneUser;
@@ -51,6 +142,7 @@ export interface UserCloneSnapshot {
   amexSyncAttempts: AmexSyncAttempt[];
   benefitStatusSourceProvenance: BenefitStatusSourceProvenance[];
   amexSyncRowAudits: AmexSyncRowAudit[];
+  globalCatalogBindings?: CloneGlobalCatalogBindings;
 }
 
 export interface InternalDatabaseIdentity {
@@ -136,6 +228,7 @@ export function countUserCloneSnapshot(snapshot: UserCloneSnapshot): UserCloneCo
     AmexSyncAttempt: snapshot.amexSyncAttempts.length,
     BenefitStatusSourceProvenance: snapshot.benefitStatusSourceProvenance.length,
     AmexSyncRowAudit: snapshot.amexSyncRowAudits.length,
+    CatalogMigrationLedger: snapshot.globalCatalogBindings?.ledger.length ?? 0,
   };
 }
 
@@ -195,6 +288,8 @@ export function validateUserCloneSnapshot(snapshot: UserCloneSnapshot, normalize
   const statusIds = new Set(snapshot.benefitStatuses.map((status) => status.id));
   const loyaltyAccountIds = new Set(snapshot.loyaltyAccounts.map((account) => account.id));
   const attemptIds = new Set(snapshot.amexSyncAttempts.map((attempt) => attempt.id));
+  const bindings = snapshot.globalCatalogBindings;
+  const globallyBoundStatusIds = new Set(bindings?.statuses.map((row) => row.benefitStatusId) ?? []);
 
   for (const benefit of snapshot.benefits) {
     const cardOwned = benefit.creditCardId !== null && cardIds.has(benefit.creditCardId) && benefit.userId === null;
@@ -203,7 +298,13 @@ export function validateUserCloneSnapshot(snapshot: UserCloneSnapshot, normalize
       throw new UserCloneOperatorError("The source Benefit graph contains a cross-user or ambiguous owner.");
     }
   }
-  if (snapshot.benefitStatuses.some((status) => status.userId !== userId || !benefitIds.has(status.benefitId))) {
+  if (snapshot.benefitStatuses.some((status) => {
+    const hasLegacyBenefit = status.benefitId !== null;
+    const hasGlobalBenefit = globallyBoundStatusIds.has(status.id);
+    return status.userId !== userId
+      || (hasLegacyBenefit && !benefitIds.has(status.benefitId!))
+      || (!hasLegacyBenefit && !hasGlobalBenefit);
+  })) {
     throw new UserCloneOperatorError("The source BenefitStatus graph contains a cross-user link.");
   }
   if (snapshot.creditCardEvents.some((event) => event.userId !== userId || !cardIds.has(event.creditCardId))) {
@@ -230,6 +331,17 @@ export function validateUserCloneSnapshot(snapshot: UserCloneSnapshot, normalize
     || (audit.destinationStatusId !== null && !statusIds.has(audit.destinationStatusId)))) {
     throw new UserCloneOperatorError("The source audit graph contains an invalid destination link.");
   }
+  const auditIds = new Set(snapshot.amexSyncRowAudits.map((audit) => audit.id));
+  if (bindings && (bindings.cards.some((row) => !cardIds.has(row.creditCardId) || !row.catalogKey)
+    || bindings.statuses.some((row) => !statusIds.has(row.benefitStatusId) || !cardIds.has(row.creditCardId) || !row.catalogKey)
+    || bindings.audits.some((row) => !auditIds.has(row.auditId) || !row.catalogKey)
+    || bindings.ledger.some((row) => row.userId !== userId
+      || (row.phase !== "CLEANED" && !benefitIds.has(row.legacyBenefitId))
+      || (row.creditCardId !== null && !cardIds.has(row.creditCardId))
+      || (row.classification === "STANDARD"
+        && (!row.predefinedCardCatalogKey || !row.predefinedBenefitCatalogKey))))) {
+    throw new UserCloneOperatorError("The source global-catalog bridge graph contains an invalid link.");
+  }
 
   assertUniqueIds([snapshot.user], "User");
   assertUniqueIds(snapshot.creditCards, "CreditCard");
@@ -242,6 +354,13 @@ export function validateUserCloneSnapshot(snapshot: UserCloneSnapshot, normalize
   assertUniqueIds(snapshot.amexSyncAttempts, "AmexSyncAttempt");
   assertUniqueIds(snapshot.benefitStatusSourceProvenance, "BenefitStatusSourceProvenance");
   assertUniqueIds(snapshot.amexSyncRowAudits, "AmexSyncRowAudit");
+  if (snapshot.globalCatalogBindings) {
+    assertUniqueIds(snapshot.globalCatalogBindings.ledger, "CatalogMigrationLedger");
+    if (new Set(snapshot.globalCatalogBindings.ledger.map((row) => row.legacyBenefitId)).size
+      !== snapshot.globalCatalogBindings.ledger.length) {
+      throw new UserCloneOperatorError("The source catalog-migration ledger contains duplicate legacy keys.");
+    }
+  }
 }
 
 export async function runSingleUserCloneOperator(input: {

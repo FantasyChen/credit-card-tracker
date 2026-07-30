@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/index.md","reason":"Entry point for migration, catalog, and safe verification contracts."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Defines dry-run, target verification, data preservation, clone, and rollback requirements."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Defines exact existing-user migration and status-materialization disposition."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"The old backfill contract is safety reference and must be explicitly superseded without weakening authority."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/research/production-backfill-review.md","reason":"Historical sanitized evidence documents legacy shape drift and why partial/fuzzy matching must remain excluded; it is not apply authority."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/design.md","reason":"Parent design defines exact classification, bridge, cleanup, and rollback boundaries."}

@@ -17,6 +17,8 @@ export type AmexPeriodKey = typeof AMEX_PERIOD_KEYS[number];
 export type AmexSourceSemantics = "usage" | "spend" | "certificate" | "status_or_access";
 
 export interface AmexCatalogBenefitIdentity {
+  catalogKey: string;
+  parentCatalogKey: string;
   creditFamilyKey: string;
   periodKey: AmexPeriodKey;
   sourceSemantics: AmexSourceSemantics;
@@ -24,144 +26,178 @@ export interface AmexCatalogBenefitIdentity {
 }
 
 export interface AmexCatalogProductIdentity {
+  catalogKey: string;
   productKey: string;
   exactAliases: readonly string[];
   affiliationAliases?: readonly string[];
   benefits: readonly AmexCatalogBenefitIdentity[];
 }
 
-const usage = (family: string, periodKey: AmexPeriodKey, sourceCreditKey = family): AmexCatalogBenefitIdentity => ({
+const usage = (
+  catalogKey: string,
+  parentCatalogKey: string,
+  family: string,
+  periodKey: AmexPeriodKey,
+  sourceCreditKey = family,
+): AmexCatalogBenefitIdentity => ({
+  catalogKey,
+  parentCatalogKey,
   creditFamilyKey: family,
   periodKey,
   sourceSemantics: "usage",
   sourceCreditKey,
 });
 const excluded = (
+  catalogKey: string,
+  parentCatalogKey: string,
   family: string,
   periodKey: AmexPeriodKey,
   sourceSemantics: Exclude<AmexSourceSemantics, "usage">,
-): AmexCatalogBenefitIdentity => ({ creditFamilyKey: family, periodKey, sourceSemantics, sourceCreditKey: null });
-const q = (product: string, family: string): AmexCatalogBenefitIdentity[] => [1, 2, 3, 4].map((number) =>
-  usage(`${product}:${family}`, `calendar-quarter-q${number}` as AmexPeriodKey));
+): AmexCatalogBenefitIdentity => ({
+  catalogKey,
+  parentCatalogKey,
+  creditFamilyKey: family,
+  periodKey,
+  sourceSemantics,
+  sourceCreditKey: null,
+});
 
 export const AMEX_CATALOG_IDENTITY_REGISTRY = {
   "American Express Gold Card": {
+    catalogKey: "card:american-express-gold-card",
     productKey: "american-express-gold-card",
     exactAliases: ["American Express Gold Card", "American Express Gold Card®", "Amex Gold Card"],
     benefits: [
-      usage("american-express-gold-card:uber-cash", "calendar-month"),
-      usage("american-express-gold-card:dining", "calendar-month"),
-      usage("american-express-gold-card:dunkin", "calendar-month"),
-      usage("american-express-gold-card:resy", "calendar-half-h1"),
-      usage("american-express-gold-card:resy", "calendar-half-h2"),
+      usage("benefit:american-express-gold-card:uber-cash:calendar-month", "card:american-express-gold-card", "american-express-gold-card:uber-cash", "calendar-month"),
+      usage("benefit:american-express-gold-card:dining:calendar-month", "card:american-express-gold-card", "american-express-gold-card:dining", "calendar-month"),
+      usage("benefit:american-express-gold-card:dunkin:calendar-month", "card:american-express-gold-card", "american-express-gold-card:dunkin", "calendar-month"),
+      usage("benefit:american-express-gold-card:resy:calendar-half-h1", "card:american-express-gold-card", "american-express-gold-card:resy", "calendar-half-h1"),
+      usage("benefit:american-express-gold-card:resy:calendar-half-h2", "card:american-express-gold-card", "american-express-gold-card:resy", "calendar-half-h2"),
     ],
   },
   "American Express Platinum Card": {
+    catalogKey: "card:american-express-platinum-card",
     productKey: "american-express-platinum-card",
     exactAliases: ["American Express Platinum Card", "The Platinum Card from American Express", "Platinum Card®"],
     affiliationAliases: ["Morgan Stanley Platinum", "The Platinum Card from American Express Exclusively for Morgan Stanley"],
     benefits: [
-      usage("american-express-platinum-card:airline-fee", "calendar-year"),
-      usage("american-express-platinum-card:uber-cash", "calendar-month"),
-      usage("american-express-platinum-card:uber-cash-december-bonus", "calendar-month-december", "american-express-platinum-card:uber-cash"),
-      usage("american-express-platinum-card:saks", "calendar-half-h1"),
-      usage("american-express-platinum-card:saks", "calendar-half-h2"),
-      ...q("american-express-platinum-card", "resy"),
-      ...q("american-express-platinum-card", "lululemon"),
-      usage("american-express-platinum-card:hotel", "calendar-half-h1"),
-      usage("american-express-platinum-card:hotel", "calendar-half-h2"),
-      usage("american-express-platinum-card:digital-entertainment", "calendar-month"),
-      usage("american-express-platinum-card:uber-one", "calendar-year"),
-      usage("american-express-platinum-card:oura", "calendar-year"),
-      usage("american-express-platinum-card:walmart-plus", "calendar-month"),
+      usage("benefit:american-express-platinum-card:airline-fee:calendar-year", "card:american-express-platinum-card", "american-express-platinum-card:airline-fee", "calendar-year"),
+      usage("benefit:american-express-platinum-card:uber-cash:calendar-month", "card:american-express-platinum-card", "american-express-platinum-card:uber-cash", "calendar-month"),
+      usage("benefit:american-express-platinum-card:uber-cash-december-bonus:calendar-month-december", "card:american-express-platinum-card", "american-express-platinum-card:uber-cash-december-bonus", "calendar-month-december", "american-express-platinum-card:uber-cash"),
+      usage("benefit:american-express-platinum-card:saks:calendar-half-h1", "card:american-express-platinum-card", "american-express-platinum-card:saks", "calendar-half-h1"),
+      usage("benefit:american-express-platinum-card:saks:calendar-half-h2", "card:american-express-platinum-card", "american-express-platinum-card:saks", "calendar-half-h2"),
+      usage("benefit:american-express-platinum-card:resy:calendar-quarter-q1", "card:american-express-platinum-card", "american-express-platinum-card:resy", "calendar-quarter-q1"),
+      usage("benefit:american-express-platinum-card:resy:calendar-quarter-q2", "card:american-express-platinum-card", "american-express-platinum-card:resy", "calendar-quarter-q2"),
+      usage("benefit:american-express-platinum-card:resy:calendar-quarter-q3", "card:american-express-platinum-card", "american-express-platinum-card:resy", "calendar-quarter-q3"),
+      usage("benefit:american-express-platinum-card:resy:calendar-quarter-q4", "card:american-express-platinum-card", "american-express-platinum-card:resy", "calendar-quarter-q4"),
+      usage("benefit:american-express-platinum-card:lululemon:calendar-quarter-q1", "card:american-express-platinum-card", "american-express-platinum-card:lululemon", "calendar-quarter-q1"),
+      usage("benefit:american-express-platinum-card:lululemon:calendar-quarter-q2", "card:american-express-platinum-card", "american-express-platinum-card:lululemon", "calendar-quarter-q2"),
+      usage("benefit:american-express-platinum-card:lululemon:calendar-quarter-q3", "card:american-express-platinum-card", "american-express-platinum-card:lululemon", "calendar-quarter-q3"),
+      usage("benefit:american-express-platinum-card:lululemon:calendar-quarter-q4", "card:american-express-platinum-card", "american-express-platinum-card:lululemon", "calendar-quarter-q4"),
+      usage("benefit:american-express-platinum-card:hotel:calendar-half-h1", "card:american-express-platinum-card", "american-express-platinum-card:hotel", "calendar-half-h1"),
+      usage("benefit:american-express-platinum-card:hotel:calendar-half-h2", "card:american-express-platinum-card", "american-express-platinum-card:hotel", "calendar-half-h2"),
+      usage("benefit:american-express-platinum-card:digital-entertainment:calendar-month", "card:american-express-platinum-card", "american-express-platinum-card:digital-entertainment", "calendar-month"),
+      usage("benefit:american-express-platinum-card:uber-one:calendar-year", "card:american-express-platinum-card", "american-express-platinum-card:uber-one", "calendar-year"),
+      usage("benefit:american-express-platinum-card:oura:calendar-year", "card:american-express-platinum-card", "american-express-platinum-card:oura", "calendar-year"),
+      usage("benefit:american-express-platinum-card:walmart-plus:calendar-month", "card:american-express-platinum-card", "american-express-platinum-card:walmart-plus", "calendar-month"),
     ],
   },
   "American Express Business Platinum Card": {
+    catalogKey: "card:american-express-business-platinum-card",
     productKey: "american-express-business-platinum-card",
     exactAliases: ["American Express Business Platinum Card", "Business Platinum Card from American Express", "Business Platinum Card®"],
     benefits: [
-      usage("american-express-business-platinum-card:airline-fee", "calendar-year"),
-      usage("american-express-business-platinum-card:hotel", "calendar-half-h1"),
-      usage("american-express-business-platinum-card:hotel", "calendar-half-h2"),
-      usage("american-express-business-platinum-card:dell", "calendar-year"),
-      excluded("american-express-business-platinum-card:adobe", "calendar-year", "spend"),
-      excluded("american-express-business-platinum-card:amex-travel-flight", "calendar-year", "spend"),
-      excluded("american-express-business-platinum-card:one-ap", "calendar-year", "spend"),
-      usage("american-express-business-platinum-card:hilton", "card-anniversary-quarter"),
-      usage("american-express-business-platinum-card:indeed", "calendar-quarter"),
-      usage("american-express-business-platinum-card:wireless", "calendar-month"),
+      usage("benefit:american-express-business-platinum-card:airline-fee:calendar-year", "card:american-express-business-platinum-card", "american-express-business-platinum-card:airline-fee", "calendar-year"),
+      usage("benefit:american-express-business-platinum-card:hotel:calendar-half-h1", "card:american-express-business-platinum-card", "american-express-business-platinum-card:hotel", "calendar-half-h1"),
+      usage("benefit:american-express-business-platinum-card:hotel:calendar-half-h2", "card:american-express-business-platinum-card", "american-express-business-platinum-card:hotel", "calendar-half-h2"),
+      usage("benefit:american-express-business-platinum-card:dell:calendar-year", "card:american-express-business-platinum-card", "american-express-business-platinum-card:dell", "calendar-year"),
+      excluded("benefit:american-express-business-platinum-card:adobe:calendar-year", "card:american-express-business-platinum-card", "american-express-business-platinum-card:adobe", "calendar-year", "spend"),
+      excluded("benefit:american-express-business-platinum-card:amex-travel-flight:calendar-year", "card:american-express-business-platinum-card", "american-express-business-platinum-card:amex-travel-flight", "calendar-year", "spend"),
+      excluded("benefit:american-express-business-platinum-card:one-ap:calendar-year", "card:american-express-business-platinum-card", "american-express-business-platinum-card:one-ap", "calendar-year", "spend"),
+      usage("benefit:american-express-business-platinum-card:hilton:card-anniversary-quarter", "card:american-express-business-platinum-card", "american-express-business-platinum-card:hilton", "card-anniversary-quarter"),
+      usage("benefit:american-express-business-platinum-card:indeed:calendar-quarter", "card:american-express-business-platinum-card", "american-express-business-platinum-card:indeed", "calendar-quarter"),
+      usage("benefit:american-express-business-platinum-card:wireless:calendar-month", "card:american-express-business-platinum-card", "american-express-business-platinum-card:wireless", "calendar-month"),
     ],
   },
   "American Express Business Gold Card": {
+    catalogKey: "card:american-express-business-gold-card",
     productKey: "american-express-business-gold-card",
     exactAliases: ["American Express Business Gold Card", "Business Gold Card from American Express", "Amex Business Gold Card"],
     benefits: [
-      usage("american-express-business-gold-card:flexible-business", "calendar-month"),
-      usage("american-express-business-gold-card:walmart-plus", "calendar-month"),
+      usage("benefit:american-express-business-gold-card:flexible-business:calendar-month", "card:american-express-business-gold-card", "american-express-business-gold-card:flexible-business", "calendar-month"),
+      usage("benefit:american-express-business-gold-card:walmart-plus:calendar-month", "card:american-express-business-gold-card", "american-express-business-gold-card:walmart-plus", "calendar-month"),
     ],
   },
   "Hilton Honors American Express Aspire Card": {
+    catalogKey: "card:hilton-honors-american-express-aspire-card",
     productKey: "hilton-honors-american-express-aspire-card",
     exactAliases: ["Hilton Honors American Express Aspire Card", "Hilton Honors Aspire Card"],
     benefits: [
-      excluded("hilton-honors-american-express-aspire-card:free-night", "card-anniversary-year", "certificate"),
-      usage("hilton-honors-american-express-aspire-card:flight", "calendar-quarter"),
-      usage("hilton-honors-american-express-aspire-card:hilton-resort", "calendar-half-h1"),
-      usage("hilton-honors-american-express-aspire-card:hilton-resort", "calendar-half-h2"),
-      usage("hilton-honors-american-express-aspire-card:clear-plus", "calendar-year"),
+      excluded("benefit:hilton-honors-american-express-aspire-card:free-night:card-anniversary-year", "card:hilton-honors-american-express-aspire-card", "hilton-honors-american-express-aspire-card:free-night", "card-anniversary-year", "certificate"),
+      usage("benefit:hilton-honors-american-express-aspire-card:flight:calendar-quarter", "card:hilton-honors-american-express-aspire-card", "hilton-honors-american-express-aspire-card:flight", "calendar-quarter"),
+      usage("benefit:hilton-honors-american-express-aspire-card:hilton-resort:calendar-half-h1", "card:hilton-honors-american-express-aspire-card", "hilton-honors-american-express-aspire-card:hilton-resort", "calendar-half-h1"),
+      usage("benefit:hilton-honors-american-express-aspire-card:hilton-resort:calendar-half-h2", "card:hilton-honors-american-express-aspire-card", "hilton-honors-american-express-aspire-card:hilton-resort", "calendar-half-h2"),
+      usage("benefit:hilton-honors-american-express-aspire-card:clear-plus:calendar-year", "card:hilton-honors-american-express-aspire-card", "hilton-honors-american-express-aspire-card:clear-plus", "calendar-year"),
     ],
   },
   "Hilton Honors American Express Surpass Card": {
+    catalogKey: "card:hilton-honors-american-express-surpass-card",
     productKey: "hilton-honors-american-express-surpass-card",
     exactAliases: ["Hilton Honors American Express Surpass Card", "Hilton Honors Surpass Card"],
-    benefits: [usage("hilton-honors-american-express-surpass-card:hilton", "calendar-quarter")],
+    benefits: [usage("benefit:hilton-honors-american-express-surpass-card:hilton:calendar-quarter", "card:hilton-honors-american-express-surpass-card", "hilton-honors-american-express-surpass-card:hilton", "calendar-quarter")],
   },
   "Hilton Honors American Express Business Card": {
+    catalogKey: "card:hilton-honors-american-express-business-card",
     productKey: "hilton-honors-american-express-business-card",
     exactAliases: ["Hilton Honors American Express Business Card", "Hilton Honors Business Card"],
-    benefits: [usage("hilton-honors-american-express-business-card:hilton", "card-anniversary-quarter")],
+    benefits: [usage("benefit:hilton-honors-american-express-business-card:hilton:card-anniversary-quarter", "card:hilton-honors-american-express-business-card", "hilton-honors-american-express-business-card:hilton", "card-anniversary-quarter")],
   },
   "Delta SkyMiles Gold American Express Card": {
+    catalogKey: "card:delta-skymiles-gold-american-express-card",
     productKey: "delta-skymiles-gold-american-express-card",
     exactAliases: ["Delta SkyMiles Gold American Express Card", "Delta SkyMiles Gold Amex Card"],
     benefits: [
-      excluded("delta-skymiles-gold-american-express-card:delta-flight", "card-anniversary-year", "spend"),
-      usage("delta-skymiles-gold-american-express-card:delta-stays", "card-anniversary-year"),
+      excluded("benefit:delta-skymiles-gold-american-express-card:delta-flight:card-anniversary-year", "card:delta-skymiles-gold-american-express-card", "delta-skymiles-gold-american-express-card:delta-flight", "card-anniversary-year", "spend"),
+      usage("benefit:delta-skymiles-gold-american-express-card:delta-stays:card-anniversary-year", "card:delta-skymiles-gold-american-express-card", "delta-skymiles-gold-american-express-card:delta-stays", "card-anniversary-year"),
     ],
   },
   "Delta SkyMiles Platinum American Express Card": {
+    catalogKey: "card:delta-skymiles-platinum-american-express-card",
     productKey: "delta-skymiles-platinum-american-express-card",
     exactAliases: ["Delta SkyMiles Platinum American Express Card", "Delta SkyMiles Platinum Amex Card"],
     benefits: [
-      usage("delta-skymiles-platinum-american-express-card:delta-stays", "card-anniversary-year"),
-      usage("delta-skymiles-platinum-american-express-card:resy", "calendar-month"),
-      usage("delta-skymiles-platinum-american-express-card:rideshare", "calendar-month"),
+      usage("benefit:delta-skymiles-platinum-american-express-card:delta-stays:card-anniversary-year", "card:delta-skymiles-platinum-american-express-card", "delta-skymiles-platinum-american-express-card:delta-stays", "card-anniversary-year"),
+      usage("benefit:delta-skymiles-platinum-american-express-card:resy:calendar-month", "card:delta-skymiles-platinum-american-express-card", "delta-skymiles-platinum-american-express-card:resy", "calendar-month"),
+      usage("benefit:delta-skymiles-platinum-american-express-card:rideshare:calendar-month", "card:delta-skymiles-platinum-american-express-card", "delta-skymiles-platinum-american-express-card:rideshare", "calendar-month"),
     ],
   },
   "Delta SkyMiles Reserve American Express Card": {
+    catalogKey: "card:delta-skymiles-reserve-american-express-card",
     productKey: "delta-skymiles-reserve-american-express-card",
     exactAliases: ["Delta SkyMiles Reserve American Express Card", "Delta SkyMiles Reserve Amex Card"],
     benefits: [
-      usage("delta-skymiles-reserve-american-express-card:delta-stays", "card-anniversary-year"),
-      usage("delta-skymiles-reserve-american-express-card:resy", "calendar-month"),
-      usage("delta-skymiles-reserve-american-express-card:rideshare", "calendar-month"),
+      usage("benefit:delta-skymiles-reserve-american-express-card:delta-stays:card-anniversary-year", "card:delta-skymiles-reserve-american-express-card", "delta-skymiles-reserve-american-express-card:delta-stays", "card-anniversary-year"),
+      usage("benefit:delta-skymiles-reserve-american-express-card:resy:calendar-month", "card:delta-skymiles-reserve-american-express-card", "delta-skymiles-reserve-american-express-card:resy", "calendar-month"),
+      usage("benefit:delta-skymiles-reserve-american-express-card:rideshare:calendar-month", "card:delta-skymiles-reserve-american-express-card", "delta-skymiles-reserve-american-express-card:rideshare", "calendar-month"),
     ],
   },
   "Marriott Bonvoy Brilliant American Express Card": {
+    catalogKey: "card:marriott-bonvoy-brilliant-american-express-card",
     productKey: "marriott-bonvoy-brilliant-american-express-card",
     exactAliases: ["Marriott Bonvoy Brilliant American Express Card", "Marriott Bonvoy Brilliant Card"],
     benefits: [
-      excluded("marriott-bonvoy-brilliant-american-express-card:free-night", "card-anniversary-year", "certificate"),
-      usage("marriott-bonvoy-brilliant-american-express-card:dining", "calendar-month"),
+      excluded("benefit:marriott-bonvoy-brilliant-american-express-card:free-night:card-anniversary-year", "card:marriott-bonvoy-brilliant-american-express-card", "marriott-bonvoy-brilliant-american-express-card:free-night", "card-anniversary-year", "certificate"),
+      usage("benefit:marriott-bonvoy-brilliant-american-express-card:dining:calendar-month", "card:marriott-bonvoy-brilliant-american-express-card", "marriott-bonvoy-brilliant-american-express-card:dining", "calendar-month"),
     ],
   },
   "Marriott Bonvoy Business American Express Card": {
+    catalogKey: "card:marriott-bonvoy-business-american-express-card",
     productKey: "marriott-bonvoy-business-american-express-card",
     exactAliases: ["Marriott Bonvoy Business American Express Card", "Marriott Bonvoy Business Card"],
     benefits: [
-      excluded("marriott-bonvoy-business-american-express-card:free-night", "card-anniversary-year", "certificate"),
-      excluded("marriott-bonvoy-business-american-express-card:elite-night-credits", "card-anniversary-year", "status_or_access"),
-      excluded("marriott-bonvoy-business-american-express-card:gold-elite-status", "card-anniversary-year", "status_or_access"),
+      excluded("benefit:marriott-bonvoy-business-american-express-card:free-night:card-anniversary-year", "card:marriott-bonvoy-business-american-express-card", "marriott-bonvoy-business-american-express-card:free-night", "card-anniversary-year", "certificate"),
+      excluded("benefit:marriott-bonvoy-business-american-express-card:elite-night-credits:card-anniversary-year", "card:marriott-bonvoy-business-american-express-card", "marriott-bonvoy-business-american-express-card:elite-night-credits", "card-anniversary-year", "status_or_access"),
+      excluded("benefit:marriott-bonvoy-business-american-express-card:gold-elite-status:card-anniversary-year", "card:marriott-bonvoy-business-american-express-card", "marriott-bonvoy-business-american-express-card:gold-elite-status", "card-anniversary-year", "status_or_access"),
     ],
   },
 } as const satisfies Record<string, AmexCatalogProductIdentity>;

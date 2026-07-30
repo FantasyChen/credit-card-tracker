@@ -42,6 +42,7 @@ model User {
   standaloneBenefits      Benefit[] // Custom benefits not tied to a card
   externalCardMappings    ExternalCardMapping[]
   amexSyncAttempts        AmexSyncAttempt[]
+  catalogMigrationLedger  CatalogMigrationLedger[]
 }
 
 model Account {
@@ -108,13 +109,18 @@ model CreditCard {
   productChangedTo    String?
   lifecycleNotes      String?
   productKey          String?
+  predefinedCardId    String?
   benefits            Benefit[]
+  benefitStatuses     BenefitStatus[]
   events              CreditCardEvent[]
   externalMappings    ExternalCardMapping[]
   syncRowAudits       AmexSyncRowAudit[]
+  catalogMigrations   CatalogMigrationLedger[]
+  predefinedCard      PredefinedCard?       @relation(fields: [predefinedCardId], references: [id], onDelete: Restrict)
   user                User                  @relation(fields: [userId], references: [id])
 
   @@index([userId, productKey, lastFourDigits])
+  @@index([predefinedCardId])
 }
 
 model CreditCardEvent {
@@ -163,25 +169,31 @@ model Benefit {
 }
 
 model PredefinedCard {
-  id         String              @id @default(cuid())
-  name       String              @unique
-  issuer     String
-  annualFee  Float
-  imageUrl   String?
-  productKey String?             @unique
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
-  benefits   PredefinedBenefit[]
+  id                String                   @id @default(cuid())
+  catalogKey        String?                  @unique
+  name              String                   @unique
+  issuer            String
+  annualFee         Float
+  imageUrl          String?
+  productKey        String?                  @unique
+  retiredAt         DateTime?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  benefits          PredefinedBenefit[]
+  creditCards       CreditCard[]
+  catalogMigrations CatalogMigrationLedger[]
 }
 
 model PredefinedBenefit {
   id                       String                 @id @default(cuid())
+  catalogKey               String?                @unique
   category                 String
   description              String
   percentage               Float
   maxAmount                Float?
   frequency                BenefitFrequency       @default(ONE_TIME)
   predefinedCardId         String
+  retiredAt                DateTime?
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
   cycleAlignment           BenefitCycleAlignment? @default(CARD_ANNIVERSARY)
@@ -192,8 +204,14 @@ model PredefinedBenefit {
   creditFamilyKey          String?
   periodKey                String?
   usageWayId               String?
-  predefinedCard           PredefinedCard         @relation(fields: [predefinedCardId], references: [id])
+  predefinedCard           PredefinedCard         @relation(fields: [predefinedCardId], references: [id], onDelete: Restrict)
   usageWay                 BenefitUsageWay?       @relation(fields: [usageWayId], references: [id])
+  benefitStatuses          BenefitStatus[]
+  catalogMigrations        CatalogMigrationLedger[]
+  syncRowAudits            AmexSyncRowAudit[]
+
+  @@index([predefinedCardId, retiredAt])
+  @@index([productKey, creditFamilyKey, periodKey])
 }
 
 model BenefitUsageWay {
@@ -210,25 +228,30 @@ model BenefitUsageWay {
 }
 
 model BenefitStatus {
-  id               String                          @id @default(cuid())
-  benefitId        String
-  userId           String
-  cycleStartDate   DateTime
-  cycleEndDate     DateTime
-  isCompleted      Boolean                         @default(false)
-  completedAt      DateTime?
-  isNotUsable      Boolean                         @default(false)
-  usedAmount       Float                           @default(0) // Track partial/full amount used
-  createdAt        DateTime                        @default(now())
-  updatedAt        DateTime                        @updatedAt
-  orderIndex       Int?
-  occurrenceIndex  Int                             @default(0)
-  benefit          Benefit                         @relation(fields: [benefitId], references: [id], onDelete: Cascade)
-  user             User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceProvenance BenefitStatusSourceProvenance[]
-  syncRowAudits    AmexSyncRowAudit[]
+  id                       String                          @id @default(cuid())
+  benefitId                String?
+  creditCardId             String?
+  predefinedBenefitId      String?
+  userId                   String
+  cycleStartDate           DateTime
+  cycleEndDate             DateTime
+  isCompleted              Boolean                         @default(false)
+  completedAt              DateTime?
+  isNotUsable              Boolean                         @default(false)
+  usedAmount               Float                           @default(0) // Track partial/full amount used
+  createdAt                DateTime                        @default(now())
+  updatedAt                DateTime                        @updatedAt
+  orderIndex               Int?
+  occurrenceIndex          Int                             @default(0)
+  benefit                  Benefit?                        @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+  creditCard               CreditCard?                     @relation(fields: [creditCardId], references: [id], onDelete: Restrict)
+  predefinedBenefit        PredefinedBenefit?              @relation(fields: [predefinedBenefitId], references: [id], onDelete: Restrict)
+  user                     User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceProvenance         BenefitStatusSourceProvenance[]
+  syncRowAudits            AmexSyncRowAudit[]
 
-  @@unique([benefitId, userId, cycleStartDate, occurrenceIndex])
+  @@unique([benefitId, userId, cycleStartDate, occurrenceIndex], map: "BenefitStatus_custom_occurrence_key")
+  @@index([creditCardId, predefinedBenefitId, userId, cycleStartDate, occurrenceIndex], map: "BenefitStatus_standard_occurrence_lookup_idx")
   @@index([userId, orderIndex, cycleEndDate], map: "BenefitStatus_dashboard_user_order_end_idx")
   @@index([userId, cycleEndDate], map: "BenefitStatus_dashboard_user_end_idx")
   @@index([userId, isCompleted, isNotUsable, cycleEndDate], map: "BenefitStatus_dashboard_user_state_end_idx")
@@ -309,8 +332,10 @@ model AmexSyncRowAudit {
   disposition               AmexSyncDisposition
   reasonCode                String
   destinationCardId         String?
-  destinationBenefitId      String?
-  destinationStatusId       String?
+  destinationBenefitId           String?
+  destinationPredefinedBenefitId String?
+  destinationDefinitionFingerprint String?
+  destinationStatusId            String?
   beforeUsedAmount          Float?
   afterUsedAmount           Float?
   beforeIsCompleted         Boolean?
@@ -322,12 +347,41 @@ model AmexSyncRowAudit {
   createdAt                 DateTime            @default(now())
   attempt                   AmexSyncAttempt     @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   destinationCard           CreditCard?         @relation(fields: [destinationCardId], references: [id], onDelete: SetNull)
-  destinationBenefit        Benefit?            @relation(fields: [destinationBenefitId], references: [id], onDelete: SetNull)
-  destinationStatus         BenefitStatus?      @relation(fields: [destinationStatusId], references: [id], onDelete: SetNull)
+  destinationBenefit           Benefit?            @relation(fields: [destinationBenefitId], references: [id], onDelete: SetNull)
+  destinationPredefinedBenefit PredefinedBenefit?  @relation(fields: [destinationPredefinedBenefitId], references: [id], onDelete: Restrict)
+  destinationStatus            BenefitStatus?      @relation(fields: [destinationStatusId], references: [id], onDelete: SetNull)
 
   @@unique([attemptId, sourceRowIdentity])
   @@index([createdAt])
   @@index([destinationStatusId])
+  @@index([destinationPredefinedBenefitId])
+}
+
+model CatalogMigrationLedger {
+  id                     String                         @id @default(cuid())
+  legacyBenefitId        String                         @unique
+  userId                 String
+  creditCardId           String?
+  predefinedCardId       String?
+  predefinedBenefitId    String?
+  classification         CatalogMigrationClassification
+  phase                  CatalogMigrationPhase          @default(CLASSIFIED)
+  sourceFingerprint      String
+  destinationFingerprint String?
+  classifiedAt           DateTime                       @default(now())
+  bridgedAt              DateTime?
+  cleanedAt              DateTime?
+  rolledBackAt           DateTime?
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+  user                   User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creditCard             CreditCard?                    @relation(fields: [creditCardId], references: [id], onDelete: Restrict)
+  predefinedCard         PredefinedCard?                @relation(fields: [predefinedCardId], references: [id], onDelete: Restrict)
+  predefinedBenefit      PredefinedBenefit?             @relation(fields: [predefinedBenefitId], references: [id], onDelete: Restrict)
+
+  @@index([userId, phase])
+  @@index([creditCardId])
+  @@index([predefinedBenefitId])
 }
 
 model playing_with_neon {
@@ -481,4 +535,16 @@ enum AmexSyncDisposition {
   UNCHANGED
   SKIPPED
   FAILED
+}
+
+enum CatalogMigrationClassification {
+  STANDARD
+  CUSTOM
+}
+
+enum CatalogMigrationPhase {
+  CLASSIFIED
+  BRIDGED
+  CLEANED
+  ROLLED_BACK
 }

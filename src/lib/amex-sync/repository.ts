@@ -1,8 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import type {
-  AmexSyncDestinationContext,
-  AmexSyncPlanRow,
-  StatusStateProjection,
+import {
+  amexDestinationDefinitionFingerprint,
+  resolveAmexGlobalDefinitionAuthority,
+  type AmexSyncDestinationContext,
+  type AmexSyncPlanRow,
+  type DestinationPredefinedBenefitSnapshot,
+  type DestinationPredefinedCardSnapshot,
+  type StatusStateProjection,
 } from "./authority";
 
 interface SyncDelegate {
@@ -34,6 +38,9 @@ function client(): SyncPrismaClient {
 
 interface RawDestinationStatus {
   id: string;
+  benefitId: string | null;
+  creditCardId: string | null;
+  predefinedBenefitId: string | null;
   userId: string;
   cycleStartDate: Date;
   cycleEndDate: Date;
@@ -52,12 +59,32 @@ interface RawDestinationStatus {
 
 interface RawDestinationBenefit {
   id: string;
+  catalogKey: string | null;
+  predefinedCardId: string;
+  category: string;
+  description: string;
+  percentage: number;
+  maxAmount: number | null;
+  frequency: string;
+  cycleAlignment: string | null;
+  fixedCycleDurationMonths: number | null;
+  fixedCycleStartMonth: number | null;
+  occurrencesInCycle: number;
   productKey: string | null;
   creditFamilyKey: string | null;
   periodKey: string | null;
-  startDate: Date;
-  endDate: Date | null;
+  retiredAt: Date | null;
   benefitStatuses: RawDestinationStatus[];
+}
+
+interface RawDestinationPredefinedCard {
+  id: string;
+  catalogKey: string | null;
+  name: string;
+  issuer: string;
+  productKey: string | null;
+  retiredAt: Date | null;
+  benefits: RawDestinationBenefit[];
 }
 
 interface RawDestinationCard {
@@ -66,10 +93,9 @@ interface RawDestinationCard {
   name: string;
   nickname: string | null;
   issuer: string;
-  productKey: string | null;
   lastFourDigits: string | null;
   lifecycleStatus: "ACTIVE" | "CLOSED" | "PRODUCT_CHANGED";
-  benefits: RawDestinationBenefit[];
+  predefinedCard: RawDestinationPredefinedCard | null;
 }
 
 export async function loadAmexSyncDestinationContext(userId: string): Promise<AmexSyncDestinationContext> {
@@ -82,37 +108,59 @@ export async function loadAmexSyncDestinationContext(userId: string): Promise<Am
         name: true,
         nickname: true,
         issuer: true,
-        productKey: true,
         lastFourDigits: true,
         lifecycleStatus: true,
-        benefits: {
+        predefinedCard: {
           select: {
             id: true,
+            catalogKey: true,
+            name: true,
+            issuer: true,
             productKey: true,
-            creditFamilyKey: true,
-            periodKey: true,
-            startDate: true,
-            endDate: true,
-            benefitStatuses: {
-              where: { userId },
+            retiredAt: true,
+            benefits: {
               select: {
                 id: true,
-                userId: true,
-                cycleStartDate: true,
-                cycleEndDate: true,
-                occurrenceIndex: true,
-                usedAmount: true,
-                isCompleted: true,
-                completedAt: true,
-                isNotUsable: true,
-                updatedAt: true,
-                sourceProvenance: {
-                  where: { source: "AMEX" },
-                  take: 1,
+                catalogKey: true,
+                predefinedCardId: true,
+                category: true,
+                description: true,
+                percentage: true,
+                maxAmount: true,
+                frequency: true,
+                cycleAlignment: true,
+                fixedCycleDurationMonths: true,
+                fixedCycleStartMonth: true,
+                occurrencesInCycle: true,
+                productKey: true,
+                creditFamilyKey: true,
+                periodKey: true,
+                retiredAt: true,
+                benefitStatuses: {
+                  where: { userId },
                   select: {
-                    observedAt: true,
-                    sourceObservationIdentity: true,
-                    sourceObservationDigest: true,
+                    id: true,
+                    benefitId: true,
+                    creditCardId: true,
+                    predefinedBenefitId: true,
+                    userId: true,
+                    cycleStartDate: true,
+                    cycleEndDate: true,
+                    occurrenceIndex: true,
+                    usedAmount: true,
+                    isCompleted: true,
+                    completedAt: true,
+                    isNotUsable: true,
+                    updatedAt: true,
+                    sourceProvenance: {
+                      where: { source: "AMEX" },
+                      take: 1,
+                      select: {
+                        observedAt: true,
+                        sourceObservationIdentity: true,
+                        sourceObservationDigest: true,
+                      },
+                    },
                   },
                 },
               },
@@ -124,15 +172,24 @@ export async function loadAmexSyncDestinationContext(userId: string): Promise<Am
   const cards = rawCards as unknown as RawDestinationCard[];
   return {
     cards: cards.map((card) => ({
-      ...card,
+      id: card.id,
+      userId: card.userId,
       displayName: card.nickname ? `${card.nickname} (${card.name})` : card.name,
-      benefits: card.benefits.map((benefit) => ({
-        ...benefit,
-        statuses: benefit.benefitStatuses.map((status) => ({
-          ...status,
-          provenance: status.sourceProvenance[0] ?? null,
+      issuer: card.issuer,
+      lastFourDigits: card.lastFourDigits,
+      lifecycleStatus: card.lifecycleStatus,
+      predefinedCard: card.predefinedCard ? {
+        ...card.predefinedCard,
+        benefits: card.predefinedCard.benefits.map((benefit) => ({
+          ...benefit,
+          statuses: benefit.benefitStatuses
+            .filter((status) => status.creditCardId === card.id)
+            .map((status) => ({
+              ...status,
+              provenance: status.sourceProvenance[0] ?? null,
+            })),
         })),
-      })),
+      } : null,
     })),
   };
 }
@@ -147,7 +204,31 @@ export interface StoredRowResult {
   sourceRowIdentity: string;
   disposition: "UPDATED" | "UNCHANGED" | "SKIPPED" | "FAILED";
   reasonCode: string;
+  destinationCardId: string | null;
+  beforeUsedAmount: number | null;
+  beforeIsCompleted: boolean | null;
+  beforeCompletedAt: Date | string | null;
+  beforeIsNotUsable: boolean | null;
+  afterUsedAmount: number | null;
+  afterIsCompleted: boolean | null;
+  afterCompletedAt: Date | string | null;
+  afterIsNotUsable: boolean | null;
 }
+
+const storedRowResultSelect = {
+  sourceRowIdentity: true,
+  disposition: true,
+  reasonCode: true,
+  destinationCardId: true,
+  beforeUsedAmount: true,
+  beforeIsCompleted: true,
+  beforeCompletedAt: true,
+  beforeIsNotUsable: true,
+  afterUsedAmount: true,
+  afterIsCompleted: true,
+  afterCompletedAt: true,
+  afterIsNotUsable: true,
+} as const;
 
 export async function findAmexSyncAttempt(userId: string, idempotencyKey: string): Promise<StoredAttemptResult | null> {
   return client().amexSyncAttempt.findUnique({
@@ -155,7 +236,7 @@ export async function findAmexSyncAttempt(userId: string, idempotencyKey: string
     select: {
       id: true,
       state: true,
-      rowAudits: { select: { sourceRowIdentity: true, disposition: true, reasonCode: true } },
+      rowAudits: { select: storedRowResultSelect },
     },
   }) as Promise<StoredAttemptResult | null>;
 }
@@ -220,9 +301,32 @@ function auditData(attemptId: string, row: AmexSyncPlanRow, disposition: string,
     reasonCode,
     destinationCardId: row.destinationCardId,
     destinationBenefitId: row.destinationBenefitId,
+    destinationPredefinedBenefitId: row.destinationPredefinedBenefitId,
+    destinationDefinitionFingerprint: row.destinationDefinitionFingerprint,
     destinationStatusId: row.destinationStatusId,
     ...auditSnapshot("before", row.before),
     ...auditSnapshot("after", row.after),
+  };
+}
+
+function storedResultFromPlan(
+  row: AmexSyncPlanRow,
+  disposition: StoredRowResult["disposition"],
+  reasonCode: string,
+): StoredRowResult {
+  return {
+    sourceRowIdentity: row.sourceRowIdentity,
+    disposition,
+    reasonCode,
+    destinationCardId: row.destinationCardId,
+    beforeUsedAmount: row.before?.usedAmount ?? null,
+    beforeIsCompleted: row.before?.isCompleted ?? null,
+    beforeCompletedAt: row.before?.completedAt ?? null,
+    beforeIsNotUsable: row.before?.isNotUsable ?? null,
+    afterUsedAmount: row.after?.usedAmount ?? null,
+    afterIsCompleted: row.after?.isCompleted ?? null,
+    afterCompletedAt: row.after?.completedAt ?? null,
+    afterIsNotUsable: row.after?.isNotUsable ?? null,
   };
 }
 
@@ -235,7 +339,7 @@ export async function recordNonAppliedAmexSyncRow(
   return client().$transaction(async (transaction) => {
     const existingAudit = await transaction.amexSyncRowAudit.findUnique({
       where: { attemptId_sourceRowIdentity: { attemptId, sourceRowIdentity: row.sourceRowIdentity } },
-      select: { sourceRowIdentity: true, disposition: true, reasonCode: true },
+      select: storedRowResultSelect,
     }) as StoredRowResult | null;
     if (existingAudit && existingAudit.disposition !== "FAILED") return existingAudit;
 
@@ -247,11 +351,7 @@ export async function recordNonAppliedAmexSyncRow(
     } else {
       await transaction.amexSyncRowAudit.create({ data: successfulAudit });
     }
-    return {
-      sourceRowIdentity: row.sourceRowIdentity,
-      disposition,
-      reasonCode: row.reason,
-    };
+    return storedResultFromPlan(row, disposition, row.reason);
   }, { isolationLevel: "Serializable" });
 }
 
@@ -293,6 +393,9 @@ function provenanceUpsertArgs(
 }
 
 interface TransactionalDestinationStatus {
+  benefitId: string | null;
+  creditCardId: string | null;
+  predefinedBenefitId: string | null;
   userId: string;
   usedAmount: number;
   isCompleted: boolean;
@@ -301,21 +404,18 @@ interface TransactionalDestinationStatus {
   cycleStartDate: Date;
   cycleEndDate: Date;
   occurrenceIndex: number;
-  benefit: {
+  creditCard: {
     id: string;
-    creditCardId: string | null;
-    productKey: string | null;
-    creditFamilyKey: string | null;
-    periodKey: string | null;
-    creditCard: {
-      id: string;
-      userId: string;
-      issuer: string;
-      productKey: string | null;
-      lastFourDigits: string | null;
-      lifecycleStatus: "ACTIVE" | "CLOSED" | "PRODUCT_CHANGED";
-    } | null;
-  };
+    userId: string;
+    issuer: string;
+    lastFourDigits: string | null;
+    lifecycleStatus: "ACTIVE" | "CLOSED" | "PRODUCT_CHANGED";
+    predefinedCardId: string | null;
+    predefinedCard: Omit<DestinationPredefinedCardSnapshot, "benefits"> | null;
+  } | null;
+  predefinedBenefit: Omit<DestinationPredefinedBenefitSnapshot, "statuses"> & {
+    predefinedCard: Omit<DestinationPredefinedCardSnapshot, "benefits">;
+  } | null;
 }
 
 function stateMatchesProjection(
@@ -345,9 +445,18 @@ async function assertAmexProvenanceCanAdvance(
     },
     select: {
       observedAt: true,
+      sourceObservationIdentity: true,
       sourceObservationDigest: true,
     },
-  }) as { observedAt: Date; sourceObservationDigest: string } | null;
+  }) as { observedAt: Date; sourceObservationIdentity: string; sourceObservationDigest: string } | null;
+  const expected = row.beforeProvenance;
+  if ((currentProvenance === null) !== (expected === null)
+    || (currentProvenance && expected
+      && (currentProvenance.observedAt.toISOString() !== expected.observedAt
+        || currentProvenance.sourceObservationIdentity !== expected.sourceObservationIdentity
+        || currentProvenance.sourceObservationDigest !== expected.sourceObservationDigest))) {
+    throw new Error("conflict_repreview_required");
+  }
   const observedAt = new Date(row.observedAt);
   if (currentProvenance
     && (currentProvenance.observedAt.getTime() > observedAt.getTime()
@@ -363,15 +472,25 @@ async function loadAuthorizedDestinationStatus(
   row: AmexSyncPlanRow,
 ): Promise<TransactionalDestinationStatus | null> {
   if (!row.destinationStatusId
-    || !row.destinationBenefitId
+    || !row.destinationPredefinedCardId
+    || !row.destinationProductCatalogKey
+    || !row.destinationPredefinedBenefitId
+    || !row.destinationBenefitCatalogKey
+    || !row.destinationDefinitionFingerprint
     || !row.destinationCardId
+    || row.destinationOccurrenceIndex === null
     || !row.periodKey
     || !row.sourcePeriodStartDate
-    || !row.sourcePeriodEndDate) return null;
+    || !row.sourcePeriodEndDate
+    || !row.destinationCycleStartInstant
+    || !row.destinationCycleEndInstant) return null;
 
   const status = await transaction.benefitStatus.findUnique({
     where: { id: row.destinationStatusId },
     select: {
+      benefitId: true,
+      creditCardId: true,
+      predefinedBenefitId: true,
       userId: true,
       usedAmount: true,
       isCompleted: true,
@@ -380,21 +499,52 @@ async function loadAuthorizedDestinationStatus(
       cycleStartDate: true,
       cycleEndDate: true,
       occurrenceIndex: true,
-      benefit: {
+      creditCard: {
         select: {
           id: true,
-          creditCardId: true,
+          userId: true,
+          issuer: true,
+          lastFourDigits: true,
+          lifecycleStatus: true,
+          predefinedCardId: true,
+          predefinedCard: {
+            select: {
+              id: true,
+              catalogKey: true,
+              name: true,
+              issuer: true,
+              productKey: true,
+              retiredAt: true,
+            },
+          },
+        },
+      },
+      predefinedBenefit: {
+        select: {
+          id: true,
+          catalogKey: true,
+          predefinedCardId: true,
+          category: true,
+          description: true,
+          percentage: true,
+          maxAmount: true,
+          frequency: true,
+          cycleAlignment: true,
+          fixedCycleDurationMonths: true,
+          fixedCycleStartMonth: true,
+          occurrencesInCycle: true,
           productKey: true,
           creditFamilyKey: true,
           periodKey: true,
-          creditCard: {
+          retiredAt: true,
+          predefinedCard: {
             select: {
               id: true,
-              userId: true,
+              catalogKey: true,
+              name: true,
               issuer: true,
               productKey: true,
-              lastFourDigits: true,
-              lifecycleStatus: true,
+              retiredAt: true,
             },
           },
         },
@@ -403,22 +553,54 @@ async function loadAuthorizedDestinationStatus(
   }) as TransactionalDestinationStatus | null;
   if (!status
     || status.userId !== userId
-    || status.occurrenceIndex !== 0
+    || status.occurrenceIndex !== row.destinationOccurrenceIndex
+    || status.cycleStartDate.toISOString() !== row.destinationCycleStartInstant
+    || status.cycleEndDate.toISOString() !== row.destinationCycleEndInstant
     || status.cycleStartDate.toISOString().slice(0, 10) !== row.sourcePeriodStartDate
     || status.cycleEndDate.toISOString().slice(0, 10) !== row.sourcePeriodEndDate
-    || status.benefit.id !== row.destinationBenefitId
-    || status.benefit.creditCardId !== row.destinationCardId
-    || status.benefit.productKey !== row.productKey
-    || status.benefit.creditFamilyKey !== row.creditFamilyKey
-    || status.benefit.periodKey !== row.periodKey
-    || !status.benefit.creditCard
-    || status.benefit.creditCard.id !== row.destinationCardId
-    || status.benefit.creditCard.userId !== userId
-    || status.benefit.creditCard.issuer !== "American Express"
-    || status.benefit.creditCard.lifecycleStatus !== "ACTIVE"
-    || status.benefit.creditCard.productKey !== row.productKey
-    || !/^\d{5}$/.test(status.benefit.creditCard.lastFourDigits ?? "")
-    || status.benefit.creditCard.lastFourDigits !== row.sourceEndingDigits) return null;
+    || status.creditCardId !== row.destinationCardId
+    || status.predefinedBenefitId !== row.destinationPredefinedBenefitId
+    || status.benefitId !== row.destinationBenefitId
+    || !status.creditCard
+    || status.creditCard.id !== row.destinationCardId
+    || status.creditCard.userId !== userId
+    || status.creditCard.issuer !== "American Express"
+    || status.creditCard.lifecycleStatus !== "ACTIVE"
+    || status.creditCard.predefinedCardId !== row.destinationPredefinedCardId
+    || !/^\d{5}$/.test(status.creditCard.lastFourDigits ?? "")
+    || status.creditCard.lastFourDigits !== row.sourceEndingDigits
+    || !status.creditCard.predefinedCard
+    || status.creditCard.predefinedCard.id !== row.destinationPredefinedCardId
+    || status.creditCard.predefinedCard.catalogKey !== row.destinationProductCatalogKey
+    || status.creditCard.predefinedCard.productKey !== row.productKey
+    || status.creditCard.predefinedCard.issuer !== "American Express"
+    || !status.predefinedBenefit
+    || status.predefinedBenefit.id !== row.destinationPredefinedBenefitId
+    || status.predefinedBenefit.catalogKey !== row.destinationBenefitCatalogKey
+    || status.predefinedBenefit.predefinedCardId !== row.destinationPredefinedCardId
+    || status.predefinedBenefit.predefinedCard.id !== row.destinationPredefinedCardId
+    || status.predefinedBenefit.predefinedCard.catalogKey !== row.destinationProductCatalogKey
+    || status.predefinedBenefit.productKey !== row.productKey
+    || status.predefinedBenefit.creditFamilyKey !== row.creditFamilyKey
+    || status.predefinedBenefit.periodKey !== row.periodKey) return null;
+
+  const product: DestinationPredefinedCardSnapshot = {
+    ...status.creditCard.predefinedCard,
+    benefits: [],
+  };
+  const benefit: DestinationPredefinedBenefitSnapshot = {
+    ...status.predefinedBenefit,
+    statuses: [],
+  };
+  const sourceIdentity = resolveAmexGlobalDefinitionAuthority({
+    product,
+    benefit,
+    sourceCreditKey: row.sourceCreditKey,
+  });
+  if (!sourceIdentity
+    || amexDestinationDefinitionFingerprint({ product, benefit, sourceIdentity }) !== row.destinationDefinitionFingerprint) {
+    return null;
+  }
   return status;
 }
 
@@ -436,8 +618,10 @@ export async function recordCurrentAmexSyncRow(input: {
   if (row.disposition !== "unchanged"
     || row.reason !== "already_current"
     || !row.destinationStatusId
-    || !row.destinationBenefitId
+    || !row.destinationPredefinedBenefitId
+    || !row.destinationDefinitionFingerprint
     || !row.destinationCardId
+    || row.destinationOccurrenceIndex === null
     || !row.before
     || !row.after
     || !row.periodKey
@@ -450,7 +634,7 @@ export async function recordCurrentAmexSyncRow(input: {
   return client().$transaction(async (transaction) => {
     const existingAudit = await transaction.amexSyncRowAudit.findUnique({
       where: { attemptId_sourceRowIdentity: { attemptId, sourceRowIdentity: row.sourceRowIdentity } },
-      select: { sourceRowIdentity: true, disposition: true, reasonCode: true },
+      select: storedRowResultSelect,
     }) as StoredRowResult | null;
     if (existingAudit && existingAudit.disposition !== "FAILED") return existingAudit;
 
@@ -473,11 +657,7 @@ export async function recordCurrentAmexSyncRow(input: {
     } else {
       await transaction.amexSyncRowAudit.create({ data: successfulAudit });
     }
-    return {
-      sourceRowIdentity: row.sourceRowIdentity,
-      disposition: "UNCHANGED",
-      reasonCode: row.reason,
-    };
+    return storedResultFromPlan(row, "UNCHANGED", row.reason);
   }, { isolationLevel: "Serializable" });
 }
 
@@ -489,7 +669,9 @@ export async function applyAmexSyncRow(input: {
   const { attemptId, userId, row } = input;
   if (!row.destinationStatusId
     || !row.destinationCardId
-    || !row.destinationBenefitId
+    || !row.destinationPredefinedBenefitId
+    || !row.destinationDefinitionFingerprint
+    || row.destinationOccurrenceIndex === null
     || !row.before
     || !row.after
     || !row.periodKey
@@ -502,7 +684,7 @@ export async function applyAmexSyncRow(input: {
   return client().$transaction(async (transaction) => {
     const existingAudit = await transaction.amexSyncRowAudit.findUnique({
       where: { attemptId_sourceRowIdentity: { attemptId, sourceRowIdentity: row.sourceRowIdentity } },
-      select: { sourceRowIdentity: true, disposition: true, reasonCode: true },
+      select: storedRowResultSelect,
     }) as StoredRowResult | null;
     if (existingAudit && existingAudit.disposition !== "FAILED") return existingAudit;
 
@@ -517,9 +699,11 @@ export async function applyAmexSyncRow(input: {
         id: row.destinationStatusId,
         userId,
         benefitId: row.destinationBenefitId,
+        creditCardId: row.destinationCardId,
+        predefinedBenefitId: row.destinationPredefinedBenefitId,
         cycleStartDate: currentStatus.cycleStartDate,
         cycleEndDate: currentStatus.cycleEndDate,
-        occurrenceIndex: 0,
+        occurrenceIndex: row.destinationOccurrenceIndex,
         usedAmount: before.usedAmount,
         isCompleted: before.isCompleted,
         completedAt: before.completedAt ? new Date(before.completedAt) : null,
@@ -545,7 +729,7 @@ export async function applyAmexSyncRow(input: {
     } else {
       await transaction.amexSyncRowAudit.create({ data: successfulAudit });
     }
-    return { sourceRowIdentity: row.sourceRowIdentity, disposition: "UPDATED", reasonCode: row.reason };
+    return storedResultFromPlan(row, "UPDATED", row.reason);
   }, { isolationLevel: "Serializable" });
 }
 
@@ -561,7 +745,9 @@ export async function applyAmexSyncGroup(input: {
       && !(row.disposition === "unchanged" && row.reason === "already_current"))
       || !row.destinationStatusId
       || !row.destinationCardId
-      || !row.destinationBenefitId
+      || !row.destinationPredefinedBenefitId
+      || !row.destinationDefinitionFingerprint
+      || row.destinationOccurrenceIndex === null
       || !row.before
       || !row.after
       || !row.periodKey
@@ -575,7 +761,7 @@ export async function applyAmexSyncGroup(input: {
     for (const row of rows) {
       existingAudits.push(await transaction.amexSyncRowAudit.findUnique({
         where: { attemptId_sourceRowIdentity: { attemptId, sourceRowIdentity: row.sourceRowIdentity } },
-        select: { sourceRowIdentity: true, disposition: true, reasonCode: true },
+        select: storedRowResultSelect,
       }) as StoredRowResult | null);
     }
     const successfulExisting = existingAudits.filter((audit) => audit && audit.disposition !== "FAILED") as StoredRowResult[];
@@ -605,9 +791,11 @@ export async function applyAmexSyncGroup(input: {
           id: row.destinationStatusId,
           userId,
           benefitId: row.destinationBenefitId,
+          creditCardId: row.destinationCardId,
+          predefinedBenefitId: row.destinationPredefinedBenefitId,
           cycleStartDate: currentStatus.cycleStartDate,
           cycleEndDate: currentStatus.cycleEndDate,
-          occurrenceIndex: 0,
+          occurrenceIndex: row.destinationOccurrenceIndex,
           usedAmount: before.usedAmount,
           isCompleted: before.isCompleted,
           completedAt: before.completedAt ? new Date(before.completedAt) : null,
@@ -638,7 +826,7 @@ export async function applyAmexSyncGroup(input: {
       } else {
         await transaction.amexSyncRowAudit.create({ data });
       }
-      results.push({ sourceRowIdentity: row.sourceRowIdentity, disposition, reasonCode: row.reason });
+      results.push(storedResultFromPlan(row, disposition, row.reason));
     }
     return results;
   }, { isolationLevel: "Serializable" });
@@ -654,7 +842,7 @@ export async function recordFailedAmexSyncRow(
     create: auditData(attemptId, row, "FAILED", reasonCode),
     // Never downgrade a concurrently successful retry to FAILED.
     update: {},
-    select: { sourceRowIdentity: true, disposition: true, reasonCode: true },
+    select: storedRowResultSelect,
   }) as Promise<StoredRowResult>;
 }
 

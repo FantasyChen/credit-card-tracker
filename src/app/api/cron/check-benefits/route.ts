@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
+import { BenefitFrequency, type BenefitCycleAlignment } from '@/generated/prisma';
 import { prisma } from '@/lib/prisma';
-import { BenefitFrequency, BenefitCycleAlignment } from '@/generated/prisma';
-import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
-import { randomUUID } from 'crypto';
+import {
+  planBenefitStatusMaterialization,
+  type CustomMaterializationDefinition,
+  type PlannedBenefitStatusInsert,
+  type StandardMaterializationDefinition,
+} from '@/lib/global-benefit-materialization';
 import {
   amexSyncAuditRetentionCutoff,
   deleteExpiredAmexSyncRowAudits,
@@ -10,255 +14,283 @@ import {
 
 export const maxDuration = 10;
 
-interface UpsertRow {
+const INSERT_BATCH_SIZE = 2_000;
+const SOURCE_BATCH_SIZE = 500;
+
+interface RawStandardDefinition {
   id: string;
-  benefitId: string;
   userId: string;
-  cycleStartDate: Date;
-  cycleEndDate: Date;
-  occurrenceIndex: number;
+  creditCardId: string;
+  cardOpenedDate: Date | null;
+  description: string;
+  frequency: BenefitFrequency;
+  cycleAlignment: BenefitCycleAlignment | null;
+  fixedCycleStartMonth: number | null;
+  fixedCycleDurationMonths: number | null;
+  occurrencesInCycle: number | null;
+}
+
+interface RawCustomDefinition {
+  id: string;
+  userId: string;
+  cardOpenedDate: Date | null;
+  startDate: Date;
+  description: string;
+  frequency: BenefitFrequency;
+  cycleAlignment: BenefitCycleAlignment | null;
+  fixedCycleStartMonth: number | null;
+  fixedCycleDurationMonths: number | null;
+  occurrencesInCycle: number | null;
 }
 
 async function runCheckBenefitsLogic(dryRun = false) {
   const now = new Date();
   const startMs = Date.now();
-  console.log(`🚀 check-benefits started at: ${now.toISOString()}${dryRun ? ' [DRY RUN]' : ''}`);
+  console.log(`check-benefits started at ${now.toISOString()}${dryRun ? ' [DRY RUN]' : ''}`);
 
   try {
-    // Phase 1: Fetch all data in parallel (2 queries instead of sequential)
-    const [allCards, standaloneBenefits] = await Promise.all([
-      prisma.creditCard.findMany({
-        include: {
-          benefits: {
-            where: { frequency: { not: BenefitFrequency.ONE_TIME } },
-            select: {
-              id: true,
-              description: true,
-              frequency: true,
-              cycleAlignment: true,
-              fixedCycleStartMonth: true,
-              fixedCycleDurationMonths: true,
-              occurrencesInCycle: true,
-            }
-          },
-          user: { select: { id: true } }
-        },
-      }),
-      prisma.benefit.findMany({
-        where: {
-          creditCardId: null,
-          userId: { not: null },
-          frequency: { not: BenefitFrequency.ONE_TIME },
-        },
-        select: {
-          id: true,
-          description: true,
-          userId: true,
-          frequency: true,
-          startDate: true,
-          cycleAlignment: true,
-          fixedCycleStartMonth: true,
-          fixedCycleDurationMonths: true,
-          occurrencesInCycle: true,
-        }
-      })
+    const [standardDefinitions, customAndLegacyDefinitions] = await Promise.all([
+      prisma.$queryRaw<RawStandardDefinition[]>`
+        SELECT
+          pb."id",
+          c."userId",
+          c."id" AS "creditCardId",
+          c."openedDate" AS "cardOpenedDate",
+          pb."description",
+          pb."frequency",
+          pb."cycleAlignment",
+          pb."fixedCycleStartMonth",
+          pb."fixedCycleDurationMonths",
+          pb."occurrencesInCycle"
+        FROM "CreditCard" c
+        INNER JOIN "PredefinedCard" pc ON pc."id" = c."predefinedCardId"
+        INNER JOIN "PredefinedBenefit" pb ON pb."predefinedCardId" = pc."id"
+        WHERE c."lifecycleStatus" = 'ACTIVE'
+          AND pc."retiredAt" IS NULL
+          AND pb."retiredAt" IS NULL
+          AND EXISTS (
+            SELECT 1
+            FROM generate_series(
+              0,
+              LEAST(GREATEST(COALESCE(pb."occurrencesInCycle", 1), 1), 13) - 1
+            ) AS expected("occurrenceIndex")
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM "BenefitStatus" bs
+              WHERE bs."creditCardId" = c."id"
+                AND bs."predefinedBenefitId" = pb."id"
+                AND bs."userId" = c."userId"
+                AND bs."occurrenceIndex" = expected."occurrenceIndex"
+                AND (
+                  pb."frequency" = ${BenefitFrequency.ONE_TIME}::"BenefitFrequency"
+                  OR bs."cycleEndDate" >= ${now}
+                )
+            )
+          )
+        ORDER BY c."id", pb."id"
+        LIMIT ${SOURCE_BATCH_SIZE}
+      `,
+      prisma.$queryRaw<RawCustomDefinition[]>`
+        SELECT
+          b."id",
+          COALESCE(b."userId", c."userId") AS "userId",
+          c."openedDate" AS "cardOpenedDate",
+          b."startDate",
+          b."description",
+          b."frequency",
+          b."cycleAlignment",
+          b."fixedCycleStartMonth",
+          b."fixedCycleDurationMonths",
+          b."occurrencesInCycle"
+        FROM "Benefit" b
+        LEFT JOIN "CreditCard" c ON c."id" = b."creditCardId"
+        WHERE b."frequency" <> ${BenefitFrequency.ONE_TIME}::"BenefitFrequency"
+          AND COALESCE(b."userId", c."userId") IS NOT NULL
+          AND (b."creditCardId" IS NULL OR c."lifecycleStatus" = 'ACTIVE')
+          AND (b."userId" IS NULL OR b."creditCardId" IS NULL OR b."userId" = c."userId")
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "CatalogMigrationLedger" ledger
+            WHERE ledger."legacyBenefitId" = b."id"
+              AND ledger."classification" = 'STANDARD'
+              AND ledger."phase" IN ('CLASSIFIED', 'BRIDGED', 'CLEANED')
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM generate_series(
+              0,
+              LEAST(GREATEST(COALESCE(b."occurrencesInCycle", 1), 1), 13) - 1
+            ) AS expected("occurrenceIndex")
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM "BenefitStatus" bs
+              WHERE bs."benefitId" = b."id"
+                AND bs."userId" = COALESCE(b."userId", c."userId")
+                AND bs."occurrenceIndex" = expected."occurrenceIndex"
+                AND bs."cycleEndDate" >= ${now}
+            )
+          )
+        ORDER BY b."id"
+        LIMIT ${SOURCE_BATCH_SIZE}
+      `,
     ]);
 
     const fetchMs = Date.now() - startMs;
-    console.log(`📊 Fetched ${allCards.length} cards + ${standaloneBenefits.length} standalone in ${fetchMs}ms`);
+    const plan = planBenefitStatusMaterialization(
+      standardDefinitions as StandardMaterializationDefinition[],
+      customAndLegacyDefinitions as CustomMaterializationDefinition[],
+      now
+    );
 
-    // Phase 2: Calculate all cycles in memory (CPU only, no DB calls)
-    const rows: UpsertRow[] = [];
-    let skipped = 0;
-    let calcErrors = 0;
-    let validationWarnings = 0;
-
-    for (const card of allCards) {
-      if (!card.user?.id) { skipped++; continue; }
-      const userId = card.user.id;
-
-      for (const benefit of card.benefits) {
-        if (
-          benefit.cycleAlignment !== BenefitCycleAlignment.CALENDAR_FIXED &&
-          benefit.frequency === BenefitFrequency.YEARLY &&
-          !card.openedDate
-        ) { skipped++; continue; }
-
-        try {
-          const materialized = materializeBenefitStatusRows(
-            {
-              ...benefit,
-              userId,
-            },
-            {
-              referenceDate: now,
-              cardOpenedDate: card.openedDate,
-              validateCycles: true,
-            }
-          );
-          validationWarnings += materialized.warnings.length;
-          for (const warning of materialized.warnings) {
-            console.error(`❌ Validation: benefit ${benefit.id}: ${warning}`);
-          }
-
-          for (const row of materialized.rows) {
-            rows.push({
-              id: randomUUID(),
-              ...row,
-            });
-          }
-        } catch (e) {
-          calcErrors++;
-          console.error(`Cycle error benefit ${benefit.id}:`, e instanceof Error ? e.message : e);
-        }
-      }
+    for (const warning of plan.warnings) {
+      console.warn(`Benefit cycle validation warning: ${warning}`);
     }
 
-    for (const benefit of standaloneBenefits) {
-      if (!benefit.userId) { skipped++; continue; }
-      try {
-        const materialized = materializeBenefitStatusRows(
-          {
-            ...benefit,
-            userId: benefit.userId,
-          },
-          {
-            referenceDate: now,
-            validateCycles: true,
-          }
-        );
-        validationWarnings += materialized.warnings.length;
-        for (const warning of materialized.warnings) {
-          console.error(`❌ Validation: benefit ${benefit.id}: ${warning}`);
-        }
-
-        for (const row of materialized.rows) {
-          rows.push({
-            id: randomUUID(),
-            ...row,
-          });
-        }
-      } catch (e) {
-        calcErrors++;
-        console.error(`Standalone cycle error ${benefit.id}:`, e instanceof Error ? e.message : e);
-      }
-    }
-
-    const calcMs = Date.now() - startMs - fetchMs;
-    console.log(`📊 Calculated ${rows.length} rows in ${calcMs}ms (${skipped} skipped, ${calcErrors} errors)`);
-
-    // Phase 3: Bulk upsert via raw SQL (1-3 queries instead of ~11,000 individual upserts)
-    let totalUpserted = 0;
-
+    let rowsInserted = 0;
     if (dryRun) {
-      console.log(`🔍 [DRY RUN] Would upsert ${rows.length} rows — skipping DB write`);
-      totalUpserted = rows.length;
+      rowsInserted = plan.rows.length;
     } else {
-      const BATCH_SIZE = 5000;
-      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-        const batch = rows.slice(i, i + BATCH_SIZE);
-        const count = await bulkUpsertBenefitStatuses(batch);
-        totalUpserted += count;
-        console.log(`📦 Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${count} rows upserted`);
+      for (let index = 0; index < plan.rows.length; index += INSERT_BATCH_SIZE) {
+        rowsInserted += await insertMissingBenefitStatuses(
+          plan.rows.slice(index, index + INSERT_BATCH_SIZE)
+        );
       }
     }
 
     const amexSyncAuditsDeleted = dryRun
       ? 0
       : await deleteExpiredAmexSyncRowAudits(amexSyncAuditRetentionCutoff(now));
-
-    const totalMs = Date.now() - startMs;
-    console.log(`✅ Done in ${totalMs}ms: ${totalUpserted} upserted from ${rows.length} calculated`);
+    const durationMs = Date.now() - startMs;
 
     return NextResponse.json({
       message: dryRun ? 'Cron job dry run completed.' : 'Cron job executed successfully.',
       dryRun,
-      rowsCalculated: rows.length,
-      rowsUpserted: totalUpserted,
-      cardsProcessed: allCards.length,
-      standaloneBenefitsProcessed: standaloneBenefits.length,
-      skipped,
-      calcErrors,
-      validationWarnings,
+      rowsCalculated: plan.rows.length,
+      rowsInserted,
+      // Preserve the existing response field while changing semantics to insert-only.
+      rowsUpserted: rowsInserted,
+      standardDefinitionsProcessed: standardDefinitions.length,
+      customAndLegacyDefinitionsProcessed: customAndLegacyDefinitions.length,
+      validationWarnings: plan.warnings.length,
       amexSyncAuditsDeleted,
-      durationMs: totalMs,
+      fetchMs,
+      durationMs,
       timestamp: now.toISOString(),
     });
   } catch (error) {
-    const totalMs = Date.now() - startMs;
-    console.error(`💥 Failed after ${totalMs}ms:`, error instanceof Error ? error.message : error);
-    if (error instanceof Error) console.error('Stack:', error.stack);
+    const durationMs = Date.now() - startMs;
+    console.error('check-benefits failed:', error instanceof Error ? error.message : error);
     return NextResponse.json({
       message: 'Cron job failed.',
       error: error instanceof Error ? error.message : 'Unknown error',
-      durationMs: totalMs,
+      durationMs,
       timestamp: now.toISOString(),
     }, { status: 500 });
   }
 }
 
-async function bulkUpsertBenefitStatuses(rows: UpsertRow[]): Promise<number> {
+/** Insert-only by design: existing cycle boundaries and user state are immutable. */
+export async function insertMissingBenefitStatuses(
+  rows: PlannedBenefitStatusInsert[]
+): Promise<number> {
   if (rows.length === 0) return 0;
-
-  const params: (string | Date | number)[] = [];
-  const valueClauses: string[] = [];
-
-  for (let i = 0; i < rows.length; i++) {
-    const o = i * 6;
-    valueClauses.push(
-      `($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4}::timestamptz, $${o + 5}::timestamptz, $${o + 6}, false, 0, false, NOW(), NOW())`
-    );
-    params.push(
-      rows[i].id, rows[i].benefitId, rows[i].userId,
-      rows[i].cycleStartDate, rows[i].cycleEndDate, rows[i].occurrenceIndex
-    );
+  if (rows.length > INSERT_BATCH_SIZE) {
+    throw new Error(`Benefit status insert batch exceeds ${INSERT_BATCH_SIZE} rows.`);
   }
 
-  const sql = `
-    INSERT INTO "BenefitStatus" ("id", "benefitId", "userId", "cycleStartDate", "cycleEndDate", "occurrenceIndex", "isCompleted", "usedAmount", "isNotUsable", "createdAt", "updatedAt")
-    VALUES ${valueClauses.join(', ')}
-    ON CONFLICT ("benefitId", "userId", "cycleStartDate", "occurrenceIndex")
-    DO UPDATE SET "cycleEndDate" = EXCLUDED."cycleEndDate", "updatedAt" = NOW()
-  `;
+  const overlapping = await prisma.benefitStatus.findMany({
+    where: {
+      OR: rows.map((row) => ({
+        userId: row.userId,
+        occurrenceIndex: row.occurrenceIndex,
+        cycleEndDate: { gte: row.cycleStartDate },
+        ...(row.benefitId
+          ? { benefitId: row.benefitId }
+          : {
+              creditCardId: row.creditCardId,
+              predefinedBenefitId: row.predefinedBenefitId,
+            }),
+      })),
+    },
+    select: {
+      id: true,
+      benefitId: true,
+      creditCardId: true,
+      predefinedBenefitId: true,
+      userId: true,
+      cycleStartDate: true,
+      cycleEndDate: true,
+      occurrenceIndex: true,
+    },
+  } as never) as unknown as Array<PlannedBenefitStatusInsert & { id: string }>;
 
-  return prisma.$executeRawUnsafe(sql, ...params);
+  const rowsToInsert = rows.filter((row) => {
+    const existing = overlapping.filter((candidate) => sameOccurrenceSource(candidate, row));
+    const exact = existing.some((candidate) =>
+      candidate.cycleStartDate.getTime() === row.cycleStartDate.getTime() &&
+      candidate.cycleEndDate.getTime() === row.cycleEndDate.getTime()
+    );
+    if (exact) return false;
+    if (existing.length > 0) {
+      throw new Error(
+        `Benefit status cycle discrepancy detected for ${row.predefinedBenefitId ?? row.benefitId}.`
+      );
+    }
+    return true;
+  });
+
+  if (rowsToInsert.length === 0) return 0;
+
+  // Prisma emits parameterized INSERT ... ON CONFLICT DO NOTHING for
+  // skipDuplicates. Keeping Date values on the normal Prisma boundary avoids
+  // session-time-zone conversion from hand-written timestamptz casts.
+  const result = await prisma.benefitStatus.createMany({
+    data: rowsToInsert.map((row) => ({
+      ...row,
+      isCompleted: false,
+      usedAmount: 0,
+      isNotUsable: false,
+      orderIndex: null,
+    })),
+    skipDuplicates: true,
+  } as never);
+  return result.count;
+}
+
+function sameOccurrenceSource(
+  left: PlannedBenefitStatusInsert,
+  right: PlannedBenefitStatusInsert
+): boolean {
+  return (
+    left.userId === right.userId &&
+    left.benefitId === right.benefitId &&
+    left.creditCardId === right.creditCardId &&
+    left.predefinedBenefitId === right.predefinedBenefitId &&
+    left.occurrenceIndex === right.occurrenceIndex
+  );
 }
 
 function parseDryRun(request: Request): boolean {
-  const { searchParams } = new URL(request.url);
-  return searchParams.get('dryRun') === 'true';
+  return new URL(request.url).searchParams.get('dryRun') === 'true';
+}
+
+async function handleRequest(request: Request) {
+  const expectedSecret = process.env.CRON_SECRET;
+  if (!expectedSecret) {
+    console.error('CRON_SECRET is not set.');
+    return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
+  }
+  if (request.headers.get('authorization') !== `Bearer ${expectedSecret}`) {
+    console.warn('Unauthorized cron attempt for check-benefits.');
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+  return runCheckBenefitsLogic(parseDryRun(request));
 }
 
 export async function GET(request: Request) {
-  const authorizationHeader = request.headers.get('authorization');
-  const expectedSecret = process.env.CRON_SECRET;
-
-  if (!expectedSecret) {
-    console.error('CRON_SECRET is not set.');
-    return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
-  }
-
-  if (authorizationHeader !== `Bearer ${expectedSecret}`) {
-    console.warn('Unauthorized cron attempt for check-benefits.');
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-  return await runCheckBenefitsLogic(parseDryRun(request));
+  return handleRequest(request);
 }
 
 export async function POST(request: Request) {
-  const authorizationHeader = request.headers.get('authorization');
-  const expectedSecret = process.env.CRON_SECRET;
-
-  if (!expectedSecret) {
-    console.error('CRON_SECRET is not set.');
-    return NextResponse.json({ message: 'Cron secret not configured.' }, { status: 500 });
-  }
-
-  if (authorizationHeader !== `Bearer ${expectedSecret}`) {
-    console.warn('Unauthorized cron attempt for check-benefits.');
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-  return await runCheckBenefitsLogic(parseDryRun(request));
+  return handleRequest(request);
 }

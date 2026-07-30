@@ -21,12 +21,21 @@ export interface BenefitStatusMaterializationOptions {
   validateCycles?: boolean;
 }
 
-export interface MaterializedBenefitStatusRow {
-  benefitId: string;
-  userId: string;
+export interface BenefitCycleCoordinates {
   cycleStartDate: Date;
   cycleEndDate: Date;
   occurrenceIndex: number;
+}
+
+export interface MaterializedBenefitStatusRow extends BenefitCycleCoordinates {
+  benefitId: string;
+  userId: string;
+}
+
+export interface MaterializedStandardBenefitStatusRow extends BenefitCycleCoordinates {
+  creditCardId: string;
+  predefinedBenefitId: string;
+  userId: string;
 }
 
 export interface BenefitStatusMaterializationResult {
@@ -34,13 +43,30 @@ export interface BenefitStatusMaterializationResult {
   warnings: string[];
 }
 
-export function materializeBenefitStatusRows(
-  benefit: BenefitCycleMaterializationInput,
+export interface StandardBenefitStatusMaterializationResult {
+  rows: MaterializedStandardBenefitStatusRow[];
+  warnings: string[];
+}
+
+export const MAX_OCCURRENCES_IN_CYCLE = 12;
+
+export function deriveBenefitCycleCoordinates(
+  benefit: Omit<BenefitCycleMaterializationInput, 'userId'>,
   options: BenefitStatusMaterializationOptions = {}
-): BenefitStatusMaterializationResult {
+): { rows: BenefitCycleCoordinates[]; warnings: string[] } {
   const referenceDate = options.referenceDate ?? new Date();
-  const occurrences = Math.max(1, benefit.occurrencesInCycle ?? 1);
+  const occurrences = benefit.occurrencesInCycle ?? 1;
   const warnings: string[] = [];
+
+  if (
+    !Number.isInteger(occurrences) ||
+    occurrences < 1 ||
+    occurrences > MAX_OCCURRENCES_IN_CYCLE
+  ) {
+    throw new Error(
+      `Benefit ${benefit.id} has invalid occurrencesInCycle; expected an integer from 1 to ${MAX_OCCURRENCES_IN_CYCLE}.`
+    );
+  }
 
   if (
     benefit.frequency === BenefitFrequency.YEARLY &&
@@ -69,22 +95,50 @@ export function materializeBenefitStatusRows(
     }
   }
 
-  const rows: MaterializedBenefitStatusRow[] = [];
-  for (let occurrenceIndex = 0; occurrenceIndex < occurrences; occurrenceIndex++) {
-    rows.push({
-      benefitId: benefit.id,
-      userId: benefit.userId,
+  return {
+    rows: Array.from({ length: occurrences }, (_, occurrenceIndex) => ({
       cycleStartDate: cycleInfo.cycleStartDate,
       cycleEndDate: cycleInfo.cycleEndDate,
       occurrenceIndex,
-    });
-  }
+    })),
+    warnings,
+  };
+}
 
-  return { rows, warnings };
+export function materializeBenefitStatusRows(
+  benefit: BenefitCycleMaterializationInput,
+  options: BenefitStatusMaterializationOptions = {}
+): BenefitStatusMaterializationResult {
+  const materialized = deriveBenefitCycleCoordinates(benefit, options);
+  return {
+    rows: materialized.rows.map((row) => ({
+      ...row,
+      benefitId: benefit.id,
+      userId: benefit.userId,
+    })),
+    warnings: materialized.warnings,
+  };
+}
+
+export function materializeStandardBenefitStatusRows(
+  benefit: Omit<BenefitCycleMaterializationInput, 'userId'>,
+  owner: { userId: string; creditCardId: string },
+  options: BenefitStatusMaterializationOptions = {}
+): StandardBenefitStatusMaterializationResult {
+  const materialized = deriveBenefitCycleCoordinates(benefit, options);
+  return {
+    rows: materialized.rows.map((row) => ({
+      ...row,
+      predefinedBenefitId: benefit.id,
+      creditCardId: owner.creditCardId,
+      userId: owner.userId,
+    })),
+    warnings: materialized.warnings,
+  };
 }
 
 export function calculateMaterializedCycle(
-  benefit: BenefitCycleMaterializationInput,
+  benefit: Omit<BenefitCycleMaterializationInput, 'userId'>,
   referenceDate: Date,
   cardOpenedDate: Date | null
 ): { cycleStartDate: Date; cycleEndDate: Date } {

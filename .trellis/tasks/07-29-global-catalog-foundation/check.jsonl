@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/index.md","reason":"Provides the package quality checklist and catalog review obligations."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Defines safe static checks and database-command restrictions."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Check additive SQL, restrictive relations, migration completeness, and forbidden effects."}
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Check static/seed consistency and existing-user/materialization disposition."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Check AMEX catalog and writable-set parity remains intact."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/prd.md","reason":"Check the foundation against parent product decisions and dependency gate."}

@@ -1,92 +1,44 @@
 import { prisma } from '@/lib/prisma';
-import type { Benefit, BenefitStatus, CreditCard } from '@/generated/prisma';
+import {
+  fetchEffectiveBenefitStatuses,
+  fetchEffectiveCardTerms,
+  type EffectiveBenefitStatus,
+} from '@/lib/effective-benefit';
 
-export interface UpcomingBenefit extends BenefitStatus {
-  benefit: Benefit & { creditCard: CreditCard };
-}
+export type UpcomingBenefit = EffectiveBenefitStatus;
 
 export async function loadHomeDashboardData(userId: string) {
-  const cardCount = await prisma.creditCard.count({
-    where: { userId },
-  });
-
-  const userCards = await prisma.creditCard.findMany({
-    where: { userId },
-    select: { name: true },
-  });
-
-  const cardCounts = userCards.reduce((acc, card) => {
-    acc[card.name] = (acc[card.name] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const totalAnnualFees = await prisma.predefinedCard.findMany({
-    where: {
-      name: {
-        in: Object.keys(cardCounts),
-      },
-    },
-  }).then((predefinedCards) => {
-    return predefinedCards.reduce((total, card) => {
-      const quantity = cardCounts[card.name] || 1;
-      return total + (card.annualFee * quantity);
-    }, 0);
-  });
-
-  const totalClaimedValue = await prisma.benefitStatus.findMany({
-    where: {
-      userId,
-      isNotUsable: false,
-    },
-    select: {
-      usedAmount: true,
-    },
-  }).then((statuses) => {
-    return statuses.reduce((total, status) => total + (status.usedAmount ?? 0), 0);
-  });
-
   const now = new Date();
-  const sevenDaysFromNow = new Date(now);
-  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const expiringSoonBenefits = await prisma.benefitStatus.findMany({
-    where: {
+  const [cardTerms, claimedStatuses, activeStatuses] = await Promise.all([
+    fetchEffectiveCardTerms(prisma, userId),
+    prisma.benefitStatus.findMany({
+      where: { userId, isNotUsable: false },
+      select: { usedAmount: true },
+    }),
+    fetchEffectiveBenefitStatuses(prisma, {
       userId,
-      isCompleted: false,
-      cycleStartDate: { lte: now },
-      cycleEndDate: { gte: now, lte: sevenDaysFromNow },
-    },
-    include: {
-      benefit: {
-        include: {
-          creditCard: true,
-        },
-      },
-    },
-    orderBy: {
-      cycleEndDate: 'asc',
-    },
-  }) as UpcomingBenefit[];
+      completed: false,
+      notUsable: false,
+      cycleStartOnOrBefore: now,
+      cycleEndOnOrAfter: now,
+    }),
+  ]);
 
-  const upcomingBenefits = await prisma.benefitStatus.findMany({
-    where: {
-      userId,
-      isCompleted: false,
-      cycleStartDate: { lte: now },
-      cycleEndDate: { gt: sevenDaysFromNow },
-    },
-    include: {
-      benefit: {
-        include: {
-          creditCard: true,
-        },
-      },
-    },
-    orderBy: {
-      cycleEndDate: 'asc',
-    },
-    take: 5,
-  }) as UpcomingBenefit[];
+  const cardCount = cardTerms.length;
+  const totalAnnualFees = cardTerms.reduce((total, card) => total + card.annualFee, 0);
+  const totalClaimedValue = claimedStatuses.reduce(
+    (total, status) => total + (status.usedAmount ?? 0),
+    0
+  );
+  const expiringSoonBenefits = activeStatuses
+    .filter((status) => status.cycleEndDate <= sevenDaysFromNow)
+    .sort((left, right) => left.cycleEndDate.getTime() - right.cycleEndDate.getTime());
+  const upcomingBenefits = activeStatuses
+    .filter((status) => status.cycleEndDate > sevenDaysFromNow)
+    .sort((left, right) => left.cycleEndDate.getTime() - right.cycleEndDate.getTime())
+    .slice(0, 5);
 
   return {
     cardCount,

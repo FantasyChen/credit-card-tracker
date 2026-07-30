@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Defines safe static/test checks and complete sensitive diff review."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Check every established V3 authority, proposal, transaction, response, and atomicity invariant."}
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Check browser observation and handoff contracts remain unchanged and privacy-safe."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Check additive audit/schema use and production-off deployment boundary."}
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Check ownership and physical-card identity remain authoritative."}
+{"file":".trellis/tasks/07-28-roll-out-amex-sync-production/prd.md","reason":"Check user-key authority is superseded and global latest-term/no-override decisions hold."}

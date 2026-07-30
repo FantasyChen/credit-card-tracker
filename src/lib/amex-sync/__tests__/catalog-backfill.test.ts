@@ -88,22 +88,16 @@ describe("catalog key backfill classifier", () => {
     }
   });
 
-  it("defaults to dry-run and requires explicit additive writer authority for apply", async () => {
-    const writer = {
-      fillNullCardProductKey: jest.fn().mockResolvedValue(true),
-      fillNullBenefitKeys: jest.fn().mockResolvedValue(true),
-      materializeMissingStatuses: jest.fn().mockResolvedValue(2),
-    };
-    await expect(executeCatalogKeyBackfill({ cards: [card()], templates: [template], writer })).resolves.toMatchObject({
+  it("defaults to dry-run and permanently rejects the superseded apply path", async () => {
+    await expect(executeCatalogKeyBackfill({ cards: [card()], templates: [template] })).resolves.toMatchObject({
       mode: "dry-run",
       applied: { cards: 0, benefits: 0, statusesMaterialized: 0 },
     });
-    expect(writer.fillNullCardProductKey).not.toHaveBeenCalled();
-    await expect(executeCatalogKeyBackfill({ cards: [card()], templates: [template], mode: "apply" })).rejects.toThrow("authorized");
-    await expect(executeCatalogKeyBackfill({ cards: [card()], templates: [template], mode: "apply", writer })).resolves.toMatchObject({
+    await expect(executeCatalogKeyBackfill({
+      cards: [card()],
+      templates: [template],
       mode: "apply",
-      applied: { cards: 1, benefits: 1, statusesMaterialized: 2 },
-    });
+    })).rejects.toThrow("superseded by global catalog migration");
   });
 
   it("does not propose writes for records whose exact keys are already populated", () => {

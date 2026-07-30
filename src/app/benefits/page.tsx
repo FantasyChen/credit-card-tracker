@@ -12,6 +12,7 @@ import {
   fetchDashboardBenefitStatuses,
   fetchRelevantUsageWays,
 } from '@/lib/benefit-dashboard-data';
+import { fetchEffectiveCardTerms } from '@/lib/effective-benefit';
 
 export const metadata: Metadata = {
   title: "Benefits Dashboard - Track All Your Credit Card Benefits",
@@ -39,10 +40,11 @@ export default async function BenefitsDashboardPage() {
   const now = new Date(); // Revert to actual system time
 
   // Fetch source records, then let the dashboard projection module own display shaping.
-  const [userCards, allStatusesRaw, notificationSettings] = await Promise.all([
+  const [storedUserCards, cardTerms, allStatusesRaw, notificationSettings] = await Promise.all([
     prisma.creditCard.findMany({
       where: { userId },
     }),
+    fetchEffectiveCardTerms(prisma, userId),
     fetchDashboardBenefitStatuses(prisma, userId, now),
     prisma.user.findUnique({
       where: { id: userId },
@@ -53,19 +55,21 @@ export default async function BenefitsDashboardPage() {
     }),
   ]);
 
-  const [usageWays, predefinedCardsForRoi] = await Promise.all([
-    fetchRelevantUsageWays(prisma, allStatusesRaw),
-    prisma.predefinedCard.findMany({
-      where: { name: { in: userCards.map((card) => card.name) } },
-      select: { name: true, annualFee: true },
-    }),
-  ]);
+  const termsByCardId = new Map(cardTerms.map((card) => [card.creditCardId, card]));
+  const userCards = storedUserCards.map((card) => {
+    const terms = termsByCardId.get(card.id);
+    return terms ? { ...card, name: terms.name, issuer: terms.issuer } : card;
+  });
+  const usageWays = await fetchRelevantUsageWays(prisma, allStatusesRaw);
 
   const projection = buildBenefitDashboardProjection({
     statuses: allStatusesRaw,
     userCards,
     usageWays,
-    predefinedCardFees: predefinedCardsForRoi,
+    predefinedCardFees: cardTerms.map((card) => ({
+      name: card.name,
+      annualFee: card.annualFee,
+    })),
     now,
   });
 

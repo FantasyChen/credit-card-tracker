@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports -- This executable intentionally uses CommonJS. */
 
 const fs = require('fs');
 
@@ -49,6 +50,9 @@ for (const path of publicApiFiles) {
 const packageJson = JSON.parse(assertFile('package.json'));
 if (packageJson.scripts?.build?.includes('prisma db seed')) {
   failures.push('package.json: build script must not run prisma db seed');
+}
+if (packageJson.scripts?.build?.includes('prisma migrate')) {
+  failures.push('package.json: generic build must not run Prisma migrations');
 }
 
 if (failures.length > 0) {

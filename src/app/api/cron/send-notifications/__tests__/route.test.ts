@@ -2,13 +2,13 @@ import { GET, POST } from '../route';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
+import { fetchEffectiveBenefitStatuses } from '@/lib/effective-benefit';
 // import { BenefitStatus, User, Benefit, CreditCard } from '@/generated/prisma'; // Types for mock data
 
 // --- Mocks ---
 jest.mock('@/lib/prisma', () => ({
   prisma: {
     user: { findMany: jest.fn() },
-    benefitStatus: { findMany: jest.fn() },
     loyaltyAccount: { findMany: jest.fn() },
     loyaltyCertificate: { findMany: jest.fn() },
   },
@@ -16,6 +16,10 @@ jest.mock('@/lib/prisma', () => ({
 
 jest.mock('@/lib/email', () => ({
   sendEmail: jest.fn(),
+}));
+
+jest.mock('@/lib/effective-benefit', () => ({
+  fetchEffectiveBenefitStatuses: jest.fn(),
 }));
 
 jest.mock('next/server', () => ({
@@ -47,7 +51,7 @@ describe('/api/cron/send-notifications', () => {
     consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     (prisma.user.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.benefitStatus.findMany as jest.Mock).mockResolvedValue([]);
+    (fetchEffectiveBenefitStatuses as jest.Mock).mockResolvedValue([]);
     (prisma.loyaltyAccount.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.loyaltyCertificate.findMany as jest.Mock).mockResolvedValue([]);
     (sendEmail as jest.Mock).mockResolvedValue(true); // Default successful email send
@@ -139,6 +143,8 @@ describe('/api/cron/send-notifications', () => {
         const benefitDetails = {
             id: `benefit-${id}`,
             description: `Benefit ${id}`,
+            creditCardId: `card-${id}`,
+            frequency: 'MONTHLY',
             creditCard: { id: `card-${id}`, name: `Card ${id}` },
             ...benefitOverrides,
         };
@@ -206,7 +212,7 @@ describe('/api/cron/send-notifications', () => {
         
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({ id: 'user-new-benefit' })]);
         
-        (prisma.benefitStatus.findMany as jest.Mock)
+        (fetchEffectiveBenefitStatuses as jest.Mock)
             .mockImplementationOnce(async (args) => {
                 const userIdMatch = args.where.userId === 'user-new-benefit';
                 const cycleStartDateExists = !!args.where.cycleStartDate;
@@ -242,7 +248,7 @@ describe('/api/cron/send-notifications', () => {
         jest.useFakeTimers().setSystemTime(systemTime);
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({ notifyExpirationDays: userNotifyDays })]);
         
-        (prisma.benefitStatus.findMany as jest.Mock)
+        (fetchEffectiveBenefitStatuses as jest.Mock)
             .mockResolvedValueOnce([]) // new benefits query
             .mockResolvedValueOnce([   // expiring benefits query (bulk: userId in [...])
                 mockBenefitStatus('expiring', utcDate(2023, 7, 23), expiryDate)
@@ -261,6 +267,33 @@ describe('/api/cron/send-notifications', () => {
         }));
     });
 
+    it('escapes user-controlled names and benefit terms in notification HTML', async () => {
+        const systemTime = utcDate(2023, 8, 15, 11, 0, 0);
+        const expiryDate = utcDate(2023, 8, 22, 12, 0, 0);
+
+        jest.useFakeTimers().setSystemTime(systemTime);
+        (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({
+            name: '<img src=x onerror=alert(1)>',
+            notifyNewBenefit: false,
+            notifyExpirationDays: 7,
+        })]);
+        (fetchEffectiveBenefitStatuses as jest.Mock).mockResolvedValueOnce([
+            mockBenefitStatus('escaped', utcDate(2023, 7, 1), expiryDate, 'user1', {
+                description: '<script>unsafe()</script>',
+                creditCard: { id: 'card-escaped', name: 'Card & "Rewards"' },
+            }),
+        ]);
+
+        await GET(createMockReq());
+
+        const html = (sendEmail as jest.Mock).mock.calls[0][0].html as string;
+        expect(html).not.toContain('<script>');
+        expect(html).not.toContain('<img src=x');
+        expect(html).toContain('&lt;script&gt;unsafe()&lt;/script&gt;');
+        expect(html).toContain('Card &amp; &quot;Rewards&quot;');
+        expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    });
+
     it('should honor custom benefit expiration windows for free users', async () => {
         const systemTime = utcDate(2023, 8, 15, 11, 0, 0);
         const sevenDayExpiry = utcDate(2023, 8, 22, 12, 0, 0);
@@ -277,7 +310,7 @@ describe('/api/cron/send-notifications', () => {
             }),
         ]);
 
-        (prisma.benefitStatus.findMany as jest.Mock)
+        (fetchEffectiveBenefitStatuses as jest.Mock)
             .mockResolvedValueOnce([
                 mockBenefitStatus('seven-days', utcDate(2023, 7, 23), sevenDayExpiry),
                 mockBenefitStatus('thirty-days', utcDate(2023, 7, 23), thirtyDayExpiry),
@@ -286,9 +319,9 @@ describe('/api/cron/send-notifications', () => {
         await GET(createMockReq('?dryRun=true'));
 
         const response = await (NextResponse.json as jest.Mock).mock.results.at(-1)?.value.json();
-        const expiringQuery = (prisma.benefitStatus.findMany as jest.Mock).mock.calls[0][0];
+        const expiringFilters = (fetchEffectiveBenefitStatuses as jest.Mock).mock.calls[0][1];
         expect(response.emailsAttempted).toBe(1);
-        expect(expiringQuery.where.cycleEndDate.lte).toEqual(utcDate(2023, 9, 14, 23, 59, 59, 999));
+        expect(expiringFilters.cycleEndOnOrBefore).toEqual(utcDate(2023, 9, 14, 23, 59, 59, 999));
     });
 
     it('should send digest email for expiring loyalty program points', async () => {
@@ -300,7 +333,7 @@ describe('/api/cron/send-notifications', () => {
         jest.useFakeTimers().setSystemTime(systemTime);
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({ pointsExpirationDays: userNotifyDays })]);
         
-        (prisma.benefitStatus.findMany as jest.Mock)
+        (fetchEffectiveBenefitStatuses as jest.Mock)
             .mockResolvedValueOnce([])  // new benefits
             .mockResolvedValueOnce([]); // expiring benefits
         
@@ -333,7 +366,7 @@ describe('/api/cron/send-notifications', () => {
         jest.useFakeTimers().setSystemTime(systemTime);
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({ pointsExpirationDays: userNotifyDays })]);
 
-        (prisma.benefitStatus.findMany as jest.Mock)
+        (fetchEffectiveBenefitStatuses as jest.Mock)
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce([]);
 
@@ -366,7 +399,7 @@ describe('/api/cron/send-notifications', () => {
         jest.useFakeTimers().setSystemTime(systemTime);
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({ pointsExpirationDays: userNotifyDays })]);
 
-        (prisma.benefitStatus.findMany as jest.Mock)
+        (fetchEffectiveBenefitStatuses as jest.Mock)
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce([]);
 
@@ -409,7 +442,7 @@ describe('/api/cron/send-notifications', () => {
 
         jest.useFakeTimers().setSystemTime(systemTime);
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser()]);
-        (prisma.benefitStatus.findMany as jest.Mock)
+        (fetchEffectiveBenefitStatuses as jest.Mock)
             .mockResolvedValueOnce([
                 mockBenefitStatus('custom-new', queryStartDate, utcDate(2023, 9, 14), 'user1', {
                     creditCard: null,
@@ -443,7 +476,7 @@ describe('/api/cron/send-notifications', () => {
 
         jest.useFakeTimers().setSystemTime(systemTime);
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser()]);
-        (prisma.benefitStatus.findMany as jest.Mock)
+        (fetchEffectiveBenefitStatuses as jest.Mock)
             .mockResolvedValueOnce([
                 mockBenefitStatus('weekly-new', queryStartDate, shortCycleEndDate, 'user1', {
                     creditCardId: 'card-weekly-new',
@@ -493,7 +526,7 @@ describe('/api/cron/send-notifications', () => {
         const queryMockDateStart = utcDate(2024, 1, 10); // Route logic will set to 00:00:00
 
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({id: 'user-mockdate'})]);
-        (prisma.benefitStatus.findMany as jest.Mock)
+        (fetchEffectiveBenefitStatuses as jest.Mock)
             .mockResolvedValueOnce([
                 mockBenefitStatus('mockedNew', queryMockDateStart, utcDate(2024, 2, 9), 'user-mockdate')
             ])
@@ -518,7 +551,7 @@ describe('/api/cron/send-notifications', () => {
 
         jest.useFakeTimers().setSystemTime(systemTime);
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser()]);
-        (prisma.benefitStatus.findMany as jest.Mock)
+        (fetchEffectiveBenefitStatuses as jest.Mock)
             .mockResolvedValueOnce([  // new benefits (bulk query returns matching data)
                 mockBenefitStatus('new', queryStartDate, utcDate(2023, 9, 14))
             ])
