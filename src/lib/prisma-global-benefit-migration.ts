@@ -133,9 +133,16 @@ async function readUnitKeys(
         SELECT ('card:' || c."id")::text AS "unitKey"
         FROM "CreditCard" c
         WHERE EXISTS (SELECT 1 FROM "Benefit" b WHERE b."creditCardId" = c."id")
-        UNION ALL
+        UNION
         SELECT ('standalone:' || "id")::text AS "unitKey"
         FROM "Benefit" WHERE "creditCardId" IS NULL
+        UNION
+        -- Cleanup can delete every copied Benefit in the page's final card unit.
+        -- Retain that unit only for cursor resolution so the next bounded page can
+        -- resume from its still-auditable ledger without reprocessing cleaned rows.
+        SELECT ('card:' || "creditCardId")::text AS "unitKey"
+        FROM "CatalogMigrationLedger"
+        WHERE "creditCardId" IS NOT NULL
       ) units
       WHERE md5('global-benefit-migration/v2:' || "unitKey") = ${afterCursorDigest}
       LIMIT 2

@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@/generated/prisma";
 import {
   classifyLegacyMigrationUnit,
+  encodeGlobalBenefitMigrationCursor,
   globalDefinitionFingerprint,
   migrationFingerprint,
   type ExistingMigrationLedger,
@@ -477,5 +478,27 @@ describe("Prisma global-benefit migration adapter", () => {
 
     await expect(harness.adapter.rollbackBridge(expected)).resolves.toMatchObject({ idempotent: 1, rolledBack: 0 });
     expect(harness.executeRaw).not.toHaveBeenCalled();
+  });
+
+  it("resolves a continuation cursor after cleanup deletes the final unit's copied benefits", async () => {
+    const cursor = encodeGlobalBenefitMigrationCursor("card:cleaned-card");
+    const queryRaw = jest.fn(async (query: unknown) => {
+      const text = sqlText(query);
+      if (text.includes("md5('global-benefit-migration/v2:'")) {
+        expect(text).toContain('FROM "CatalogMigrationLedger"');
+        return [{ unitKey: "card:cleaned-card" }];
+      }
+      if (text.includes('ORDER BY "unitKey" ASC')) return [];
+      if (text.includes('FROM "PredefinedCard"') || text.includes('FROM "PredefinedBenefit"')) return [];
+      throw new Error(`Unexpected mocked query: ${text}`);
+    });
+    const adapter = new PrismaGlobalBenefitMigrationDatabase({
+      $queryRaw: queryRaw,
+    } as unknown as PrismaClient);
+
+    await expect(adapter.readBatch({
+      afterCursorDigest: cursor.slice("v2.".length),
+      limit: 100,
+    })).resolves.toEqual({ definitions: [], units: [], hasMore: false });
   });
 });

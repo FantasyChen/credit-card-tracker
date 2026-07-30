@@ -61,7 +61,7 @@ The resume process emitted a complete success record with all gates true, but it
 
 ## Current gate
 
-The schema, catalog, legacy bridge, preservation, hybrid parity, and idempotency gates passed. Production AMEX remains `off`. The next independent boundary is publishing the reviewed release branch and deploying the application while retaining AMEX `off`, followed by read-only core smoke tests. Cleanup, HMAC provisioning, preview, userscript/provider activity, live scanning, and write activation remain separately gated.
+The schema, catalog, legacy bridge, preservation, hybrid parity, and idempotency gates passed. Production AMEX remains `off`. The next independent boundary is merging the reviewed release through the approved path and verifying its automatic application deployment while retaining AMEX `off`, followed by read-only core smoke tests. Cleanup, HMAC provisioning, preview, userscript/provider activity, live scanning, and write activation remain separately gated.
 
 ## Privacy
 
