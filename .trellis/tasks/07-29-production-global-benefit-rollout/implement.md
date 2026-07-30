@@ -8,14 +8,14 @@
 - [x] Exact targets, stop conditions, point-in-time recovery, and a provider-native recovery branch without compute are verified before production migration.
 - [x] The superseded `backfill:amex-catalog --apply` is disabled and will not be invoked.
 
-**Current gate:** Production target/recovery, additive schema, and global-catalog gates have passed under separate authorizations. Production AMEX remains `off`; legacy migration, push/deployment, cleanup, preview, and activation remain separately gated.
+**Current gate:** Production target/recovery, additive schema, global-catalog, legacy bridge, preservation, hybrid-parity, and idempotent-replay gates have passed under separate authorizations. Production AMEX remains `off`; push/deployment, cleanup, preview, and activation remain separately gated.
 
 ## 1. Review implementation evidence
 
 - [x] Review checked-in migration SQL, catalog/key invariants, runtime projection/materialization, migration preservation, AMEX global authority, and all safe checks.
 - [x] Confirm through source review/tests that public anonymous routes remain DB-free and no per-user standard override/authority exists.
 - [x] Record the six final full-scope fixes in the parent and owning child implementation artifacts without sensitive values.
-- [x] Confirm full Jest (74 suites, 593 passed, 1 skipped), strict TypeScript, all changed-source lint, public DB, card-template, userscript, safe usage-guide source/link, JSON/JSONL/Markdown-link, sensitive-pattern, package-context, and diff checks passed.
+- [x] Confirm full Jest (74 suites, 594 passed, 1 skipped), strict TypeScript, all changed-source lint, public DB, card-template, userscript, safe usage-guide source/link, JSON/JSONL/Markdown-link, sensitive-pattern, package-context, and diff checks passed.
 - [ ] Resolve any defect found by later development rehearsal in its owning implementation child; do not operationally work around it.
 
 ## 2. Verified development rehearsal
@@ -95,7 +95,7 @@
 ### Safe implementation evidence already reviewed
 
 ```text
-Full Jest: 74 suites passed; 593 tests passed; 1 skipped
+Full Jest: 74 suites passed; 594 tests passed; 1 skipped
 npx tsc --noEmit --pretty false --incremental false
 all changed source lint
 npm run check:public-db
@@ -118,8 +118,8 @@ git diff --check
 - [ ] Production cleanup/rollback, seed, reset, or other database mutation — unperformed.
 - [x] Verified development-database migration/catalog/runtime/bridge/rollback-re-bridge/synthetic-AMEX validation — completed.
 - [ ] Browser/live AMEX, userscript installation/publication, production preview, or confirmation — unperformed.
-- [ ] Production configuration change or deployment — unperformed.
-- [ ] Git commit or push — unperformed.
+- [ ] Production configuration change, main release, or rollout-authorized application deployment — unperformed; provider Preview state from the review branch is not claimed as evidence.
+- [x] Review branch commits/push — present for pull request review; no merge, main-branch release, or rollout-authorized application deployment was performed by these operational gates.
 
 The database-backed usage-guide audit was inadvertently invoked during final source review and failed read-only against the expected unmigrated schema before returning rows. It was not retried and made no mutation. Operational commands run only after their exact authorization; a skipped or blocked gate is not passed.
 
@@ -134,4 +134,4 @@ The earlier production read-only inspection and per-user-key dry-run are preserv
 
 ## Current status
 
-Implementation and verified-development prerequisites are complete. Production target/recovery, additive schema, and global catalog gates passed. The separately authorized 19-page legacy bridge classified 11,922 exact standards and 813 preserved customs with zero unresolved or blocked units; protected-state preservation, hybrid parity, and the complete 12,735-classification idempotent replay passed. Legacy rows and links remain, cleanup is deferred, and production AMEX remains effectively `off`. The next independent boundary is publishing the reviewed release branch and deploying the application with AMEX still off, followed by core read-only smoke tests. Cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
+Implementation and verified-development prerequisites are complete. Production target/recovery, additive schema, and global catalog gates passed. The separately authorized 19-page legacy bridge classified 11,922 exact standards and 813 preserved customs with zero unresolved or blocked units; protected-state preservation, hybrid parity, and the complete 12,735-classification idempotent replay passed. Legacy rows and links remain, cleanup is deferred, and production AMEX remains effectively `off`. The next independent boundary is merging the reviewed release through the approved path and verifying its automatic application deployment with AMEX still off, followed by core read-only smoke tests. Cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
