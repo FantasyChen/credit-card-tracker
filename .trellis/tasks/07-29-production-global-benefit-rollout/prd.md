@@ -32,7 +32,8 @@ Operationally migrate and validate the global-benefit model in development and p
 - [x] Fresh production dry-runs reconcile every row to exact standard or preserved custom outcomes with no unresolved unit and no fuzzy inference.
 - [x] Production bridge preserves every pre-existing status/state/cycle/timestamp/audit/provenance field and is deterministic/idempotent.
 - [ ] Cleanup, if authorized, removes only ledger-proven standard copies and has a tested recovery point.
-- [ ] Standard definitions are read-only, latest global terms are visible, and catalog additions reach existing active cards without state resets.
+- [x] Standard definitions are read-only, latest global terms are visible, and catalog additions reach existing active cards without state resets.
+- [x] The reviewed application release is merged and deployed with AMEX `off`; anonymous core smoke and post-deployment catalog/bridge invariants pass.
 - [x] The old per-user AMEX key apply is not executed and user keys have no runtime authority.
 - [ ] Preview is authenticated and zero-write; userscript installation/live scan are separately authorized and audited.
 - [ ] Write, if authorized, is bounded and reconciles expected attempts/audits/provenance/status changes with no unrelated account effects.
