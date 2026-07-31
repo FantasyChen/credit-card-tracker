@@ -75,7 +75,7 @@
 
 ## 7. Preview and userscript boundary
 
-- [ ] Verify global AMEX authority deployment, exact target, migrations, and effective off state.
+- [x] Verify global AMEX authority deployment, exact target, migrations, and effective off state.
 - [ ] Separately provision production HMAC and configure preview without exposing values.
 - [ ] Redeploy through the approved path and prove authenticated preview is zero-write.
 - [ ] Build/audit and separately install the production userscript through the owner-approved procedure.
@@ -110,7 +110,7 @@ git diff --check
 
 ### Operational status
 
-- [ ] `npm run build` or any production build — unperformed.
+- [x] Automatic production application build — completed from the reviewed merge; the generic build remained migration-free and the deployment reached ready.
 - [x] Read-only production environment, migration status, and database-identity checks — completed with sanitized aggregate output.
 - [x] Production additive schema migration deploy — completed after explicit authorization; post-status is up to date and required columns are present.
 - [x] Production catalog apply — completed after separate authorization; 34 cards and 129 benefits were adopted, and the immediate dry-run reported all rows unchanged with zero conflicts.
@@ -118,8 +118,8 @@ git diff --check
 - [ ] Production cleanup/rollback, seed, reset, or other database mutation — unperformed.
 - [x] Verified development-database migration/catalog/runtime/bridge/rollback-re-bridge/synthetic-AMEX validation — completed.
 - [ ] Browser/live AMEX, userscript installation/publication, production preview, or confirmation — unperformed.
-- [ ] Production configuration change, main release, or rollout-authorized application deployment — unperformed; provider Preview state from the review branch is not claimed as evidence.
-- [x] Review branch commits/push — present for pull request review; no merge, main-branch release, or rollout-authorized application deployment was performed by these operational gates.
+- [x] Main release and rollout-authorized automatic production deployment — completed through reviewed pull request #10 with AMEX still `off`; no production configuration value changed.
+- [x] Review branch push, pull-request review, merge, promoted production alias, anonymous core smoke, and post-deployment database invariants — passed.
 
 The database-backed usage-guide audit was inadvertently invoked during final source review and failed read-only against the expected unmigrated schema before returning rows. It was not retried and made no mutation. Operational commands run only after their exact authorization; a skipped or blocked gate is not passed.
 
@@ -134,4 +134,4 @@ The earlier production read-only inspection and per-user-key dry-run are preserv
 
 ## Current status
 
-Implementation and verified-development prerequisites are complete. Production target/recovery, additive schema, and global catalog gates passed. The separately authorized 19-page legacy bridge classified 11,922 exact standards and 813 preserved customs with zero unresolved or blocked units; protected-state preservation, hybrid parity, and the complete 12,735-classification idempotent replay passed. Legacy rows and links remain, cleanup is deferred, and production AMEX remains effectively `off`. The next independent boundary is merging the reviewed release through the approved path and verifying its automatic application deployment with AMEX still off, followed by core read-only smoke tests. Cleanup, preview, userscript/provider activity, and write activation remain later independent boundaries.
+Implementation, verified-development, production target/recovery, additive schema, global catalog, legacy bridge, preservation, hybrid parity, and idempotent replay gates passed. Pull request #10 was independently reviewed, corrected, merged, and automatically deployed; the promoted production alias and anonymous core routes passed smoke tests, and post-deployment catalog/bridge invariants remain exact. Legacy rows and links remain, cleanup is deferred, and production AMEX remains effectively `off`. Cleanup, HMAC provisioning, preview, userscript/provider activity, live scanning, and write activation remain later independent boundaries.

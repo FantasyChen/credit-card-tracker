@@ -50,7 +50,8 @@
 
 - [x] Reverify all development evidence and define production recovery/stop conditions.
 - [x] Obtain and record separate approvals for the completed production schema, catalog, and legacy-bridge boundaries.
-- [ ] Keep cleanup, application deployment, preview, userscript, live-provider, and write boundaries independently unapproved until each receives its own later decision.
+- [x] Obtain and record the reviewed main-release and automatic application-deployment authorization and verification.
+- [ ] Keep cleanup, preview, userscript, live-provider, and write boundaries independently unapproved until each receives its own later decision.
 - [x] Generate fresh sanitized evidence from the new operators; do not reuse historical counts as acceptance evidence.
 
 ## 3. Cross-child integration review
@@ -109,7 +110,7 @@ The following sanitized evidence is retained from the superseded rollout and rem
 - [x] Pre-cleanup rollback and exact re-bridge rehearsal completed with preservation checks.
 - [x] Separately authorized production target/recovery, additive schema, global-catalog, legacy-bridge, preservation, hybrid-parity, and idempotent-replay gates completed with sanitized evidence.
 - [ ] Separately gated production cleanup — not run.
-- [ ] Main release, rollout-authorized application deployment, and production configuration change — not performed; provider Preview state from the review branch is not claimed as rollout evidence.
+- [x] Main release and rollout-authorized automatic application deployment — completed through reviewed pull request #10 with AMEX `off`; no production configuration value changed.
 - [ ] Browser/live provider scan or userscript installation/publication — not run.
 - [ ] Production preview or write activation — not performed; AMEX remains effectively `off`.
 
@@ -124,4 +125,4 @@ The following sanitized evidence is retained from the superseded rollout and rem
 
 ## Current status
 
-Development validation and the separately authorized production target/recovery, additive schema, global catalog, exact legacy bridge, preservation, hybrid-parity, and idempotent-replay gates have passed. The parent remains `in_progress`; production AMEX remains effectively `off`. The next boundary is merging the reviewed release through the approved path and verifying its automatic deployment while retaining `off`, followed by read-only smoke tests. Cleanup, preview, userscript/provider activity, write activation, and rollback-window removal remain independent later gates.
+Development validation and the separately authorized production target/recovery, additive schema, global catalog, exact legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed merge, automatic application deployment, and read-only smoke gates have passed. The parent remains `in_progress`; production AMEX remains effectively `off`. Cleanup, HMAC provisioning, preview, userscript/provider activity, live scanning, write activation, and rollback-window removal remain independent later gates.
