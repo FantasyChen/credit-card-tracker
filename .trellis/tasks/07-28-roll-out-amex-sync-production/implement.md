@@ -51,7 +51,7 @@
 - [x] Reverify all development evidence and define production recovery/stop conditions.
 - [x] Obtain and record separate approvals for the completed production schema, catalog, and legacy-bridge boundaries.
 - [x] Obtain and record the reviewed main-release and automatic application-deployment authorization and verification.
-- [x] Enable authenticated zero-write production preview only after its separate approval and prerequisite gates; keep cleanup, userscript, live-provider, and write boundaries independently unapproved until each receives its own later decision.
+- [x] Enable authenticated zero-write production preview only after its separate approval and prerequisite gates; cleanup, userscript, live-provider, and write boundaries remained independently gated, and write configuration later received its own decision without authorizing confirmation.
 - [x] Generate fresh sanitized evidence from the new operators; do not reuse historical counts as acceptance evidence.
 
 ## 3. Cross-child integration review
@@ -112,18 +112,18 @@ The following sanitized evidence is retained from the superseded rollout and rem
 - [ ] Separately gated production cleanup — not run.
 - [x] Main release and rollout-authorized automatic application deployment — completed through reviewed pull request #10 with AMEX `off`; no production configuration value changed.
 - [ ] Browser/live provider scan or userscript installation/publication — not run.
-- [x] Production preview — separately authorized, configured with a sensitive HMAC, deployed, and authenticated as zero-write; AMEX now resolves to `preview`.
-- [ ] Production write activation — not performed.
+- [x] Production preview — separately authorized, configured with a sensitive HMAC, deployed, and authenticated as zero-write.
+- [x] Production write activation — separately authorized, configured on the exact production project, deployed Ready, and authenticated through a zero-write synthetic preview response returning mode `write`; no proposal was confirmed.
 
 ## 6. Parent completion gate
 
 - [x] Children 1, 2, and 4 have verified development evidence and are eligible for completion/archive.
 - [ ] Child 3 remains pending only the separately gated cleanup deletion/recovery boundary.
 - [x] Child 5 records fresh development and completed production schema/catalog/bridge evidence without reusing historical per-user-key counts.
-- [ ] Child 5 remains `in_progress` pending optional cleanup, userscript/live-provider, write, and rollback-window boundaries; release deployment and preview are complete.
+- [ ] Child 5 remains `in_progress` pending optional cleanup, userscript/live-provider activity, first confirmation, and rollback-window boundaries; release deployment, preview, and write configuration are complete.
 - [x] Production AMEX remained effectively `off` throughout the completed production database gates.
 - [ ] Legacy columns/ledger retention and any future removal are handed to a separate rollback-window task after rollout evidence exists.
 
 ## Current status
 
-Development validation and the separately authorized production target/recovery, additive schema, global catalog, exact legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed merge, application deployment, anonymous smoke, and authenticated zero-write preview gates have passed. The parent remains `in_progress`; production AMEX now resolves to `preview`. Cleanup, userscript/provider activity, live scanning, write activation, and rollback-window removal remain independent later gates.
+Development validation and the separately authorized production target/recovery, additive schema, global catalog, exact legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed merge, application deployment, anonymous smoke, authenticated zero-write preview, and write-configuration gates have passed. The parent remains `in_progress`; production AMEX now resolves to `write`, but no proposal has been confirmed. Cleanup, userscript/provider activity, live scanning, first confirmation, and rollback-window removal remain independent later gates.
