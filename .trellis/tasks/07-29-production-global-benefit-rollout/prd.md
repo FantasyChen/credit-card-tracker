@@ -35,7 +35,7 @@ Operationally migrate and validate the global-benefit model in development and p
 - [x] Standard definitions are read-only, latest global terms are visible, and catalog additions reach existing active cards without state resets.
 - [x] The reviewed application release is merged and deployed with AMEX `off`; anonymous core smoke and post-deployment catalog/bridge invariants pass.
 - [x] The old per-user AMEX key apply is not executed and user keys have no runtime authority.
-- [ ] Preview is authenticated and zero-write; userscript installation/live scan are separately authorized and audited.
+- [x] Preview is authenticated and zero-write; userscript installation and live scan remain unperformed and separately gated.
 - [ ] Write, if authorized, is bounded and reconciles expected attempts/audits/provenance/status changes with no unrelated account effects.
 - [ ] Rollback to mode `off` and pre-cleanup bridge rollback are operationally verified; evidence is sanitized.
 
