@@ -77,6 +77,13 @@ describe("Amex sync mode", () => {
   ])("fails closed for configuration %#", (environment, expected) => {
     expect(resolveAmexSyncConfiguration(environment).mode).toBe(expected);
   });
+
+  it.each(["preview\n", "write\n"])("fails closed for newline-contaminated mode %p", (mode) => {
+    expect(resolveAmexSyncConfiguration({
+      AMEX_SYNC_MODE: mode,
+      AMEX_SYNC_HMAC_KEY: key,
+    })).toEqual({ mode: "off", hmacKey: null });
+  });
 });
 
 describe("HMAC-bound Amex sync proposal", () => {
