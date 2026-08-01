@@ -22,7 +22,7 @@ The successful response had only these sanitized properties:
 - HTTP status: 200;
 - mode: `preview`;
 - proposal rows: 0;
-- card skips: 0, because the envelope contained no benefit rows requiring card mapping;
+- card skips: 0, because the fresh nonexistent synthetic identity owned no destination cards;
 - signed proposal token: present;
 - proposal expiry: present;
 - cache policy: private and no-store;
