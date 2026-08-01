@@ -8,7 +8,7 @@
 - [x] Exact targets, stop conditions, point-in-time recovery, and a provider-native recovery branch without compute are verified before production migration.
 - [x] The superseded `backfill:amex-catalog --apply` is disabled and will not be invoked.
 
-**Current gate:** Production target/recovery, additive schema, global-catalog, legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed deployment, and authenticated zero-write preview gates have passed under separate authorizations. Production AMEX is `preview`; cleanup, userscript/provider activity, and write activation remain separately gated.
+**Current gate:** Production target/recovery, additive schema, global-catalog, legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed deployment, authenticated zero-write preview, and separately authorized write-configuration gates have passed. Production AMEX is `write`, but no proposal has been confirmed; cleanup, userscript/provider activity, real-account proposal review, and the first bounded confirmation remain separately gated.
 
 ## 1. Review implementation evidence
 
@@ -84,8 +84,8 @@
 
 ## 8. Write boundary
 
-- [ ] Present sanitized preview evidence and obtain a separate explicit write decision.
-- [ ] Enable write through the approved configuration/deployment path.
+- [x] Present sanitized preview evidence and obtain a separate explicit write decision.
+- [x] Enable write through the approved configuration/deployment path without confirming a proposal.
 - [ ] Perform one bounded explicit confirmation.
 - [ ] Reconcile attempt, row-audit, provenance, destination status, and unrelated-account aggregates.
 - [ ] Return mode off immediately on any mismatch; do not issue compensating repair writes without review.
@@ -119,7 +119,8 @@ git diff --check
 - [x] Verified development-database migration/catalog/runtime/bridge/rollback-re-bridge/synthetic-AMEX validation — completed.
 - [ ] Browser/live AMEX, userscript installation/publication, or confirmation — unperformed.
 - [x] Production preview — configured with a sensitive HMAC, deployed, and verified through one authenticated synthetic HTTP 200 preview with zero proposal rows and exactly unchanged zero synthetic-user database counts.
-- [x] Main release and rollout-authorized automatic production deployment — completed through reviewed pull request #10 with AMEX `off`; the later separately authorized preview deployment reached Ready and the primary alias was verified against its deployment ID.
+- [x] Production write activation — separately authorized after preview evidence, configured on the exact production project with a fresh sensitive HMAC, deployed Ready, and verified through an authenticated synthetic HTTP 200 response returning mode `write` with exactly unchanged zero database counts; no proposal was confirmed.
+- [x] Main release and rollout-authorized automatic production deployment — completed through reviewed pull request #10 with AMEX `off`; later separately authorized preview and write deployments reached Ready and their primary aliases were verified against deployment IDs.
 - [x] Review branch push, pull-request review, merge, promoted production alias, anonymous core smoke, and post-deployment database invariants — passed.
 
 The database-backed usage-guide audit was inadvertently invoked during final source review and failed read-only against the expected unmigrated schema before returning rows. It was not retried and made no mutation. Operational commands run only after their exact authorization; a skipped or blocked gate is not passed.
@@ -135,4 +136,4 @@ The earlier production read-only inspection and per-user-key dry-run are preserv
 
 ## Current status
 
-Implementation, verified-development, production target/recovery, additive schema, global catalog, legacy bridge, preservation, hybrid parity, idempotent replay, reviewed deployment, anonymous smoke, and authenticated zero-write preview gates passed. The production primary alias is verified against the preview-configured Ready deployment; production AMEX resolves to `preview`, the successful synthetic response was HTTP 200 with zero proposal rows, and all ten synthetic-user-scoped database counts remained zero and exactly unchanged. Legacy rows and links remain and cleanup is deferred. Cleanup, userscript/provider activity, live scanning, confirmation, and write activation remain later independent boundaries.
+Implementation, verified-development, production target/recovery, additive schema, global catalog, legacy bridge, preservation, hybrid parity, idempotent replay, reviewed deployment, anonymous smoke, authenticated zero-write preview, and separately authorized write-configuration gates passed. The production primary alias is verified against the Ready write-configured deployment; production AMEX resolves to `write`, the authenticated synthetic response was HTTP 200 with zero proposal rows, and all ten synthetic-user-scoped database counts remained zero and exactly unchanged. No proposal was confirmed. Legacy rows and links remain and cleanup is deferred. Cleanup, userscript/provider activity, live scanning, real-account proposal review, and the first bounded confirmation remain later independent boundaries.
