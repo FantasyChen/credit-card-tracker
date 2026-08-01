@@ -3,7 +3,7 @@
 ## Operating Rules
 
 - This parent coordinates children and production gates; it does not own application code.
-- Keep production AMEX effectively `off` through children 1–4 and every unapproved child-5 boundary.
+- Keep production AMEX effectively `off` through children 1–4 and until the preview boundary receives separate authorization; preview authorization does not authorize userscript, provider, confirmation, or write actions.
 - Do not run the old `backfill:amex-catalog --apply`. Its per-user key writes are superseded even for the formerly accepted strict partial subset.
 - Database, deployment, configuration, userscript, provider, live-browser, and git-history actions require their own authorization and target verification.
 
@@ -51,7 +51,7 @@
 - [x] Reverify all development evidence and define production recovery/stop conditions.
 - [x] Obtain and record separate approvals for the completed production schema, catalog, and legacy-bridge boundaries.
 - [x] Obtain and record the reviewed main-release and automatic application-deployment authorization and verification.
-- [ ] Keep cleanup, preview, userscript, live-provider, and write boundaries independently unapproved until each receives its own later decision.
+- [x] Enable authenticated zero-write production preview only after its separate approval and prerequisite gates; keep cleanup, userscript, live-provider, and write boundaries independently unapproved until each receives its own later decision.
 - [x] Generate fresh sanitized evidence from the new operators; do not reuse historical counts as acceptance evidence.
 
 ## 3. Cross-child integration review
@@ -112,17 +112,18 @@ The following sanitized evidence is retained from the superseded rollout and rem
 - [ ] Separately gated production cleanup — not run.
 - [x] Main release and rollout-authorized automatic application deployment — completed through reviewed pull request #10 with AMEX `off`; no production configuration value changed.
 - [ ] Browser/live provider scan or userscript installation/publication — not run.
-- [ ] Production preview or write activation — not performed; AMEX remains effectively `off`.
+- [x] Production preview — separately authorized, configured with a sensitive HMAC, deployed, and authenticated as zero-write; AMEX now resolves to `preview`.
+- [ ] Production write activation — not performed.
 
 ## 6. Parent completion gate
 
 - [x] Children 1, 2, and 4 have verified development evidence and are eligible for completion/archive.
 - [ ] Child 3 remains pending only the separately gated cleanup deletion/recovery boundary.
 - [x] Child 5 records fresh development and completed production schema/catalog/bridge evidence without reusing historical per-user-key counts.
-- [ ] Child 5 remains `in_progress` pending release deployment, optional cleanup, preview, userscript/live-provider, write, and rollback-window boundaries.
+- [ ] Child 5 remains `in_progress` pending optional cleanup, userscript/live-provider, write, and rollback-window boundaries; release deployment and preview are complete.
 - [x] Production AMEX remained effectively `off` throughout the completed production database gates.
 - [ ] Legacy columns/ledger retention and any future removal are handed to a separate rollback-window task after rollout evidence exists.
 
 ## Current status
 
-Development validation and the separately authorized production target/recovery, additive schema, global catalog, exact legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed merge, automatic application deployment, and read-only smoke gates have passed. The parent remains `in_progress`; production AMEX remains effectively `off`. Cleanup, HMAC provisioning, preview, userscript/provider activity, live scanning, write activation, and rollback-window removal remain independent later gates.
+Development validation and the separately authorized production target/recovery, additive schema, global catalog, exact legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed merge, application deployment, anonymous smoke, and authenticated zero-write preview gates have passed. The parent remains `in_progress`; production AMEX now resolves to `preview`. Cleanup, userscript/provider activity, live scanning, write activation, and rollback-window removal remain independent later gates.

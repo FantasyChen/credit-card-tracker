@@ -4,11 +4,11 @@
 
 - [x] Children 1–4 are code-complete and their safe static/unit checks have been reviewed.
 - [x] Children 1–4 passed separately authorized verified development-database validation.
-- [x] Production AMEX remains effectively off.
+- [x] Production AMEX remained effectively off through the prerequisite gates before separately authorized preview enablement.
 - [x] Exact targets, stop conditions, point-in-time recovery, and a provider-native recovery branch without compute are verified before production migration.
 - [x] The superseded `backfill:amex-catalog --apply` is disabled and will not be invoked.
 
-**Current gate:** Production target/recovery, additive schema, global-catalog, legacy bridge, preservation, hybrid-parity, and idempotent-replay gates have passed under separate authorizations. Production AMEX remains `off`; push/deployment, cleanup, preview, and activation remain separately gated.
+**Current gate:** Production target/recovery, additive schema, global-catalog, legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed deployment, and authenticated zero-write preview gates have passed under separate authorizations. Production AMEX is `preview`; cleanup, userscript/provider activity, and write activation remain separately gated.
 
 ## 1. Review implementation evidence
 
@@ -76,8 +76,8 @@
 ## 7. Preview and userscript boundary
 
 - [x] Verify global AMEX authority deployment, exact target, migrations, and effective off state.
-- [ ] Separately provision production HMAC and configure preview without exposing values.
-- [ ] Redeploy through the approved path and prove authenticated preview is zero-write.
+- [x] Separately provision production HMAC and configure preview without exposing values.
+- [x] Redeploy through the approved path and prove authenticated preview is zero-write.
 - [ ] Build/audit and separately install the production userscript through the owner-approved procedure.
 - [ ] Obtain attended live-scan authorization and review sanitized proposed/unchanged/skipped/failed outcomes.
 - [ ] Require zero unexpected destination and no custom/unresolved/user-key authority.
@@ -117,8 +117,9 @@ git diff --check
 - [x] Production legacy bridge apply — completed under separate authorization; preservation, hybrid parity, and complete idempotent replay passed.
 - [ ] Production cleanup/rollback, seed, reset, or other database mutation — unperformed.
 - [x] Verified development-database migration/catalog/runtime/bridge/rollback-re-bridge/synthetic-AMEX validation — completed.
-- [ ] Browser/live AMEX, userscript installation/publication, production preview, or confirmation — unperformed.
-- [x] Main release and rollout-authorized automatic production deployment — completed through reviewed pull request #10 with AMEX still `off`; no production configuration value changed.
+- [ ] Browser/live AMEX, userscript installation/publication, or confirmation — unperformed.
+- [x] Production preview — configured with a sensitive HMAC, deployed, and verified through one authenticated synthetic HTTP 200 preview with zero proposal rows and exactly unchanged zero synthetic-user database counts.
+- [x] Main release and rollout-authorized automatic production deployment — completed through reviewed pull request #10 with AMEX `off`; the later separately authorized preview deployment reached Ready and the primary alias was verified against its deployment ID.
 - [x] Review branch push, pull-request review, merge, promoted production alias, anonymous core smoke, and post-deployment database invariants — passed.
 
 The database-backed usage-guide audit was inadvertently invoked during final source review and failed read-only against the expected unmigrated schema before returning rows. It was not retried and made no mutation. Operational commands run only after their exact authorization; a skipped or blocked gate is not passed.
@@ -134,4 +135,4 @@ The earlier production read-only inspection and per-user-key dry-run are preserv
 
 ## Current status
 
-Implementation, verified-development, production target/recovery, additive schema, global catalog, legacy bridge, preservation, hybrid parity, and idempotent replay gates passed. Pull request #10 was independently reviewed, corrected, merged, and automatically deployed; the promoted production alias and anonymous core routes passed smoke tests, and post-deployment catalog/bridge invariants remain exact. Legacy rows and links remain, cleanup is deferred, and production AMEX remains effectively `off`. Cleanup, HMAC provisioning, preview, userscript/provider activity, live scanning, and write activation remain later independent boundaries.
+Implementation, verified-development, production target/recovery, additive schema, global catalog, legacy bridge, preservation, hybrid parity, idempotent replay, reviewed deployment, anonymous smoke, and authenticated zero-write preview gates passed. The production primary alias is verified against the preview-configured Ready deployment; production AMEX resolves to `preview`, the successful synthetic response was HTTP 200 with zero proposal rows, and all ten synthetic-user-scoped database counts remained zero and exactly unchanged. Legacy rows and links remain and cleanup is deferred. Cleanup, userscript/provider activity, live scanning, confirmation, and write activation remain later independent boundaries.
