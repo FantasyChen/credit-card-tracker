@@ -24,7 +24,7 @@
 
 require('dotenv').config();
 
-const { PrismaClient } = require('../src/generated/prisma');
+const { Prisma, PrismaClient } = require('../src/generated/prisma');
 const prisma = new PrismaClient();
 
 /**
@@ -224,6 +224,39 @@ async function fixDuplicateBenefitStatuses(dryRun = true) {
     console.log('\nTo apply these changes, run:');
     console.log('  node scripts/fix-duplicate-benefit-statuses.cjs --force\n');
     return { deleted: 0, normalized: 0, wouldDelete: toDelete.length, wouldNormalize: allToNormalize.length };
+  }
+
+  // Superseded broad repair: fail closed before its first force batch when any
+  // selected keeper/deletion/normalization intersects active repair evidence.
+  const selectedStatusIds = Array.from(new Set([
+    ...toDelete,
+    ...allToNormalize.map((row) => row.id),
+  ]));
+  if (selectedStatusIds.length > 0) {
+    const intersections = await prisma.$queryRaw(Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM "GlobalBenefitCategoryRepairOccurrence" evidence
+        JOIN "GlobalBenefitCategoryRepair" repair ON repair."id" = evidence."repairId"
+        WHERE repair."phase" = 'APPLIED'
+          AND (
+            evidence."keeperStatusId" IN (${Prisma.join(selectedStatusIds)})
+            OR EXISTS (
+              SELECT 1 FROM "BenefitStatus" selected
+              WHERE selected."id" IN (${Prisma.join(selectedStatusIds)})
+                AND selected."userId" = evidence."userId"
+                AND selected."creditCardId" = evidence."creditCardId"
+                AND selected."predefinedBenefitId" = evidence."predefinedBenefitId"
+                AND selected."cycleStartDate" = evidence."cycleStartDate"
+                AND selected."cycleEndDate" = evidence."cycleEndDate"
+                AND selected."occurrenceIndex" = evidence."occurrenceIndex"
+            )
+          )
+      ) AS "exists"
+    `);
+    if (intersections[0] && intersections[0].exists) {
+      throw new Error('Superseded duplicate-status repair intersects active category-repair evidence.');
+    }
   }
 
   // Execute in batches with transaction

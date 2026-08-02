@@ -1,5 +1,6 @@
 import { BenefitCycleAlignment, BenefitFrequency } from '@/generated/prisma';
 import { calculateBenefitCycle } from '@/lib/benefit-cycle';
+import { globalDefinitionFingerprint } from '@/lib/global-benefit-migration';
 import { prisma } from '@/lib/prisma';
 import {
   amexSyncAuditRetentionCutoff,
@@ -84,6 +85,78 @@ function customDefinition(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function categoryRepairParent(overrides: Record<string, unknown> = {}) {
+  const benefit = {
+    id: 'global-benefit-1',
+    catalogKey: 'benefit:global-card-1:credit-1',
+    predefinedCardId: 'global-card-1',
+    category: 'Dining',
+    description: 'Current canonical credit',
+    percentage: 100,
+    maxAmount: 100,
+    frequency: BenefitFrequency.QUARTERLY,
+    cycleAlignment: BenefitCycleAlignment.CALENDAR_FIXED,
+    fixedCycleStartMonth: null,
+    fixedCycleDurationMonths: null,
+    occurrencesInCycle: 1,
+    productKey: 'product-1',
+    creditFamilyKey: 'product-1:credit-1',
+    periodKey: 'calendar-quarter',
+    retiredAt: null,
+  };
+  return {
+    sourceBenefitId: 'custom-benefit-1',
+    ledgerId: 'ledger-1',
+    ledgerLegacyBenefitId: 'custom-benefit-1',
+    ledgerUserId: 'user-1',
+    ledgerCreditCardId: 'card-1',
+    ledgerPredefinedCardId: null,
+    ledgerPredefinedBenefitId: null,
+    ledgerClassification: 'CUSTOM',
+    ledgerPhase: 'CLASSIFIED',
+    ledgerDestinationFingerprint: null,
+    repairId: 'repair-1',
+    repairLegacyBenefitId: 'custom-benefit-1',
+    repairLedgerId: 'ledger-1',
+    repairUserId: 'user-1',
+    repairCreditCardId: 'card-1',
+    repairPredefinedCardId: 'global-card-1',
+    repairPredefinedBenefitId: 'global-benefit-1',
+    targetCardCatalogKey: 'card:global-card-1',
+    targetBenefitCatalogKey: 'benefit:global-card-1:credit-1',
+    definitionFingerprint: globalDefinitionFingerprint(benefit),
+    evidenceVersion: 1,
+    repairPhase: 'APPLIED',
+    repairRolledBackAt: null,
+    cardId: 'card-1',
+    cardUserId: 'user-1',
+    cardPredefinedCardId: 'global-card-1',
+    productId: 'global-card-1',
+    productCatalogKey: 'card:global-card-1',
+    productName: 'Global Card',
+    productIssuer: 'Issuer',
+    productKey: 'product-1',
+    productRetiredAt: null,
+    benefitId: benefit.id,
+    benefitCatalogKey: benefit.catalogKey,
+    benefitPredefinedCardId: benefit.predefinedCardId,
+    benefitCategory: benefit.category,
+    benefitDescription: benefit.description,
+    benefitPercentage: benefit.percentage,
+    benefitMaxAmount: benefit.maxAmount,
+    benefitFrequency: benefit.frequency,
+    benefitCycleAlignment: benefit.cycleAlignment,
+    benefitFixedCycleStartMonth: benefit.fixedCycleStartMonth,
+    benefitFixedCycleDurationMonths: benefit.fixedCycleDurationMonths,
+    benefitOccurrencesInCycle: benefit.occurrencesInCycle,
+    benefitProductKey: benefit.productKey,
+    benefitCreditFamilyKey: benefit.creditFamilyKey,
+    benefitPeriodKey: benefit.periodKey,
+    benefitRetiredAt: benefit.retiredAt,
+    ...overrides,
+  };
+}
+
 describe('/api/cron/check-benefits', () => {
   let originalProcessEnv: NodeJS.ProcessEnv;
 
@@ -151,6 +224,7 @@ describe('/api/cron/check-benefits', () => {
     expect(standardSql).toContain('LIMIT');
     expect(customSql).toContain("'CLASSIFIED', 'BRIDGED', 'CLEANED'");
     expect(customSql).toContain('generate_series');
+    expect(customSql).toContain('FROM "GlobalBenefitCategoryRepair" repair_order');
     expect(customSql).toContain('LIMIT');
     expect(mockCreateMany).not.toHaveBeenCalled();
     expect(body).toMatchObject({
@@ -213,6 +287,43 @@ describe('/api/cron/check-benefits', () => {
       standardDefinitionsProcessed: 1,
       customAndLegacyDefinitionsProcessed: 1,
     });
+  });
+
+  it('suppresses only a custom source with exact applied category-repair authority', async () => {
+    mockQueryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([customDefinition()])
+      .mockResolvedValueOnce([categoryRepairParent()]);
+
+    const response = await GET(request());
+    const body = await response.json();
+    const categoryRepairSql = (mockQueryRaw.mock.calls[2][0] as readonly string[]).join('');
+
+    expect(categoryRepairSql).toContain('FROM "GlobalBenefitCategoryRepair" r');
+    expect(categoryRepairSql).toContain('JOIN "CatalogMigrationLedger" l');
+    expect(categoryRepairSql).toContain('AND b."id" IN (');
+    expect(body).toMatchObject({
+      rowsCalculated: 0,
+      customAndLegacyDefinitionsProcessed: 0,
+    });
+    expect(mockCreateMany).not.toHaveBeenCalled();
+  });
+
+  it('keeps a custom source materializable when applied repair evidence is malformed', async () => {
+    mockQueryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([customDefinition()])
+      .mockResolvedValueOnce([categoryRepairParent({ definitionFingerprint: 'drifted' })]);
+    mockCreateMany.mockResolvedValueOnce({ count: 1 });
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(body).toMatchObject({
+      rowsCalculated: 1,
+      customAndLegacyDefinitionsProcessed: 1,
+    });
+    expect(mockCreateMany).toHaveBeenCalledTimes(1);
   });
 
   it('keeps duplicate physical cards as separate standard status candidates', async () => {

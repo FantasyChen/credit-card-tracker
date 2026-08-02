@@ -115,6 +115,34 @@ describe('deleteCardAction', () => {
     ]);
   });
 
+  it('blocks card deletion before writes when active category-repair evidence exists', async () => {
+    mockGetServerSession.mockResolvedValue({ user: { id: 'user-1' }, expires: '2025-12-31' });
+    mockPrisma.creditCard.findUnique.mockResolvedValue({
+      id: 'clxx1234567890123456789012',
+      userId: 'user-1',
+    } as any);
+    (mockPrisma.$queryRaw as unknown as { mockResolvedValueOnce(value: unknown): void })
+      .mockResolvedValueOnce([{ exists: true }]);
+
+    const formData = new FormData();
+    formData.append('cardId', 'clxx1234567890123456789012');
+
+    await expect(deleteCardAction(formData)).resolves.toEqual({
+      success: false,
+      error: 'Failed to delete card.',
+    });
+    const repairGuardSql = (mockPrisma.$queryRaw as jest.Mock).mock.calls[0][0] as {
+      strings: readonly string[];
+      values: unknown[];
+    };
+    expect(repairGuardSql.strings.join('')).not.toContain('repair."userId"');
+    expect(repairGuardSql.values).toEqual(['clxx1234567890123456789012']);
+    expect(mockPrisma.$executeRaw).not.toHaveBeenCalled();
+    expect(mockPrisma.benefitStatus.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.creditCard.deleteMany).not.toHaveBeenCalled();
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+
   it('returns error when delete throws', async () => {
     mockGetServerSession.mockResolvedValue({ user: { id: 'user-1' }, expires: '2025-12-31' });
     mockPrisma.creditCard.findUnique.mockResolvedValue({

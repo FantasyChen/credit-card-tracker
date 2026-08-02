@@ -330,6 +330,48 @@ describe("legacy global-benefit exact classifier", () => {
     });
   });
 
+  it("replays an exact applied category repair only as a historical custom exception", () => {
+    const original = benefit({ category: 'Legacy drifted category' });
+    const first = classifyLegacyMigrationUnit(unit({ benefits: [original] }), [globalCard()]);
+    const repaired = benefit({
+      category: 'Travel',
+      categoryRepairAuthority: 'APPLIED_VALID',
+      ledger: {
+        legacyBenefitId: 'legacy-benefit-1',
+        userId: 'owner-1',
+        creditCardId: 'owned-card-1',
+        predefinedCardId: null,
+        predefinedBenefitId: null,
+        classification: 'CUSTOM',
+        phase: 'CLASSIFIED',
+        sourceFingerprint: first.benefits[0].sourceFingerprint,
+        destinationFingerprint: null,
+      },
+      statuses: [{
+        ...benefit().statuses[0],
+        creditCardId: 'owned-card-1',
+        predefinedBenefitId: 'global-benefit-1',
+      }],
+    });
+    const repairedUnit = unit({ benefits: [repaired] });
+    repairedUnit.card!.predefinedCardId = 'global-card-1';
+
+    expect(classifyLegacyMigrationUnit(repairedUnit, [globalCard()])).toMatchObject({
+      blocked: false,
+      benefits: [{
+        disposition: 'custom',
+        reason: 'unmatched_benefit_custom',
+        sourceFingerprint: first.benefits[0].sourceFingerprint,
+        ledgerPhase: 'CLASSIFIED',
+      }],
+    });
+
+    repaired.categoryRepairAuthority = 'APPLIED_INVALID';
+    const invalid = classifyLegacyMigrationUnit(repairedUnit, [globalCard()]);
+    expect(invalid.blocked).toBe(true);
+    expect(invalid.benefits[0].reason).toBe('relationship_inconsistent');
+  });
+
   it("rejects unledgered pre-existing global links so rollback only clears bridge-added metadata", () => {
     const prelinked = benefit({
       statuses: [{

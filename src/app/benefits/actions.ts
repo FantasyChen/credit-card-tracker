@@ -685,6 +685,12 @@ export async function updateCustomBenefitAction(formData: FormData) {
           WHERE ledger."legacyBenefitId" = b."id"
             AND ledger."classification" = 'STANDARD'
         )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "GlobalBenefitCategoryRepair" repair
+          WHERE repair."legacyBenefitId" = b."id"
+            AND repair."phase" = 'APPLIED'
+        )
     `);
     if (updatedCount === 0) {
       throw new Error('Custom benefit not found or permission denied.');
@@ -754,6 +760,12 @@ export async function deleteCustomBenefitAction(formData: FormData) {
           FROM "CatalogMigrationLedger" ledger
           WHERE ledger."legacyBenefitId" = b."id"
             AND ledger."classification" = 'STANDARD'
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "GlobalBenefitCategoryRepair" repair
+          WHERE repair."legacyBenefitId" = b."id"
+            AND repair."phase" = 'APPLIED'
         )
     `);
     if (deletedCount === 0) {

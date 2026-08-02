@@ -107,6 +107,7 @@ export interface LegacyBenefitRecord extends LegacyBenefitShape {
   audits: LegacyAuditRelation[];
   provenance: LegacyProvenanceRelation[];
   ledger: ExistingMigrationLedger | null;
+  categoryRepairAuthority?: "NONE" | "ROLLED_BACK" | "APPLIED_VALID" | "APPLIED_INVALID";
 }
 
 export interface LegacyCardRecord {
@@ -249,7 +250,7 @@ function shapesEqual(legacy: LegacyBenefitRecord, definition: GlobalBenefitDefin
   return shapeFields.every((field) => legacy[field] === definition[field]);
 }
 
-function sourceFingerprint(benefit: LegacyBenefitRecord): string {
+export function legacyBenefitSourceFingerprint(benefit: LegacyBenefitRecord): string {
   return migrationFingerprint({
     id: benefit.id,
     creditCardId: benefit.creditCardId,
@@ -322,6 +323,7 @@ function relationGraphIsConsistent(
   cardId: string | null,
   definition: GlobalBenefitDefinition | null,
 ): boolean {
+  if (benefit.categoryRepairAuthority === "APPLIED_VALID") return true;
   const statusIds = new Set(benefit.statuses.map((status) => status.id));
   const bridgeIsRecorded = definition !== null
     && benefit.ledger?.classification === "STANDARD"
@@ -356,7 +358,7 @@ function unresolved(
     legacyBenefitId: benefit.id,
     disposition: "unresolved",
     reason,
-    sourceFingerprint: sourceFingerprint(benefit),
+    sourceFingerprint: legacyBenefitSourceFingerprint(benefit),
     destinationFingerprint: null,
     predefinedBenefitId: null,
     ledgerPhase: benefit.ledger?.phase ?? null,
@@ -368,7 +370,9 @@ function custom(
   reason: "standalone_custom" | "unmatched_card_custom" | "unmatched_benefit_custom",
   card: LegacyCardRecord | null,
 ): ClassifiedLegacyBenefit {
-  const source = sourceFingerprint(benefit);
+  const source = benefit.categoryRepairAuthority === "APPLIED_VALID" && benefit.ledger
+    ? benefit.ledger.sourceFingerprint
+    : legacyBenefitSourceFingerprint(benefit);
   if (!ledgerAgrees(benefit, "custom", card, null, null, source, null)) return unresolved(benefit, "ledger_conflict");
   return {
     legacyBenefitId: benefit.id,
@@ -489,6 +493,12 @@ export function classifyLegacyMigrationUnit(
       }
       return custom(benefit, "unmatched_benefit_custom", card);
     }
+    // A valid additive category repair remains historically CUSTOM even when its
+    // repaired category makes the current source shape equal the global shape.
+    // Persisted exact repair evidence, not relaxed matching, grants this exception.
+    if (benefit.categoryRepairAuthority === "APPLIED_VALID") {
+      return custom(benefit, "unmatched_benefit_custom", card);
+    }
     const shapeMatches = globalCard.benefits.filter((definition) => shapesEqual(benefit, definition));
     if (shapeMatches.length === 0) {
       if (!relationGraphIsConsistent(benefit, card.userId, card.id, null)) return unresolved(benefit, "relationship_inconsistent");
@@ -500,7 +510,7 @@ export function classifyLegacyMigrationUnit(
     if (!relationGraphIsConsistent(benefit, card.userId, card.id, definition)) {
       return unresolved(benefit, "relationship_inconsistent");
     }
-    const source = sourceFingerprint(benefit);
+    const source = legacyBenefitSourceFingerprint(benefit);
     const destination = globalDefinitionFingerprint(definition);
     if (!ledgerAgrees(benefit, "standard", card, globalCard.id, definition, source, destination)) {
       return unresolved(benefit, "ledger_conflict");

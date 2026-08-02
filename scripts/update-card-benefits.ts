@@ -14,7 +14,7 @@
  */
 
 import dotenv from 'dotenv';
-import { PrismaClient, type Benefit, type CreditCard, type PredefinedBenefit } from '../src/generated/prisma';
+import { Prisma, PrismaClient, type Benefit, type CreditCard, type PredefinedBenefit } from '../src/generated/prisma';
 import { materializeBenefitStatusRows } from '../src/lib/benefit-cycle-materialization';
 
 dotenv.config();
@@ -168,6 +168,15 @@ async function migrateExistingUsers(): Promise<boolean> {
   for (const userCard of userCards) {
     try {
       await prisma.$transaction(async (tx) => {
+        const activeRepairs = await tx.$queryRaw<Array<{ exists: boolean }>>`
+          SELECT EXISTS (
+            SELECT 1 FROM "GlobalBenefitCategoryRepair"
+            WHERE "creditCardId" = ${userCard.id} AND "phase" = 'APPLIED'
+          ) AS "exists"
+        `;
+        if (activeRepairs[0]?.exists) {
+          throw new Error('Superseded card update is blocked by active category-repair evidence.');
+        }
         const existingBenefits = userCard.benefits;
         const templateBenefits = predefinedCard.benefits;
 
@@ -325,6 +334,17 @@ async function createBenefitStatuses(): Promise<boolean> {
   if (isDryRun) {
     console.log(`   DRY RUN: Would create ${statusesToCreate.length} benefit status record(s)`);
     return true;
+  }
+
+  const repairRows = await prisma.$queryRaw<Array<{ exists: boolean }>>(Prisma.sql`
+    SELECT EXISTS (
+      SELECT 1 FROM "GlobalBenefitCategoryRepair"
+      WHERE "creditCardId" IN (${Prisma.join(userCards.map((card) => card.id))})
+        AND "phase" = 'APPLIED'
+    ) AS "exists"
+  `);
+  if (repairRows[0]?.exists) {
+    throw new Error('Superseded card update is blocked by active category-repair evidence.');
   }
 
   const batchSize = 500;

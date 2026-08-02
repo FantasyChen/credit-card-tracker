@@ -1,4 +1,6 @@
 import { Prisma, type BenefitCycleAlignment, type BenefitFrequency, type PrismaClient } from '@/generated/prisma';
+import { classifyGlobalBenefitCategoryRepairAuthority } from './global-benefit-category-repair-authority';
+import type { GlobalBenefitDefinition, GlobalCardDefinition } from './global-benefit-migration';
 
 export type EffectiveBenefitSource =
   | { kind: 'standard'; predefinedBenefitId: string; creditCardId: string }
@@ -173,6 +175,7 @@ interface EffectiveBenefitRow {
   legacyPeriodKey: string | null;
 
   globalId: string | null;
+  globalCatalogKey: string | null;
   globalPredefinedCardId: string | null;
   globalCategory: string | null;
   globalDescription: string | null;
@@ -188,8 +191,44 @@ interface EffectiveBenefitRow {
   globalProductKey: string | null;
   globalCreditFamilyKey: string | null;
   globalPeriodKey: string | null;
+  globalRetiredAt: Date | null;
   globalUsageWaySlug: string | null;
+  migrationLedgerId: string | null;
+  migrationLegacyBenefitId: string | null;
+  migrationUserId: string | null;
+  migrationCreditCardId: string | null;
+  migrationPredefinedCardId: string | null;
+  migrationPredefinedBenefitId: string | null;
   migrationClassification: 'STANDARD' | 'CUSTOM' | null;
+  migrationPhase: string | null;
+  migrationDestinationFingerprint: string | null;
+  repairId: string | null;
+  repairLegacyBenefitId: string | null;
+  repairLedgerId: string | null;
+  repairUserId: string | null;
+  repairCreditCardId: string | null;
+  repairPredefinedCardId: string | null;
+  repairPredefinedBenefitId: string | null;
+  repairTargetCardCatalogKey: string | null;
+  repairTargetBenefitCatalogKey: string | null;
+  repairDefinitionFingerprint: string | null;
+  repairEvidenceVersion: number | null;
+  repairPhase: string | null;
+  repairRolledBackAt: Date | null;
+  occurrenceRepairId: string | null;
+  occurrenceUserId: string | null;
+  occurrenceCreditCardId: string | null;
+  occurrencePredefinedBenefitId: string | null;
+  occurrenceTargetBenefitCatalogKey: string | null;
+  occurrenceAction: string | null;
+  occurrenceKeeperSource: string | null;
+  occurrenceKeeperStatusId: string | null;
+  occurrenceCycleStartDate: Date | null;
+  occurrenceCycleEndDate: Date | null;
+  occurrenceIndexEvidence: number | null;
+  occurrenceKeeperBaselineVersion: number | null;
+  occurrenceRemovedPreimageVersion: number | null;
+  occurrenceAuditMetadataVersion: number | null;
 
   cardId: string | null;
   cardName: string | null;
@@ -213,6 +252,11 @@ interface EffectiveBenefitRow {
   cardLifecycleNotes: string | null;
   cardProductKey: string | null;
   cardPredefinedCardId: string | null;
+  productCatalogKey: string | null;
+  productName: string | null;
+  productIssuer: string | null;
+  productProductKey: string | null;
+  productRetiredAt: Date | null;
 }
 
 export async function fetchEffectiveBenefitStatuses(
@@ -280,6 +324,7 @@ export async function fetchEffectiveBenefitStatuses(
       b."periodKey" AS "legacyPeriodKey",
 
       pb."id" AS "globalId",
+      pb."catalogKey" AS "globalCatalogKey",
       pb."predefinedCardId" AS "globalPredefinedCardId",
       pb."category" AS "globalCategory",
       pb."description" AS "globalDescription",
@@ -295,8 +340,44 @@ export async function fetchEffectiveBenefitStatuses(
       pb."productKey" AS "globalProductKey",
       pb."creditFamilyKey" AS "globalCreditFamilyKey",
       pb."periodKey" AS "globalPeriodKey",
+      pb."retiredAt" AS "globalRetiredAt",
       uw."slug" AS "globalUsageWaySlug",
+      ledger."id" AS "migrationLedgerId",
+      ledger."legacyBenefitId" AS "migrationLegacyBenefitId",
+      ledger."userId" AS "migrationUserId",
+      ledger."creditCardId" AS "migrationCreditCardId",
+      ledger."predefinedCardId" AS "migrationPredefinedCardId",
+      ledger."predefinedBenefitId" AS "migrationPredefinedBenefitId",
       ledger."classification"::text AS "migrationClassification",
+      ledger."phase"::text AS "migrationPhase",
+      ledger."destinationFingerprint" AS "migrationDestinationFingerprint",
+      repair."id" AS "repairId",
+      repair."legacyBenefitId" AS "repairLegacyBenefitId",
+      repair."catalogMigrationLedgerId" AS "repairLedgerId",
+      repair."userId" AS "repairUserId",
+      repair."creditCardId" AS "repairCreditCardId",
+      repair."predefinedCardId" AS "repairPredefinedCardId",
+      repair."predefinedBenefitId" AS "repairPredefinedBenefitId",
+      repair."targetPredefinedCardCatalogKey" AS "repairTargetCardCatalogKey",
+      repair."targetPredefinedBenefitCatalogKey" AS "repairTargetBenefitCatalogKey",
+      repair."definitionFingerprint" AS "repairDefinitionFingerprint",
+      repair."evidenceVersion" AS "repairEvidenceVersion",
+      repair."phase"::text AS "repairPhase",
+      repair."rolledBackAt" AS "repairRolledBackAt",
+      occurrence."repairId" AS "occurrenceRepairId",
+      occurrence."userId" AS "occurrenceUserId",
+      occurrence."creditCardId" AS "occurrenceCreditCardId",
+      occurrence."predefinedBenefitId" AS "occurrencePredefinedBenefitId",
+      occurrence."targetPredefinedBenefitCatalogKey" AS "occurrenceTargetBenefitCatalogKey",
+      occurrence."action"::text AS "occurrenceAction",
+      occurrence."keeperSource"::text AS "occurrenceKeeperSource",
+      occurrence."keeperStatusId" AS "occurrenceKeeperStatusId",
+      occurrence."cycleStartDate" AS "occurrenceCycleStartDate",
+      occurrence."cycleEndDate" AS "occurrenceCycleEndDate",
+      occurrence."occurrenceIndex" AS "occurrenceIndexEvidence",
+      occurrence."keeperBaselineVersion" AS "occurrenceKeeperBaselineVersion",
+      occurrence."removedStatusPreimageVersion" AS "occurrenceRemovedPreimageVersion",
+      occurrence."repairAddedAuditMetadataVersion" AS "occurrenceAuditMetadataVersion",
 
       c."id" AS "cardId",
       COALESCE(pc."name", c."name") AS "cardName",
@@ -319,12 +400,21 @@ export async function fetchEffectiveBenefitStatuses(
       c."productChangedTo" AS "cardProductChangedTo",
       c."lifecycleNotes" AS "cardLifecycleNotes",
       c."productKey" AS "cardProductKey",
-      c."predefinedCardId" AS "cardPredefinedCardId"
+      c."predefinedCardId" AS "cardPredefinedCardId",
+      pc."catalogKey" AS "productCatalogKey",
+      pc."name" AS "productName",
+      pc."issuer" AS "productIssuer",
+      pc."productKey" AS "productProductKey",
+      pc."retiredAt" AS "productRetiredAt"
     FROM "BenefitStatus" bs
     LEFT JOIN "Benefit" b ON b."id" = bs."benefitId"
     LEFT JOIN "PredefinedBenefit" pb ON pb."id" = bs."predefinedBenefitId"
     LEFT JOIN "BenefitUsageWay" uw ON uw."id" = pb."usageWayId"
     LEFT JOIN "CatalogMigrationLedger" ledger ON ledger."legacyBenefitId" = b."id"
+    LEFT JOIN "GlobalBenefitCategoryRepair" repair ON repair."legacyBenefitId" = b."id"
+    LEFT JOIN "GlobalBenefitCategoryRepairOccurrence" occurrence
+      ON occurrence."repairId" = repair."id"
+      AND occurrence."keeperStatusId" = bs."id"
     LEFT JOIN "CreditCard" c
       ON c."id" = COALESCE(bs."creditCardId", b."creditCardId")
       AND c."userId" = bs."userId"
@@ -378,6 +468,7 @@ export async function findEffectiveBenefitStatus(
       b."creditFamilyKey" AS "legacyCreditFamilyKey",
       b."periodKey" AS "legacyPeriodKey",
       pb."id" AS "globalId",
+      pb."catalogKey" AS "globalCatalogKey",
       pb."predefinedCardId" AS "globalPredefinedCardId",
       pb."category" AS "globalCategory",
       pb."description" AS "globalDescription",
@@ -393,8 +484,44 @@ export async function findEffectiveBenefitStatus(
       pb."productKey" AS "globalProductKey",
       pb."creditFamilyKey" AS "globalCreditFamilyKey",
       pb."periodKey" AS "globalPeriodKey",
+      pb."retiredAt" AS "globalRetiredAt",
       uw."slug" AS "globalUsageWaySlug",
+      ledger."id" AS "migrationLedgerId",
+      ledger."legacyBenefitId" AS "migrationLegacyBenefitId",
+      ledger."userId" AS "migrationUserId",
+      ledger."creditCardId" AS "migrationCreditCardId",
+      ledger."predefinedCardId" AS "migrationPredefinedCardId",
+      ledger."predefinedBenefitId" AS "migrationPredefinedBenefitId",
       ledger."classification"::text AS "migrationClassification",
+      ledger."phase"::text AS "migrationPhase",
+      ledger."destinationFingerprint" AS "migrationDestinationFingerprint",
+      repair."id" AS "repairId",
+      repair."legacyBenefitId" AS "repairLegacyBenefitId",
+      repair."catalogMigrationLedgerId" AS "repairLedgerId",
+      repair."userId" AS "repairUserId",
+      repair."creditCardId" AS "repairCreditCardId",
+      repair."predefinedCardId" AS "repairPredefinedCardId",
+      repair."predefinedBenefitId" AS "repairPredefinedBenefitId",
+      repair."targetPredefinedCardCatalogKey" AS "repairTargetCardCatalogKey",
+      repair."targetPredefinedBenefitCatalogKey" AS "repairTargetBenefitCatalogKey",
+      repair."definitionFingerprint" AS "repairDefinitionFingerprint",
+      repair."evidenceVersion" AS "repairEvidenceVersion",
+      repair."phase"::text AS "repairPhase",
+      repair."rolledBackAt" AS "repairRolledBackAt",
+      occurrence."repairId" AS "occurrenceRepairId",
+      occurrence."userId" AS "occurrenceUserId",
+      occurrence."creditCardId" AS "occurrenceCreditCardId",
+      occurrence."predefinedBenefitId" AS "occurrencePredefinedBenefitId",
+      occurrence."targetPredefinedBenefitCatalogKey" AS "occurrenceTargetBenefitCatalogKey",
+      occurrence."action"::text AS "occurrenceAction",
+      occurrence."keeperSource"::text AS "occurrenceKeeperSource",
+      occurrence."keeperStatusId" AS "occurrenceKeeperStatusId",
+      occurrence."cycleStartDate" AS "occurrenceCycleStartDate",
+      occurrence."cycleEndDate" AS "occurrenceCycleEndDate",
+      occurrence."occurrenceIndex" AS "occurrenceIndexEvidence",
+      occurrence."keeperBaselineVersion" AS "occurrenceKeeperBaselineVersion",
+      occurrence."removedStatusPreimageVersion" AS "occurrenceRemovedPreimageVersion",
+      occurrence."repairAddedAuditMetadataVersion" AS "occurrenceAuditMetadataVersion",
       c."id" AS "cardId",
       COALESCE(pc."name", c."name") AS "cardName",
       COALESCE(pc."issuer", c."issuer") AS "cardIssuer",
@@ -416,12 +543,21 @@ export async function findEffectiveBenefitStatus(
       c."productChangedTo" AS "cardProductChangedTo",
       c."lifecycleNotes" AS "cardLifecycleNotes",
       c."productKey" AS "cardProductKey",
-      c."predefinedCardId" AS "cardPredefinedCardId"
+      c."predefinedCardId" AS "cardPredefinedCardId",
+      pc."catalogKey" AS "productCatalogKey",
+      pc."name" AS "productName",
+      pc."issuer" AS "productIssuer",
+      pc."productKey" AS "productProductKey",
+      pc."retiredAt" AS "productRetiredAt"
     FROM "BenefitStatus" bs
     LEFT JOIN "Benefit" b ON b."id" = bs."benefitId"
     LEFT JOIN "PredefinedBenefit" pb ON pb."id" = bs."predefinedBenefitId"
     LEFT JOIN "BenefitUsageWay" uw ON uw."id" = pb."usageWayId"
     LEFT JOIN "CatalogMigrationLedger" ledger ON ledger."legacyBenefitId" = b."id"
+    LEFT JOIN "GlobalBenefitCategoryRepair" repair ON repair."legacyBenefitId" = b."id"
+    LEFT JOIN "GlobalBenefitCategoryRepairOccurrence" occurrence
+      ON occurrence."repairId" = repair."id"
+      AND occurrence."keeperStatusId" = bs."id"
     LEFT JOIN "CreditCard" c
       ON c."id" = COALESCE(bs."creditCardId", b."creditCardId")
       AND c."userId" = bs."userId"
@@ -431,6 +567,114 @@ export async function findEffectiveBenefitStatus(
   `);
 
   return rows[0] ? projectEffectiveBenefitRow(rows[0]) : null;
+}
+
+function categoryRepairAuthorityForRow(row: EffectiveBenefitRow): ReturnType<typeof classifyGlobalBenefitCategoryRepairAuthority> {
+  if (!row.benefitId || !row.globalId || !row.globalCatalogKey || !row.globalPredefinedCardId
+    || !row.productCatalogKey || !row.productName || !row.productIssuer
+    || !row.cardId || !row.cardUserId || !row.migrationLedgerId
+    || !row.migrationLegacyBenefitId || !row.migrationUserId || !row.repairId
+    || !row.repairLegacyBenefitId || !row.repairLedgerId || !row.repairUserId
+    || !row.repairCreditCardId || !row.repairPredefinedCardId
+    || !row.repairPredefinedBenefitId || !row.repairTargetCardCatalogKey
+    || !row.repairTargetBenefitCatalogKey || !row.repairDefinitionFingerprint
+    || row.repairEvidenceVersion === null || !row.repairPhase) return row.repairId ? 'APPLIED_INVALID' : 'NONE';
+
+  const benefit: GlobalBenefitDefinition = {
+    id: row.globalId,
+    catalogKey: row.globalCatalogKey,
+    predefinedCardId: row.globalPredefinedCardId,
+    category: required(row.globalCategory, 'global category', row.statusId),
+    description: required(row.globalDescription, 'global description', row.statusId),
+    percentage: requiredNumber(row.globalPercentage, 'global percentage', row.statusId),
+    maxAmount: row.globalMaxAmount,
+    frequency: required(row.globalFrequency, 'global frequency', row.statusId),
+    cycleAlignment: row.globalCycleAlignment,
+    fixedCycleStartMonth: row.globalFixedCycleStartMonth,
+    fixedCycleDurationMonths: row.globalFixedCycleDurationMonths,
+    occurrencesInCycle: row.globalOccurrencesInCycle ?? 1,
+    productKey: row.globalProductKey,
+    creditFamilyKey: row.globalCreditFamilyKey,
+    periodKey: row.globalPeriodKey,
+    retiredAt: row.globalRetiredAt,
+  };
+  const product: GlobalCardDefinition = {
+    id: row.globalPredefinedCardId,
+    catalogKey: row.productCatalogKey,
+    name: row.productName,
+    issuer: row.productIssuer,
+    productKey: row.productProductKey,
+    retiredAt: row.productRetiredAt,
+    benefits: [benefit],
+  };
+  const occurrence = row.occurrenceRepairId && row.occurrenceUserId
+    && row.occurrenceCreditCardId && row.occurrencePredefinedBenefitId
+    && row.occurrenceTargetBenefitCatalogKey && row.occurrenceAction
+    && row.occurrenceKeeperSource && row.occurrenceKeeperStatusId
+    && row.occurrenceCycleStartDate && row.occurrenceCycleEndDate
+    && row.occurrenceIndexEvidence !== null
+    && row.occurrenceKeeperBaselineVersion !== null
+    && row.occurrenceAuditMetadataVersion !== null
+    ? {
+        repairId: row.occurrenceRepairId,
+        userId: row.occurrenceUserId,
+        creditCardId: row.occurrenceCreditCardId,
+        predefinedBenefitId: row.occurrencePredefinedBenefitId,
+        targetPredefinedBenefitCatalogKey: row.occurrenceTargetBenefitCatalogKey,
+        action: row.occurrenceAction,
+        keeperSource: row.occurrenceKeeperSource,
+        keeperStatusId: row.occurrenceKeeperStatusId,
+        cycleStartDate: row.occurrenceCycleStartDate,
+        cycleEndDate: row.occurrenceCycleEndDate,
+        occurrenceIndex: row.occurrenceIndexEvidence,
+        keeperBaselineVersion: row.occurrenceKeeperBaselineVersion,
+        removedStatusPreimageVersion: row.occurrenceRemovedPreimageVersion,
+        repairAddedAuditMetadataVersion: row.occurrenceAuditMetadataVersion,
+      }
+    : null;
+  return classifyGlobalBenefitCategoryRepairAuthority({
+    sourceBenefitId: row.benefitId,
+    ledger: {
+      id: row.migrationLedgerId,
+      legacyBenefitId: row.migrationLegacyBenefitId,
+      userId: row.migrationUserId,
+      creditCardId: row.migrationCreditCardId,
+      predefinedCardId: row.migrationPredefinedCardId,
+      predefinedBenefitId: row.migrationPredefinedBenefitId,
+      classification: row.migrationClassification ?? '',
+      phase: row.migrationPhase ?? '',
+      destinationFingerprint: row.migrationDestinationFingerprint,
+    },
+    repair: {
+      id: row.repairId,
+      legacyBenefitId: row.repairLegacyBenefitId,
+      catalogMigrationLedgerId: row.repairLedgerId,
+      userId: row.repairUserId,
+      creditCardId: row.repairCreditCardId,
+      predefinedCardId: row.repairPredefinedCardId,
+      predefinedBenefitId: row.repairPredefinedBenefitId,
+      targetPredefinedCardCatalogKey: row.repairTargetCardCatalogKey,
+      targetPredefinedBenefitCatalogKey: row.repairTargetBenefitCatalogKey,
+      definitionFingerprint: row.repairDefinitionFingerprint,
+      evidenceVersion: row.repairEvidenceVersion,
+      phase: row.repairPhase,
+      rolledBackAt: row.repairRolledBackAt,
+    },
+    card: { id: row.cardId, userId: row.cardUserId, predefinedCardId: row.cardPredefinedCardId },
+    product,
+    benefit,
+    status: {
+      id: row.statusId,
+      benefitId: row.benefitId,
+      creditCardId: row.statusCreditCardId,
+      predefinedBenefitId: row.predefinedBenefitId,
+      userId: row.userId,
+      cycleStartDate: row.cycleStartDate,
+      cycleEndDate: row.cycleEndDate,
+      occurrenceIndex: row.occurrenceIndex,
+    },
+    occurrence,
+  });
 }
 
 export function projectEffectiveBenefitRow(row: EffectiveBenefitRow): EffectiveBenefitStatus {
@@ -446,6 +690,19 @@ export function projectEffectiveBenefitRow(row: EffectiveBenefitRow): EffectiveB
     }
     if (row.globalPredefinedCardId !== card.predefinedCardId) {
       throw new Error(`Standard benefit status ${row.statusId} links definitions from different global products.`);
+    }
+    if (row.benefitId) {
+      const strictBridge = row.migrationLegacyBenefitId === row.benefitId
+        && row.migrationUserId === row.userId
+        && row.migrationCreditCardId === card.id
+        && row.migrationPredefinedCardId === card.predefinedCardId
+        && row.migrationPredefinedBenefitId === row.globalId
+        && row.migrationClassification === 'STANDARD'
+        && row.migrationPhase === 'BRIDGED';
+      const repairAuthority = categoryRepairAuthorityForRow(row);
+      if (!strictBridge && repairAuthority !== 'APPLIED_VALID') {
+        throw new Error(`Benefit status ${row.statusId} has an invalid retained-benefit global authority.`);
+      }
     }
 
     const source: EffectiveBenefitSource = row.benefitId
