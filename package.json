@@ -39,6 +39,7 @@
     "backfill:amex-catalog": "tsx scripts/backfill-amex-catalog-keys.ts",
     "sync:global-catalog": "tsx scripts/sync-global-catalog.ts",
     "migrate:global-benefits": "tsx scripts/migrate-global-benefits.ts",
+    "repair:global-benefit-categories": "tsx scripts/repair-global-benefit-categories.ts",
     "clone:amex-user:dev": "tsx scripts/clone-amex-user-to-development.ts",
     "postinstall": "prisma generate",
     "db:check": "node scripts/check-database-connection.js",

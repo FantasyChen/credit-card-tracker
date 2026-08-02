@@ -40,9 +40,11 @@ model User {
   searchAnalytics         SearchAnalytics[]
   sessions                Session[]
   standaloneBenefits      Benefit[] // Custom benefits not tied to a card
-  externalCardMappings    ExternalCardMapping[]
-  amexSyncAttempts        AmexSyncAttempt[]
-  catalogMigrationLedger  CatalogMigrationLedger[]
+  externalCardMappings                   ExternalCardMapping[]
+  amexSyncAttempts                       AmexSyncAttempt[]
+  catalogMigrationLedger                 CatalogMigrationLedger[]
+  globalBenefitCategoryRepairs           GlobalBenefitCategoryRepair[]           @relation("CategoryRepairOwner")
+  globalBenefitCategoryRepairOccurrences GlobalBenefitCategoryRepairOccurrence[] @relation("CategoryRepairOccurrenceOwner")
 }
 
 model Account {
@@ -114,9 +116,11 @@ model CreditCard {
   benefitStatuses     BenefitStatus[]
   events              CreditCardEvent[]
   externalMappings    ExternalCardMapping[]
-  syncRowAudits       AmexSyncRowAudit[]
-  catalogMigrations   CatalogMigrationLedger[]
-  predefinedCard      PredefinedCard?       @relation(fields: [predefinedCardId], references: [id], onDelete: Restrict)
+  syncRowAudits                    AmexSyncRowAudit[]
+  catalogMigrations                CatalogMigrationLedger[]
+  globalBenefitCategoryRepairs     GlobalBenefitCategoryRepair[]           @relation("CategoryRepairCreditCard")
+  categoryRepairOccurrenceEvidence GlobalBenefitCategoryRepairOccurrence[] @relation("CategoryRepairOccurrenceCreditCard")
+  predefinedCard                   PredefinedCard?                          @relation(fields: [predefinedCardId], references: [id], onDelete: Restrict)
   user                User                  @relation(fields: [userId], references: [id])
 
   @@index([userId, productKey, lastFourDigits])
@@ -164,6 +168,7 @@ model Benefit {
   user                     User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   benefitStatuses          BenefitStatus[]
   syncRowAudits            AmexSyncRowAudit[]
+  categoryRepair           GlobalBenefitCategoryRepair? @relation("CategoryRepairLegacyBenefit")
 
   @@index([creditCardId, productKey, creditFamilyKey, periodKey])
 }
@@ -179,9 +184,10 @@ model PredefinedCard {
   retiredAt         DateTime?
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
-  benefits          PredefinedBenefit[]
-  creditCards       CreditCard[]
-  catalogMigrations CatalogMigrationLedger[]
+  benefits                     PredefinedBenefit[]
+  creditCards                  CreditCard[]
+  catalogMigrations            CatalogMigrationLedger[]
+  globalBenefitCategoryRepairs GlobalBenefitCategoryRepair[] @relation("CategoryRepairPredefinedCard")
 }
 
 model PredefinedBenefit {
@@ -207,8 +213,10 @@ model PredefinedBenefit {
   predefinedCard           PredefinedCard         @relation(fields: [predefinedCardId], references: [id], onDelete: Restrict)
   usageWay                 BenefitUsageWay?       @relation(fields: [usageWayId], references: [id])
   benefitStatuses          BenefitStatus[]
-  catalogMigrations        CatalogMigrationLedger[]
-  syncRowAudits            AmexSyncRowAudit[]
+  catalogMigrations                CatalogMigrationLedger[]
+  syncRowAudits                    AmexSyncRowAudit[]
+  globalBenefitCategoryRepairs     GlobalBenefitCategoryRepair[]           @relation("CategoryRepairPredefinedBenefit")
+  categoryRepairOccurrenceEvidence GlobalBenefitCategoryRepairOccurrence[] @relation("CategoryRepairOccurrencePredefinedBenefit")
 
   @@index([predefinedCardId, retiredAt])
   @@index([productKey, creditFamilyKey, periodKey])
@@ -247,8 +255,9 @@ model BenefitStatus {
   creditCard               CreditCard?                     @relation(fields: [creditCardId], references: [id], onDelete: Restrict)
   predefinedBenefit        PredefinedBenefit?              @relation(fields: [predefinedBenefitId], references: [id], onDelete: Restrict)
   user                     User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceProvenance         BenefitStatusSourceProvenance[]
-  syncRowAudits            AmexSyncRowAudit[]
+  sourceProvenance                 BenefitStatusSourceProvenance[]
+  syncRowAudits                    AmexSyncRowAudit[]
+  categoryRepairKeeperEvidence     GlobalBenefitCategoryRepairOccurrence? @relation("CategoryRepairKeeperStatus")
 
   @@unique([benefitId, userId, cycleStartDate, occurrenceIndex], map: "BenefitStatus_custom_occurrence_key")
   @@index([creditCardId, predefinedBenefitId, userId, cycleStartDate, occurrenceIndex], map: "BenefitStatus_standard_occurrence_lookup_idx")
@@ -378,10 +387,86 @@ model CatalogMigrationLedger {
   creditCard             CreditCard?                    @relation(fields: [creditCardId], references: [id], onDelete: Restrict)
   predefinedCard         PredefinedCard?                @relation(fields: [predefinedCardId], references: [id], onDelete: Restrict)
   predefinedBenefit      PredefinedBenefit?             @relation(fields: [predefinedBenefitId], references: [id], onDelete: Restrict)
+  categoryRepair         GlobalBenefitCategoryRepair?   @relation("CategoryRepairMigrationLedger")
 
   @@index([userId, phase])
   @@index([creditCardId])
   @@index([predefinedBenefitId])
+}
+
+model GlobalBenefitCategoryRepair {
+  id                                  String                           @id @default(cuid())
+  legacyBenefitId                     String                           @unique
+  catalogMigrationLedgerId            String                           @unique(map: "GBCategoryRepair_ledgerId_key")
+  userId                              String
+  creditCardId                        String
+  predefinedCardId                    String
+  predefinedBenefitId                 String
+  targetPredefinedCardCatalogKey      String
+  targetPredefinedBenefitCatalogKey   String
+  definitionFingerprint               String
+  inventoryFingerprint                String
+  graphFingerprint                    String
+  reviewedCurrentGraphFingerprint     String
+  destinationFingerprint              String
+  manifestFingerprint                 String
+  manifestEntryFingerprint            String
+  planFingerprint                     String
+  postimageFingerprint                String
+  evidenceVersion                     Int                              @default(1)
+  phase                               GlobalBenefitCategoryRepairPhase @default(APPLIED)
+  appliedAt                           DateTime                         @default(now())
+  rolledBackAt                        DateTime?
+  createdAt                           DateTime                         @default(now())
+  updatedAt                           DateTime                         @updatedAt
+  legacyBenefit                       Benefit                          @relation("CategoryRepairLegacyBenefit", fields: [legacyBenefitId], references: [id], onDelete: Cascade, map: "GBCategoryRepair_legacyBenefit_fkey")
+  catalogMigrationLedger              CatalogMigrationLedger           @relation("CategoryRepairMigrationLedger", fields: [catalogMigrationLedgerId], references: [id], onDelete: Cascade, map: "GBCategoryRepair_ledger_fkey")
+  user                                User                             @relation("CategoryRepairOwner", fields: [userId], references: [id], onDelete: Cascade, map: "GBCategoryRepair_user_fkey")
+  creditCard                          CreditCard                       @relation("CategoryRepairCreditCard", fields: [creditCardId], references: [id], onDelete: Cascade, map: "GBCategoryRepair_card_fkey")
+  predefinedCard                      PredefinedCard                   @relation("CategoryRepairPredefinedCard", fields: [predefinedCardId], references: [id], onDelete: Restrict, map: "GBCategoryRepair_predefinedCard_fkey")
+  predefinedBenefit                   PredefinedBenefit                @relation("CategoryRepairPredefinedBenefit", fields: [predefinedBenefitId], references: [id], onDelete: Restrict, map: "GBCategoryRepair_predefinedBenefit_fkey")
+  occurrenceEvidence                  GlobalBenefitCategoryRepairOccurrence[]
+
+  @@index([userId, phase], map: "GBCategoryRepair_user_phase_idx")
+  @@index([creditCardId, phase], map: "GBCategoryRepair_card_phase_idx")
+  @@index([predefinedBenefitId, phase], map: "GBCategoryRepair_benefit_phase_idx")
+}
+
+model GlobalBenefitCategoryRepairOccurrence {
+  id                                     String                                  @id @default(cuid())
+  repairId                               String
+  userId                                 String
+  creditCardId                           String
+  predefinedBenefitId                    String
+  targetPredefinedBenefitCatalogKey      String
+  action                                 GlobalBenefitCategoryRepairAction
+  keeperSource                           GlobalBenefitCategoryRepairStatusSource
+  keeperStatusId                         String                                  @unique(map: "GBCategoryRepairOccurrence_keeperStatus_key")
+  cycleStartDate                         DateTime
+  cycleEndDate                           DateTime
+  occurrenceIndex                        Int
+  keeperBaselineVersion                  Int                                     @default(1)
+  keeperBaseline                         Json
+  removedStatusId                        String?                                 @unique(map: "GBCategoryRepairOccurrence_removedStatus_key")
+  removedStatusSource                    GlobalBenefitCategoryRepairStatusSource?
+  removedStatusPreimageVersion           Int?
+  removedStatusPreimage                  Json?
+  repairAddedAuditMetadataVersion        Int                                     @default(1)
+  repairAddedAuditMetadata               Json
+  planFingerprint                        String
+  postimageFingerprint                   String
+  createdAt                              DateTime                                @default(now())
+  updatedAt                              DateTime                                @updatedAt
+  repair                                 GlobalBenefitCategoryRepair             @relation(fields: [repairId], references: [id], onDelete: Cascade, map: "GBCategoryRepairOccurrence_repair_fkey")
+  user                                   User                                    @relation("CategoryRepairOccurrenceOwner", fields: [userId], references: [id], onDelete: Cascade, map: "GBCategoryRepairOccurrence_user_fkey")
+  creditCard                             CreditCard                              @relation("CategoryRepairOccurrenceCreditCard", fields: [creditCardId], references: [id], onDelete: Cascade, map: "GBCategoryRepairOccurrence_card_fkey")
+  predefinedBenefit                      PredefinedBenefit                       @relation("CategoryRepairOccurrencePredefinedBenefit", fields: [predefinedBenefitId], references: [id], onDelete: Restrict, map: "GBCategoryRepairOccurrence_benefit_fkey")
+  keeperStatus                           BenefitStatus                           @relation("CategoryRepairKeeperStatus", fields: [keeperStatusId], references: [id], onDelete: Cascade, map: "GBCategoryRepairOccurrence_keeperStatus_fkey")
+
+  @@unique([repairId, userId, creditCardId, predefinedBenefitId, cycleStartDate, cycleEndDate, occurrenceIndex], map: "GBCategoryRepairOccurrence_tuple_key")
+  @@index([repairId], map: "GBCategoryRepairOccurrence_repair_idx")
+  @@index([userId, creditCardId], map: "GBCategoryRepairOccurrence_owner_card_idx")
+  @@index([predefinedBenefitId, cycleStartDate], map: "GBCategoryRepairOccurrence_target_cycle_idx")
 }
 
 model playing_with_neon {
@@ -547,4 +632,19 @@ enum CatalogMigrationPhase {
   BRIDGED
   CLEANED
   ROLLED_BACK
+}
+
+enum GlobalBenefitCategoryRepairPhase {
+  APPLIED
+  ROLLED_BACK
+}
+
+enum GlobalBenefitCategoryRepairAction {
+  PROMOTE_LEGACY_STATUS
+  RETAIN_CANONICAL_STATUS
+}
+
+enum GlobalBenefitCategoryRepairStatusSource {
+  LEGACY_CUSTOM
+  CANONICAL_STANDARD
 }
