@@ -1,7 +1,7 @@
 {
-  "id": "production-global-benefit-rollout",
-  "name": "production-global-benefit-rollout",
-  "title": "Production global-benefit rollout",
+  "id": "global-benefit-category-drift-repair",
+  "name": "global-benefit-category-drift-repair",
+  "title": "Repair global benefit category drift",
   "description": "",
   "status": "in_progress",
   "dev_type": null,
@@ -10,7 +10,7 @@
   "priority": "P2",
   "creator": "fantasyc",
   "assignee": "fantasyc",
-  "createdAt": "2026-07-29",
+  "createdAt": "2026-08-01",
   "completedAt": null,
   "branch": null,
   "base_branch": "main",
@@ -18,10 +18,8 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [
-    "08-01-global-benefit-category-drift-repair"
-  ],
-  "parent": "07-28-roll-out-amex-sync-production",
+  "children": [],
+  "parent": "07-29-production-global-benefit-rollout",
   "relatedFiles": [],
   "notes": "",
   "meta": {}

@@ -1,0 +1,5 @@
+{"file":".trellis/spec/perks-reminder/global-benefit-definitions-and-migration.md","reason":"Review strict classifier invariants, repair overlay semantics, runtime authority, cleanup isolation, and rollback preservation."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Review that repaired bridges cannot weaken physical/global/status AMEX authority or proposal revalidation."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Review aggregate-only output, exact targets, recovery, no production apply, and byte-preserving writes."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Review required tests and evidence across schema, planner, persistence, runtime, AMEX, and clone paths."}
+{"file":".trellis/tasks/07-29-production-global-benefit-rollout/research/production-legacy-bridge-2026-07-30.md","reason":"Ensure implementation preserves the already-verified production bridge graph and rollback window."}

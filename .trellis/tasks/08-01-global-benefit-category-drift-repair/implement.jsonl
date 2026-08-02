@@ -1,0 +1,5 @@
+{"file":".trellis/spec/perks-reminder/global-benefit-definitions-and-migration.md","reason":"Defines strict classification, bridge preservation, effective projection, materialization, cleanup, rollback, clone, and global AMEX authority contracts."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Defines exact global destination authority, proposal binding, transaction revalidation, audits, and provenance constraints."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Defines target verification, dry-run, recovery, state preservation, clone sanitization, and production mutation boundaries."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Defines production configuration/deployment authorization and exact runtime-mode verification boundaries."}
+{"file":".trellis/tasks/07-29-production-global-benefit-rollout/research/production-legacy-bridge-2026-07-30.md","reason":"Provides sanitized production bridge and preservation evidence that the repair must remain compatible with."}
