@@ -17,6 +17,7 @@ import {
   type LegacyStatusRelation,
   type MigrationWriteResult,
 } from "./global-benefit-migration";
+import { classifyGlobalBenefitCategoryRepairAuthority } from './global-benefit-category-repair-authority';
 
 type QueryClient = Pick<PrismaClient, "$queryRaw" | "$executeRaw">;
 
@@ -45,7 +46,7 @@ interface AuditRow {
   stateJson: unknown;
 }
 interface ProvenanceRow { id: string; benefitStatusId: string; attemptUserId: string | null }
-type LedgerRow = ExistingMigrationLedger;
+type LedgerRow = ExistingMigrationLedger & { id: string };
 interface DefinitionCardRow {
   id: string; catalogKey: string; name: string; issuer: string;
   productKey: string | null; retiredAt: Date | null;
@@ -57,6 +58,44 @@ interface DefinitionBenefitRow {
   fixedCycleStartMonth: number | null; fixedCycleDurationMonths: number | null;
   occurrencesInCycle: number; productKey: string | null;
   creditFamilyKey: string | null; periodKey: string | null; retiredAt: Date | null;
+}
+
+interface MigrationCategoryRepairRow {
+  sourceBenefitId: string;
+  repairId: string;
+  repairLegacyBenefitId: string;
+  repairLedgerId: string;
+  repairUserId: string;
+  repairCreditCardId: string;
+  repairPredefinedCardId: string;
+  repairPredefinedBenefitId: string;
+  targetCardCatalogKey: string;
+  targetBenefitCatalogKey: string;
+  definitionFingerprint: string;
+  evidenceVersion: number;
+  repairPhase: string;
+  repairRolledBackAt: Date | null;
+  occurrenceRepairId: string | null;
+  occurrenceUserId: string | null;
+  occurrenceCreditCardId: string | null;
+  occurrencePredefinedBenefitId: string | null;
+  occurrenceTargetBenefitCatalogKey: string | null;
+  occurrenceAction: string | null;
+  occurrenceKeeperSource: string | null;
+  occurrenceKeeperStatusId: string | null;
+  occurrenceCycleStartDate: Date | null;
+  occurrenceCycleEndDate: Date | null;
+  occurrenceIndexEvidence: number | null;
+  keeperBaselineVersion: number | null;
+  removedStatusPreimageVersion: number | null;
+  auditMetadataVersion: number | null;
+  keeperBenefitId: string | null;
+  keeperCreditCardId: string | null;
+  keeperPredefinedBenefitId: string | null;
+  keeperUserId: string | null;
+  keeperCycleStartDate: Date | null;
+  keeperCycleEndDate: Date | null;
+  keeperOccurrenceIndex: number | null;
 }
 
 function asDate(value: Date | string): Date {
@@ -227,16 +266,208 @@ async function readUnitsByKeys(client: QueryClient, keys: readonly string[]): Pr
     ORDER BY r."id" ASC
   `);
   const ledgers = benefitIds.length === 0 ? [] : await client.$queryRaw<LedgerRow[]>(Prisma.sql`
-    SELECT "legacyBenefitId", "userId", "creditCardId", "predefinedCardId",
+    SELECT "id", "legacyBenefitId", "userId", "creditCardId", "predefinedCardId",
       "predefinedBenefitId", "classification"::text AS "classification",
       "phase"::text AS "phase", "sourceFingerprint", "destinationFingerprint"
     FROM "CatalogMigrationLedger"
     WHERE "legacyBenefitId" IN (${Prisma.join(benefitIds)})
     ORDER BY "legacyBenefitId" ASC
   `);
+  const categoryRepairRows = benefitIds.length === 0 ? [] : await client.$queryRaw<MigrationCategoryRepairRow[]>(Prisma.sql`
+    SELECT
+      repair."legacyBenefitId" AS "sourceBenefitId",
+      repair."id" AS "repairId",
+      repair."legacyBenefitId" AS "repairLegacyBenefitId",
+      repair."catalogMigrationLedgerId" AS "repairLedgerId",
+      repair."userId" AS "repairUserId",
+      repair."creditCardId" AS "repairCreditCardId",
+      repair."predefinedCardId" AS "repairPredefinedCardId",
+      repair."predefinedBenefitId" AS "repairPredefinedBenefitId",
+      repair."targetPredefinedCardCatalogKey" AS "targetCardCatalogKey",
+      repair."targetPredefinedBenefitCatalogKey" AS "targetBenefitCatalogKey",
+      repair."definitionFingerprint", repair."evidenceVersion",
+      repair."phase"::text AS "repairPhase", repair."rolledBackAt" AS "repairRolledBackAt",
+      occurrence."repairId" AS "occurrenceRepairId",
+      occurrence."userId" AS "occurrenceUserId",
+      occurrence."creditCardId" AS "occurrenceCreditCardId",
+      occurrence."predefinedBenefitId" AS "occurrencePredefinedBenefitId",
+      occurrence."targetPredefinedBenefitCatalogKey" AS "occurrenceTargetBenefitCatalogKey",
+      occurrence."action"::text AS "occurrenceAction",
+      occurrence."keeperSource"::text AS "occurrenceKeeperSource",
+      occurrence."keeperStatusId" AS "occurrenceKeeperStatusId",
+      occurrence."cycleStartDate" AS "occurrenceCycleStartDate",
+      occurrence."cycleEndDate" AS "occurrenceCycleEndDate",
+      occurrence."occurrenceIndex" AS "occurrenceIndexEvidence",
+      occurrence."keeperBaselineVersion",
+      occurrence."removedStatusPreimageVersion",
+      occurrence."repairAddedAuditMetadataVersion" AS "auditMetadataVersion",
+      keeper."benefitId" AS "keeperBenefitId",
+      keeper."creditCardId" AS "keeperCreditCardId",
+      keeper."predefinedBenefitId" AS "keeperPredefinedBenefitId",
+      keeper."userId" AS "keeperUserId",
+      keeper."cycleStartDate" AS "keeperCycleStartDate",
+      keeper."cycleEndDate" AS "keeperCycleEndDate",
+      keeper."occurrenceIndex" AS "keeperOccurrenceIndex"
+    FROM "GlobalBenefitCategoryRepair" repair
+    LEFT JOIN "GlobalBenefitCategoryRepairOccurrence" occurrence
+      ON occurrence."repairId" = repair."id"
+    LEFT JOIN "BenefitStatus" keeper ON keeper."id" = occurrence."keeperStatusId"
+    WHERE repair."legacyBenefitId" IN (${Prisma.join(benefitIds)})
+    ORDER BY repair."legacyBenefitId", occurrence."id"
+  `);
+  const repairDefinitions = categoryRepairRows.length === 0 ? [] : await readDefinitions(client);
 
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   const ledgerByBenefit = new Map(ledgers.map((ledger) => [ledger.legacyBenefitId, ledger]));
+  const cardById = new Map(cards.map((card) => [card.id, card]));
+  const repairRowsByBenefit = new Map<string, MigrationCategoryRepairRow[]>();
+  for (const evidence of categoryRepairRows) {
+    const current = repairRowsByBenefit.get(evidence.sourceBenefitId) ?? [];
+    current.push(evidence);
+    repairRowsByBenefit.set(evidence.sourceBenefitId, current);
+  }
+  const repairProductsById = new Map(repairDefinitions.map((definition) => [definition.id, definition]));
+
+  function categoryRepairAuthorityForBenefit(
+    benefit: BenefitRow,
+    benefitStatuses: LegacyStatusRelation[],
+  ): LegacyBenefitRecord['categoryRepairAuthority'] {
+    const evidenceRows = repairRowsByBenefit.get(benefit.id) ?? [];
+    if (evidenceRows.length === 0) return 'NONE';
+
+    const first = evidenceRows[0];
+    if (first.repairPhase === 'ROLLED_BACK') return 'ROLLED_BACK';
+    if (first.repairPhase !== 'APPLIED' || first.repairRolledBackAt !== null) return 'APPLIED_INVALID';
+
+    const card = cardById.get(first.repairCreditCardId);
+    const product = repairProductsById.get(first.repairPredefinedCardId);
+    const targetBenefit = product?.benefits.find(
+      (definition) => definition.id === first.repairPredefinedBenefitId,
+    );
+    const ledger = ledgerByBenefit.get(benefit.id);
+    if (!card || !product || !targetBenefit || !ledger) return 'APPLIED_INVALID';
+
+    const repair = {
+      id: first.repairId,
+      legacyBenefitId: first.repairLegacyBenefitId,
+      catalogMigrationLedgerId: first.repairLedgerId,
+      userId: first.repairUserId,
+      creditCardId: first.repairCreditCardId,
+      predefinedCardId: first.repairPredefinedCardId,
+      predefinedBenefitId: first.repairPredefinedBenefitId,
+      targetPredefinedCardCatalogKey: first.targetCardCatalogKey,
+      targetPredefinedBenefitCatalogKey: first.targetBenefitCatalogKey,
+      definitionFingerprint: first.definitionFingerprint,
+      evidenceVersion: first.evidenceVersion,
+      phase: first.repairPhase,
+      rolledBackAt: first.repairRolledBackAt,
+    };
+    const parentState = classifyGlobalBenefitCategoryRepairAuthority({
+      sourceBenefitId: benefit.id,
+      ledger: {
+        id: ledger.id,
+        legacyBenefitId: ledger.legacyBenefitId,
+        userId: ledger.userId,
+        creditCardId: ledger.creditCardId,
+        predefinedCardId: ledger.predefinedCardId,
+        predefinedBenefitId: ledger.predefinedBenefitId,
+        classification: ledger.classification,
+        phase: ledger.phase,
+        destinationFingerprint: ledger.destinationFingerprint,
+      },
+      repair,
+      card,
+      product,
+      benefit: targetBenefit,
+    });
+    if (parentState !== 'APPLIED_VALID') return parentState;
+
+    const occurrenceRows = evidenceRows.filter((evidence) => evidence.occurrenceRepairId !== null);
+    if (occurrenceRows.length !== evidenceRows.length) {
+      return evidenceRows.length === 1 && benefitStatuses.length === 0
+        ? 'APPLIED_VALID'
+        : 'APPLIED_INVALID';
+    }
+
+    const promotedStatusIds = new Set<string>();
+    for (const evidence of occurrenceRows) {
+      if (evidence.occurrenceAction === 'PROMOTE_LEGACY_STATUS'
+        && evidence.occurrenceKeeperStatusId !== null) {
+        promotedStatusIds.add(evidence.occurrenceKeeperStatusId);
+      }
+      if (evidence.occurrenceRepairId === null
+        || evidence.occurrenceUserId === null
+        || evidence.occurrenceCreditCardId === null
+        || evidence.occurrencePredefinedBenefitId === null
+        || evidence.occurrenceTargetBenefitCatalogKey === null
+        || evidence.occurrenceAction === null
+        || evidence.occurrenceKeeperSource === null
+        || evidence.occurrenceKeeperStatusId === null
+        || evidence.occurrenceCycleStartDate === null
+        || evidence.occurrenceCycleEndDate === null
+        || evidence.occurrenceIndexEvidence === null
+        || evidence.keeperBaselineVersion === null
+        || evidence.auditMetadataVersion === null
+        || evidence.keeperCreditCardId === null
+        || evidence.keeperPredefinedBenefitId === null
+        || evidence.keeperUserId === null
+        || evidence.keeperCycleStartDate === null
+        || evidence.keeperCycleEndDate === null
+        || evidence.keeperOccurrenceIndex === null) return 'APPLIED_INVALID';
+
+      const state = classifyGlobalBenefitCategoryRepairAuthority({
+        sourceBenefitId: benefit.id,
+        ledger: {
+          id: ledger.id,
+          legacyBenefitId: ledger.legacyBenefitId,
+          userId: ledger.userId,
+          creditCardId: ledger.creditCardId,
+          predefinedCardId: ledger.predefinedCardId,
+          predefinedBenefitId: ledger.predefinedBenefitId,
+          classification: ledger.classification,
+          phase: ledger.phase,
+          destinationFingerprint: ledger.destinationFingerprint,
+        },
+        repair,
+        card,
+        product,
+        benefit: targetBenefit,
+        status: {
+          id: evidence.occurrenceKeeperStatusId,
+          benefitId: evidence.keeperBenefitId,
+          creditCardId: evidence.keeperCreditCardId,
+          predefinedBenefitId: evidence.keeperPredefinedBenefitId,
+          userId: evidence.keeperUserId,
+          cycleStartDate: asDate(evidence.keeperCycleStartDate),
+          cycleEndDate: asDate(evidence.keeperCycleEndDate),
+          occurrenceIndex: evidence.keeperOccurrenceIndex,
+        },
+        occurrence: {
+          repairId: evidence.occurrenceRepairId,
+          userId: evidence.occurrenceUserId,
+          creditCardId: evidence.occurrenceCreditCardId,
+          predefinedBenefitId: evidence.occurrencePredefinedBenefitId,
+          targetPredefinedBenefitCatalogKey: evidence.occurrenceTargetBenefitCatalogKey,
+          action: evidence.occurrenceAction,
+          keeperSource: evidence.occurrenceKeeperSource,
+          keeperStatusId: evidence.occurrenceKeeperStatusId,
+          cycleStartDate: asDate(evidence.occurrenceCycleStartDate),
+          cycleEndDate: asDate(evidence.occurrenceCycleEndDate),
+          occurrenceIndex: evidence.occurrenceIndexEvidence,
+          keeperBaselineVersion: evidence.keeperBaselineVersion,
+          removedStatusPreimageVersion: evidence.removedStatusPreimageVersion,
+          repairAddedAuditMetadataVersion: evidence.auditMetadataVersion,
+        },
+      });
+      if (state !== 'APPLIED_VALID') return state;
+    }
+
+    return benefitStatuses.length === promotedStatusIds.size
+      && benefitStatuses.every((status) => promotedStatusIds.has(status.id))
+      ? 'APPLIED_VALID'
+      : 'APPLIED_INVALID';
+  }
+
   const records = new Map<string, LegacyBenefitRecord>();
   for (const row of benefits) {
     const benefitStatuses: LegacyStatusRelation[] = statuses
@@ -268,10 +499,10 @@ async function readUnitsByKeys(client: QueryClient, keys: readonly string[]): Pr
       audits: benefitAudits,
       provenance: benefitProvenance,
       ledger: ledgerByBenefit.get(row.id) ?? null,
+      categoryRepairAuthority: categoryRepairAuthorityForBenefit(row, benefitStatuses),
     });
   }
 
-  const cardById = new Map(cards.map((card) => [card.id, card]));
   const units = keys.map((key): LegacyMigrationUnit => {
     if (key.startsWith("card:")) {
       const id = key.slice("card:".length);
@@ -332,6 +563,31 @@ async function readOneUnit(client: QueryClient, key: string): Promise<LegacyMigr
 
 function emptyWriteResult(): MigrationWriteResult {
   return { standard: 0, custom: 0, cleaned: 0, rolledBack: 0, idempotent: 0 };
+}
+
+async function assertNoAppliedCategoryRepairIntersection(
+  client: QueryClient,
+  benefitId: string,
+  statusIds: string[],
+): Promise<void> {
+  const rows = await client.$queryRaw<Array<{ exists: boolean }>>(Prisma.sql`
+    SELECT EXISTS (
+      SELECT 1
+      FROM "GlobalBenefitCategoryRepair" repair
+      LEFT JOIN "GlobalBenefitCategoryRepairOccurrence" occurrence
+        ON occurrence."repairId" = repair."id"
+      WHERE repair."phase" = 'APPLIED'
+        AND (
+          repair."legacyBenefitId" = ${benefitId}
+          OR ${statusIds.length > 0
+            ? Prisma.sql`occurrence."keeperStatusId" IN (${Prisma.join(statusIds)})`
+            : Prisma.sql`FALSE`}
+        )
+    ) AS "exists"
+  `);
+  if (rows[0]?.exists) {
+    throw new GlobalBenefitMigrationError('Active category-repair evidence blocks generic migration cleanup or rollback.');
+  }
 }
 
 async function ensureCurrentPlan(
@@ -507,6 +763,11 @@ export class PrismaGlobalBenefitMigrationDatabase implements GlobalBenefitMigrat
       for (const proposal of classified.benefits) {
         const benefit = current.benefits.find((item) => item.id === proposal.legacyBenefitId)!;
         if (proposal.disposition !== "standard") continue;
+        await assertNoAppliedCategoryRepairIntersection(
+          transaction as unknown as QueryClient,
+          benefit.id,
+          benefit.statuses.map((status) => status.id),
+        );
         const ledger = benefit.ledger;
         if (!ledger) throw new GlobalBenefitMigrationError("Cleanup requires an exact bridged ledger.");
         if (ledger.phase === "CLEANED") { result.idempotent += 1; continue; }
@@ -558,6 +819,11 @@ export class PrismaGlobalBenefitMigrationDatabase implements GlobalBenefitMigrat
       for (const proposal of classified.benefits) {
         if (proposal.disposition !== "standard") continue;
         const benefit = current.benefits.find((item) => item.id === proposal.legacyBenefitId)!;
+        await assertNoAppliedCategoryRepairIntersection(
+          transaction as unknown as QueryClient,
+          benefit.id,
+          benefit.statuses.map((status) => status.id),
+        );
         const ledger = benefit.ledger;
         if (!ledger) throw new GlobalBenefitMigrationError("Rollback requires an exact bridged ledger.");
         if (ledger.phase === "ROLLED_BACK") { result.idempotent += 1; continue; }
@@ -594,12 +860,17 @@ export class PrismaGlobalBenefitMigrationDatabase implements GlobalBenefitMigrat
         result.rolledBack += 1;
       }
       if (classified.card && classified.predefinedCardId) {
-        const remaining = await transaction.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
-          SELECT count(*)::bigint AS "count" FROM "CatalogMigrationLedger"
-          WHERE "creditCardId" = ${classified.card.id} AND "phase" = 'BRIDGED'
-            AND "classification" = 'STANDARD'
+        const remaining = await transaction.$queryRaw<Array<{ count: bigint; repairCount: bigint }>>(Prisma.sql`
+          SELECT
+            (SELECT count(*) FROM "CatalogMigrationLedger"
+              WHERE "creditCardId" = ${classified.card.id} AND "phase" = 'BRIDGED'
+                AND "classification" = 'STANDARD')::bigint AS "count",
+            (SELECT count(*) FROM "GlobalBenefitCategoryRepair"
+              WHERE "creditCardId" = ${classified.card.id} AND "phase" = 'APPLIED')::bigint AS "repairCount"
         `);
-        if (Number(remaining[0]?.count ?? 0) === 0 && classified.card.predefinedCardId !== null) {
+        if (Number(remaining[0]?.count ?? 0) === 0
+          && Number(remaining[0]?.repairCount ?? 0) === 0
+          && classified.card.predefinedCardId !== null) {
           const changed = await transaction.$executeRaw(Prisma.sql`
             UPDATE "CreditCard" SET "predefinedCardId" = NULL
             WHERE "id" = ${classified.card.id} AND "predefinedCardId" = ${classified.predefinedCardId}

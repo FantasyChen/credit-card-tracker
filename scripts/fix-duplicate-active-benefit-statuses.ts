@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import dotenv from 'dotenv';
-import { PrismaClient, type BenefitStatus } from '../src/generated/prisma';
+import { Prisma, PrismaClient, type BenefitStatus } from '../src/generated/prisma';
 import { materializeBenefitStatusRows } from '../src/lib/benefit-cycle-materialization';
 
 dotenv.config();
@@ -71,6 +71,7 @@ type RepairGroup = {
   occurrenceIndex: number;
   statusCount: number;
   deleteIds: string[];
+  keepId: string | null;
   createCanonical: RepairCreate | null;
   skippedStateful: number;
 };
@@ -195,6 +196,7 @@ async function buildRepairPlan(): Promise<RepairGroup[]> {
           occurrenceIndex,
           statusCount: activeStatuses.length,
           deleteIds,
+          keepId,
           createCanonical,
           skippedStateful: Math.max(0, statefulStatuses.length - (keepId && statefulStatuses.some((s) => s.id === keepId) ? 1 : 0)),
         });
@@ -206,7 +208,37 @@ async function buildRepairPlan(): Promise<RepairGroup[]> {
 }
 
 async function applyRepairPlan(repairs: RepairGroup[]): Promise<void> {
+  if (repairs.length === 0) return;
   await prisma.$transaction(async (tx) => {
+    const touchedStatusIds = Array.from(new Set(repairs.flatMap((repair) => [
+      ...repair.deleteIds,
+      ...(repair.keepId ? [repair.keepId] : []),
+    ])));
+    const tuplePredicates = repairs.flatMap((repair) => repair.createCanonical ? [Prisma.sql`
+      (evidence."userId" = ${repair.createCanonical.userId}
+        AND evidence."creditCardId" = ${repair.cardId}
+        AND evidence."cycleStartDate" = ${repair.createCanonical.cycleStartDate}
+        AND evidence."cycleEndDate" = ${repair.createCanonical.cycleEndDate}
+        AND evidence."occurrenceIndex" = ${repair.createCanonical.occurrenceIndex})
+    `] : []);
+    const intersections = await tx.$queryRaw<Array<{ exists: boolean }>>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM "GlobalBenefitCategoryRepairOccurrence" evidence
+        JOIN "GlobalBenefitCategoryRepair" repair ON repair."id" = evidence."repairId"
+        WHERE repair."phase" = 'APPLIED'
+          AND (
+            ${touchedStatusIds.length > 0
+              ? Prisma.sql`evidence."keeperStatusId" IN (${Prisma.join(touchedStatusIds)})`
+              : Prisma.sql`FALSE`}
+            OR ${tuplePredicates.length > 0 ? Prisma.join(tuplePredicates, ' OR ') : Prisma.sql`FALSE`}
+          )
+      ) AS "exists"
+    `);
+    if (intersections[0]?.exists) {
+      throw new Error('Duplicate-status repair intersects active category-repair evidence.');
+    }
+
     for (const repair of repairs) {
       if (repair.createCanonical) {
         await tx.benefitStatus.upsert({

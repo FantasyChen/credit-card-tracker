@@ -1,3 +1,4 @@
+import { migrationFingerprint } from "@/lib/global-benefit-migration";
 import type {
   AmexSyncAttempt,
   AmexSyncRowAudit,
@@ -28,6 +29,8 @@ export const USER_CLONE_TABLES = [
   "BenefitStatusSourceProvenance",
   "AmexSyncRowAudit",
   "CatalogMigrationLedger",
+  "GlobalBenefitCategoryRepair",
+  "GlobalBenefitCategoryRepairOccurrence",
 ] as const;
 
 export type UserCloneTable = (typeof USER_CLONE_TABLES)[number];
@@ -59,11 +62,76 @@ export interface CloneCatalogMigrationLedgerBinding {
   updatedAt: Date;
 }
 
+export interface CloneCategoryRepair {
+  id: string;
+  legacyBenefitId: string;
+  catalogMigrationLedgerId: string;
+  userId: string;
+  creditCardId: string;
+  predefinedCardId: string;
+  predefinedBenefitId: string;
+  resolvedPredefinedCardCatalogKey: string;
+  resolvedPredefinedBenefitCatalogKey: string;
+  predefinedBenefitParentMatchesCard: boolean;
+  targetPredefinedCardCatalogKey: string;
+  targetPredefinedBenefitCatalogKey: string;
+  definitionFingerprint: string;
+  inventoryFingerprint: string;
+  graphFingerprint: string;
+  reviewedCurrentGraphFingerprint: string;
+  destinationFingerprint: string;
+  manifestFingerprint: string;
+  manifestEntryFingerprint: string;
+  planFingerprint: string;
+  postimageFingerprint: string;
+  evidenceVersion: number;
+  phase: "APPLIED" | "ROLLED_BACK";
+  appliedAt: Date;
+  rolledBackAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CloneCategoryRepairOccurrence {
+  id: string;
+  repairId: string;
+  userId: string;
+  creditCardId: string;
+  predefinedBenefitId: string;
+  targetPredefinedBenefitCatalogKey: string;
+  action: "PROMOTE_LEGACY_STATUS" | "RETAIN_CANONICAL_STATUS";
+  keeperSource: "LEGACY_CUSTOM" | "CANONICAL_STANDARD";
+  keeperStatusId: string;
+  cycleStartDate: Date;
+  cycleEndDate: Date;
+  occurrenceIndex: number;
+  keeperBaselineVersion: number;
+  keeperBaseline: unknown;
+  removedStatusId: string | null;
+  removedStatusSource: "LEGACY_CUSTOM" | "CANONICAL_STANDARD" | null;
+  removedStatusPreimageVersion: number | null;
+  removedStatusPreimage: unknown;
+  removedStatusPreimageIsSqlNull: boolean;
+  removedStatusPreimageJsonType: string | null;
+  repairAddedAuditMetadataVersion: number;
+  repairAddedAuditMetadata: unknown;
+  planFingerprint: string;
+  postimageFingerprint: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface CloneGlobalCatalogBindings {
   cards: Array<{ creditCardId: string; catalogKey: string }>;
   statuses: Array<{ benefitStatusId: string; creditCardId: string; catalogKey: string }>;
   audits: Array<{ auditId: string; catalogKey: string; definitionFingerprint: string | null }>;
   ledger: CloneCatalogMigrationLedgerBinding[];
+}
+
+export interface CloneCategoryRepairStateFingerprints {
+  statuses: Array<{ id: string; stateFingerprint: string }>;
+  audits: Array<{ id: string; stateFingerprint: string }>;
+  provenance: Array<{ id: string; stateFingerprint: string }>;
 }
 
 export interface CloneGlobalCatalogRebindingPlan {
@@ -74,6 +142,11 @@ export interface CloneGlobalCatalogRebindingPlan {
     predefinedCardId: string | null;
     predefinedBenefitId: string | null;
   }>;
+}
+
+export interface CloneCategoryRepairRebindingPlan {
+  repairs: CloneCategoryRepair[];
+  occurrences: CloneCategoryRepairOccurrence[];
 }
 
 export function planCloneGlobalCatalogRebindings(
@@ -130,6 +203,107 @@ export function planCloneGlobalCatalogRebindings(
   };
 }
 
+function rebindCategoryRepairJson(
+  value: unknown,
+  sourcePredefinedBenefitId: string,
+  destinationPredefinedBenefitId: string,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => rebindCategoryRepairJson(
+      item,
+      sourcePredefinedBenefitId,
+      destinationPredefinedBenefitId,
+    ));
+  }
+  if (value === null || typeof value !== 'object') return value;
+  const result: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if ((key === 'predefinedBenefitId' || key === 'destinationPredefinedBenefitId')
+      && item !== null) {
+      if (item !== sourcePredefinedBenefitId) {
+        throw new UserCloneOperatorError('Category-repair JSON contains an unbound global definition ID.');
+      }
+      result[key] = destinationPredefinedBenefitId;
+    } else {
+      result[key] = rebindCategoryRepairJson(
+        item,
+        sourcePredefinedBenefitId,
+        destinationPredefinedBenefitId,
+      );
+    }
+  }
+  return result;
+}
+
+export function planCloneCategoryRepairRebindings(
+  repairs: CloneCategoryRepair[],
+  occurrences: CloneCategoryRepairOccurrence[],
+  destination: {
+    cards: Array<{ id: string; catalogKey: string }>;
+    benefits: Array<{ id: string; catalogKey: string; predefinedCardId?: string }>;
+  },
+): CloneCategoryRepairRebindingPlan {
+  const cardIds = new Map<string, string>();
+  for (const card of destination.cards) {
+    if (!card.catalogKey || cardIds.has(card.catalogKey)) {
+      throw new UserCloneOperatorError('Destination card catalog keys are not unique.');
+    }
+    cardIds.set(card.catalogKey, card.id);
+  }
+  const benefitRows = new Map<string, { id: string; predefinedCardId?: string }>();
+  for (const benefit of destination.benefits) {
+    if (!benefit.catalogKey || benefitRows.has(benefit.catalogKey)) {
+      throw new UserCloneOperatorError('Destination benefit catalog keys are not unique.');
+    }
+    benefitRows.set(benefit.catalogKey, benefit);
+  }
+  const repairById = new Map(repairs.map((repair) => [repair.id, repair]));
+  if (repairById.size !== repairs.length) {
+    throw new UserCloneOperatorError('The source category-repair graph contains duplicate identifiers.');
+  }
+  const reboundRepairs = repairs.map((repair) => {
+    const predefinedCardId = cardIds.get(repair.targetPredefinedCardCatalogKey);
+    const targetBenefit = benefitRows.get(repair.targetPredefinedBenefitCatalogKey);
+    if (!predefinedCardId || !targetBenefit
+      || (targetBenefit.predefinedCardId !== undefined
+        && targetBenefit.predefinedCardId !== predefinedCardId)) {
+      throw new UserCloneOperatorError('A category repair has no exact same-product catalog binding.');
+    }
+    return { ...repair, predefinedCardId, predefinedBenefitId: targetBenefit.id };
+  });
+  const reboundByRepair = new Map(reboundRepairs.map((repair) => [repair.id, repair]));
+  const reboundOccurrences = occurrences.map((occurrence) => {
+    const sourceRepair = repairById.get(occurrence.repairId);
+    const reboundRepair = reboundByRepair.get(occurrence.repairId);
+    if (!sourceRepair || !reboundRepair
+      || occurrence.targetPredefinedBenefitCatalogKey
+        !== sourceRepair.targetPredefinedBenefitCatalogKey
+      || occurrence.predefinedBenefitId !== sourceRepair.predefinedBenefitId) {
+      throw new UserCloneOperatorError('A category-repair occurrence has an invalid catalog binding.');
+    }
+    return {
+      ...occurrence,
+      predefinedBenefitId: reboundRepair.predefinedBenefitId,
+      keeperBaseline: rebindCategoryRepairJson(
+        occurrence.keeperBaseline,
+        sourceRepair.predefinedBenefitId,
+        reboundRepair.predefinedBenefitId,
+      ),
+      removedStatusPreimage: rebindCategoryRepairJson(
+        occurrence.removedStatusPreimage,
+        sourceRepair.predefinedBenefitId,
+        reboundRepair.predefinedBenefitId,
+      ),
+      repairAddedAuditMetadata: rebindCategoryRepairJson(
+        occurrence.repairAddedAuditMetadata,
+        sourceRepair.predefinedBenefitId,
+        reboundRepair.predefinedBenefitId,
+      ),
+    };
+  }).sort(compareCloneCategoryRepairOccurrences);
+  return { repairs: reboundRepairs, occurrences: reboundOccurrences };
+}
+
 export interface UserCloneSnapshot {
   user: CloneUser;
   creditCards: CloneCreditCard[];
@@ -143,6 +317,9 @@ export interface UserCloneSnapshot {
   benefitStatusSourceProvenance: BenefitStatusSourceProvenance[];
   amexSyncRowAudits: AmexSyncRowAudit[];
   globalCatalogBindings?: CloneGlobalCatalogBindings;
+  categoryRepairStateFingerprints?: CloneCategoryRepairStateFingerprints;
+  categoryRepairs?: CloneCategoryRepair[];
+  categoryRepairOccurrences?: CloneCategoryRepairOccurrence[];
 }
 
 export interface InternalDatabaseIdentity {
@@ -229,6 +406,8 @@ export function countUserCloneSnapshot(snapshot: UserCloneSnapshot): UserCloneCo
     BenefitStatusSourceProvenance: snapshot.benefitStatusSourceProvenance.length,
     AmexSyncRowAudit: snapshot.amexSyncRowAudits.length,
     CatalogMigrationLedger: snapshot.globalCatalogBindings?.ledger.length ?? 0,
+    GlobalBenefitCategoryRepair: snapshot.categoryRepairs?.length ?? 0,
+    GlobalBenefitCategoryRepairOccurrence: snapshot.categoryRepairOccurrences?.length ?? 0,
   };
 }
 
@@ -269,6 +448,358 @@ function assertUniqueIds(values: Array<{ id: string }>, model: UserCloneTable): 
   if (new Set(values.map((value) => value.id)).size !== values.length) {
     throw new UserCloneOperatorError(`The source ${model} graph contains duplicate identifiers.`);
   }
+}
+
+interface CloneCategoryRepairStatusPreimage {
+  id: string;
+  benefitId: string | null;
+  creditCardId: string | null;
+  predefinedBenefitId: string | null;
+  userId: string;
+  cycleStartDate: string;
+  cycleEndDate: string;
+  occurrenceIndex: number;
+  usedAmount: number | null;
+  isCompleted: boolean;
+  completedAt: string | null;
+  isNotUsable: boolean;
+  orderIndex: number | null;
+  createdAt: string;
+  updatedAt: string;
+  stateFingerprint: string;
+}
+
+interface CloneCategoryRepairAttachmentSnapshot {
+  id: string;
+  ownerId: string | null;
+  stateFingerprint: string;
+}
+
+interface CloneCategoryRepairAuditSnapshot extends CloneCategoryRepairAttachmentSnapshot {
+  destinationCardId: string | null;
+  destinationBenefitId: string | null;
+  destinationStatusId: string | null;
+  destinationPredefinedBenefitId: string | null;
+  destinationDefinitionFingerprint: string | null;
+}
+
+interface CloneCategoryRepairAuditPatch {
+  auditId: string;
+  destinationCardId: string | null;
+  destinationBenefitId: string | null;
+  destinationStatusId: string;
+  before: {
+    destinationPredefinedBenefitId: string | null;
+    destinationDefinitionFingerprint: string | null;
+    stateFingerprint: string;
+  };
+  after: {
+    destinationPredefinedBenefitId: string | null;
+    destinationDefinitionFingerprint: string | null;
+    stateFingerprint: string;
+  };
+}
+
+interface CloneStoredKeeperBaseline {
+  status: CloneCategoryRepairStatusPreimage;
+  audits: CloneCategoryRepairAuditSnapshot[];
+  provenance: CloneCategoryRepairAttachmentSnapshot[];
+}
+
+const CATEGORY_REPAIR_STATUS_PREIMAGE_KEYS = [
+  "id",
+  "benefitId",
+  "creditCardId",
+  "predefinedBenefitId",
+  "userId",
+  "cycleStartDate",
+  "cycleEndDate",
+  "occurrenceIndex",
+  "usedAmount",
+  "isCompleted",
+  "completedAt",
+  "isNotUsable",
+  "orderIndex",
+  "createdAt",
+  "updatedAt",
+  "stateFingerprint",
+] as const;
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length
+    && actual.every((key, index) => key === expected[index]);
+}
+
+function isExactIsoInstant(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.toISOString() === value;
+}
+
+function parseCategoryRepairStatusPreimage(value: unknown): CloneCategoryRepairStatusPreimage | null {
+  if (!isPlainRecord(value) || !hasExactKeys(value, CATEGORY_REPAIR_STATUS_PREIMAGE_KEYS)) return null;
+  const preimage = value as unknown as CloneCategoryRepairStatusPreimage;
+  if (typeof preimage.id !== "string" || !preimage.id
+    || (preimage.benefitId !== null && typeof preimage.benefitId !== "string")
+    || (preimage.creditCardId !== null && typeof preimage.creditCardId !== "string")
+    || (preimage.predefinedBenefitId !== null && typeof preimage.predefinedBenefitId !== "string")
+    || typeof preimage.userId !== "string" || !preimage.userId
+    || !isExactIsoInstant(preimage.cycleStartDate)
+    || !isExactIsoInstant(preimage.cycleEndDate)
+    || !Number.isInteger(preimage.occurrenceIndex)
+    || (preimage.usedAmount !== null
+      && (typeof preimage.usedAmount !== "number" || !Number.isFinite(preimage.usedAmount)))
+    || typeof preimage.isCompleted !== "boolean"
+    || (preimage.completedAt !== null && !isExactIsoInstant(preimage.completedAt))
+    || typeof preimage.isNotUsable !== "boolean"
+    || (preimage.orderIndex !== null && !Number.isInteger(preimage.orderIndex))
+    || !isExactIsoInstant(preimage.createdAt)
+    || !isExactIsoInstant(preimage.updatedAt)
+    || typeof preimage.stateFingerprint !== "string"
+    || !/^[a-f0-9]{64}$/.test(preimage.stateFingerprint)) return null;
+  return preimage;
+}
+
+function parseCategoryRepairAttachmentSnapshot(
+  value: unknown,
+): CloneCategoryRepairAttachmentSnapshot | null {
+  if (!isPlainRecord(value) || !hasExactKeys(value, ["id", "ownerId", "stateFingerprint"])
+    || typeof value.id !== "string" || !value.id
+    || (value.ownerId !== null && typeof value.ownerId !== "string")
+    || typeof value.stateFingerprint !== "string"
+    || !/^[a-f0-9]{64}$/.test(value.stateFingerprint)) return null;
+  return value as unknown as CloneCategoryRepairAttachmentSnapshot;
+}
+
+function parseCategoryRepairAuditSnapshot(value: unknown): CloneCategoryRepairAuditSnapshot | null {
+  if (!isPlainRecord(value) || !hasExactKeys(value, [
+    "id",
+    "ownerId",
+    "stateFingerprint",
+    "destinationCardId",
+    "destinationBenefitId",
+    "destinationStatusId",
+    "destinationPredefinedBenefitId",
+    "destinationDefinitionFingerprint",
+  ])) return null;
+  const attachment = parseCategoryRepairAttachmentSnapshot({
+    id: value.id,
+    ownerId: value.ownerId,
+    stateFingerprint: value.stateFingerprint,
+  });
+  const nullableStrings = [
+    value.destinationCardId,
+    value.destinationBenefitId,
+    value.destinationStatusId,
+    value.destinationPredefinedBenefitId,
+    value.destinationDefinitionFingerprint,
+  ];
+  return attachment && nullableStrings.every((item) => item === null || typeof item === "string")
+    ? value as unknown as CloneCategoryRepairAuditSnapshot
+    : null;
+}
+
+function parseCategoryRepairAuditPatch(value: unknown): CloneCategoryRepairAuditPatch | null {
+  if (!isPlainRecord(value) || !hasExactKeys(value, [
+    "auditId",
+    "destinationCardId",
+    "destinationBenefitId",
+    "destinationStatusId",
+    "before",
+    "after",
+  ]) || typeof value.auditId !== "string" || !value.auditId
+    || (value.destinationCardId !== null && typeof value.destinationCardId !== "string")
+    || (value.destinationBenefitId !== null && typeof value.destinationBenefitId !== "string")
+    || typeof value.destinationStatusId !== "string" || !value.destinationStatusId) return null;
+  const metadata = (item: unknown): boolean => isPlainRecord(item)
+    && hasExactKeys(item, [
+      "destinationPredefinedBenefitId",
+      "destinationDefinitionFingerprint",
+      "stateFingerprint",
+    ])
+    && (item.destinationPredefinedBenefitId === null
+      || typeof item.destinationPredefinedBenefitId === "string")
+    && (item.destinationDefinitionFingerprint === null
+      || typeof item.destinationDefinitionFingerprint === "string")
+    && typeof item.stateFingerprint === "string"
+    && /^[a-f0-9]{64}$/.test(item.stateFingerprint);
+  return metadata(value.before) && metadata(value.after)
+    ? value as unknown as CloneCategoryRepairAuditPatch
+    : null;
+}
+
+function parseStoredKeeperBaseline(value: unknown): CloneStoredKeeperBaseline | null {
+  if (!isPlainRecord(value) || !hasExactKeys(value, ["status", "audits", "provenance"])
+    || !Array.isArray(value.audits) || !Array.isArray(value.provenance)) return null;
+  const status = parseCategoryRepairStatusPreimage(value.status);
+  const audits = value.audits.map(parseCategoryRepairAuditSnapshot);
+  const provenance = value.provenance.map(parseCategoryRepairAttachmentSnapshot);
+  return status === null || audits.some((row) => row === null) || provenance.some((row) => row === null)
+    ? null
+    : {
+      status,
+      audits: audits as CloneCategoryRepairAuditSnapshot[],
+      provenance: provenance as CloneCategoryRepairAttachmentSnapshot[],
+    };
+}
+
+function portableCategoryRepairStatusPreimage(
+  preimage: CloneCategoryRepairStatusPreimage,
+): unknown {
+  return {
+    ...preimage,
+    predefinedBenefitId: preimage.predefinedBenefitId === null ? null : "catalog-bound",
+  };
+}
+
+function portableCategoryRepairAuditSnapshot(
+  audit: CloneCategoryRepairAuditSnapshot,
+): unknown {
+  return {
+    ...audit,
+    destinationPredefinedBenefitId: audit.destinationPredefinedBenefitId === null
+      ? null
+      : "catalog-bound",
+  };
+}
+
+function portableCategoryRepairAuditPatch(patch: CloneCategoryRepairAuditPatch): unknown {
+  const portableMetadata = (metadata: CloneCategoryRepairAuditPatch["before"]): unknown => ({
+    ...metadata,
+    destinationPredefinedBenefitId: metadata.destinationPredefinedBenefitId === null
+      ? null
+      : "catalog-bound",
+  });
+  return {
+    ...patch,
+    before: portableMetadata(patch.before),
+    after: portableMetadata(patch.after),
+  };
+}
+
+function categoryRepairActionFingerprintsMatch(input: {
+  occurrence: CloneCategoryRepairOccurrence;
+  keeperBaseline: CloneStoredKeeperBaseline;
+  removedPreimage: CloneCategoryRepairStatusPreimage | null;
+  auditPatches: CloneCategoryRepairAuditPatch[];
+}): boolean {
+  const { occurrence, keeperBaseline, removedPreimage, auditPatches } = input;
+  const keeperSourceKind = occurrence.keeperSource === "LEGACY_CUSTOM" ? "legacy" : "canonical";
+  const removedSourceKind = occurrence.removedStatusSource === null
+    ? null
+    : occurrence.removedStatusSource === "LEGACY_CUSTOM" ? "legacy" : "canonical";
+  const actionInput = {
+    kind: occurrence.action,
+    userId: occurrence.userId,
+    creditCardId: occurrence.creditCardId,
+    predefinedBenefitId: occurrence.predefinedBenefitId,
+    cycleStartDate: occurrence.cycleStartDate.toISOString(),
+    cycleEndDate: occurrence.cycleEndDate.toISOString(),
+    occurrenceIndex: occurrence.occurrenceIndex,
+    keeperStatusId: occurrence.keeperStatusId,
+    keeperSourceKind,
+    keeperBaselineVersion: occurrence.keeperBaselineVersion,
+    keeperBaseline: keeperBaseline.status,
+    keeperAuditBaseline: keeperBaseline.audits,
+    keeperProvenanceBaseline: keeperBaseline.provenance,
+    removedStatusId: occurrence.removedStatusId,
+    removedSourceKind,
+    removedPreimageVersion: occurrence.removedStatusPreimageVersion,
+    removedPreimage,
+    repairAddedAuditMetadataVersion: occurrence.repairAddedAuditMetadataVersion,
+    repairAddedAuditMetadata: auditPatches,
+  };
+  const portableActionInput = {
+    ...actionInput,
+    predefinedBenefitId: "catalog-bound",
+    keeperBaseline: portableCategoryRepairStatusPreimage(keeperBaseline.status),
+    keeperAuditBaseline: keeperBaseline.audits.map(portableCategoryRepairAuditSnapshot),
+    removedPreimage: removedPreimage === null
+      ? null
+      : portableCategoryRepairStatusPreimage(removedPreimage),
+    repairAddedAuditMetadata: auditPatches.map(portableCategoryRepairAuditPatch),
+  };
+  const postimageFingerprint = migrationFingerprint({
+    ...portableCategoryRepairStatusPreimage(keeperBaseline.status) as Record<string, unknown>,
+    benefitId: keeperSourceKind === "legacy" ? keeperBaseline.status.benefitId : null,
+    creditCardId: occurrence.creditCardId,
+    predefinedBenefitId: "catalog-bound",
+    repairAddedAuditMetadata: auditPatches.map(portableCategoryRepairAuditPatch),
+  });
+  return postimageFingerprint === occurrence.postimageFingerprint
+    && migrationFingerprint({ action: portableActionInput, postimageFingerprint })
+      === occurrence.planFingerprint;
+}
+
+function statusStateMatchesPreimage(
+  status: BenefitStatus,
+  preimage: CloneCategoryRepairStatusPreimage,
+): boolean {
+  return status.id === preimage.id
+    && status.benefitId === preimage.benefitId
+    && status.userId === preimage.userId
+    && status.cycleStartDate.toISOString() === preimage.cycleStartDate
+    && status.cycleEndDate.toISOString() === preimage.cycleEndDate
+    && status.occurrenceIndex === preimage.occurrenceIndex
+    && status.usedAmount === preimage.usedAmount
+    && status.isCompleted === preimage.isCompleted
+    && (status.completedAt === null ? null : status.completedAt.toISOString()) === preimage.completedAt
+    && status.isNotUsable === preimage.isNotUsable
+    && status.orderIndex === preimage.orderIndex
+    && status.createdAt.toISOString() === preimage.createdAt
+    && status.updatedAt.toISOString() === preimage.updatedAt;
+}
+
+function categoryRepairOccurrenceTuple(row: CloneCategoryRepairOccurrence): string {
+  return [
+    row.repairId,
+    row.userId,
+    row.creditCardId,
+    row.predefinedBenefitId,
+    row.cycleStartDate.getTime(),
+    row.cycleEndDate.getTime(),
+    row.occurrenceIndex,
+  ].join("\u0000");
+}
+
+export function compareCloneCategoryRepairOccurrences(
+  left: CloneCategoryRepairOccurrence,
+  right: CloneCategoryRepairOccurrence,
+): number {
+  return left.cycleStartDate.getTime() - right.cycleStartDate.getTime()
+    || left.cycleEndDate.getTime() - right.cycleEndDate.getTime()
+    || left.occurrenceIndex - right.occurrenceIndex
+    || left.keeperStatusId.localeCompare(right.keeperStatusId)
+    || left.id.localeCompare(right.id);
+}
+
+function categoryRepairParentFingerprintsMatch(
+  repair: CloneCategoryRepair,
+  occurrences: CloneCategoryRepairOccurrence[],
+): boolean {
+  const ordered = [...occurrences].sort(compareCloneCategoryRepairOccurrences);
+  const postimageFingerprint = migrationFingerprint({
+    sourceBenefitId: repair.legacyBenefitId,
+    cardId: repair.creditCardId,
+    targetBenefitCatalogKey: repair.targetPredefinedBenefitCatalogKey,
+    statusPostimages: ordered.map((occurrence) => occurrence.postimageFingerprint),
+  });
+  const planFingerprint = migrationFingerprint({
+    immutableGraphFingerprint: repair.graphFingerprint,
+    currentGraphFingerprint: repair.reviewedCurrentGraphFingerprint,
+    destinationFingerprint: repair.destinationFingerprint,
+    postimageFingerprint,
+    actionFingerprints: ordered.map((occurrence) => occurrence.planFingerprint),
+    stopReasons: [],
+  });
+  return repair.postimageFingerprint === postimageFingerprint
+    && repair.planFingerprint === planFingerprint;
 }
 
 export function validateUserCloneSnapshot(snapshot: UserCloneSnapshot, normalizedEmail: string): void {
@@ -342,6 +873,296 @@ export function validateUserCloneSnapshot(snapshot: UserCloneSnapshot, normalize
         && (!row.predefinedCardCatalogKey || !row.predefinedBenefitCatalogKey))))) {
     throw new UserCloneOperatorError("The source global-catalog bridge graph contains an invalid link.");
   }
+  const ledgerById = new Map(bindings?.ledger.map((row) => [row.id, row]) ?? []);
+  const benefitById = new Map(snapshot.benefits.map((row) => [row.id, row]));
+  const cardById = new Map(snapshot.creditCards.map((row) => [row.id, row]));
+  const statusById = new Map(snapshot.benefitStatuses.map((row) => [row.id, row]));
+  const cardBindingById = new Map<string, string>();
+  let duplicateCardBinding = false;
+  for (const binding of bindings?.cards ?? []) {
+    if (cardBindingById.has(binding.creditCardId)) duplicateCardBinding = true;
+    cardBindingById.set(binding.creditCardId, binding.catalogKey);
+  }
+  const statusBindingById = new Map<string, { creditCardId: string; catalogKey: string }>();
+  let duplicateStatusBinding = false;
+  for (const binding of bindings?.statuses ?? []) {
+    if (statusBindingById.has(binding.benefitStatusId)) duplicateStatusBinding = true;
+    statusBindingById.set(binding.benefitStatusId, binding);
+  }
+  const auditBindingById = new Map<string, { catalogKey: string; definitionFingerprint: string | null }>();
+  let duplicateAuditBinding = false;
+  for (const binding of bindings?.audits ?? []) {
+    if (auditBindingById.has(binding.auditId)) duplicateAuditBinding = true;
+    auditBindingById.set(binding.auditId, binding);
+  }
+  const repairStateFingerprints = snapshot.categoryRepairStateFingerprints;
+  const fingerprintMap = (
+    rows: Array<{ id: string; stateFingerprint: string }> | undefined,
+  ): Map<string, string> | null => {
+    if (!rows) return null;
+    const result = new Map<string, string>();
+    for (const row of rows) {
+      if (!row.id || !/^[a-f0-9]{64}$/.test(row.stateFingerprint) || result.has(row.id)) return null;
+      result.set(row.id, row.stateFingerprint);
+    }
+    return result;
+  };
+  const statusStateFingerprints = fingerprintMap(repairStateFingerprints?.statuses);
+  const auditStateFingerprints = fingerprintMap(repairStateFingerprints?.audits);
+  const provenanceStateFingerprints = fingerprintMap(repairStateFingerprints?.provenance);
+  const repairs = snapshot.categoryRepairs ?? [];
+  const repairById = new Map(repairs.map((repair) => [repair.id, repair]));
+  const repairLegacyIds = repairs.map((repair) => repair.legacyBenefitId);
+  const repairLedgerIds = repairs.map((repair) => repair.catalogMigrationLedgerId);
+  if (duplicateCardBinding
+    || duplicateStatusBinding
+    || duplicateAuditBinding
+    || repairById.size !== repairs.length
+    || new Set(repairLegacyIds).size !== repairLegacyIds.length
+    || new Set(repairLedgerIds).size !== repairLedgerIds.length
+    || (repairs.length > 0 && (
+      statusStateFingerprints === null
+      || auditStateFingerprints === null
+      || provenanceStateFingerprints === null))
+    || repairs.some((repair) => {
+      const source = benefitById.get(repair.legacyBenefitId);
+      const ledger = ledgerById.get(repair.catalogMigrationLedgerId);
+      const card = cardById.get(repair.creditCardId);
+      return repair.userId !== userId
+        || !source
+        || source.userId !== null
+        || source.creditCardId !== repair.creditCardId
+        || !card
+        || card.userId !== userId
+        || cardBindingById.get(repair.creditCardId) !== repair.targetPredefinedCardCatalogKey
+        || !ledger
+        || ledger.legacyBenefitId !== repair.legacyBenefitId
+        || ledger.userId !== userId
+        || ledger.creditCardId !== repair.creditCardId
+        || ledger.classification !== "CUSTOM"
+        || ledger.phase !== "CLASSIFIED"
+        || ledger.predefinedCardCatalogKey !== null
+        || ledger.predefinedBenefitCatalogKey !== null
+        || repair.evidenceVersion !== 1
+        || repair.resolvedPredefinedCardCatalogKey !== repair.targetPredefinedCardCatalogKey
+        || repair.resolvedPredefinedBenefitCatalogKey !== repair.targetPredefinedBenefitCatalogKey
+        || repair.predefinedBenefitParentMatchesCard !== true
+        || !repair.targetPredefinedCardCatalogKey
+        || !repair.targetPredefinedBenefitCatalogKey
+        || (repair.phase === "APPLIED") !== (repair.rolledBackAt === null);
+    })) {
+    throw new UserCloneOperatorError("The source category-repair graph contains an invalid parent link.");
+  }
+
+  const occurrences = snapshot.categoryRepairOccurrences ?? [];
+  const occurrenceTupleKeys = occurrences.map(categoryRepairOccurrenceTuple);
+  const keeperStatusIds = occurrences.map((occurrence) => occurrence.keeperStatusId);
+  const removedStatusIds = occurrences.flatMap((occurrence) =>
+    occurrence.removedStatusId === null ? [] : [occurrence.removedStatusId]);
+  const evidenceCollides = occurrences.some((occurrence) =>
+    Number.isNaN(occurrence.cycleStartDate.getTime())
+    || Number.isNaN(occurrence.cycleEndDate.getTime()))
+    || new Set(occurrenceTupleKeys).size !== occurrenceTupleKeys.length
+    || new Set(keeperStatusIds).size !== keeperStatusIds.length
+    || new Set(removedStatusIds).size !== removedStatusIds.length
+    || keeperStatusIds.some((id) => removedStatusIds.includes(id));
+  if (evidenceCollides || occurrences.some((occurrence) => {
+    const repair = repairById.get(occurrence.repairId);
+    const keeper = statusById.get(occurrence.keeperStatusId);
+    const keeperBinding = statusBindingById.get(occurrence.keeperStatusId) ?? null;
+    const keeperBaseline = parseStoredKeeperBaseline(occurrence.keeperBaseline);
+    const removedPreimage = occurrence.removedStatusPreimage === null
+      ? null
+      : parseCategoryRepairStatusPreimage(occurrence.removedStatusPreimage);
+    const auditPatches = Array.isArray(occurrence.repairAddedAuditMetadata)
+      ? occurrence.repairAddedAuditMetadata.map(parseCategoryRepairAuditPatch)
+      : [];
+    if (!repair || !keeper || !keeperBaseline
+      || !Array.isArray(occurrence.repairAddedAuditMetadata)
+      || auditPatches.some((patch) => patch === null)) return true;
+    const parsedAuditPatches = auditPatches as CloneCategoryRepairAuditPatch[];
+
+    const isPromote = occurrence.action === "PROMOTE_LEGACY_STATUS"
+      && occurrence.keeperSource === "LEGACY_CUSTOM";
+    const isRetain = occurrence.action === "RETAIN_CANONICAL_STATUS"
+      && occurrence.keeperSource === "CANONICAL_STANDARD";
+    if (!isPromote && !isRetain) return true;
+    const expectedRemovedSource = occurrence.removedStatusId === null
+      ? null
+      : isPromote ? "CANONICAL_STANDARD" : "LEGACY_CUSTOM";
+    const baselineStatus = keeperBaseline.status;
+    const baselineIsGlobal = isRetain;
+    const currentIsGlobal = repair.phase === "APPLIED" || isRetain;
+    const currentBindingMatches = currentIsGlobal
+      ? keeperBinding?.creditCardId === repair.creditCardId
+        && keeperBinding.catalogKey === repair.targetPredefinedBenefitCatalogKey
+      : keeperBinding === null;
+    const baselineSourceMatches = baselineStatus.id === occurrence.keeperStatusId
+      && baselineStatus.userId === userId
+      && baselineStatus.benefitId === (isPromote ? repair.legacyBenefitId : null)
+      && baselineStatus.creditCardId === (baselineIsGlobal ? repair.creditCardId : null)
+      && baselineStatus.predefinedBenefitId === (baselineIsGlobal ? repair.predefinedBenefitId : null)
+      && baselineStatus.cycleStartDate === occurrence.cycleStartDate.toISOString()
+      && baselineStatus.cycleEndDate === occurrence.cycleEndDate.toISOString()
+      && baselineStatus.occurrenceIndex === occurrence.occurrenceIndex;
+    const currentSourceMatches = keeper.userId === userId
+      && keeper.benefitId === (isPromote ? repair.legacyBenefitId : null)
+      && currentBindingMatches
+      && keeper.cycleStartDate.getTime() === occurrence.cycleStartDate.getTime()
+      && keeper.cycleEndDate.getTime() === occurrence.cycleEndDate.getTime()
+      && keeper.occurrenceIndex === occurrence.occurrenceIndex;
+
+    const baselineAuditIds = keeperBaseline.audits.map((audit) => audit.id);
+    const baselineProvenanceIds = keeperBaseline.provenance.map((row) => row.id);
+    const patchIds = parsedAuditPatches.map((patch) => patch.auditId);
+    const attachmentsStructurallyUnique = new Set(baselineAuditIds).size === baselineAuditIds.length
+      && new Set(baselineProvenanceIds).size === baselineProvenanceIds.length
+      && new Set(patchIds).size === patchIds.length
+      && (isPromote
+        ? patchIds.length === baselineAuditIds.length
+          && patchIds.every((id) => baselineAuditIds.includes(id))
+        : patchIds.length === 0);
+    const baselineAuditsMatch = keeperBaseline.audits.every((baseline) => {
+      const actual = snapshot.amexSyncRowAudits.find((audit) => audit.id === baseline.id);
+      const attempt = actual
+        ? snapshot.amexSyncAttempts.find((candidate) => candidate.id === actual.attemptId)
+        : null;
+      const patch = parsedAuditPatches.find((candidate) => candidate.auditId === baseline.id);
+      const expectedMetadata = patch
+        ? repair.phase === "APPLIED" ? patch.after : patch.before
+        : {
+          destinationPredefinedBenefitId: baseline.destinationPredefinedBenefitId,
+          destinationDefinitionFingerprint: baseline.destinationDefinitionFingerprint,
+          stateFingerprint: baseline.stateFingerprint,
+        };
+      const actualGlobalBinding = auditBindingById.get(baseline.id) ?? null;
+      const actualMetadataMatches = expectedMetadata.destinationPredefinedBenefitId === null
+        ? actualGlobalBinding === null
+          && expectedMetadata.destinationDefinitionFingerprint === null
+        : expectedMetadata.destinationPredefinedBenefitId === repair.predefinedBenefitId
+          && actualGlobalBinding?.catalogKey === repair.targetPredefinedBenefitCatalogKey
+          && actualGlobalBinding.definitionFingerprint === expectedMetadata.destinationDefinitionFingerprint;
+      return actual !== undefined
+        && attempt?.userId === baseline.ownerId
+        && baseline.ownerId === userId
+        && auditStateFingerprints?.get(actual.id) === baseline.stateFingerprint
+        && actual.destinationCardId === baseline.destinationCardId
+        && actual.destinationBenefitId === baseline.destinationBenefitId
+        && actual.destinationStatusId === baseline.destinationStatusId
+        && baseline.destinationCardId === repair.creditCardId
+        && baseline.destinationBenefitId === (isPromote ? repair.legacyBenefitId : null)
+        && baseline.destinationStatusId === occurrence.keeperStatusId
+        && ((baseline.destinationPredefinedBenefitId === null
+          && baseline.destinationDefinitionFingerprint === null)
+          || (baseline.destinationPredefinedBenefitId === repair.predefinedBenefitId
+            && baseline.destinationDefinitionFingerprint === repair.definitionFingerprint))
+        && actualMetadataMatches;
+    });
+    const baselineProvenanceMatches = keeperBaseline.provenance.every((baseline) => {
+      const actual = snapshot.benefitStatusSourceProvenance.find((row) => row.id === baseline.id);
+      const attempt = actual?.attemptId === null
+        ? null
+        : snapshot.amexSyncAttempts.find((candidate) => candidate.id === actual?.attemptId);
+      return actual !== undefined
+        && actual.benefitStatusId === occurrence.keeperStatusId
+        && (attempt?.userId ?? null) === baseline.ownerId
+        && (baseline.ownerId === null || baseline.ownerId === userId)
+        && provenanceStateFingerprints?.get(actual.id) === baseline.stateFingerprint;
+    });
+    const auditPatchesMatchRelations = parsedAuditPatches.every((patch) => {
+      const baseline = keeperBaseline.audits.find((audit) => audit.id === patch.auditId);
+      return baseline !== undefined
+        && patch.destinationStatusId === occurrence.keeperStatusId
+        && patch.destinationCardId === repair.creditCardId
+        && patch.destinationBenefitId === repair.legacyBenefitId
+        && patch.before.stateFingerprint === baseline.stateFingerprint
+        && patch.before.stateFingerprint === patch.after.stateFingerprint
+        && ((patch.before.destinationPredefinedBenefitId === null
+          && patch.before.destinationDefinitionFingerprint === null)
+          || (patch.before.destinationPredefinedBenefitId === repair.predefinedBenefitId
+            && patch.before.destinationDefinitionFingerprint === repair.definitionFingerprint))
+        && patch.after.destinationPredefinedBenefitId === repair.predefinedBenefitId
+        && patch.after.destinationDefinitionFingerprint === repair.definitionFingerprint;
+    });
+
+    const removed = occurrence.removedStatusId === null
+      ? null
+      : statusById.get(occurrence.removedStatusId) ?? null;
+    const removedBinding = occurrence.removedStatusId === null
+      ? null
+      : statusBindingById.get(occurrence.removedStatusId) ?? null;
+    const removedSourceIsGlobal = occurrence.removedStatusSource === "CANONICAL_STANDARD";
+    const removedPreimageMatches = occurrence.removedStatusId === null
+      ? removedPreimage === null
+      : removedPreimage !== null
+        && removedPreimage.id === occurrence.removedStatusId
+        && removedPreimage.userId === userId
+        && removedPreimage.benefitId === (removedSourceIsGlobal ? null : repair.legacyBenefitId)
+        && removedPreimage.creditCardId === (removedSourceIsGlobal ? repair.creditCardId : null)
+        && removedPreimage.predefinedBenefitId === (removedSourceIsGlobal
+          ? repair.predefinedBenefitId
+          : null)
+        && removedPreimage.cycleStartDate === occurrence.cycleStartDate.toISOString()
+        && removedPreimage.cycleEndDate === occurrence.cycleEndDate.toISOString()
+        && removedPreimage.occurrenceIndex === occurrence.occurrenceIndex;
+    const removedCurrentMatches = repair.phase === "APPLIED"
+      ? removed === null && removedBinding === null
+      : occurrence.removedStatusId === null
+        ? true
+        : removed !== null && removedPreimage !== null
+          && statusStateMatchesPreimage(removed, removedPreimage)
+          && statusStateFingerprints?.get(removed.id) === removedPreimage.stateFingerprint
+          && (removedSourceIsGlobal
+            ? removedBinding?.creditCardId === repair.creditCardId
+              && removedBinding.catalogKey === repair.targetPredefinedBenefitCatalogKey
+            : removedBinding === null)
+          && !snapshot.benefitStatusSourceProvenance.some((row) =>
+            row.benefitStatusId === occurrence.removedStatusId)
+          && !snapshot.amexSyncRowAudits.some((row) =>
+            row.destinationStatusId === occurrence.removedStatusId);
+    const actionFingerprintsMatch = categoryRepairActionFingerprintsMatch({
+      occurrence,
+      keeperBaseline,
+      removedPreimage,
+      auditPatches: parsedAuditPatches,
+    });
+    const removedPreimageStorageMatches = occurrence.removedStatusId === null
+      ? occurrence.removedStatusPreimageIsSqlNull === true
+        && occurrence.removedStatusPreimageJsonType === null
+      : occurrence.removedStatusPreimageIsSqlNull === false
+        && occurrence.removedStatusPreimageJsonType === "object";
+
+    return occurrence.userId !== userId
+      || occurrence.creditCardId !== repair.creditCardId
+      || occurrence.predefinedBenefitId !== repair.predefinedBenefitId
+      || occurrence.targetPredefinedBenefitCatalogKey !== repair.targetPredefinedBenefitCatalogKey
+      || occurrence.keeperBaselineVersion !== 1
+      || occurrence.repairAddedAuditMetadataVersion !== 1
+      || (occurrence.removedStatusId === null) !== (occurrence.removedStatusSource === null)
+      || (occurrence.removedStatusId === null) !== (occurrence.removedStatusPreimageVersion === null)
+      || (occurrence.removedStatusId === null) !== (occurrence.removedStatusPreimage === null)
+      || (occurrence.removedStatusPreimageVersion !== null
+        && occurrence.removedStatusPreimageVersion !== 1)
+      || occurrence.removedStatusSource !== expectedRemovedSource
+      || !removedPreimageStorageMatches
+      || !baselineSourceMatches
+      || !currentSourceMatches
+      || !attachmentsStructurallyUnique
+      || !baselineAuditsMatch
+      || !baselineProvenanceMatches
+      || !auditPatchesMatchRelations
+      || !actionFingerprintsMatch
+      || !removedPreimageMatches
+      || !removedCurrentMatches;
+  })) {
+    throw new UserCloneOperatorError("The source category-repair graph contains invalid or colliding occurrence evidence.");
+  }
+  if (repairs.some((repair) => !categoryRepairParentFingerprintsMatch(
+    repair,
+    occurrences.filter((occurrence) => occurrence.repairId === repair.id),
+  ))) {
+    throw new UserCloneOperatorError("The source category-repair graph contains invalid portable fingerprints.");
+  }
 
   assertUniqueIds([snapshot.user], "User");
   assertUniqueIds(snapshot.creditCards, "CreditCard");
@@ -354,6 +1175,8 @@ export function validateUserCloneSnapshot(snapshot: UserCloneSnapshot, normalize
   assertUniqueIds(snapshot.amexSyncAttempts, "AmexSyncAttempt");
   assertUniqueIds(snapshot.benefitStatusSourceProvenance, "BenefitStatusSourceProvenance");
   assertUniqueIds(snapshot.amexSyncRowAudits, "AmexSyncRowAudit");
+  assertUniqueIds(snapshot.categoryRepairs ?? [], "GlobalBenefitCategoryRepair");
+  assertUniqueIds(snapshot.categoryRepairOccurrences ?? [], "GlobalBenefitCategoryRepairOccurrence");
   if (snapshot.globalCatalogBindings) {
     assertUniqueIds(snapshot.globalCatalogBindings.ledger, "CatalogMigrationLedger");
     if (new Set(snapshot.globalCatalogBindings.ledger.map((row) => row.legacyBenefitId)).size

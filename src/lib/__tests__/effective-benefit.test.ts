@@ -1,4 +1,5 @@
 import { BenefitFrequency } from '@/generated/prisma';
+import { globalDefinitionFingerprint } from '../global-benefit-migration';
 import {
   fetchEffectiveBenefitStatuses,
   fetchEffectiveCardTerms,
@@ -47,6 +48,7 @@ function row(overrides: Record<string, unknown> = {}) {
     legacyPeriodKey: null,
 
     globalId: 'global-1',
+    globalCatalogKey: 'benefit:global-card-1:global-1',
     globalPredefinedCardId: 'global-card-1',
     globalCategory: 'Current global category',
     globalDescription: 'Current global description',
@@ -62,8 +64,44 @@ function row(overrides: Record<string, unknown> = {}) {
     globalProductKey: 'global-product-key',
     globalCreditFamilyKey: 'travel-credit',
     globalPeriodKey: 'monthly',
+    globalRetiredAt: null,
     globalUsageWaySlug: 'current-global-guide',
+    migrationLedgerId: null,
+    migrationLegacyBenefitId: null,
+    migrationUserId: null,
+    migrationCreditCardId: null,
+    migrationPredefinedCardId: null,
+    migrationPredefinedBenefitId: null,
     migrationClassification: null,
+    migrationPhase: null,
+    migrationDestinationFingerprint: null,
+    repairId: null,
+    repairLegacyBenefitId: null,
+    repairLedgerId: null,
+    repairUserId: null,
+    repairCreditCardId: null,
+    repairPredefinedCardId: null,
+    repairPredefinedBenefitId: null,
+    repairTargetCardCatalogKey: null,
+    repairTargetBenefitCatalogKey: null,
+    repairDefinitionFingerprint: null,
+    repairEvidenceVersion: null,
+    repairPhase: null,
+    repairRolledBackAt: null,
+    occurrenceRepairId: null,
+    occurrenceUserId: null,
+    occurrenceCreditCardId: null,
+    occurrencePredefinedBenefitId: null,
+    occurrenceTargetBenefitCatalogKey: null,
+    occurrenceAction: null,
+    occurrenceKeeperSource: null,
+    occurrenceKeeperStatusId: null,
+    occurrenceCycleStartDate: null,
+    occurrenceCycleEndDate: null,
+    occurrenceIndexEvidence: null,
+    occurrenceKeeperBaselineVersion: null,
+    occurrenceRemovedPreimageVersion: null,
+    occurrenceAuditMetadataVersion: null,
 
     cardId: 'card-1',
     cardName: 'Global Card',
@@ -87,6 +125,11 @@ function row(overrides: Record<string, unknown> = {}) {
     cardLifecycleNotes: null,
     cardProductKey: 'global-product-key',
     cardPredefinedCardId: 'global-card-1',
+    productCatalogKey: 'card:global-card-1',
+    productName: 'Global Card',
+    productIssuer: 'Issuer',
+    productProductKey: 'global-product-key',
+    productRetiredAt: null,
     ...overrides,
   };
 }
@@ -172,6 +215,13 @@ describe('projectEffectiveBenefitRow', () => {
     const result = projectEffectiveBenefitRow(row({
       benefitId: 'legacy-1',
       ...legacyFields(),
+      migrationLegacyBenefitId: 'legacy-1',
+      migrationUserId: 'user-1',
+      migrationCreditCardId: 'card-1',
+      migrationPredefinedCardId: 'global-card-1',
+      migrationPredefinedBenefitId: 'global-1',
+      migrationClassification: 'STANDARD',
+      migrationPhase: 'BRIDGED',
     }) as never);
 
     expect(result.source).toEqual({
@@ -188,6 +238,89 @@ describe('projectEffectiveBenefitRow', () => {
     });
     expect(result.usageWaySlug).toBe('current-global-guide');
     expect(result.canMutateDefinition).toBe(false);
+  });
+
+  it('uses canonical terms for an exact active category-repair promoted status', () => {
+    const definitionFingerprint = globalDefinitionFingerprint({
+      id: 'global-1',
+      catalogKey: 'benefit:global-card-1:global-1',
+      predefinedCardId: 'global-card-1',
+      category: 'Current global category',
+      description: 'Current global description',
+      percentage: 0,
+      maxAmount: 100,
+      frequency: BenefitFrequency.MONTHLY,
+      cycleAlignment: null,
+      fixedCycleStartMonth: null,
+      fixedCycleDurationMonths: null,
+      occurrencesInCycle: 1,
+      productKey: 'global-product-key',
+      creditFamilyKey: 'travel-credit',
+      periodKey: 'monthly',
+      retiredAt: null,
+    });
+    const result = projectEffectiveBenefitRow(row({
+      benefitId: 'legacy-1',
+      ...legacyFields(),
+      migrationLedgerId: 'ledger-1',
+      migrationLegacyBenefitId: 'legacy-1',
+      migrationUserId: 'user-1',
+      migrationCreditCardId: 'card-1',
+      migrationPredefinedCardId: null,
+      migrationPredefinedBenefitId: null,
+      migrationClassification: 'CUSTOM',
+      migrationPhase: 'CLASSIFIED',
+      migrationDestinationFingerprint: null,
+      repairId: 'repair-1',
+      repairLegacyBenefitId: 'legacy-1',
+      repairLedgerId: 'ledger-1',
+      repairUserId: 'user-1',
+      repairCreditCardId: 'card-1',
+      repairPredefinedCardId: 'global-card-1',
+      repairPredefinedBenefitId: 'global-1',
+      repairTargetCardCatalogKey: 'card:global-card-1',
+      repairTargetBenefitCatalogKey: 'benefit:global-card-1:global-1',
+      repairDefinitionFingerprint: definitionFingerprint,
+      repairEvidenceVersion: 1,
+      repairPhase: 'APPLIED',
+      repairRolledBackAt: null,
+      occurrenceRepairId: 'repair-1',
+      occurrenceUserId: 'user-1',
+      occurrenceCreditCardId: 'card-1',
+      occurrencePredefinedBenefitId: 'global-1',
+      occurrenceTargetBenefitCatalogKey: 'benefit:global-card-1:global-1',
+      occurrenceAction: 'PROMOTE_LEGACY_STATUS',
+      occurrenceKeeperSource: 'LEGACY_CUSTOM',
+      occurrenceKeeperStatusId: 'status-1',
+      occurrenceCycleStartDate: date('2026-07-01'),
+      occurrenceCycleEndDate: date('2026-07-31'),
+      occurrenceIndexEvidence: 0,
+      occurrenceKeeperBaselineVersion: 1,
+      occurrenceRemovedPreimageVersion: null,
+      occurrenceAuditMetadataVersion: 1,
+    }) as never);
+
+    expect(result.source).toEqual({
+      kind: 'bridge',
+      predefinedBenefitId: 'global-1',
+      creditCardId: 'card-1',
+      legacyBenefitId: 'legacy-1',
+    });
+    expect(result.benefit).toMatchObject({
+      id: 'global-1',
+      category: 'Current global category',
+      description: 'Current global description',
+    });
+    expect(result.canMutateDefinition).toBe(false);
+  });
+
+  it('fails closed for malformed applied category-repair evidence', () => {
+    expect(() => projectEffectiveBenefitRow(row({
+      benefitId: 'legacy-1',
+      ...legacyFields(),
+      repairId: 'repair-1',
+      repairPhase: 'APPLIED',
+    }) as never)).toThrow('invalid retained-benefit global authority');
   });
 
   it('projects standalone and card-linked user definitions as custom', () => {

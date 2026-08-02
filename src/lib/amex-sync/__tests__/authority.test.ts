@@ -5,6 +5,7 @@ import {
   planAmexSync,
   planReviewedAmexCompensation,
   syncIdempotencyKey,
+  type AmexDestinationLegacyAuthority,
   type AmexSyncDestinationContext,
 } from "../authority";
 
@@ -60,10 +61,13 @@ function destination(options: {
   ownerId?: string;
   issuer?: string;
   lifecycleStatus?: "ACTIVE" | "CLOSED" | "PRODUCT_CHANGED";
+  legacyAuthority?: AmexDestinationLegacyAuthority;
 } = {}): AmexSyncDestinationContext {
   const status = {
     id: statusId,
     benefitId: "legacy-benefit-1",
+    legacyAuthority: options.legacyAuthority
+      ?? { kind: "STRICT_STANDARD" as const, legacyBenefitId: "legacy-benefit-1" },
     creditCardId: cardId,
     predefinedBenefitId: "global-benefit-1",
     userId,
@@ -123,6 +127,44 @@ function plan(envelope = source(), context = destination()) {
   return planAmexSync({ envelope, context, userId, now, transitionTime: now });
 }
 
+function decemberUberScenario(legacyAuthority?: AmexDestinationLegacyAuthority) {
+  const decemberNow = new Date("2026-12-15T12:00:00.000Z");
+  const decemberEnvelope = source({
+    providerTitle: "Uber Cash",
+    sourceCreditKey: "american-express-platinum-card:uber-cash",
+    creditFamilyKey: "american-express-platinum-card:uber-cash",
+    sourcePeriod: { kind: "calendar_date_range", startDate: "2026-12-01", endDate: "2026-12-31", timeZone: "UTC" },
+    earnedOrUsed: { value: "30.00", unit: "USD", currency: "USD" },
+    completionState: null,
+  });
+  decemberEnvelope.scanFinishedAt = decemberNow.toISOString();
+  decemberEnvelope.cards[0].observedAt = "2026-12-15T11:59:00.000Z";
+  const decemberContext = destination();
+  const monthlyStatus = {
+    ...decemberContext.cards[0].predefinedCard!.benefits[0].statuses[0],
+    id: "status-monthly",
+    cycleStartDate: new Date("2026-12-01T00:00:00.000Z"),
+    cycleEndDate: new Date("2026-12-31T00:00:00.000Z"),
+    ...(legacyAuthority === undefined ? {} : { legacyAuthority }),
+  };
+  decemberContext.cards[0].predefinedCard!.benefits = [{
+    ...decemberContext.cards[0].predefinedCard!.benefits[0],
+    id: "benefit-monthly",
+    catalogKey: "benefit:american-express-platinum-card:uber-cash:calendar-month",
+    creditFamilyKey: "american-express-platinum-card:uber-cash",
+    periodKey: "calendar-month",
+    statuses: [{ ...monthlyStatus, predefinedBenefitId: "benefit-monthly" }],
+  }, {
+    ...decemberContext.cards[0].predefinedCard!.benefits[0],
+    id: "benefit-december-bonus",
+    catalogKey: "benefit:american-express-platinum-card:uber-cash-december-bonus:calendar-month-december",
+    creditFamilyKey: "american-express-platinum-card:uber-cash-december-bonus",
+    periodKey: "calendar-month-december",
+    statuses: [{ ...monthlyStatus, id: "status-december-bonus", predefinedBenefitId: "benefit-december-bonus" }],
+  }];
+  return { decemberNow, decemberEnvelope, decemberContext };
+}
+
 describe("Amex sync authority", () => {
   it("recognizes only exact calendar quarter ranges", () => {
     expect(periodKeyForExactRange("2026-01-01", "2026-03-31")).toBe("calendar-quarter-q1");
@@ -154,40 +196,7 @@ describe("Amex sync authority", () => {
   });
 
   it("splits a Platinum December Uber aggregate into one atomic $15/$20 group", () => {
-    const decemberNow = new Date("2026-12-15T12:00:00.000Z");
-    const decemberEnvelope = source({
-      providerTitle: "Uber Cash",
-      sourceCreditKey: "american-express-platinum-card:uber-cash",
-      creditFamilyKey: "american-express-platinum-card:uber-cash",
-      sourcePeriod: { kind: "calendar_date_range", startDate: "2026-12-01", endDate: "2026-12-31", timeZone: "UTC" },
-      earnedOrUsed: { value: "30.00", unit: "USD", currency: "USD" },
-      completionState: null,
-    });
-    decemberEnvelope.scanFinishedAt = decemberNow.toISOString();
-    decemberEnvelope.cards[0].observedAt = "2026-12-15T11:59:00.000Z";
-    const decemberContext = destination();
-    const monthlyStatus = {
-      ...decemberContext.cards[0].predefinedCard!.benefits[0].statuses[0],
-      id: "status-monthly",
-      cycleStartDate: new Date("2026-12-01T00:00:00.000Z"),
-      cycleEndDate: new Date("2026-12-31T00:00:00.000Z"),
-    };
-    decemberContext.cards[0].predefinedCard!.benefits = [{
-      ...decemberContext.cards[0].predefinedCard!.benefits[0],
-      id: "benefit-monthly",
-      catalogKey: "benefit:american-express-platinum-card:uber-cash:calendar-month",
-      creditFamilyKey: "american-express-platinum-card:uber-cash",
-      periodKey: "calendar-month",
-      statuses: [{ ...monthlyStatus, predefinedBenefitId: "benefit-monthly" }],
-    }, {
-      ...decemberContext.cards[0].predefinedCard!.benefits[0],
-      id: "benefit-december-bonus",
-      catalogKey: "benefit:american-express-platinum-card:uber-cash-december-bonus:calendar-month-december",
-      creditFamilyKey: "american-express-platinum-card:uber-cash-december-bonus",
-      periodKey: "calendar-month-december",
-      statuses: [{ ...monthlyStatus, id: "status-december-bonus", predefinedBenefitId: "benefit-december-bonus" }],
-    }];
-
+    const { decemberNow, decemberEnvelope, decemberContext } = decemberUberScenario();
     const split = planAmexSync({
       envelope: decemberEnvelope,
       context: decemberContext,
@@ -221,6 +230,38 @@ describe("Amex sync authority", () => {
     }).rows).toEqual([
       expect.objectContaining({ disposition: "skipped", reason: "amount_incompatible" }),
       expect.objectContaining({ disposition: "skipped", reason: "amount_incompatible" }),
+    ]);
+  });
+
+  it("excludes invalid retained statuses from both Platinum December Uber destinations", () => {
+    const invalidAuthority = { kind: "INVALID_RETAINED_BENEFIT" as const };
+    const { decemberNow, decemberEnvelope, decemberContext } = decemberUberScenario(invalidAuthority);
+    expect(decemberContext.cards[0].predefinedCard!.benefits.map(
+      (benefit) => benefit.statuses[0].legacyAuthority,
+    )).toEqual([invalidAuthority, invalidAuthority]);
+
+    const split = planAmexSync({
+      envelope: decemberEnvelope,
+      context: decemberContext,
+      userId,
+      now: decemberNow,
+      transitionTime: decemberNow,
+    }).rows;
+    expect(split).toEqual([
+      expect.objectContaining({
+        creditFamilyKey: "american-express-platinum-card:uber-cash",
+        disposition: "skipped",
+        reason: "destination_status_missing",
+        destinationStatusId: null,
+        destinationLegacyAuthority: null,
+      }),
+      expect.objectContaining({
+        creditFamilyKey: "american-express-platinum-card:uber-cash-december-bonus",
+        disposition: "skipped",
+        reason: "destination_status_missing",
+        destinationStatusId: null,
+        destinationLegacyAuthority: null,
+      }),
     ]);
   });
 
@@ -306,6 +347,14 @@ describe("Amex sync authority", () => {
     const customOnly = destination();
     customOnly.cards[0].predefinedCard!.benefits[0].statuses[0].predefinedBenefitId = null;
     expect(plan(source(), customOnly).rows[0].reason).toBe("destination_status_missing");
+
+    const invalidRetained = destination({
+      legacyAuthority: { kind: "INVALID_RETAINED_BENEFIT" },
+    });
+    expect(plan(source(), invalidRetained).rows[0]).toMatchObject({
+      disposition: "skipped",
+      reason: "destination_status_missing",
+    });
 
     const wrongGlobalKey = destination();
     wrongGlobalKey.cards[0].predefinedCard!.benefits[0].catalogKey = "benefit:american-express-platinum-card:saks:calendar-half-h1";

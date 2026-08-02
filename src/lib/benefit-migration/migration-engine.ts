@@ -66,6 +66,29 @@ export class BenefitMigrationEngine {
         throw new Error(`Pre-migration checks failed: ${failedChecks.map(c => c.message).join(', ')}`);
       }
 
+      // Deprecated broad migration path: active category-repair evidence makes
+      // template/card replacement unsafe. Stop before its first destructive write.
+      if (!this.options.dryRun) {
+        for (const cardUpdate of plan.cardUpdates) {
+          const repairRows = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+            SELECT EXISTS (
+              SELECT 1
+              FROM "GlobalBenefitCategoryRepair" repair
+              JOIN "CreditCard" card ON card."id" = repair."creditCardId"
+              JOIN "PredefinedCard" target ON target."id" = repair."predefinedCardId"
+              WHERE repair."phase" = 'APPLIED'
+                AND (
+                  card."name" = ${cardUpdate.cardName}
+                  OR target."name" = ${cardUpdate.cardName}
+                )
+            ) AS "exists"
+          `;
+          if (repairRows[0]?.exists) {
+            throw new Error('Deprecated benefit migration is blocked by active category-repair evidence.');
+          }
+        }
+      }
+
       // Step 2: Update predefined card templates
       console.log('\n📝 Updating predefined card templates...');
       await this.updatePredefinedCards(plan.cardUpdates);
@@ -426,6 +449,16 @@ export class BenefitMigrationEngine {
     let benefitsDeleted = 0;
 
     await prisma.$transaction(async (tx) => {
+      const activeRepairs = await tx.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT EXISTS (
+          SELECT 1 FROM "GlobalBenefitCategoryRepair"
+          WHERE "creditCardId" = ${card.id} AND "phase" = 'APPLIED'
+        ) AS "exists"
+      `;
+      if (activeRepairs[0]?.exists) {
+        throw new Error('Deprecated benefit migration is blocked by active category-repair evidence.');
+      }
+
       // Step 1: Delete old benefits and their statuses (if preserveUserActions is false)
       // or only delete benefits that don't have completed/not-usable statuses
       if (this.options.preserveUserActions) {

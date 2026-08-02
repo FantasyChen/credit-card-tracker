@@ -105,6 +105,10 @@ function context(usedAmount = 0) {
           isNotUsable: false,
           updatedAt: new Date("2026-07-14T00:00:00.000Z"),
           provenance: null,
+          legacyAuthority: {
+            kind: "STRICT_STANDARD" as const,
+            legacyBenefitId: "legacy-benefit-1",
+          },
           }],
         }],
       },
