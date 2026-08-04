@@ -163,6 +163,16 @@ runGlobalBenefitCategoryRepairOperator({
 
 Private manifests and temporary fingerprints are operator inputs. They are never committed, logged, returned by public APIs, or retained in sanitized evidence.
 
+The development rehearsal command is a separate explicitly authorized boundary:
+
+```bash
+npm run rehearse:global-benefit-category-repair:dev -- \
+  --recovery-point-verified \
+  --confirm=REHEARSE_CATEGORY_DRIFT_REPAIR_ON_VERIFIED_DEVELOPMENT
+```
+
+It reads `DATABASE_URL_DEV` directly from the process and never invokes dotenv, `with-dev-db`, Prisma CLI commands, or environment-variable reassignment. A private expected development host, database/schema/branch identity fingerprint, and branch fingerprint plus forbidden production host/branch fingerprints are mandatory process inputs and never output.
+
 ### 3. Contracts
 
 1. The migration creates only new enums, tables, indexes, checks, and foreign keys. It alters, updates, backfills, deletes, or changes uniqueness on no existing row/table. Relations to canonical global definitions are restrictive; relations to user-owned source, ledger, owner, card, parent evidence, and keeper status cascade repair evidence so rolled-back history cannot permanently block normal lifecycle deletion.
@@ -179,6 +189,9 @@ Private manifests and temporary fingerprints are operator inputs. They are never
 12. Cleanup or dropping repair/preimage data is a new destructive boundary with its own retention/recovery design; it is not part of apply or rollback.
 13. Portable repair fingerprints first validate exact environment-local global relations and catalog keys, then normalize those global database IDs to a catalog-bound marker inside graph/action/manifest inputs. They never normalize physical-card, source, ledger, status, cycle, or occurrence identity. This preserves authority across sanitized clone rebinding without weakening exact relation validation.
 14. Occurrence evidence must be read, verified, cloned, and hashed in semantic tuple order—cycle start, cycle end, occurrence index, keeper status ID—rather than evidence-row UUID order.
+15. Rehearsal input validation completes before client construction: exact PostgreSQL development URL host, distinct forbidden production host, exact 16-character expected database/schema/branch identity fingerprint, exact distinct 16-character branch fingerprints, exact confirmation, recovery attestation, and raw/effective AMEX `off`. The one client is then independently identified by existing database/schema/branch machinery. Missing repair tables fail before fixture creation, and identity is repeated immediately before setup/bootstrap/apply/replay/CAS/rollback/reapply/provenance writes/final rollback/cleanup.
+16. The harness invents only `example.invalid` fixture data with in-memory IDs, selects one active writable AMEX global definition deterministically by catalog key, and never creates or deletes a global catalog row. It uses a first-page limit of one and fails if unrelated development data enters that bounded page. The placeholder ledger digest is replaced only after adapter `readBatch` and canonical `legacyBenefitSourceFingerprint` agree.
+17. Normal completion and failure recovery delete only exact fixture-owned rows after proving repair evidence `ROLLED_BACK` or absent. If target verification, ordinary rollback, graph authority, or exact deletion counts fail, cleanup is reported incomplete. Active or invalid evidence is never force-deleted. No native database error, target value, URL, ID, email, key, cursor, fingerprint, manifest, or snapshot enters stdout/stderr.
 
 ### 4. Validation & Error Matrix
 

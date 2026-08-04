@@ -933,6 +933,40 @@ describe("bounded operator replay and rollback", () => {
     expect(replay.counts.idempotent).toBe(1);
   });
 
+  it("keeps rollback preview authorized after an allowed mutable keeper-state change", async () => {
+    const before = unit();
+    const current = snapshot([before]);
+    const manifest = discoveryManifest(current);
+    const proposal = planGlobalBenefitCategoryRepairUnit(before);
+    const applied = appliedUnit(before, proposal, manifest);
+    const changedKeeper: CategoryRepairStatusSnapshot = {
+      ...applied.source.statuses[0],
+      usedAmount: 11,
+      isCompleted: true,
+      completedAt: new Date("2026-01-15T12:00:00.000Z"),
+      orderIndex: 23,
+      updatedAt: new Date("2026-02-02T10:00:00.000Z"),
+      stateFingerprint: "allowed-mutable-state-change",
+    };
+    const changedSource = sourceBenefit({ ...applied.source, statuses: [changedKeeper] });
+    changedSource.ledger = applied.source.ledger;
+    const changed = unit({
+      ...applied,
+      source: changedSource,
+      destinationStatuses: [changedKeeper],
+      cardStrictCustomSources: [changedSource],
+    });
+
+    const preview = await runGlobalBenefitCategoryRepairOperator({
+      mode: "rollback-preview",
+      manifest,
+      database: database(snapshot([changed])),
+    });
+
+    expect(preview.counts).toMatchObject({ proposed: 1, blocked: 0, statusActions: 1 });
+    expect(preview.stops).toEqual({});
+  });
+
   it("rolls back manifest entries without requiring blocked page rows to have repair evidence", async () => {
     const before = unit();
     const blockedSource = sourceBenefit({

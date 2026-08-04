@@ -37,12 +37,19 @@
 - [x] Run targeted Jest, full Jest, strict TypeScript, changed-source lint, Prisma/migration checks, public DB/card-template/userscript checks, sensitive-pattern/spec checks, and `git diff --check`.
 - [x] Dispatch Trellis quality review and resolve all verified findings.
 
-## 6. Verified development only — separately authorized
+## 6. Development rehearsal harness — implementation only
+
+- [x] Add the testable development-only orchestrator, exact confirmation/recovery/target/AMEX-off gates, lazy one-client construction, repeated identity checks, and closed aggregate report.
+- [x] Add the thin process-env CLI and package script without dotenv, `with-dev-db`, manifest files, Prisma CLI, environment reassignment, or production client construction.
+- [x] Add the optional server-internal AMEX destination-context client seam while retaining one-argument singleton behavior.
+- [x] Add mocked orchestration, target rejection, exact authority forwarding, state preservation, drift closure/removal, safe cleanup, active-evidence refusal, injection-seam, and report-privacy tests.
+
+## 7. Verified development execution — separately authorized and still open
 
 - [ ] Verify development target and apply additive migration.
-- [ ] Rehearse deterministic discovery/manifest/dry-run twice.
-- [ ] Exercise apply, suppression, effective/AMEX authority, rollback preserving later state, blocked provenance drift, and reapply.
-- [ ] Record sanitized evidence. Do not access or mutate production.
+- [ ] Run the checked-in harness to rehearse deterministic discovery/manifest/dry-run twice.
+- [ ] Exercise apply, suppression, effective/AMEX authority, rollback preserving later state, blocked provenance drift, and reapply against the verified development target.
+- [ ] Record sanitized aggregate evidence. Do not access or mutate production.
 
 ## Stop conditions
 

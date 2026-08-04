@@ -40,6 +40,7 @@
     "sync:global-catalog": "tsx scripts/sync-global-catalog.ts",
     "migrate:global-benefits": "tsx scripts/migrate-global-benefits.ts",
     "repair:global-benefit-categories": "tsx scripts/repair-global-benefit-categories.ts",
+    "rehearse:global-benefit-category-repair:dev": "tsx scripts/rehearse-global-benefit-category-repair-development.ts",
     "clone:amex-user:dev": "tsx scripts/clone-amex-user-to-development.ts",
     "postinstall": "prisma generate",
     "db:check": "node scripts/check-database-connection.js",
