@@ -43,6 +43,18 @@ export async function deleteCardAction(formData: FormData) {
     }
 
     await prisma.$transaction(async (transaction) => {
+      const activeRepairs = await transaction.$queryRaw<Array<{ exists: boolean }>>(Prisma.sql`
+        SELECT EXISTS (
+          SELECT 1
+          FROM "GlobalBenefitCategoryRepair" repair
+          WHERE repair."creditCardId" = ${cardId}
+            AND repair."phase" = 'APPLIED'
+        ) AS "exists"
+      `);
+      if (activeRepairs[0]?.exists) {
+        throw new Error('Active category-repair evidence blocks card deletion.');
+      }
+
       // Preserve migration audit rows while releasing their optional restrictive
       // physical-card reference. The legacy definition ID remains in the ledger.
       await transaction.$executeRaw(Prisma.sql`

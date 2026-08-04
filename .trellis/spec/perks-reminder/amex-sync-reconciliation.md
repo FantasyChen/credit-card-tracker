@@ -448,3 +448,132 @@ pageWindow.postMessage(payload, target.origin);
 // Local bridges the Tampermonkey sandbox to the same localhost page realm;
 // production and local builds retain distinct identities, grants, and exact targets.
 ```
+
+## Scenario: active category-repair AMEX destination authority
+
+### 1. Scope / Trigger
+
+Use this contract when an AMEX destination status retains a historical custom `benefitId` or acquired canonical links through the reviewed category-drift repair overlay rather than the original strict-standard bridge. Category similarity never runs in preview or confirmation. AMEX consumes only exact persisted evidence that the centralized classifier proves `APPLIED_VALID` after the repair operator has completed under effective mode `off`; any later AMEX activation is a separate authorization. There is no production authorization in this contract.
+
+### 2. Signatures
+
+```ts
+type AmexDestinationLegacyAuthority =
+  | { kind: "STRICT_STANDARD"; legacyBenefitId: string | null }
+  | {
+      kind: "ACTIVE_CATEGORY_REPAIR";
+      repairId: string;
+      repairEvidenceVersion: number;
+      repairPostimageFingerprint: string;
+      repairPlanFingerprint: string;
+      targetCardCatalogKey: string;
+      targetBenefitCatalogKey: string;
+      legacyBenefitId: string;
+    }
+  | { kind: "INVALID_RETAINED_BENEFIT" };
+
+loadAmexSyncDestinationContext(
+  userId: string,
+  injectedClient?, // optional server-internal rehearsal/test seam only
+): Promise<AmexSyncDestinationContext>; // populates status.legacyAuthority
+
+statusHasAmexLegacyAuthority(
+  status: DestinationStatusSnapshot,
+): boolean; // internal preview filter
+
+loadTransactionalAmexLegacyAuthority({
+  transaction,
+  userId,
+  statusId,
+  status,
+}): Promise<AmexDestinationLegacyAuthority | null>; // internal confirmation reload
+
+sameAmexLegacyAuthority(
+  current: AmexDestinationLegacyAuthority,
+  expected: AmexDestinationLegacyAuthority | null | undefined,
+): boolean; // exact confirmation comparison
+```
+
+The server-internal plan row and ordered `destinationAuthorityDigest` bind the returned authority kind and, for an active repair, the repair ID, evidence version, target catalog keys, definition/plan/postimage fingerprints, keeper status ID, exact tuple, and bounded retained legacy benefit ID. Public envelope/request/response DTOs remain unchanged.
+
+### 3. Contracts
+
+1. `STRICT_STANDARD` retains all existing global graph and strict bridge rules.
+2. `ACTIVE_CATEGORY_REPAIR` requires one exact semantically `APPLIED_VALID` parent tied to the retained legacy definition and its unchanged `CUSTOM / CLASSIFIED` ledger, owner, physical card, global product, global benefit, and catalog-key snapshots.
+3. Exactly one occurrence evidence row must bind the destination status as keeper and match owner, card, global benefit, exact persisted cycle instants, occurrence index, action/source kind, and evidence versions.
+4. The repair's definition fingerprint and target catalog keys must match the registry-valid writable global product/benefit tuple. Category or copied user-row provider keys cannot substitute.
+5. `ROLLED_BACK`, `APPLIED_INVALID`, missing, duplicated, cross-owner, cross-product, stale, or relation-inconsistent evidence yields `INVALID_RETAINED_BENEFIT`; retained custom links alone are not writable.
+6. Preview binds the complete internal authority—including repair evidence version, plan/postimage fingerprints, target catalog keys, retained source, and exact destination tuple—into the proposal without exposing it publicly. Any phase, relation, catalog, fingerprint, cycle, keeper, state, provenance, or audit change requires re-preview.
+7. Confirmation reloads parent repair, occurrence evidence, historical ledger, keeper status, physical/global graph, before state, provenance, and audits inside the existing serializable single/group transaction; it recomputes the same exact authority and destination digest before any status CAS.
+8. Repair-added audit metadata is not source provenance. AMEX confirmation may add ordinary AMEX provenance/audit only after all authority checks pass; that later activity intentionally blocks category-repair rollback.
+9. Generic AMEX resolution never performs category-only discovery, mutates repair evidence, restores a removed row, or changes repair phase.
+10. Repair apply/rollback is forbidden while AMEX is effectively `preview` or `write`; the separately authorized operator requires exact effective `off` verification before any repair write.
+11. Active repair application paths block source/card/status/account deletion before database mutation. After rollback, ordinary owned-data deletion may cascade historical repair evidence; missing cascaded evidence grants no AMEX authority. Canonical global targets remain restrictive while evidence exists.
+12. The destination-context loader's optional Prisma parameter is a server-internal test/rehearsal seam, not a request field. Omitted calls retain the process singleton. The verified-development harness passes its one explicitly target-verified client, and lazy singleton lookup ensures importing or using that injected path constructs no environment-selected production client. Public service/request DTOs cannot choose or forward a database client.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Strict-standard destination has no repair evidence | Use existing strict authority path |
+| Historical-custom bridge has one exact active parent and occurrence evidence row | Continue only if every physical/global/status/registry check also passes |
+| Parent is `ROLLED_BACK`, target catalog key changed, or postimage differs | `conflict_repreview_required` or destination-not-authorized; no write |
+| Status merely has both `benefitId` and global IDs without `STRICT_STANDARD` or `ACTIVE_CATEGORY_REPAIR` authority | `INVALID_RETAINED_BENEFIT`; no write |
+| Repair evidence matches by category/content but not exact IDs and fingerprints | Invalid destination; no inference |
+| Preview happened before repair apply/rollback or evidence drift | Proposal conflict; require fresh preview |
+| AMEX audit/provenance is added after repair apply | Preserve AMEX result; repair rollback must stop |
+| Repair writer sees effective AMEX `preview` or `write` | Reject repair write before transaction |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** An active repair occurrence binds one owned status to the same physical card and writable global definition as the AMEX source tuple. Preview includes the evidence digest; confirmation reloads it unchanged and performs the ordinary status/provenance/audit transaction.
+- **Base:** A strict bridge has no category-repair row. Existing strict-standard authority remains unchanged.
+- **Base:** A rolled-back repair leaves historical evidence. It grants no AMEX authority; ordinary custom projection resumes.
+- **Bad:** Authorize because a retained benefit differs only in category, because its legacy provider keys match, or because a stale proposal predates repair apply/rollback.
+
+### 6. Tests Required
+
+Assert `STRICT_STANDARD` behavior is unchanged; exact `ACTIVE_CATEGORY_REPAIR` success; unchanged historical `CUSTOM / CLASSIFIED` ledger requirement; owner/card/product/benefit/catalog-key/keeper/tuple equality; custom-only and un-evidenced three-link rejection as `INVALID_RETAINED_BENEFIT`; rolled-back/malformed/duplicate/cross-product evidence rejection; active source/card/status/account deletion guards; missing evidence after rolled-back owned-lifecycle cascades; restrictive canonical global targets; definition/plan/postimage/phase drift proposal conflicts; target catalog-key, plan-fingerprint, postimage-fingerprint, and ordered authority-digest binding; transaction-time exact authority reload in one-row and December groups before mutation; exact inclusive cycle instants; AMEX provenance/audit atomicity; rollback blocking after AMEX activity; unchanged public DTO/userscript snapshots; effective-AMEX-off repair-write gates; and the optional destination-context client seam using the injected client without touching the singleton while one-argument callers remain unchanged. Do not use live preview, confirmation, provider activity, configuration changes, or a database-backed repair operator as routine verification.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: category-only content and retained user keys authorize AMEX directly.
+if (legacy.category !== global.category && legacy.periodKey === global.periodKey) {
+  return { kind: "standard", status };
+}
+```
+
+```ts
+// Correct: context loading classifies exact persisted relations; ordinary and
+// December preview paths filter invalid retained statuses before planning.
+const context = await loadAmexSyncDestinationContext(userId);
+const statuses = benefit.statuses.filter((status) =>
+  status.userId === userId
+  && status.creditCardId === card.id
+  && status.predefinedBenefitId === benefit.id
+  && statusHasAmexLegacyAuthority(status)
+  && status.occurrenceIndex === 0
+  && dateOnly(status.cycleStartDate) === sourceRow.sourcePeriod!.startDate
+  && dateOnly(status.cycleEndDate) === sourceRow.sourcePeriod!.endDate,
+);
+if (statuses.length !== 1) return destinationNotAuthorized();
+const binding = destinationBinding({
+  card,
+  benefit,
+  status: statuses[0],
+  sourceIdentity,
+}); // includes destinationLegacyAuthority in the ordered plan digest
+
+// Confirmation independently reloads and compares the exact authority inside
+// the serializable status/group transaction before mutation.
+const current = await loadTransactionalAmexLegacyAuthority({
+  transaction,
+  userId,
+  statusId: status.id,
+  status: transactionStatus,
+});
+if (!current || !sameAmexLegacyAuthority(current, status.legacyAuthority)) {
+  throw new Error("conflict_repreview_required");
+}
+```

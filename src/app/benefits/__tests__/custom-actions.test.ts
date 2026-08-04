@@ -75,6 +75,8 @@ describe('custom benefit definition actions', () => {
     expect(sql).toContain('custom_ledger."classification" = \'CUSTOM\'');
     expect(sql).toContain('bs."predefinedBenefitId" IS NOT NULL');
     expect(sql).toContain('ledger."classification" = \'STANDARD\'');
+    expect(sql).toContain('FROM "GlobalBenefitCategoryRepair" repair');
+    expect(sql).toContain('repair."phase" = \'APPLIED\'');
     expect(sql).toContain('"updatedAt" = NOW()');
     expect(mockRevalidatePath).toHaveBeenCalledWith('/benefits');
     expect(mockRevalidatePath).toHaveBeenCalledWith('/benefits/custom');
@@ -99,6 +101,8 @@ describe('custom benefit definition actions', () => {
     expect(sql).toContain('custom_ledger."classification" = \'CUSTOM\'');
     expect(sql).toContain('bs."predefinedBenefitId" IS NOT NULL');
     expect(sql).toContain('ledger."classification" = \'STANDARD\'');
+    expect(sql).toContain('FROM "GlobalBenefitCategoryRepair" repair');
+    expect(sql).toContain('repair."phase" = \'APPLIED\'');
     expect(mockRevalidatePath).toHaveBeenCalledWith('/benefits');
     expect(mockRevalidatePath).toHaveBeenCalledWith('/benefits/custom');
   });

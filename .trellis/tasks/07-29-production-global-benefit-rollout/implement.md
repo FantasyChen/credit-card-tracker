@@ -8,7 +8,7 @@
 - [x] Exact targets, stop conditions, point-in-time recovery, and a provider-native recovery branch without compute are verified before production migration.
 - [x] The superseded `backfill:amex-catalog --apply` is disabled and will not be invoked.
 
-**Current gate:** Production target/recovery, additive schema, global-catalog, legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed deployment, authenticated zero-write preview, and separately authorized write-configuration gates have passed. Production AMEX is `write`, but no proposal has been confirmed; cleanup, userscript/provider activity, real-account proposal review, and the first bounded confirmation remain separately gated.
+**Current gate:** Production target/recovery, original additive schema, global-catalog, legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed deployment, authenticated zero-write preview, and separately authorized write-configuration gates have passed. Production AMEX is `write`, but no proposal has been confirmed. The category-drift duplicate audit now blocks both first confirmation and legacy cleanup pending child implementation, verified-development rehearsal, a separately authorized return to effective `off`, additive repair-schema deployment, reviewed private repair manifest/apply/parity evidence, and a new reactivation/cleanup decision. Userscript/provider activity and real-account proposal review also remain separately gated.
 
 ## 1. Review implementation evidence
 
@@ -68,6 +68,7 @@
 
 ## 6. Cleanup/global-first boundary
 
+- [ ] Keep cleanup blocked until the category-drift repair child, verified-development rehearsal, effective-production-off transition, additive repair schema, reviewed repair apply, and post-repair parity gates pass.
 - [ ] Establish a fresh recovery point and obtain separate cleanup authorization, if cleanup proceeds.
 - [ ] Clean only ledger-proven standard copies; verify all custom/unresolved rows and status identity/state remain.
 - [ ] Validate exclusive standard/custom sources and global-first consumer parity.
@@ -86,6 +87,8 @@
 
 - [x] Present sanitized preview evidence and obtain a separate explicit write decision.
 - [x] Enable write through the approved configuration/deployment path without confirming a proposal.
+- [ ] Before any repair write, separately return production from current `write` to effective `off` and verify immutable-deployment/primary-alias identity plus fail-closed runtime behavior.
+- [ ] Complete the category-drift repair and parity gates, then obtain a new AMEX activation and first-confirmation decision.
 - [ ] Perform one bounded explicit confirmation.
 - [ ] Reconcile attempt, row-audit, provenance, destination status, and unrelated-account aggregates.
 - [ ] Return mode off immediately on any mismatch; do not issue compensating repair writes without review.
@@ -117,7 +120,8 @@ git diff --check
 - [x] Production legacy bridge apply — completed under separate authorization; preservation, hybrid parity, and complete idempotent replay passed.
 - [ ] Production cleanup/rollback, seed, reset, or other database mutation — unperformed.
 - [x] Verified development-database migration/catalog/runtime/bridge/rollback-re-bridge/synthetic-AMEX validation — completed.
-- [ ] Browser/live AMEX, userscript installation/publication, or confirmation — unperformed.
+- [ ] Browser/live AMEX, userscript installation/publication, or confirmation — unperformed and first confirmation is blocked pending category-drift repair gates.
+- [ ] Category-drift repair schema deployment, database discovery/manifest, apply/rollback, and post-repair parity — unperformed and separately gated.
 - [x] Production preview — configured with a sensitive HMAC, deployed, and verified through one authenticated synthetic HTTP 200 preview with zero proposal rows and exactly unchanged zero synthetic-user database counts.
 - [x] Production write activation — separately authorized after preview evidence, configured on the exact production project with a fresh sensitive HMAC, deployed Ready, and verified through an authenticated synthetic HTTP 200 response returning mode `write` with exactly unchanged zero database counts; no proposal was confirmed.
 - [x] Main release and rollout-authorized automatic production deployment — completed through reviewed pull request #10 with AMEX `off`; later separately authorized preview and write deployments reached Ready and their primary aliases were verified against deployment IDs.
@@ -136,4 +140,4 @@ The earlier production read-only inspection and per-user-key dry-run are preserv
 
 ## Current status
 
-Implementation, verified-development, production target/recovery, additive schema, global catalog, legacy bridge, preservation, hybrid parity, idempotent replay, reviewed deployment, anonymous smoke, authenticated zero-write preview, and separately authorized write-configuration gates passed. The production primary alias is verified against the Ready write-configured deployment; production AMEX resolves to `write`, the authenticated synthetic response was HTTP 200 with zero proposal rows, and all ten synthetic-user-scoped database counts remained zero and exactly unchanged. No proposal was confirmed. Legacy rows and links remain and cleanup is deferred. Cleanup, userscript/provider activity, live scanning, real-account proposal review, and the first bounded confirmation remain later independent boundaries.
+Implementation, prior verified-development, production target/recovery, original additive schema, global catalog, legacy bridge, preservation, hybrid parity, idempotent replay, reviewed deployment, anonymous smoke, authenticated zero-write preview, and separately authorized write-configuration gates passed. The production primary alias is verified against the Ready write-configured deployment; production AMEX resolves to `write`, the authenticated synthetic response was HTTP 200 with zero proposal rows, and all ten synthetic-user-scoped database counts remained zero and exactly unchanged. No proposal was confirmed. Legacy rows and links remain. The category-drift duplicate audit now blocks cleanup and first confirmation: repair implementation/rehearsal, a separately authorized effective-off transition, additive repair-schema deployment, private manifest/apply/parity review, and a later AMEX reactivation or cleanup decision are all pending. Userscript/provider activity, live scanning, and real-account proposal review remain separate boundaries.

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getPrismaClient } from "@/lib/prisma-client-provider";
 import {
   amexSyncAuditRetentionCutoff,
   applyAmexSyncGroup,
@@ -17,6 +18,10 @@ import {
   type DestinationPredefinedCardSnapshot,
 } from "../authority";
 
+jest.mock("@/lib/prisma-client-provider", () => ({
+  getPrismaClient: jest.fn(() => jest.requireMock("@/lib/prisma").prisma),
+}));
+
 jest.mock("@/lib/prisma", () => {
   const database = {
     creditCard: { findMany: jest.fn(), findUnique: jest.fn() },
@@ -25,6 +30,7 @@ jest.mock("@/lib/prisma", () => {
     amexSyncRowAudit: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), deleteMany: jest.fn() },
     amexSyncAttempt: { findMany: jest.fn(), deleteMany: jest.fn() },
     externalCardMapping: { upsert: jest.fn(), updateMany: jest.fn() },
+    $queryRaw: jest.fn(),
     $transaction: jest.fn(),
   };
   database.$transaction.mockImplementation(async (callback: (transaction: typeof database) => Promise<unknown>) => callback(database));
@@ -38,6 +44,7 @@ const db = prisma as unknown as {
   amexSyncRowAudit: { findUnique: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; deleteMany: jest.Mock };
   amexSyncAttempt: { findMany: jest.Mock; deleteMany: jest.Mock };
   externalCardMapping: { upsert: jest.Mock; updateMany: jest.Mock };
+  $queryRaw: jest.Mock;
   $transaction: jest.Mock;
 };
 
@@ -80,6 +87,64 @@ const definitionFingerprint = amexDestinationDefinitionFingerprint({
   sourceIdentity,
 });
 
+function strictAuthorityRow(statusId: string, benefitId: string | null) {
+  return {
+    statusId,
+    statusBenefitId: benefitId,
+    statusCreditCardId: "card-1",
+    statusPredefinedBenefitId: globalBenefit.id,
+    statusUserId: "user-1",
+    cycleStartDate: new Date("2026-07-01T00:00:00.000Z"),
+    cycleEndDate: new Date("2026-09-30T23:59:59.999Z"),
+    occurrenceIndex: 0,
+    strictLegacyBenefitId: benefitId,
+    strictUserId: benefitId ? "user-1" : null,
+    strictCreditCardId: benefitId ? "card-1" : null,
+    strictPredefinedCardId: benefitId ? globalProduct.id : null,
+    strictPredefinedBenefitId: benefitId ? globalBenefit.id : null,
+    strictClassification: benefitId ? "STANDARD" : null,
+    strictPhase: benefitId ? "BRIDGED" : null,
+    repairId: null,
+    repairLegacyBenefitId: null,
+    repairLedgerId: null,
+    repairUserId: null,
+    repairCreditCardId: null,
+    repairPredefinedCardId: null,
+    repairPredefinedBenefitId: null,
+    targetCardCatalogKey: null,
+    targetBenefitCatalogKey: null,
+    definitionFingerprint: null,
+    repairPlanFingerprint: null,
+    repairPostimageFingerprint: null,
+    evidenceVersion: null,
+    repairPhase: null,
+    repairRolledBackAt: null,
+    ledgerId: null,
+    ledgerLegacyBenefitId: null,
+    ledgerUserId: null,
+    ledgerCreditCardId: null,
+    ledgerPredefinedCardId: null,
+    ledgerPredefinedBenefitId: null,
+    ledgerClassification: null,
+    ledgerPhase: null,
+    ledgerDestinationFingerprint: null,
+    occurrenceRepairId: null,
+    occurrenceUserId: null,
+    occurrenceCreditCardId: null,
+    occurrencePredefinedBenefitId: null,
+    occurrenceTargetBenefitCatalogKey: null,
+    occurrenceAction: null,
+    occurrenceKeeperSource: null,
+    occurrenceKeeperStatusId: null,
+    occurrenceCycleStartDate: null,
+    occurrenceCycleEndDate: null,
+    occurrenceIndexEvidence: null,
+    keeperBaselineVersion: null,
+    removedStatusPreimageVersion: null,
+    auditMetadataVersion: null,
+  };
+}
+
 const row: AmexSyncPlanRow = {
   sourceRowIdentity: "a".repeat(64),
   atomicGroupIdentity: "e".repeat(64),
@@ -101,6 +166,7 @@ const row: AmexSyncPlanRow = {
   destinationPredefinedCardId: globalProduct.id,
   destinationProductCatalogKey: globalProduct.catalogKey,
   destinationBenefitId: "legacy-benefit-1",
+  destinationLegacyAuthority: { kind: "STRICT_STANDARD", legacyBenefitId: "legacy-benefit-1" },
   destinationPredefinedBenefitId: globalBenefit.id,
   destinationBenefitCatalogKey: globalBenefit.catalogKey,
   destinationDefinitionFingerprint: definitionFingerprint,
@@ -149,6 +215,15 @@ describe("Amex sync persistence boundary", () => {
         statuses: undefined,
         predefinedCard: { ...globalProduct, benefits: undefined },
       },
+    });
+    db.$queryRaw.mockImplementation(async (query: { strings?: readonly string[]; values?: unknown[] }) => {
+      const text = query.strings?.join(' ') ?? '';
+      if (text.includes('WHERE bs."id"')) {
+        const statusId = String(query.values?.[0]);
+        const status = await db.benefitStatus.findUnique({ where: { id: statusId } });
+        return status ? [strictAuthorityRow(statusId, status.benefitId ?? null)] : [];
+      }
+      return [strictAuthorityRow("status-1", "legacy-benefit-1")];
     });
     db.benefitStatus.updateMany.mockResolvedValue({ count: 1 });
     db.benefitStatusSourceProvenance.findUnique.mockResolvedValue(null);
@@ -216,6 +291,23 @@ describe("Amex sync persistence boundary", () => {
     });
   });
 
+  it("uses an explicitly injected server-side client without changing the singleton default", async () => {
+    const injected = {
+      creditCard: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+
+    await expect(loadAmexSyncDestinationContext("development-user", injected as never))
+      .resolves.toEqual({ cards: [] });
+    expect(injected.creditCard.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: "development-user" },
+    }));
+    expect(injected.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(db.creditCard.findMany).not.toHaveBeenCalled();
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+    expect(getPrismaClient).not.toHaveBeenCalled();
+  });
+
   it("atomically writes one owned compare-and-set status, provenance, and audit", async () => {
     await expect(applyAmexSyncRow({ attemptId: "attempt-1", userId: "user-1", row })).resolves.toMatchObject({
       sourceRowIdentity: row.sourceRowIdentity,
@@ -254,7 +346,11 @@ describe("Amex sync persistence boundary", () => {
   });
 
   it("applies both destinations without requiring legacy benefit links in one serializable transaction", async () => {
-    const standardRow: AmexSyncPlanRow = { ...row, destinationBenefitId: null };
+    const standardRow: AmexSyncPlanRow = {
+      ...row,
+      destinationBenefitId: null,
+      destinationLegacyAuthority: { kind: "STRICT_STANDARD", legacyBenefitId: null },
+    };
     const bonusRow: AmexSyncPlanRow = {
       ...standardRow,
       sourceRowIdentity: "d".repeat(64),
@@ -345,6 +441,21 @@ describe("Amex sync persistence boundary", () => {
     })).rejects.toThrow("conflict_repreview_required");
     expect(db.benefitStatus.updateMany).not.toHaveBeenCalled();
     expect(db.benefitStatusSourceProvenance.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects transaction-time legacy authority drift before mutation", async () => {
+    db.$queryRaw.mockResolvedValue([
+      strictAuthorityRow('status-1', 'different-legacy-benefit'),
+    ]);
+
+    await expect(applyAmexSyncRow({
+      attemptId: 'attempt-1',
+      userId: 'user-1',
+      row,
+    })).rejects.toThrow('conflict_repreview_required');
+    expect(db.benefitStatus.updateMany).not.toHaveBeenCalled();
+    expect(db.benefitStatusSourceProvenance.upsert).not.toHaveBeenCalled();
+    expect(db.amexSyncRowAudit.create).not.toHaveBeenCalled();
   });
 
   it("rejects transaction-time global definition drift before mutation", async () => {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { BenefitFrequency, type BenefitCycleAlignment } from '@/generated/prisma';
+import { BenefitFrequency, Prisma, type BenefitCycleAlignment } from '@/generated/prisma';
 import { prisma } from '@/lib/prisma';
 import {
   planBenefitStatusMaterialization,
@@ -11,6 +11,8 @@ import {
   amexSyncAuditRetentionCutoff,
   deleteExpiredAmexSyncRowAudits,
 } from '@/lib/amex-sync/repository';
+import { classifyGlobalBenefitCategoryRepairAuthority } from '@/lib/global-benefit-category-repair-authority';
+import type { GlobalBenefitDefinition, GlobalCardDefinition } from '@/lib/global-benefit-migration';
 
 export const maxDuration = 10;
 
@@ -43,13 +45,64 @@ interface RawCustomDefinition {
   occurrencesInCycle: number | null;
 }
 
+interface RawCategoryRepairParent {
+  sourceBenefitId: string;
+  ledgerId: string;
+  ledgerLegacyBenefitId: string;
+  ledgerUserId: string;
+  ledgerCreditCardId: string | null;
+  ledgerPredefinedCardId: string | null;
+  ledgerPredefinedBenefitId: string | null;
+  ledgerClassification: string;
+  ledgerPhase: string;
+  ledgerDestinationFingerprint: string | null;
+  repairId: string;
+  repairLegacyBenefitId: string;
+  repairLedgerId: string;
+  repairUserId: string;
+  repairCreditCardId: string;
+  repairPredefinedCardId: string;
+  repairPredefinedBenefitId: string;
+  targetCardCatalogKey: string;
+  targetBenefitCatalogKey: string;
+  definitionFingerprint: string;
+  evidenceVersion: number;
+  repairPhase: string;
+  repairRolledBackAt: Date | null;
+  cardId: string;
+  cardUserId: string;
+  cardPredefinedCardId: string | null;
+  productId: string;
+  productCatalogKey: string;
+  productName: string;
+  productIssuer: string;
+  productKey: string | null;
+  productRetiredAt: Date | null;
+  benefitId: string;
+  benefitCatalogKey: string;
+  benefitPredefinedCardId: string;
+  benefitCategory: string;
+  benefitDescription: string;
+  benefitPercentage: number;
+  benefitMaxAmount: number | null;
+  benefitFrequency: string;
+  benefitCycleAlignment: string | null;
+  benefitFixedCycleStartMonth: number | null;
+  benefitFixedCycleDurationMonths: number | null;
+  benefitOccurrencesInCycle: number;
+  benefitProductKey: string | null;
+  benefitCreditFamilyKey: string | null;
+  benefitPeriodKey: string | null;
+  benefitRetiredAt: Date | null;
+}
+
 async function runCheckBenefitsLogic(dryRun = false) {
   const now = new Date();
   const startMs = Date.now();
   console.log(`check-benefits started at ${now.toISOString()}${dryRun ? ' [DRY RUN]' : ''}`);
 
   try {
-    const [standardDefinitions, customAndLegacyDefinitions] = await Promise.all([
+    const [standardDefinitions, customAndLegacyCandidates] = await Promise.all([
       prisma.$queryRaw<RawStandardDefinition[]>`
         SELECT
           pb."id",
@@ -130,10 +183,145 @@ async function runCheckBenefitsLogic(dryRun = false) {
                 AND bs."cycleEndDate" >= ${now}
             )
           )
-        ORDER BY b."id"
+        ORDER BY EXISTS (
+          SELECT 1
+          FROM "GlobalBenefitCategoryRepair" repair_order
+          WHERE repair_order."legacyBenefitId" = b."id"
+            AND repair_order."phase" = 'APPLIED'
+        ), b."id"
         LIMIT ${SOURCE_BATCH_SIZE}
       `,
     ]);
+
+    const candidateBenefitIds = customAndLegacyCandidates.map((definition) => definition.id);
+    const categoryRepairParents = candidateBenefitIds.length === 0
+      ? []
+      : await prisma.$queryRaw<RawCategoryRepairParent[]>`
+        SELECT
+          b."id" AS "sourceBenefitId",
+          l."id" AS "ledgerId",
+          l."legacyBenefitId" AS "ledgerLegacyBenefitId",
+          l."userId" AS "ledgerUserId",
+          l."creditCardId" AS "ledgerCreditCardId",
+          l."predefinedCardId" AS "ledgerPredefinedCardId",
+          l."predefinedBenefitId" AS "ledgerPredefinedBenefitId",
+          l."classification"::text AS "ledgerClassification",
+          l."phase"::text AS "ledgerPhase",
+          l."destinationFingerprint" AS "ledgerDestinationFingerprint",
+          r."id" AS "repairId",
+          r."legacyBenefitId" AS "repairLegacyBenefitId",
+          r."catalogMigrationLedgerId" AS "repairLedgerId",
+          r."userId" AS "repairUserId",
+          r."creditCardId" AS "repairCreditCardId",
+          r."predefinedCardId" AS "repairPredefinedCardId",
+          r."predefinedBenefitId" AS "repairPredefinedBenefitId",
+          r."targetPredefinedCardCatalogKey" AS "targetCardCatalogKey",
+          r."targetPredefinedBenefitCatalogKey" AS "targetBenefitCatalogKey",
+          r."definitionFingerprint",
+          r."evidenceVersion",
+          r."phase"::text AS "repairPhase",
+          r."rolledBackAt" AS "repairRolledBackAt",
+          c."id" AS "cardId",
+          c."userId" AS "cardUserId",
+          c."predefinedCardId" AS "cardPredefinedCardId",
+          pc."id" AS "productId",
+          pc."catalogKey" AS "productCatalogKey",
+          pc."name" AS "productName",
+          pc."issuer" AS "productIssuer",
+          pc."productKey",
+          pc."retiredAt" AS "productRetiredAt",
+          pb."id" AS "benefitId",
+          pb."catalogKey" AS "benefitCatalogKey",
+          pb."predefinedCardId" AS "benefitPredefinedCardId",
+          pb."category" AS "benefitCategory",
+          pb."description" AS "benefitDescription",
+          pb."percentage" AS "benefitPercentage",
+          pb."maxAmount" AS "benefitMaxAmount",
+          pb."frequency"::text AS "benefitFrequency",
+          pb."cycleAlignment"::text AS "benefitCycleAlignment",
+          pb."fixedCycleStartMonth" AS "benefitFixedCycleStartMonth",
+          pb."fixedCycleDurationMonths" AS "benefitFixedCycleDurationMonths",
+          pb."occurrencesInCycle" AS "benefitOccurrencesInCycle",
+          pb."productKey" AS "benefitProductKey",
+          pb."creditFamilyKey" AS "benefitCreditFamilyKey",
+          pb."periodKey" AS "benefitPeriodKey",
+          pb."retiredAt" AS "benefitRetiredAt"
+        FROM "GlobalBenefitCategoryRepair" r
+        JOIN "Benefit" b ON b."id" = r."legacyBenefitId"
+        JOIN "CatalogMigrationLedger" l ON l."id" = r."catalogMigrationLedgerId"
+        JOIN "CreditCard" c ON c."id" = r."creditCardId"
+        JOIN "PredefinedCard" pc ON pc."id" = r."predefinedCardId"
+        JOIN "PredefinedBenefit" pb ON pb."id" = r."predefinedBenefitId"
+        WHERE r."phase" = 'APPLIED'
+          AND b."id" IN (${Prisma.join(candidateBenefitIds)})
+        ORDER BY b."id"
+      `;
+
+    const validSuppressedBenefitIds = new Set(categoryRepairParents.flatMap((row) => {
+      const benefit: GlobalBenefitDefinition = {
+        id: row.benefitId,
+        catalogKey: row.benefitCatalogKey,
+        predefinedCardId: row.benefitPredefinedCardId,
+        category: row.benefitCategory,
+        description: row.benefitDescription,
+        percentage: row.benefitPercentage,
+        maxAmount: row.benefitMaxAmount,
+        frequency: row.benefitFrequency,
+        cycleAlignment: row.benefitCycleAlignment,
+        fixedCycleStartMonth: row.benefitFixedCycleStartMonth,
+        fixedCycleDurationMonths: row.benefitFixedCycleDurationMonths,
+        occurrencesInCycle: row.benefitOccurrencesInCycle,
+        productKey: row.benefitProductKey,
+        creditFamilyKey: row.benefitCreditFamilyKey,
+        periodKey: row.benefitPeriodKey,
+        retiredAt: row.benefitRetiredAt,
+      };
+      const product: GlobalCardDefinition = {
+        id: row.productId,
+        catalogKey: row.productCatalogKey,
+        name: row.productName,
+        issuer: row.productIssuer,
+        productKey: row.productKey,
+        retiredAt: row.productRetiredAt,
+        benefits: [benefit],
+      };
+      const state = classifyGlobalBenefitCategoryRepairAuthority({
+        sourceBenefitId: row.sourceBenefitId,
+        ledger: {
+          id: row.ledgerId,
+          legacyBenefitId: row.ledgerLegacyBenefitId,
+          userId: row.ledgerUserId,
+          creditCardId: row.ledgerCreditCardId,
+          predefinedCardId: row.ledgerPredefinedCardId,
+          predefinedBenefitId: row.ledgerPredefinedBenefitId,
+          classification: row.ledgerClassification,
+          phase: row.ledgerPhase,
+          destinationFingerprint: row.ledgerDestinationFingerprint,
+        },
+        repair: {
+          id: row.repairId,
+          legacyBenefitId: row.repairLegacyBenefitId,
+          catalogMigrationLedgerId: row.repairLedgerId,
+          userId: row.repairUserId,
+          creditCardId: row.repairCreditCardId,
+          predefinedCardId: row.repairPredefinedCardId,
+          predefinedBenefitId: row.repairPredefinedBenefitId,
+          targetPredefinedCardCatalogKey: row.targetCardCatalogKey,
+          targetPredefinedBenefitCatalogKey: row.targetBenefitCatalogKey,
+          definitionFingerprint: row.definitionFingerprint,
+          evidenceVersion: row.evidenceVersion,
+          phase: row.repairPhase,
+          rolledBackAt: row.repairRolledBackAt,
+        },
+        card: { id: row.cardId, userId: row.cardUserId, predefinedCardId: row.cardPredefinedCardId },
+        product,
+        benefit,
+      });
+      return state === 'APPLIED_VALID' ? [row.sourceBenefitId] : [];
+    }));
+    const customAndLegacyDefinitions = customAndLegacyCandidates
+      .filter((definition) => !validSuppressedBenefitIds.has(definition.id))
+      .slice(0, SOURCE_BATCH_SIZE);
 
     const fetchMs = Date.now() - startMs;
     const plan = planBenefitStatusMaterialization(

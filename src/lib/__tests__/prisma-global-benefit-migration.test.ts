@@ -26,6 +26,7 @@ function createAdapterHarness(
     mutateStatusDuringBridge?: boolean;
     cardOnlyAudit?: boolean;
     customOnly?: boolean;
+    activeCategoryRepair?: boolean;
   } = {},
 ) {
   const definition: GlobalCardDefinition = {
@@ -173,6 +174,7 @@ function createAdapterHarness(
       }],
       provenance: [],
       ledger: state.ledger,
+      categoryRepairAuthority: options.activeCategoryRepair ? "APPLIED_VALID" : undefined,
     }],
     cardAudits: options.cardOnlyAudit ? [{
       id: "audit-1",
@@ -199,6 +201,22 @@ function createAdapterHarness(
       sourceFingerprint: unbridged.benefits[0].sourceFingerprint,
       destinationFingerprint,
     };
+  }
+  if (options.activeCategoryRepair) {
+    state.ledger = {
+      legacyBenefitId: "legacy-benefit-1",
+      userId: "owner-1",
+      creditCardId: "owned-card-1",
+      predefinedCardId: null,
+      predefinedBenefitId: null,
+      classification: "CUSTOM",
+      phase: "CLASSIFIED",
+      sourceFingerprint: unbridged.benefits[0].sourceFingerprint,
+      destinationFingerprint: null,
+    };
+    state.cardPredefinedCardId = "global-card-1";
+    state.statusCreditCardId = "owned-card-1";
+    state.statusPredefinedBenefitId = "global-benefit-1";
   }
 
   const queryRaw = jest.fn(async (query: unknown) => {
@@ -256,6 +274,46 @@ function createAdapterHarness(
       stateJson: statusJson(),
     }];
     if (text.includes('FROM "BenefitStatusSourceProvenance"')) return [];
+    if (text.includes('FROM "GlobalBenefitCategoryRepair" repair')) {
+      if (text.includes('SELECT EXISTS')) return [{ exists: false }];
+      return options.activeCategoryRepair ? [{
+        sourceBenefitId: 'legacy-benefit-1',
+        repairId: 'repair-1',
+        repairLegacyBenefitId: 'legacy-benefit-1',
+        repairLedgerId: 'ledger-1',
+        repairUserId: 'owner-1',
+        repairCreditCardId: 'owned-card-1',
+        repairPredefinedCardId: 'global-card-1',
+        repairPredefinedBenefitId: 'global-benefit-1',
+        targetCardCatalogKey: 'card-1',
+        targetBenefitCatalogKey: 'card:benefit-1',
+        definitionFingerprint: destinationFingerprint,
+        evidenceVersion: 1,
+        repairPhase: 'APPLIED',
+        repairRolledBackAt: null,
+        occurrenceRepairId: 'repair-1',
+        occurrenceUserId: 'owner-1',
+        occurrenceCreditCardId: 'owned-card-1',
+        occurrencePredefinedBenefitId: 'global-benefit-1',
+        occurrenceTargetBenefitCatalogKey: 'card:benefit-1',
+        occurrenceAction: 'PROMOTE_LEGACY_STATUS',
+        occurrenceKeeperSource: 'LEGACY_CUSTOM',
+        occurrenceKeeperStatusId: 'status-1',
+        occurrenceCycleStartDate: START,
+        occurrenceCycleEndDate: END,
+        occurrenceIndexEvidence: 0,
+        keeperBaselineVersion: 1,
+        removedStatusPreimageVersion: null,
+        auditMetadataVersion: 1,
+        keeperBenefitId: 'legacy-benefit-1',
+        keeperCreditCardId: 'owned-card-1',
+        keeperPredefinedBenefitId: 'global-benefit-1',
+        keeperUserId: 'owner-1',
+        keeperCycleStartDate: START,
+        keeperCycleEndDate: END,
+        keeperOccurrenceIndex: 0,
+      }] : [];
+    }
     if (text.includes('FROM "AmexSyncRowAudit" r')) return [{
       id: "audit-1",
       attemptUserId: "owner-1",
@@ -269,7 +327,9 @@ function createAdapterHarness(
     if (text.includes('count(*)') && text.includes('FROM "CatalogMigrationLedger"')) {
       return [{ count: state.ledger?.phase === "BRIDGED" ? BigInt(1) : BigInt(0) }];
     }
-    if (text.includes('FROM "CatalogMigrationLedger"')) return state.ledger ? [state.ledger] : [];
+    if (text.includes('FROM "CatalogMigrationLedger"')) {
+      return state.ledger ? [{ id: 'ledger-1', ...state.ledger }] : [];
+    }
     throw new Error(`Unexpected mocked query: ${text}`);
   });
   const executeRaw = jest.fn(async (query: unknown) => {
@@ -387,6 +447,23 @@ describe("Prisma global-benefit migration adapter", () => {
         predefinedCardId: null,
         predefinedBenefitId: null,
       },
+    });
+  });
+
+  it("hydrates exact active category-repair evidence as a replayable historical custom unit", async () => {
+    const harness = createAdapterHarness('unbridged', {
+      customOnly: true,
+      activeCategoryRepair: true,
+    });
+    const expected = classifyLegacyMigrationUnit(harness.migrationUnit(), [harness.definition]);
+
+    expect(expected).toMatchObject({
+      blocked: false,
+      benefits: [{ disposition: 'custom', ledgerPhase: 'CLASSIFIED' }],
+    });
+    await expect(harness.adapter.applyBridge(expected)).resolves.toMatchObject({
+      idempotent: 1,
+      custom: 0,
     });
   });
 

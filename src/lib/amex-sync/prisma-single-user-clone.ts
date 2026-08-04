@@ -11,9 +11,14 @@ import {
   type ExternalCardMapping,
   type LoyaltyCertificate,
 } from "@/generated/prisma";
+import { migrationFingerprint } from "@/lib/global-benefit-migration";
 import {
   countUserCloneSnapshot,
   planCloneGlobalCatalogRebindings,
+  planCloneCategoryRepairRebindings,
+  type CloneCategoryRepair,
+  type CloneCategoryRepairOccurrence,
+  type CloneCategoryRepairStateFingerprints,
   type CloneCreditCard,
   type CloneGlobalCatalogBindings,
   type CloneLoyaltyAccount,
@@ -42,6 +47,21 @@ interface RawQueryClient {
 
 function shortFingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 16);
+}
+
+function canonicalCloneEvidence(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(canonicalCloneEvidence);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, canonicalCloneEvidence(item)]));
+  }
+  return value;
+}
+
+function cloneEvidenceMatches(left: unknown, right: unknown): boolean {
+  return JSON.stringify(canonicalCloneEvidence(left)) === JSON.stringify(canonicalCloneEvidence(right));
 }
 
 function parseConfiguredTarget(databaseUrl: string): { host: string; canonicalHost: string } {
@@ -213,6 +233,49 @@ async function readGlobalCatalogBindings(
   return { cards, statuses, audits, ledger };
 }
 
+interface CloneStateFingerprintRow {
+  id: string;
+  stateJson: unknown;
+}
+
+async function readCategoryRepairStateFingerprints(
+  transaction: ReadTransaction,
+  userId: string,
+): Promise<CloneCategoryRepairStateFingerprints> {
+  const [statuses, audits, provenance] = await Promise.all([
+    transaction.$queryRaw<CloneStateFingerprintRow[]>(Prisma.sql`
+      SELECT bs."id", to_jsonb(bs) - 'creditCardId' - 'predefinedBenefitId' AS "stateJson"
+      FROM "BenefitStatus" bs
+      WHERE bs."userId" = ${userId}
+      ORDER BY bs."id"
+    `),
+    transaction.$queryRaw<CloneStateFingerprintRow[]>(Prisma.sql`
+      SELECT r."id",
+        to_jsonb(r) - 'destinationPredefinedBenefitId' - 'destinationDefinitionFingerprint' AS "stateJson"
+      FROM "AmexSyncRowAudit" r
+      JOIN "AmexSyncAttempt" a ON a."id" = r."attemptId"
+      WHERE a."userId" = ${userId}
+      ORDER BY r."id"
+    `),
+    transaction.$queryRaw<CloneStateFingerprintRow[]>(Prisma.sql`
+      SELECT p."id", to_jsonb(p) AS "stateJson"
+      FROM "BenefitStatusSourceProvenance" p
+      JOIN "BenefitStatus" bs ON bs."id" = p."benefitStatusId"
+      WHERE bs."userId" = ${userId}
+      ORDER BY p."id"
+    `),
+  ]);
+  const project = (rows: CloneStateFingerprintRow[]) => rows.map((row) => ({
+    id: row.id,
+    stateFingerprint: migrationFingerprint(row.stateJson),
+  }));
+  return {
+    statuses: project(statuses),
+    audits: project(audits),
+    provenance: project(provenance),
+  };
+}
+
 async function readSourceGraph(
   transaction: ReadTransaction,
   normalizedEmail: string,
@@ -285,7 +348,32 @@ async function readSourceGraph(
     }),
   ]);
 
-  const globalCatalogBindings = await readGlobalCatalogBindings(transaction, userId);
+  const [
+    globalCatalogBindings,
+    categoryRepairStateFingerprints,
+    categoryRepairs,
+    categoryRepairOccurrences,
+  ] = await Promise.all([
+    readGlobalCatalogBindings(transaction, userId),
+    readCategoryRepairStateFingerprints(transaction, userId),
+    transaction.$queryRaw<CloneCategoryRepair[]>(Prisma.sql`
+      SELECT r.*, pc."catalogKey" AS "resolvedPredefinedCardCatalogKey",
+        pb."catalogKey" AS "resolvedPredefinedBenefitCatalogKey",
+        (pb."predefinedCardId" = r."predefinedCardId") AS "predefinedBenefitParentMatchesCard"
+      FROM "GlobalBenefitCategoryRepair" r
+      JOIN "PredefinedCard" pc ON pc."id" = r."predefinedCardId"
+      JOIN "PredefinedBenefit" pb ON pb."id" = r."predefinedBenefitId"
+      WHERE r."userId" = ${userId}
+      ORDER BY r."id"
+    `),
+    transaction.$queryRaw<CloneCategoryRepairOccurrence[]>(Prisma.sql`
+      SELECT *, "removedStatusPreimage" IS NULL AS "removedStatusPreimageIsSqlNull",
+        jsonb_typeof("removedStatusPreimage") AS "removedStatusPreimageJsonType"
+      FROM "GlobalBenefitCategoryRepairOccurrence"
+      WHERE "userId" = ${userId}
+      ORDER BY "cycleStartDate", "cycleEndDate", "occurrenceIndex", "keeperStatusId", "id"
+    `),
+  ]);
   const legacyStatuses = benefitStatuses.map((row) => {
     const projected = { ...row } as Record<string, unknown>;
     delete projected.creditCardId;
@@ -327,6 +415,9 @@ async function readSourceGraph(
     benefitStatusSourceProvenance: benefitStatusSourceProvenance as BenefitStatusSourceProvenance[],
     amexSyncRowAudits: legacyAudits,
     globalCatalogBindings,
+    categoryRepairStateFingerprints,
+    categoryRepairs,
+    categoryRepairOccurrences,
   };
   validateUserCloneSnapshot(snapshot, normalizedEmail);
   return { matchCount: 1, snapshot };
@@ -366,11 +457,16 @@ async function findIdCollisions(
   snapshot: UserCloneSnapshot,
 ): Promise<CollisionRecord[]> {
   const ids = <T extends { id: string }>(rows: T[]) => rows.map((row) => row.id);
+  const copiedStatusIds = new Set(ids(snapshot.benefitStatuses));
+  const allRemovedStatusIds = Array.from(new Set((snapshot.categoryRepairOccurrences ?? [])
+    .flatMap((row) => row.removedStatusId === null ? [] : [row.removedStatusId])));
+  const removedStatusIds = allRemovedStatusIds.filter((id) => !copiedStatusIds.has(id));
   const [
     users,
     cards,
     benefits,
     statuses,
+    removedStatuses,
     events,
     loyaltyAccounts,
     certificates,
@@ -379,6 +475,8 @@ async function findIdCollisions(
     provenance,
     audits,
     ledgerRows,
+    categoryRepairs,
+    categoryRepairOccurrences,
   ] = await Promise.all([
     client.user.findMany({ where: { id: snapshot.user.id }, select: { id: true } }),
     client.creditCard.findMany({ where: { id: { in: ids(snapshot.creditCards) } }, select: { userId: true } }),
@@ -387,6 +485,9 @@ async function findIdCollisions(
       select: { userId: true, creditCard: { select: { userId: true } } },
     }),
     client.benefitStatus.findMany({ where: { id: { in: ids(snapshot.benefitStatuses) } }, select: { userId: true } }),
+    removedStatusIds.length > 0
+      ? client.benefitStatus.findMany({ where: { id: { in: removedStatusIds } }, select: { userId: true } })
+      : Promise.resolve([]),
     client.creditCardEvent.findMany({ where: { id: { in: ids(snapshot.creditCardEvents) } }, select: { userId: true } }),
     client.loyaltyAccount.findMany({ where: { id: { in: ids(snapshot.loyaltyAccounts) } }, select: { userId: true } }),
     client.loyaltyCertificate.findMany({ where: { id: { in: ids(snapshot.loyaltyCertificates) } }, select: { userId: true } }),
@@ -406,12 +507,31 @@ async function findIdCollisions(
         WHERE "id" IN (${Prisma.join(snapshot.globalCatalogBindings.ledger.map((row) => row.id))})
       `)
       : Promise.resolve([]),
+    snapshot.categoryRepairs?.length
+      ? client.$queryRaw<Array<{ userId: string }>>(Prisma.sql`
+        SELECT "userId" FROM "GlobalBenefitCategoryRepair"
+        WHERE "id" IN (${Prisma.join(snapshot.categoryRepairs.map((row) => row.id))})
+          OR "legacyBenefitId" IN (${Prisma.join(snapshot.categoryRepairs.map((row) => row.legacyBenefitId))})
+          OR "catalogMigrationLedgerId" IN (${Prisma.join(snapshot.categoryRepairs.map((row) => row.catalogMigrationLedgerId))})
+      `)
+      : Promise.resolve([]),
+    snapshot.categoryRepairOccurrences?.length
+      ? client.$queryRaw<Array<{ userId: string }>>(Prisma.sql`
+        SELECT "userId" FROM "GlobalBenefitCategoryRepairOccurrence"
+        WHERE "id" IN (${Prisma.join(snapshot.categoryRepairOccurrences.map((row) => row.id))})
+          OR "keeperStatusId" IN (${Prisma.join(snapshot.categoryRepairOccurrences.map((row) => row.keeperStatusId))})
+          OR ${allRemovedStatusIds.length > 0
+            ? Prisma.sql`"removedStatusId" IN (${Prisma.join(allRemovedStatusIds)})`
+            : Prisma.sql`FALSE`}
+      `)
+      : Promise.resolve([]),
   ]);
   return [
     ...users.map(() => ({ model: "User" as const, ownerUserId: snapshot.user.id })),
     ...cards.map((row) => ({ model: "CreditCard" as const, ownerUserId: row.userId })),
     ...benefits.map((row) => ({ model: "Benefit" as const, ownerUserId: ownerForBenefit(row) })),
     ...statuses.map((row) => ({ model: "BenefitStatus" as const, ownerUserId: row.userId })),
+    ...removedStatuses.map((row) => ({ model: "BenefitStatus" as const, ownerUserId: row.userId })),
     ...events.map((row) => ({ model: "CreditCardEvent" as const, ownerUserId: row.userId })),
     ...loyaltyAccounts.map((row) => ({ model: "LoyaltyAccount" as const, ownerUserId: row.userId })),
     ...certificates.map((row) => ({ model: "LoyaltyCertificate" as const, ownerUserId: row.userId })),
@@ -420,6 +540,8 @@ async function findIdCollisions(
     ...provenance.map((row) => ({ model: "BenefitStatusSourceProvenance" as const, ownerUserId: row.benefitStatus.userId })),
     ...audits.map((row) => ({ model: "AmexSyncRowAudit" as const, ownerUserId: row.attempt.userId })),
     ...ledgerRows.map((row) => ({ model: "CatalogMigrationLedger" as const, ownerUserId: row.userId })),
+    ...categoryRepairs.map((row) => ({ model: "GlobalBenefitCategoryRepair" as const, ownerUserId: row.userId })),
+    ...categoryRepairOccurrences.map((row) => ({ model: "GlobalBenefitCategoryRepairOccurrence" as const, ownerUserId: row.userId })),
   ];
 }
 
@@ -443,6 +565,7 @@ async function resolveLoyaltyPrograms(
 interface DestinationGlobalCatalogMappings {
   cards: Map<string, string>;
   benefits: Map<string, string>;
+  benefitParents: Map<string, string>;
 }
 
 async function resolveDestinationGlobalCatalog(
@@ -450,23 +573,26 @@ async function resolveDestinationGlobalCatalog(
   snapshot: UserCloneSnapshot,
 ): Promise<DestinationGlobalCatalogMappings> {
   const bindings = snapshot.globalCatalogBindings;
-  if (!bindings) return { cards: new Map(), benefits: new Map() };
+  if (!bindings) return { cards: new Map(), benefits: new Map(), benefitParents: new Map() };
+  const repairs = snapshot.categoryRepairs ?? [];
   const cardKeys = Array.from(new Set([
     ...bindings.cards.map((row) => row.catalogKey),
     ...bindings.ledger.flatMap((row) => row.predefinedCardCatalogKey ? [row.predefinedCardCatalogKey] : []),
+    ...repairs.map((row) => row.targetPredefinedCardCatalogKey),
   ]));
   const benefitKeys = Array.from(new Set([
     ...bindings.statuses.map((row) => row.catalogKey),
     ...bindings.audits.map((row) => row.catalogKey),
     ...bindings.ledger.flatMap((row) => row.predefinedBenefitCatalogKey ? [row.predefinedBenefitCatalogKey] : []),
+    ...repairs.map((row) => row.targetPredefinedBenefitCatalogKey),
   ]));
   const [cards, benefits] = await Promise.all([
     cardKeys.length === 0 ? [] : client.$queryRaw<Array<{ id: string; catalogKey: string }>>(Prisma.sql`
       SELECT "id", "catalogKey" FROM "PredefinedCard"
       WHERE "catalogKey" IN (${Prisma.join(cardKeys)}) ORDER BY "catalogKey"
     `),
-    benefitKeys.length === 0 ? [] : client.$queryRaw<Array<{ id: string; catalogKey: string }>>(Prisma.sql`
-      SELECT "id", "catalogKey" FROM "PredefinedBenefit"
+    benefitKeys.length === 0 ? [] : client.$queryRaw<Array<{ id: string; catalogKey: string; predefinedCardId: string }>>(Prisma.sql`
+      SELECT "id", "catalogKey", "predefinedCardId" FROM "PredefinedBenefit"
       WHERE "catalogKey" IN (${Prisma.join(benefitKeys)}) ORDER BY "catalogKey"
     `),
   ]);
@@ -476,7 +602,16 @@ async function resolveDestinationGlobalCatalog(
     throw new UserCloneOperatorError("A global definition has no exact destination catalog-key match.");
   }
   planCloneGlobalCatalogRebindings(bindings, { cards, benefits });
-  return { cards: cardMap, benefits: benefitMap };
+  planCloneCategoryRepairRebindings(
+    repairs,
+    snapshot.categoryRepairOccurrences ?? [],
+    { cards, benefits },
+  );
+  return {
+    cards: cardMap,
+    benefits: benefitMap,
+    benefitParents: new Map(benefits.map((row) => [row.catalogKey, row.predefinedCardId])),
+  };
 }
 
 async function findGlobalLedgerCollisions(
@@ -573,6 +708,12 @@ async function createManyIfPresent<T>(rows: T[], create: (rows: T[]) => Promise<
 function prismaWriteOperations(transaction: Prisma.TransactionClient): CloneWriteOperations {
   return {
     async deleteCatalogMigrationLedger(userId) {
+      await transaction.$executeRaw(Prisma.sql`
+        DELETE FROM "GlobalBenefitCategoryRepairOccurrence" WHERE "userId" = ${userId}
+      `);
+      await transaction.$executeRaw(Prisma.sql`
+        DELETE FROM "GlobalBenefitCategoryRepair" WHERE "userId" = ${userId}
+      `);
       await transaction.$executeRaw(Prisma.sql`
         DELETE FROM "CatalogMigrationLedger" WHERE "userId" = ${userId}
       `);
@@ -689,6 +830,73 @@ async function applyGlobalCatalogBindings(
     `);
     if (result !== 1) throw new UserCloneOperatorError("A cloned migration-ledger insert failed.");
   }
+
+  const categoryPlan = planCloneCategoryRepairRebindings(
+    snapshot.categoryRepairs ?? [],
+    snapshot.categoryRepairOccurrences ?? [],
+    {
+      cards: Array.from(mappings.cards, ([catalogKey, id]) => ({ id, catalogKey })),
+      benefits: Array.from(mappings.benefits, ([catalogKey, id]) => ({
+        id,
+        catalogKey,
+        predefinedCardId: mappings.benefitParents.get(catalogKey),
+      })),
+    },
+  );
+  for (const row of categoryPlan.repairs) {
+    const result = await transaction.$executeRaw(Prisma.sql`
+      INSERT INTO "GlobalBenefitCategoryRepair" (
+        "id", "legacyBenefitId", "catalogMigrationLedgerId", "userId",
+        "creditCardId", "predefinedCardId", "predefinedBenefitId",
+        "targetPredefinedCardCatalogKey", "targetPredefinedBenefitCatalogKey",
+        "definitionFingerprint", "inventoryFingerprint", "graphFingerprint",
+        "reviewedCurrentGraphFingerprint", "destinationFingerprint", "manifestFingerprint", "manifestEntryFingerprint",
+        "planFingerprint", "postimageFingerprint", "evidenceVersion", "phase",
+        "appliedAt", "rolledBackAt", "createdAt", "updatedAt"
+      ) VALUES (
+        ${row.id}, ${row.legacyBenefitId}, ${row.catalogMigrationLedgerId}, ${row.userId},
+        ${row.creditCardId}, ${row.predefinedCardId}, ${row.predefinedBenefitId},
+        ${row.targetPredefinedCardCatalogKey}, ${row.targetPredefinedBenefitCatalogKey},
+        ${row.definitionFingerprint}, ${row.inventoryFingerprint}, ${row.graphFingerprint},
+        ${row.reviewedCurrentGraphFingerprint}, ${row.destinationFingerprint}, ${row.manifestFingerprint}, ${row.manifestEntryFingerprint},
+        ${row.planFingerprint}, ${row.postimageFingerprint}, ${row.evidenceVersion},
+        ${row.phase}::"GlobalBenefitCategoryRepairPhase", ${row.appliedAt},
+        ${row.rolledBackAt}, ${row.createdAt}, ${row.updatedAt}
+      )
+    `);
+    if (result !== 1) throw new UserCloneOperatorError('A cloned category-repair insert failed.');
+  }
+  for (const row of categoryPlan.occurrences) {
+    const result = await transaction.$executeRaw(Prisma.sql`
+      INSERT INTO "GlobalBenefitCategoryRepairOccurrence" (
+        "id", "repairId", "userId", "creditCardId", "predefinedBenefitId",
+        "targetPredefinedBenefitCatalogKey", "action", "keeperSource",
+        "keeperStatusId", "cycleStartDate", "cycleEndDate", "occurrenceIndex",
+        "keeperBaselineVersion", "keeperBaseline", "removedStatusId",
+        "removedStatusSource", "removedStatusPreimageVersion", "removedStatusPreimage",
+        "repairAddedAuditMetadataVersion", "repairAddedAuditMetadata",
+        "planFingerprint", "postimageFingerprint", "createdAt", "updatedAt"
+      ) VALUES (
+        ${row.id}, ${row.repairId}, ${row.userId}, ${row.creditCardId},
+        ${row.predefinedBenefitId}, ${row.targetPredefinedBenefitCatalogKey},
+        ${row.action}::"GlobalBenefitCategoryRepairAction",
+        ${row.keeperSource}::"GlobalBenefitCategoryRepairStatusSource",
+        ${row.keeperStatusId}, ${row.cycleStartDate}, ${row.cycleEndDate},
+        ${row.occurrenceIndex}, ${row.keeperBaselineVersion},
+        ${JSON.stringify(row.keeperBaseline)}::jsonb, ${row.removedStatusId},
+        ${row.removedStatusSource === null
+          ? Prisma.sql`NULL`
+          : Prisma.sql`${row.removedStatusSource}::"GlobalBenefitCategoryRepairStatusSource"`},
+        ${row.removedStatusPreimageVersion}, ${row.removedStatusPreimage === null
+          ? Prisma.sql`NULL`
+          : Prisma.sql`${JSON.stringify(row.removedStatusPreimage)}::jsonb`},
+        ${row.repairAddedAuditMetadataVersion},
+        ${JSON.stringify(row.repairAddedAuditMetadata)}::jsonb, ${row.planFingerprint},
+        ${row.postimageFingerprint}, ${row.createdAt}, ${row.updatedAt}
+      )
+    `);
+    if (result !== 1) throw new UserCloneOperatorError('A cloned category-repair occurrence insert failed.');
+  }
 }
 
 async function countDestinationGraph(
@@ -709,6 +917,8 @@ async function countDestinationGraph(
     benefitStatusSourceProvenance,
     amexSyncRowAudits,
     catalogMigrationLedger,
+    categoryRepairs,
+    categoryRepairOccurrences,
   ] = await Promise.all([
     transaction.user.count({ where: { id: userId } }),
     transaction.creditCard.count({ where: { userId } }),
@@ -724,6 +934,12 @@ async function countDestinationGraph(
     transaction.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
       SELECT count(*)::bigint AS "count" FROM "CatalogMigrationLedger" WHERE "userId" = ${userId}
     `).then((rows) => Number(rows[0]?.count ?? 0)),
+    transaction.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+      SELECT count(*)::bigint AS "count" FROM "GlobalBenefitCategoryRepair" WHERE "userId" = ${userId}
+    `).then((rows) => Number(rows[0]?.count ?? 0)),
+    transaction.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+      SELECT count(*)::bigint AS "count" FROM "GlobalBenefitCategoryRepairOccurrence" WHERE "userId" = ${userId}
+    `).then((rows) => Number(rows[0]?.count ?? 0)),
   ]);
   return {
     User: user,
@@ -738,6 +954,8 @@ async function countDestinationGraph(
     BenefitStatusSourceProvenance: benefitStatusSourceProvenance,
     AmexSyncRowAudit: amexSyncRowAudits,
     CatalogMigrationLedger: catalogMigrationLedger,
+    GlobalBenefitCategoryRepair: categoryRepairs,
+    GlobalBenefitCategoryRepairOccurrence: categoryRepairOccurrences,
   };
 }
 
@@ -780,7 +998,6 @@ async function verifyDestinationGraph(
     }),
     transaction.benefitStatus.findMany({
       where: { id: { in: snapshot.benefitStatuses.map((status) => status.id) } },
-      select: { id: true, userId: true, benefitId: true },
     }),
     transaction.creditCardEvent.findMany({
       where: { id: { in: snapshot.creditCardEvents.map((event) => event.id) } },
@@ -866,12 +1083,74 @@ async function verifyDestinationGraph(
     throw new UserCloneOperatorError("Destination loyalty verification failed its ownership or mapping invariant.");
   }
 
-  if (snapshot.globalCatalogBindings) {
-    const rebound = await readGlobalCatalogBindings(transaction, snapshot.user.id);
-    if (JSON.stringify(rebound) !== JSON.stringify(snapshot.globalCatalogBindings)) {
-      throw new UserCloneOperatorError("Destination global-catalog rebinding verification failed.");
-    }
+  const reboundGlobalCatalogBindings = snapshot.globalCatalogBindings
+    ? await readGlobalCatalogBindings(transaction, snapshot.user.id)
+    : undefined;
+  if (reboundGlobalCatalogBindings
+    && JSON.stringify(reboundGlobalCatalogBindings) !== JSON.stringify(snapshot.globalCatalogBindings)) {
+    throw new UserCloneOperatorError("Destination global-catalog rebinding verification failed.");
   }
+
+  const globalMappings = await resolveDestinationGlobalCatalog(transaction, snapshot);
+  const expectedCategoryEvidence = planCloneCategoryRepairRebindings(
+    snapshot.categoryRepairs ?? [],
+    snapshot.categoryRepairOccurrences ?? [],
+    {
+      cards: Array.from(globalMappings.cards, ([catalogKey, id]) => ({ id, catalogKey })),
+      benefits: Array.from(globalMappings.benefits, ([catalogKey, id]) => ({
+        id,
+        catalogKey,
+        predefinedCardId: globalMappings.benefitParents.get(catalogKey),
+      })),
+    },
+  );
+  const [
+    copiedCategoryRepairs,
+    copiedCategoryOccurrences,
+    copiedCategoryStateFingerprints,
+  ] = await Promise.all([
+    transaction.$queryRaw<CloneCategoryRepair[]>(Prisma.sql`
+      SELECT r.*, pc."catalogKey" AS "resolvedPredefinedCardCatalogKey",
+        pb."catalogKey" AS "resolvedPredefinedBenefitCatalogKey",
+        (pb."predefinedCardId" = r."predefinedCardId") AS "predefinedBenefitParentMatchesCard"
+      FROM "GlobalBenefitCategoryRepair" r
+      JOIN "PredefinedCard" pc ON pc."id" = r."predefinedCardId"
+      JOIN "PredefinedBenefit" pb ON pb."id" = r."predefinedBenefitId"
+      WHERE r."userId" = ${snapshot.user.id}
+      ORDER BY r."id"
+    `),
+    transaction.$queryRaw<CloneCategoryRepairOccurrence[]>(Prisma.sql`
+      SELECT *, "removedStatusPreimage" IS NULL AS "removedStatusPreimageIsSqlNull",
+        jsonb_typeof("removedStatusPreimage") AS "removedStatusPreimageJsonType"
+      FROM "GlobalBenefitCategoryRepairOccurrence"
+      WHERE "userId" = ${snapshot.user.id}
+      ORDER BY "cycleStartDate", "cycleEndDate", "occurrenceIndex", "keeperStatusId", "id"
+    `),
+    readCategoryRepairStateFingerprints(transaction, snapshot.user.id),
+  ]);
+  if (!cloneEvidenceMatches(copiedCategoryRepairs, expectedCategoryEvidence.repairs)
+    || !cloneEvidenceMatches(copiedCategoryOccurrences, expectedCategoryEvidence.occurrences)
+    || (snapshot.categoryRepairStateFingerprints !== undefined
+      && !cloneEvidenceMatches(
+        copiedCategoryStateFingerprints,
+        snapshot.categoryRepairStateFingerprints,
+      ))) {
+    throw new UserCloneOperatorError("Destination category-repair rebinding verification failed.");
+  }
+  const legacyDestinationStatuses = statuses.map((status) => {
+    const projected = { ...status } as Record<string, unknown>;
+    delete projected.creditCardId;
+    delete projected.predefinedBenefitId;
+    return projected as unknown as BenefitStatus;
+  });
+  validateUserCloneSnapshot({
+    ...snapshot,
+    benefitStatuses: legacyDestinationStatuses,
+    globalCatalogBindings: reboundGlobalCatalogBindings,
+    categoryRepairStateFingerprints: copiedCategoryStateFingerprints,
+    categoryRepairs: copiedCategoryRepairs,
+    categoryRepairOccurrences: copiedCategoryOccurrences,
+  }, snapshot.user.email);
 
   const collisions = await findIdCollisions(transaction, snapshot);
   if (collisions.length !== Object.values(expected).reduce((sum, count) => sum + count, 0)) {

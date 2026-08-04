@@ -18,7 +18,9 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "08-01-global-benefit-category-drift-repair"
+  ],
   "parent": "07-28-roll-out-amex-sync-production",
   "relatedFiles": [],
   "notes": "",
