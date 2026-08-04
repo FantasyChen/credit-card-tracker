@@ -339,7 +339,10 @@ function createHarness(options: {
     if (text.includes('FROM "GlobalBenefitCategoryRepairOccurrence" o')) return occurrenceRows();
     if (text.includes('AS "idCount"')) return [{
       idCount: occupiedRestore ? BigInt(1) : BigInt(0),
-      tupleCount: BigInt(0),
+      // A promoted legacy keeper occupies the canonical tuple until rollback
+      // clears its repair-added links. The preflight must ignore only that exact
+      // keeper while still treating any other tuple occupant as a conflict.
+      tupleCount: !occupiedRestore && !text.includes('"id" <>') ? BigInt(1) : BigInt(0),
     }];
     if (text.includes('count(*)::bigint AS "count"')
       && text.includes('GlobalBenefitCategoryRepairOccurrence')) {
@@ -776,6 +779,11 @@ describe("Prisma category-repair rollback and reapply", () => {
       destinationDefinitionFingerprint: null,
     });
     expect(harness.repair?.phase).toBe("ROLLED_BACK");
+    const restoreSlotQuery = harness.queryRaw.mock.calls
+      .map(([query]) => query)
+      .find((query) => sqlText(query).includes('AS "idCount"'));
+    expect(sqlText(restoreSlotQuery)).toContain('"id" <>');
+    expect(sqlValues(restoreSlotQuery)).toContain("legacy-status-1");
 
     harness.executeRaw.mockClear();
     const replaySnapshot = await harness.adapter.readBatch({ mode: "rollback", afterCursorDigest: null, limit: 1 });

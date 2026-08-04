@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getPrismaClient } from "@/lib/prisma-client-provider";
 import {
   amexDestinationDefinitionFingerprint,
   resolveAmexGlobalDefinitionAuthority,
@@ -38,7 +38,7 @@ interface SyncPrismaClient {
 }
 
 function client(): SyncPrismaClient {
-  return prisma as unknown as SyncPrismaClient;
+  return getPrismaClient() as unknown as SyncPrismaClient;
 }
 
 interface RawDestinationStatus {
@@ -401,8 +401,13 @@ async function loadTransactionalAmexLegacyAuthority(input: {
   });
 }
 
-export async function loadAmexSyncDestinationContext(userId: string): Promise<AmexSyncDestinationContext> {
-  const db = client();
+export async function loadAmexSyncDestinationContext(
+  userId: string,
+  injectedClient?: SyncPrismaClient,
+): Promise<AmexSyncDestinationContext> {
+  // The optional client is a server-internal test/operator seam. Request DTOs and
+  // service entry points never accept or forward a database selection.
+  const db = injectedClient ?? client();
   const rawCards = await db.creditCard.findMany({
       where: { userId },
       select: {

@@ -474,6 +474,7 @@ type AmexDestinationLegacyAuthority =
 
 loadAmexSyncDestinationContext(
   userId: string,
+  injectedClient?, // optional server-internal rehearsal/test seam only
 ): Promise<AmexSyncDestinationContext>; // populates status.legacyAuthority
 
 statusHasAmexLegacyAuthority(
@@ -508,6 +509,7 @@ The server-internal plan row and ordered `destinationAuthorityDigest` bind the r
 9. Generic AMEX resolution never performs category-only discovery, mutates repair evidence, restores a removed row, or changes repair phase.
 10. Repair apply/rollback is forbidden while AMEX is effectively `preview` or `write`; the separately authorized operator requires exact effective `off` verification before any repair write.
 11. Active repair application paths block source/card/status/account deletion before database mutation. After rollback, ordinary owned-data deletion may cascade historical repair evidence; missing cascaded evidence grants no AMEX authority. Canonical global targets remain restrictive while evidence exists.
+12. The destination-context loader's optional Prisma parameter is a server-internal test/rehearsal seam, not a request field. Omitted calls retain the process singleton. The verified-development harness passes its one explicitly target-verified client, and lazy singleton lookup ensures importing or using that injected path constructs no environment-selected production client. Public service/request DTOs cannot choose or forward a database client.
 
 ### 4. Validation & Error Matrix
 
@@ -531,7 +533,7 @@ The server-internal plan row and ordered `destinationAuthorityDigest` bind the r
 
 ### 6. Tests Required
 
-Assert `STRICT_STANDARD` behavior is unchanged; exact `ACTIVE_CATEGORY_REPAIR` success; unchanged historical `CUSTOM / CLASSIFIED` ledger requirement; owner/card/product/benefit/catalog-key/keeper/tuple equality; custom-only and un-evidenced three-link rejection as `INVALID_RETAINED_BENEFIT`; rolled-back/malformed/duplicate/cross-product evidence rejection; active source/card/status/account deletion guards; missing evidence after rolled-back owned-lifecycle cascades; restrictive canonical global targets; definition/plan/postimage/phase drift proposal conflicts; target catalog-key, plan-fingerprint, postimage-fingerprint, and ordered authority-digest binding; transaction-time exact authority reload in one-row and December groups before mutation; exact inclusive cycle instants; AMEX provenance/audit atomicity; rollback blocking after AMEX activity; unchanged public DTO/userscript snapshots; and effective-AMEX-off repair-write gates. Do not use live preview, confirmation, provider activity, configuration changes, or a database-backed repair operator as routine verification.
+Assert `STRICT_STANDARD` behavior is unchanged; exact `ACTIVE_CATEGORY_REPAIR` success; unchanged historical `CUSTOM / CLASSIFIED` ledger requirement; owner/card/product/benefit/catalog-key/keeper/tuple equality; custom-only and un-evidenced three-link rejection as `INVALID_RETAINED_BENEFIT`; rolled-back/malformed/duplicate/cross-product evidence rejection; active source/card/status/account deletion guards; missing evidence after rolled-back owned-lifecycle cascades; restrictive canonical global targets; definition/plan/postimage/phase drift proposal conflicts; target catalog-key, plan-fingerprint, postimage-fingerprint, and ordered authority-digest binding; transaction-time exact authority reload in one-row and December groups before mutation; exact inclusive cycle instants; AMEX provenance/audit atomicity; rollback blocking after AMEX activity; unchanged public DTO/userscript snapshots; effective-AMEX-off repair-write gates; and the optional destination-context client seam using the injected client without touching the singleton while one-argument callers remain unchanged. Do not use live preview, confirmation, provider activity, configuration changes, or a database-backed repair operator as routine verification.
 
 ### 7. Wrong vs Correct
 

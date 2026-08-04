@@ -1178,6 +1178,12 @@ async function ensureRestoreSlotFree(
           AND ${action.removedSourceKind === "legacy"
             ? Prisma.sql`"benefitId" = ${sourceBenefitId}`
             : Prisma.sql`"creditCardId" = ${action.creditCardId} AND "predefinedBenefitId" = ${action.predefinedBenefitId}`}
+          AND ${action.kind === "PROMOTE_LEGACY_STATUS"
+            // The promoted keeper temporarily occupies the canonical tuple. It is
+            // cleared by CAS before the removed canonical row is restored in this
+            // same serializable transaction; only another occupant blocks rollback.
+            ? Prisma.sql`"id" <> ${action.keeperStatusId}`
+            : Prisma.sql`TRUE`}
       )::bigint AS "tupleCount"
   `);
   if (Number(rows[0]?.idCount ?? 1) !== 0 || Number(rows[0]?.tupleCount ?? 1) !== 0) {

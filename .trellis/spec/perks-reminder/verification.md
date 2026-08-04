@@ -91,8 +91,18 @@ Implementation completion evidence for this repair:
 | Public DB, card-template, and AMEX-userscript invariants | Passed |
 | Trellis JSON/JSONL parsing, executable-spec/sensitive-pattern/artifact review, and `git diff --check` | Passed |
 | Repository-wide lint | Not a clean task gate: seven pre-existing diagnostics remain in unchanged `src/app/api/predefined-cards/route.ts` and `src/lib/subscription.ts`; forced lint of the ignored deprecated CommonJS duplicate utility also reports ten legacy diagnostics |
-| Development database migration/rehearsal | Skipped: separately authorized boundary |
+| Development database migration/rehearsal | Failed in a separately authorized disposable-development run after apply/replay/runtime authority/keeper CAS: rollback restore-slot preflight treated the promoted keeper as a conflicting canonical tuple. Fail-closed recovery performed no force cleanup; the static fix and regressions pass, but an authorized recovery/rerun remains open. |
 | Production/provider/browser/userscript/live AMEX/build/deploy/confirmation operations | Skipped: not authorized and not routine verification |
+
+The checked-in rehearsal harness has a separate implementation gate:
+
+| Check | Result |
+| --- | --- |
+| Mocked rehearsal orchestration and AMEX injection seam | Passed statically; no external connection |
+| Strict TypeScript and changed-source lint | Passed for harness implementation |
+| Sensitive-output and diff checks | Passed for harness implementation |
+| Authorized verified-development rehearsal execution | Failed safely before rollback completed: target/prerequisites/review/apply/replay/runtime authority/keeper mutation passed, rollback did not, and cleanup remained incomplete rather than forcing deletion. The restore-slot defect is fixed statically; authorized recovery/rerun is still required, so the live PRD criterion remains open. |
+| Production/provider/schema/configuration/live AMEX operations | Skipped; not authorized |
 
 The Next/SWC package-version mismatch warning (`15.5.7` versus Next.js `15.5.11`) remains an environment/dependency warning; it did not fail the passing Jest/lint checks and is not repaired by weakening this feature's gates.
 
@@ -110,6 +120,7 @@ The Next/SWC package-version mismatch warning (`15.5.7` versus Next.js `15.5.11`
 10. Parent rollout docs must keep first confirmation and cleanup blocked until the repair's separately reviewed gates pass; tests cannot mark those operational gates complete.
 11. Compatibility review must include authenticated custom/card lifecycle guards, generic strict cleanup/rollback intersections, and every executable legacy template or duplicate-status utility. Each must fail closed before its first mutation when an `APPLIED` repair source, keeper, physical card, target global product, or exact occurrence tuple intersects.
 12. Clone verification must distinguish SQL `NULL` from JSONB `null` for absent rollback preimages and reject malformed parent/occurrence relations or destination collisions before insertion.
+13. Rehearsal-harness static verification injects every database/operator/runtime dependency. Tests prove validation before lazy singleton/client construction, no production client path, repeated identity calls, exact in-memory manifest/fingerprint forwarding, apply/replay/rollback/reapply order, injected effective/AMEX checks, keeper state preservation, provenance drift closure/removal, safe failure cleanup, active-evidence refusal, and an exact report-key allowlist. It never runs the package rehearsal command, imports dotenv, invokes Prisma CLI, or treats mocked completion as the verified-development execution result.
 
 ### 4. Validation & Error Matrix
 

@@ -545,6 +545,16 @@ npm run repair:global-benefit-categories -- \
 
 The CLI prints only mode, limit, `hasMore`, aggregate counts, action counts, and closed stop counts. Internal operator cursors/fingerprints and private manifests are never printed. `--manifest-output` is discovery-only, creates a new file exclusively with mode `0600`, synchronizes it before close, and never overwrites an existing path.
 
+A separately authorized verified-development rehearsal uses the checked-in harness without manifest files:
+
+```bash
+npm run rehearse:global-benefit-category-repair:dev -- \
+  --recovery-point-verified \
+  --confirm=REHEARSE_CATEGORY_DRIFT_REPAIR_ON_VERIFIED_DEVELOPMENT
+```
+
+The harness consumes only process-supplied `DATABASE_URL_DEV`, an exact private development database/schema/branch identity fingerprint, exact private expected/forbidden hosts and 16-character branch fingerprints, and raw exact `AMEX_SYNC_MODE=off`. Its stdout schema is a closed set of booleans and aggregate counts. Harness implementation and mocked tests do not mean an authorized development execution passed.
+
 ### 3. Contracts
 
 1. **Historical classification remains exact.** Category remains part of strict full-shape classification. A repair never changes a `CUSTOM / CLASSIFIED` ledger row or reclassifies an unmanifested definition.
@@ -569,6 +579,7 @@ The CLI prints only mode, limit, `hasMore`, aggregate counts, action counts, and
 20. **Compatibility paths fail closed.** Generic strict cleanup/rollback and executable legacy template/status utilities stop before mutating an active repair source, keeper, physical card, target global product, or exact occurrence tuple. Cron reads are bounded at the SQL boundary, prioritize unrepaired custom candidates, and load repair evidence only for that bounded page.
 21. **Historical replay is manifest-scoped.** APPLIED replay and rollback use the original manifest/evidence authority for manifest-covered units and tolerate unrelated later inventory changes. Blocked, unmanifested rows on the same database page neither gain authority nor invalidate that historical replay.
 22. **Every database read is target-gated.** Discover, dry-run, rollback-preview, apply, and rollback reject before `readBatch` unless `targetVerified === true`. That flag attests a separately authorized, immediate target-identity check; it does not expose the target identity or replace recovery/effective-off/write confirmation gates.
+23. **Development rehearsal is fixture-scoped and non-authorizing.** The checked-in orchestrator validates the configured development URL host before constructing one client, independently verifies database/schema/branch through the destination identity machinery, repeats identity checks before every fixture write/operator write/CAS/provenance removal/cleanup, and never constructs a production client. It creates one first-page `example.invalid` fixture, bootstraps the ledger digest through adapter `readBatch` plus `legacyBenefitSourceFingerprint`, keeps manifests/fingerprints in memory, exercises apply/replay/runtime authority/CAS/rollback/reapply/provenance-drift/final rollback, and cleans only exact fixture rows after proving evidence rolled back or absent. A target change or active/invalid evidence leaves cleanup incomplete rather than authorizing force deletion.
 
 ### 4. Validation & Error Matrix
 
@@ -602,6 +613,8 @@ The CLI prints only mode, limit, `hasMore`, aggregate counts, action counts, and
 ### 6. Tests Required
 
 Assert strict category-inclusive classification remains unchanged; ownerless/card-linked/ledgered eligibility; explicit custom and standalone exclusion; exact all-fields-except-category matching; non-null provider agreement; zero/multiple target and duplicate-destination stops; deterministic order reversal; complete inventory/manifest/entry/page/graph/reviewed-current-graph/destination/definition/plan/postimage fingerprints; catalog-bound normalization of environment-local global IDs only; opaque bounded pagination and aggregate-only CLI output with secure non-overwriting `0600` discovery manifests; target verification before every database-backed mode; read-only rollback-preview; exact write gates including effective AMEX `off`; full occurrence tuple equality including inclusive instants and semantic evidence ordering; pristine/meaningful/equal/conflicting action cases; attachment/provenance/audit relation blocking; evidence-before-delete ordering; scalar removed IDs and complete versioned preimages; keeper field/timestamp/audit/provenance preservation; serializable CAS rollback; idempotent replay; historical replay authority restricted to manifest-covered units despite unrelated later inventory; all four runtime authority states; valid-only suppression/projection/strict-migration/AMEX authority; valid-or-invalid APPLIED deletion guards; bounded cron candidate/evidence reads without suppression starvation; owned user/card/benefit/ledger/status evidence cascades after guards; restrictive canonical global targets; generic cleanup and executable legacy utility isolation; exact rollback restoration with current keeper state preserved; clone catalog-key rebinding, SQL-null absent preimages, parent/occurrence validation, and collision rejection; no checked-in IDs or runtime content heuristics; additive migration SQL; and explicit operational skips.
+
+For the development rehearsal harness, mocked tests additionally assert validation before lazy client construction, configured and database-side production identity rejection, exact raw/effective AMEX off, one development client and no production client, repair-table prerequisite checks before fixture writes, deterministic in-memory discover/dry-run equality, exact reviewed fingerprints into apply, idempotent replay, effective/AMEX injected-client verification, keeper CAS preservation, direct rollback-preview page authority, fresh reapply, provenance drift closure and exact removal, ordinary safe recovery, refusal to force-delete active evidence, and closed aggregate-only serialization. Running those tests does not execute or pass the authorized development rehearsal.
 
 Do not run Prisma generation/migration/seed/status, database-backed discovery/dry-run/apply/rollback, provider/browser actions, AMEX preview/confirmation, configuration changes, or production commands as routine verification.
 

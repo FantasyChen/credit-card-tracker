@@ -42,6 +42,16 @@ Rollback preserves current mutable keeper state. It clears only repair-added lin
 
 Do not change dashboard deduplication or add virtual category-based hiding; repaired data has one live status per occurrence, while blocked rows remain honestly visible.
 
+## Development rehearsal harness
+
+The checked-in rehearsal is a development-only orchestrator around the existing operator and Prisma adapter, not a second planner or writer. It validates process-supplied `DATABASE_URL_DEV`, an exact private development database/schema/branch identity fingerprint, exact private expected/forbidden host and branch fingerprints, raw/effective AMEX `off`, recovery attestation, and the exact rehearsal phrase before constructing one lazy development client. Existing destination identity machinery independently verifies database/schema/branch and is repeated immediately before every fixture/operator/CAS/provenance/cleanup write.
+
+The fixture is an invented first-page `example.invalid` graph bound to one catalog-key-sorted writable AMEX definition. It bootstraps historical ledger evidence through adapter `readBatch` and `legacyBenefitSourceFingerprint`, keeps all manifests/fingerprints/snapshots in memory, and exercises deterministic discover/dry-run, apply/replay, centralized suppression/effective/AMEX authority through an explicitly injected client, keeper-state CAS, rollback, fresh reapply, provenance-drift closure, exact provenance removal, and final rollback parity. Cleanup is exact and only after `ROLLED_BACK`/absent evidence; safe recovery never force-deletes active/invalid evidence. The CLI emits a closed boolean/count report and one fixed failure sentence.
+
+The optional client parameter on `loadAmexSyncDestinationContext` is server-internal. One-argument request/service callers retain lazy process-singleton behavior, and no request DTO can select a database.
+
+Harness code and mocked tests complete only the static implementation gate. The PRD's live verified-development rehearsal acceptance criterion remains open until separately authorized execution.
+
 ## Operational safety
 
 CLI modes are discover, dry-run, apply, rollback-preview, and rollback. Discovery can write a new permission-restricted private page manifest; rollback-preview is explicitly no-write and derives its reviewed page fingerprint from persisted evidence plus the original manifest. Writes require bounded pages, exact private manifest digest, reviewed page fingerprint, target/recovery/AMEX-off attestations, and distinct exact phrases. Output is aggregate-only. Production application remains a separate parent-task gate.

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getPrismaClient } from "@/lib/prisma-client-provider";
 import {
   amexSyncAuditRetentionCutoff,
   applyAmexSyncGroup,
@@ -16,6 +17,10 @@ import {
   type DestinationPredefinedBenefitSnapshot,
   type DestinationPredefinedCardSnapshot,
 } from "../authority";
+
+jest.mock("@/lib/prisma-client-provider", () => ({
+  getPrismaClient: jest.fn(() => jest.requireMock("@/lib/prisma").prisma),
+}));
 
 jest.mock("@/lib/prisma", () => {
   const database = {
@@ -284,6 +289,23 @@ describe("Amex sync persistence boundary", () => {
         }],
       },
     });
+  });
+
+  it("uses an explicitly injected server-side client without changing the singleton default", async () => {
+    const injected = {
+      creditCard: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+
+    await expect(loadAmexSyncDestinationContext("development-user", injected as never))
+      .resolves.toEqual({ cards: [] });
+    expect(injected.creditCard.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: "development-user" },
+    }));
+    expect(injected.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(db.creditCard.findMany).not.toHaveBeenCalled();
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+    expect(getPrismaClient).not.toHaveBeenCalled();
   });
 
   it("atomically writes one owned compare-and-set status, provenance, and audit", async () => {
