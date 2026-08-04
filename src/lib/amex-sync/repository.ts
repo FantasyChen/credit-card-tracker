@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getPrismaClient } from "@/lib/prisma-client-provider";
 import {
   amexDestinationDefinitionFingerprint,
   resolveAmexGlobalDefinitionAuthority,
@@ -7,7 +7,11 @@ import {
   type DestinationPredefinedBenefitSnapshot,
   type DestinationPredefinedCardSnapshot,
   type StatusStateProjection,
+  type AmexDestinationLegacyAuthority,
 } from "./authority";
+import { classifyGlobalBenefitCategoryRepairAuthority } from "@/lib/global-benefit-category-repair-authority";
+import type { GlobalBenefitDefinition, GlobalCardDefinition } from "@/lib/global-benefit-migration";
+import { Prisma } from "@/generated/prisma";
 
 interface SyncDelegate {
   findMany(args: unknown): Promise<unknown[]>;
@@ -26,6 +30,7 @@ interface SyncPrismaClient {
   amexSyncRowAudit: SyncDelegate;
   benefitStatus: SyncDelegate;
   benefitStatusSourceProvenance: SyncDelegate;
+  $queryRaw<T = unknown>(query: unknown): Promise<T>;
   $transaction<T>(
     callback: (transaction: SyncPrismaClient) => Promise<T>,
     options?: { isolationLevel: "Serializable" },
@@ -33,7 +38,7 @@ interface SyncPrismaClient {
 }
 
 function client(): SyncPrismaClient {
-  return prisma as unknown as SyncPrismaClient;
+  return getPrismaClient() as unknown as SyncPrismaClient;
 }
 
 interface RawDestinationStatus {
@@ -55,6 +60,7 @@ interface RawDestinationStatus {
     sourceObservationIdentity: string;
     sourceObservationDigest: string;
   }>;
+  legacyAuthority?: AmexDestinationLegacyAuthority;
 }
 
 interface RawDestinationBenefit {
@@ -98,8 +104,310 @@ interface RawDestinationCard {
   predefinedCard: RawDestinationPredefinedCard | null;
 }
 
-export async function loadAmexSyncDestinationContext(userId: string): Promise<AmexSyncDestinationContext> {
-  const db = client();
+interface RawLegacyAuthorityRow {
+  statusId: string;
+  statusBenefitId: string | null;
+  statusCreditCardId: string | null;
+  statusPredefinedBenefitId: string | null;
+  statusUserId: string;
+  cycleStartDate: Date;
+  cycleEndDate: Date;
+  occurrenceIndex: number;
+  strictLegacyBenefitId: string | null;
+  strictUserId: string | null;
+  strictCreditCardId: string | null;
+  strictPredefinedCardId: string | null;
+  strictPredefinedBenefitId: string | null;
+  strictClassification: string | null;
+  strictPhase: string | null;
+  repairId: string | null;
+  repairLegacyBenefitId: string | null;
+  repairLedgerId: string | null;
+  repairUserId: string | null;
+  repairCreditCardId: string | null;
+  repairPredefinedCardId: string | null;
+  repairPredefinedBenefitId: string | null;
+  targetCardCatalogKey: string | null;
+  targetBenefitCatalogKey: string | null;
+  definitionFingerprint: string | null;
+  repairPlanFingerprint: string | null;
+  repairPostimageFingerprint: string | null;
+  evidenceVersion: number | null;
+  repairPhase: string | null;
+  repairRolledBackAt: Date | null;
+  ledgerId: string | null;
+  ledgerLegacyBenefitId: string | null;
+  ledgerUserId: string | null;
+  ledgerCreditCardId: string | null;
+  ledgerPredefinedCardId: string | null;
+  ledgerPredefinedBenefitId: string | null;
+  ledgerClassification: string | null;
+  ledgerPhase: string | null;
+  ledgerDestinationFingerprint: string | null;
+  occurrenceRepairId: string | null;
+  occurrenceUserId: string | null;
+  occurrenceCreditCardId: string | null;
+  occurrencePredefinedBenefitId: string | null;
+  occurrenceTargetBenefitCatalogKey: string | null;
+  occurrenceAction: string | null;
+  occurrenceKeeperSource: string | null;
+  occurrenceKeeperStatusId: string | null;
+  occurrenceCycleStartDate: Date | null;
+  occurrenceCycleEndDate: Date | null;
+  occurrenceIndexEvidence: number | null;
+  keeperBaselineVersion: number | null;
+  removedStatusPreimageVersion: number | null;
+  auditMetadataVersion: number | null;
+}
+
+function definitionForRuntime(
+  benefit: Omit<RawDestinationBenefit, 'benefitStatuses'>,
+): GlobalBenefitDefinition {
+  return {
+    id: benefit.id,
+    catalogKey: benefit.catalogKey ?? '',
+    predefinedCardId: benefit.predefinedCardId,
+    category: benefit.category,
+    description: benefit.description,
+    percentage: benefit.percentage,
+    maxAmount: benefit.maxAmount,
+    frequency: benefit.frequency,
+    cycleAlignment: benefit.cycleAlignment,
+    fixedCycleStartMonth: benefit.fixedCycleStartMonth,
+    fixedCycleDurationMonths: benefit.fixedCycleDurationMonths,
+    occurrencesInCycle: benefit.occurrencesInCycle,
+    productKey: benefit.productKey,
+    creditFamilyKey: benefit.creditFamilyKey,
+    periodKey: benefit.periodKey,
+    retiredAt: benefit.retiredAt,
+  };
+}
+
+function classifyLoadedAmexLegacyAuthority(input: {
+  row: RawLegacyAuthorityRow;
+  card: Pick<RawDestinationCard, 'id' | 'userId'>;
+  product: Omit<RawDestinationPredefinedCard, 'benefits'>;
+  benefit: Omit<RawDestinationBenefit, 'benefitStatuses'>;
+}): AmexDestinationLegacyAuthority {
+  const { row, card, product, benefit } = input;
+  if (row.repairId && row.repairLegacyBenefitId && row.repairLedgerId
+    && row.repairUserId && row.repairCreditCardId && row.repairPredefinedCardId
+    && row.repairPredefinedBenefitId && row.targetCardCatalogKey
+    && row.targetBenefitCatalogKey && row.definitionFingerprint
+    && row.repairPlanFingerprint && row.repairPostimageFingerprint
+    && row.evidenceVersion !== null && row.repairPhase
+    && row.ledgerId && row.ledgerLegacyBenefitId && row.ledgerUserId
+    && row.occurrenceRepairId && row.occurrenceUserId
+    && row.occurrenceCreditCardId && row.occurrencePredefinedBenefitId
+    && row.occurrenceTargetBenefitCatalogKey && row.occurrenceAction
+    && row.occurrenceKeeperSource && row.occurrenceKeeperStatusId
+    && row.occurrenceCycleStartDate && row.occurrenceCycleEndDate
+    && row.occurrenceIndexEvidence !== null && row.keeperBaselineVersion !== null
+    && row.auditMetadataVersion !== null) {
+    const globalBenefit = definitionForRuntime(benefit);
+    const globalProduct: GlobalCardDefinition = {
+      id: product.id,
+      catalogKey: product.catalogKey ?? '',
+      name: product.name,
+      issuer: product.issuer,
+      productKey: product.productKey,
+      retiredAt: product.retiredAt,
+      benefits: [globalBenefit],
+    };
+    const state = classifyGlobalBenefitCategoryRepairAuthority({
+      sourceBenefitId: row.repairLegacyBenefitId,
+      ledger: {
+        id: row.ledgerId,
+        legacyBenefitId: row.ledgerLegacyBenefitId,
+        userId: row.ledgerUserId,
+        creditCardId: row.ledgerCreditCardId,
+        predefinedCardId: row.ledgerPredefinedCardId,
+        predefinedBenefitId: row.ledgerPredefinedBenefitId,
+        classification: row.ledgerClassification ?? '',
+        phase: row.ledgerPhase ?? '',
+        destinationFingerprint: row.ledgerDestinationFingerprint,
+      },
+      repair: {
+        id: row.repairId,
+        legacyBenefitId: row.repairLegacyBenefitId,
+        catalogMigrationLedgerId: row.repairLedgerId,
+        userId: row.repairUserId,
+        creditCardId: row.repairCreditCardId,
+        predefinedCardId: row.repairPredefinedCardId,
+        predefinedBenefitId: row.repairPredefinedBenefitId,
+        targetPredefinedCardCatalogKey: row.targetCardCatalogKey,
+        targetPredefinedBenefitCatalogKey: row.targetBenefitCatalogKey,
+        definitionFingerprint: row.definitionFingerprint,
+        evidenceVersion: row.evidenceVersion,
+        phase: row.repairPhase,
+        rolledBackAt: row.repairRolledBackAt,
+      },
+      card: { id: card.id, userId: card.userId, predefinedCardId: product.id },
+      product: globalProduct,
+      benefit: globalBenefit,
+      status: {
+        id: row.statusId,
+        benefitId: row.statusBenefitId,
+        creditCardId: row.statusCreditCardId,
+        predefinedBenefitId: row.statusPredefinedBenefitId,
+        userId: row.statusUserId,
+        cycleStartDate: row.cycleStartDate,
+        cycleEndDate: row.cycleEndDate,
+        occurrenceIndex: row.occurrenceIndex,
+      },
+      occurrence: {
+        repairId: row.occurrenceRepairId,
+        userId: row.occurrenceUserId,
+        creditCardId: row.occurrenceCreditCardId,
+        predefinedBenefitId: row.occurrencePredefinedBenefitId,
+        targetPredefinedBenefitCatalogKey: row.occurrenceTargetBenefitCatalogKey,
+        action: row.occurrenceAction,
+        keeperSource: row.occurrenceKeeperSource,
+        keeperStatusId: row.occurrenceKeeperStatusId,
+        cycleStartDate: row.occurrenceCycleStartDate,
+        cycleEndDate: row.occurrenceCycleEndDate,
+        occurrenceIndex: row.occurrenceIndexEvidence,
+        keeperBaselineVersion: row.keeperBaselineVersion,
+        removedStatusPreimageVersion: row.removedStatusPreimageVersion,
+        repairAddedAuditMetadataVersion: row.auditMetadataVersion,
+      },
+    });
+    if (state === 'APPLIED_VALID') {
+      return {
+        kind: 'ACTIVE_CATEGORY_REPAIR',
+        repairId: row.repairId,
+        repairEvidenceVersion: row.evidenceVersion,
+        repairPostimageFingerprint: row.repairPostimageFingerprint,
+        repairPlanFingerprint: row.repairPlanFingerprint,
+        targetCardCatalogKey: row.targetCardCatalogKey,
+        targetBenefitCatalogKey: row.targetBenefitCatalogKey,
+        legacyBenefitId: row.repairLegacyBenefitId,
+      };
+    }
+  }
+  const strictBridge = row.statusBenefitId !== null
+    && row.strictLegacyBenefitId === row.statusBenefitId
+    && row.strictUserId === row.statusUserId
+    && row.strictCreditCardId === row.statusCreditCardId
+    && row.strictPredefinedCardId === product.id
+    && row.strictPredefinedBenefitId === benefit.id
+    && row.strictClassification === 'STANDARD'
+    && row.strictPhase === 'BRIDGED';
+  if (strictBridge || (row.statusBenefitId === null && row.repairId === null)) {
+    return { kind: 'STRICT_STANDARD', legacyBenefitId: row.statusBenefitId };
+  }
+  return { kind: 'INVALID_RETAINED_BENEFIT' };
+}
+
+function sameAmexLegacyAuthority(
+  current: AmexDestinationLegacyAuthority,
+  expected: AmexDestinationLegacyAuthority | null | undefined,
+): boolean {
+  if (!expected || current.kind !== expected.kind) return false;
+  if (current.kind === 'INVALID_RETAINED_BENEFIT') return false;
+  if (current.kind === 'STRICT_STANDARD') {
+    return expected.kind === 'STRICT_STANDARD'
+      && current.legacyBenefitId === expected.legacyBenefitId;
+  }
+  return expected.kind === 'ACTIVE_CATEGORY_REPAIR'
+    && current.repairId === expected.repairId
+    && current.repairEvidenceVersion === expected.repairEvidenceVersion
+    && current.repairPostimageFingerprint === expected.repairPostimageFingerprint
+    && current.repairPlanFingerprint === expected.repairPlanFingerprint
+    && current.targetCardCatalogKey === expected.targetCardCatalogKey
+    && current.targetBenefitCatalogKey === expected.targetBenefitCatalogKey
+    && current.legacyBenefitId === expected.legacyBenefitId;
+}
+
+async function loadTransactionalAmexLegacyAuthority(input: {
+  transaction: SyncPrismaClient;
+  userId: string;
+  statusId: string;
+  status: TransactionalDestinationStatus;
+}): Promise<AmexDestinationLegacyAuthority | null> {
+  const { transaction, userId, statusId, status } = input;
+  if (!status.creditCard?.predefinedCard || !status.predefinedBenefit) return null;
+  const rows = await transaction.$queryRaw<RawLegacyAuthorityRow[]>(Prisma.sql`
+    SELECT
+      bs."id" AS "statusId",
+      bs."benefitId" AS "statusBenefitId",
+      bs."creditCardId" AS "statusCreditCardId",
+      bs."predefinedBenefitId" AS "statusPredefinedBenefitId",
+      bs."userId" AS "statusUserId",
+      bs."cycleStartDate",
+      bs."cycleEndDate",
+      bs."occurrenceIndex",
+      strict_ledger."legacyBenefitId" AS "strictLegacyBenefitId",
+      strict_ledger."userId" AS "strictUserId",
+      strict_ledger."creditCardId" AS "strictCreditCardId",
+      strict_ledger."predefinedCardId" AS "strictPredefinedCardId",
+      strict_ledger."predefinedBenefitId" AS "strictPredefinedBenefitId",
+      strict_ledger."classification"::text AS "strictClassification",
+      strict_ledger."phase"::text AS "strictPhase",
+      repair."id" AS "repairId",
+      repair."legacyBenefitId" AS "repairLegacyBenefitId",
+      repair."catalogMigrationLedgerId" AS "repairLedgerId",
+      repair."userId" AS "repairUserId",
+      repair."creditCardId" AS "repairCreditCardId",
+      repair."predefinedCardId" AS "repairPredefinedCardId",
+      repair."predefinedBenefitId" AS "repairPredefinedBenefitId",
+      repair."targetPredefinedCardCatalogKey" AS "targetCardCatalogKey",
+      repair."targetPredefinedBenefitCatalogKey" AS "targetBenefitCatalogKey",
+      repair."definitionFingerprint",
+      repair."planFingerprint" AS "repairPlanFingerprint",
+      repair."postimageFingerprint" AS "repairPostimageFingerprint",
+      repair."evidenceVersion",
+      repair."phase"::text AS "repairPhase",
+      repair."rolledBackAt" AS "repairRolledBackAt",
+      repair_ledger."id" AS "ledgerId",
+      repair_ledger."legacyBenefitId" AS "ledgerLegacyBenefitId",
+      repair_ledger."userId" AS "ledgerUserId",
+      repair_ledger."creditCardId" AS "ledgerCreditCardId",
+      repair_ledger."predefinedCardId" AS "ledgerPredefinedCardId",
+      repair_ledger."predefinedBenefitId" AS "ledgerPredefinedBenefitId",
+      repair_ledger."classification"::text AS "ledgerClassification",
+      repair_ledger."phase"::text AS "ledgerPhase",
+      repair_ledger."destinationFingerprint" AS "ledgerDestinationFingerprint",
+      occurrence."repairId" AS "occurrenceRepairId",
+      occurrence."userId" AS "occurrenceUserId",
+      occurrence."creditCardId" AS "occurrenceCreditCardId",
+      occurrence."predefinedBenefitId" AS "occurrencePredefinedBenefitId",
+      occurrence."targetPredefinedBenefitCatalogKey" AS "occurrenceTargetBenefitCatalogKey",
+      occurrence."action"::text AS "occurrenceAction",
+      occurrence."keeperSource"::text AS "occurrenceKeeperSource",
+      occurrence."keeperStatusId" AS "occurrenceKeeperStatusId",
+      occurrence."cycleStartDate" AS "occurrenceCycleStartDate",
+      occurrence."cycleEndDate" AS "occurrenceCycleEndDate",
+      occurrence."occurrenceIndex" AS "occurrenceIndexEvidence",
+      occurrence."keeperBaselineVersion",
+      occurrence."removedStatusPreimageVersion",
+      occurrence."repairAddedAuditMetadataVersion" AS "auditMetadataVersion"
+    FROM "BenefitStatus" bs
+    LEFT JOIN "CatalogMigrationLedger" strict_ledger
+      ON strict_ledger."legacyBenefitId" = bs."benefitId"
+    LEFT JOIN "GlobalBenefitCategoryRepairOccurrence" occurrence
+      ON occurrence."keeperStatusId" = bs."id"
+    LEFT JOIN "GlobalBenefitCategoryRepair" repair ON repair."id" = occurrence."repairId"
+    LEFT JOIN "CatalogMigrationLedger" repair_ledger
+      ON repair_ledger."id" = repair."catalogMigrationLedgerId"
+    WHERE bs."id" = ${statusId} AND bs."userId" = ${userId}
+  `);
+  if (rows.length !== 1) return null;
+  return classifyLoadedAmexLegacyAuthority({
+    row: rows[0],
+    card: status.creditCard,
+    product: status.creditCard.predefinedCard,
+    benefit: status.predefinedBenefit,
+  });
+}
+
+export async function loadAmexSyncDestinationContext(
+  userId: string,
+  injectedClient?: SyncPrismaClient,
+): Promise<AmexSyncDestinationContext> {
+  // The optional client is a server-internal test/operator seam. Request DTOs and
+  // service entry points never accept or forward a database selection.
+  const db = injectedClient ?? client();
   const rawCards = await db.creditCard.findMany({
       where: { userId },
       select: {
@@ -169,7 +477,87 @@ export async function loadAmexSyncDestinationContext(userId: string): Promise<Am
         },
       },
     });
+  const authorityRows = await db.$queryRaw<RawLegacyAuthorityRow[]>(Prisma.sql`
+    SELECT
+      bs."id" AS "statusId",
+      bs."benefitId" AS "statusBenefitId",
+      bs."creditCardId" AS "statusCreditCardId",
+      bs."predefinedBenefitId" AS "statusPredefinedBenefitId",
+      bs."userId" AS "statusUserId",
+      bs."cycleStartDate",
+      bs."cycleEndDate",
+      bs."occurrenceIndex",
+      strict_ledger."legacyBenefitId" AS "strictLegacyBenefitId",
+      strict_ledger."userId" AS "strictUserId",
+      strict_ledger."creditCardId" AS "strictCreditCardId",
+      strict_ledger."predefinedCardId" AS "strictPredefinedCardId",
+      strict_ledger."predefinedBenefitId" AS "strictPredefinedBenefitId",
+      strict_ledger."classification"::text AS "strictClassification",
+      strict_ledger."phase"::text AS "strictPhase",
+      repair."id" AS "repairId",
+      repair."legacyBenefitId" AS "repairLegacyBenefitId",
+      repair."catalogMigrationLedgerId" AS "repairLedgerId",
+      repair."userId" AS "repairUserId",
+      repair."creditCardId" AS "repairCreditCardId",
+      repair."predefinedCardId" AS "repairPredefinedCardId",
+      repair."predefinedBenefitId" AS "repairPredefinedBenefitId",
+      repair."targetPredefinedCardCatalogKey" AS "targetCardCatalogKey",
+      repair."targetPredefinedBenefitCatalogKey" AS "targetBenefitCatalogKey",
+      repair."definitionFingerprint",
+      repair."planFingerprint" AS "repairPlanFingerprint",
+      repair."postimageFingerprint" AS "repairPostimageFingerprint",
+      repair."evidenceVersion",
+      repair."phase"::text AS "repairPhase",
+      repair."rolledBackAt" AS "repairRolledBackAt",
+      repair_ledger."id" AS "ledgerId",
+      repair_ledger."legacyBenefitId" AS "ledgerLegacyBenefitId",
+      repair_ledger."userId" AS "ledgerUserId",
+      repair_ledger."creditCardId" AS "ledgerCreditCardId",
+      repair_ledger."predefinedCardId" AS "ledgerPredefinedCardId",
+      repair_ledger."predefinedBenefitId" AS "ledgerPredefinedBenefitId",
+      repair_ledger."classification"::text AS "ledgerClassification",
+      repair_ledger."phase"::text AS "ledgerPhase",
+      repair_ledger."destinationFingerprint" AS "ledgerDestinationFingerprint",
+      occurrence."repairId" AS "occurrenceRepairId",
+      occurrence."userId" AS "occurrenceUserId",
+      occurrence."creditCardId" AS "occurrenceCreditCardId",
+      occurrence."predefinedBenefitId" AS "occurrencePredefinedBenefitId",
+      occurrence."targetPredefinedBenefitCatalogKey" AS "occurrenceTargetBenefitCatalogKey",
+      occurrence."action"::text AS "occurrenceAction",
+      occurrence."keeperSource"::text AS "occurrenceKeeperSource",
+      occurrence."keeperStatusId" AS "occurrenceKeeperStatusId",
+      occurrence."cycleStartDate" AS "occurrenceCycleStartDate",
+      occurrence."cycleEndDate" AS "occurrenceCycleEndDate",
+      occurrence."occurrenceIndex" AS "occurrenceIndexEvidence",
+      occurrence."keeperBaselineVersion",
+      occurrence."removedStatusPreimageVersion",
+      occurrence."repairAddedAuditMetadataVersion" AS "auditMetadataVersion"
+    FROM "BenefitStatus" bs
+    LEFT JOIN "CatalogMigrationLedger" strict_ledger
+      ON strict_ledger."legacyBenefitId" = bs."benefitId"
+    LEFT JOIN "GlobalBenefitCategoryRepairOccurrence" occurrence
+      ON occurrence."keeperStatusId" = bs."id"
+    LEFT JOIN "GlobalBenefitCategoryRepair" repair ON repair."id" = occurrence."repairId"
+    LEFT JOIN "CatalogMigrationLedger" repair_ledger
+      ON repair_ledger."id" = repair."catalogMigrationLedgerId"
+    WHERE bs."userId" = ${userId}
+      AND bs."predefinedBenefitId" IS NOT NULL
+    ORDER BY bs."id"
+  `);
+  const authorityByStatus = new Map(authorityRows.map((row) => [row.statusId, row]));
   const cards = rawCards as unknown as RawDestinationCard[];
+  for (const card of cards) {
+    const product = card.predefinedCard;
+    if (!product) continue;
+    for (const benefit of product.benefits) {
+      for (const status of benefit.benefitStatuses) {
+        const authorityRow = authorityByStatus.get(status.id);
+        status.legacyAuthority = authorityRow
+          ? classifyLoadedAmexLegacyAuthority({ row: authorityRow, card, product, benefit })
+          : { kind: 'INVALID_RETAINED_BENEFIT' };
+      }
+    }
+  }
   return {
     cards: cards.map((card) => ({
       id: card.id,
@@ -477,6 +865,8 @@ async function loadAuthorizedDestinationStatus(
     || !row.destinationPredefinedBenefitId
     || !row.destinationBenefitCatalogKey
     || !row.destinationDefinitionFingerprint
+    || !row.destinationLegacyAuthority
+    || row.destinationLegacyAuthority.kind === 'INVALID_RETAINED_BENEFIT'
     || !row.destinationCardId
     || row.destinationOccurrenceIndex === null
     || !row.periodKey
@@ -599,6 +989,16 @@ async function loadAuthorizedDestinationStatus(
   });
   if (!sourceIdentity
     || amexDestinationDefinitionFingerprint({ product, benefit, sourceIdentity }) !== row.destinationDefinitionFingerprint) {
+    return null;
+  }
+  const currentLegacyAuthority = await loadTransactionalAmexLegacyAuthority({
+    transaction,
+    userId,
+    statusId: row.destinationStatusId,
+    status,
+  });
+  if (!currentLegacyAuthority
+    || !sameAmexLegacyAuthority(currentLegacyAuthority, row.destinationLegacyAuthority)) {
     return null;
   }
   return status;

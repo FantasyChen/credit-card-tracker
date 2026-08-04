@@ -480,3 +480,163 @@ if (!product || !globalBenefit || !status) return destinationNotAuthorized();
 // fingerprint, and uses status.cycleStartDate/status.cycleEndDate exact instants
 // in the final compare-and-set.
 ```
+
+## Scenario: reviewed category-only legacy repair overlay
+
+### 1. Scope / Trigger
+
+Use this contract only for historical card-owned `Benefit` definitions that remain `CUSTOM / CLASSIFIED` in `CatalogMigrationLedger` but differ from exactly one same-product global definition in `category` alone. The strict legacy classifier is not relaxed. Discovery is operator-only evidence preparation; request paths consume only exact persisted relations that the centralized classifier proves `APPLIED_VALID`.
+
+Implementation, static checks, or a checked-in migration do not authorize schema deployment, discovery against a database, manifest generation, apply, rollback, cleanup, AMEX mode changes, provider activity, or confirmation. There is no production authorization in this contract. Every repair write additionally requires effective AMEX mode `off` under the separately reviewed operational boundary.
+
+### 2. Signatures
+
+```ts
+type GlobalBenefitCategoryRepairPhase = "APPLIED" | "ROLLED_BACK";
+type GlobalBenefitCategoryRepairAction =
+  | "PROMOTE_LEGACY_STATUS"
+  | "RETAIN_CANONICAL_STATUS";
+type GlobalBenefitCategoryRepairStatusSource =
+  | "LEGACY_CUSTOM"
+  | "CANONICAL_STANDARD";
+
+const GLOBAL_BENEFIT_CATEGORY_REPAIR_APPLY_CONFIRMATION =
+  "APPLY_REVIEWED_CATEGORY_DRIFT_REPAIR";
+const GLOBAL_BENEFIT_CATEGORY_REPAIR_ROLLBACK_CONFIRMATION =
+  "ROLLBACK_REVIEWED_CATEGORY_DRIFT_REPAIR";
+
+runGlobalBenefitCategoryRepairOperator({
+  mode?,                       // discover | dry-run | rollback-preview | apply | rollback
+  limit?,                      // bounded 1..500
+  after?,                      // validated opaque one-way cursor
+  manifest?,                   // private exact reviewed manifest for non-discover modes
+  onDiscoveryManifest?,        // private manifest sink; discovery only
+  expectedInventoryFingerprint?,
+  expectedManifestFingerprint?,
+  expectedPageFingerprint?,
+  targetVerified?,
+  recoveryPointVerified?,
+  amexOffVerified?,
+  confirmation?,
+  database,
+}): Promise<GlobalBenefitCategoryRepairReport>;
+
+type GlobalBenefitCategoryRepairAuthorityState =
+  | "NONE"
+  | "ROLLED_BACK"
+  | "APPLIED_VALID"
+  | "APPLIED_INVALID";
+
+classifyGlobalBenefitCategoryRepairAuthority(
+  input: RuntimeCategoryRepairAuthorityInput,
+): GlobalBenefitCategoryRepairAuthorityState;
+```
+
+```bash
+npm run repair:global-benefit-categories -- \
+  [--discover | --dry-run | --rollback-preview | --apply | --rollback] \
+  [--limit=N] [--after=CURSOR] [--manifest=PRIVATE_PATH] \
+  [--manifest-output=PRIVATE_PATH] \
+  [--expect-inventory=SHA256] [--expect-manifest=SHA256] \
+  [--expect-page=SHA256] [--target-verified] \
+  [--recovery-point-verified] [--amex-off-verified] \
+  [--confirm=PHRASE]
+```
+
+The CLI prints only mode, limit, `hasMore`, aggregate counts, action counts, and closed stop counts. Internal operator cursors/fingerprints and private manifests are never printed. `--manifest-output` is discovery-only, creates a new file exclusively with mode `0600`, synchronizes it before close, and never overwrites an existing path.
+
+A separately authorized verified-development rehearsal uses the checked-in harness without manifest files:
+
+```bash
+npm run rehearse:global-benefit-category-repair:dev -- \
+  --recovery-point-verified \
+  --confirm=REHEARSE_CATEGORY_DRIFT_REPAIR_ON_VERIFIED_DEVELOPMENT
+```
+
+The harness consumes only process-supplied `DATABASE_URL_DEV`, an exact private development database/schema/branch identity fingerprint, exact private expected/forbidden hosts and 16-character branch fingerprints, and raw exact `AMEX_SYNC_MODE=off`. Its stdout schema is a closed set of booleans and aggregate counts. Harness implementation and mocked tests do not mean an authorized development execution passed.
+
+### 3. Contracts
+
+1. **Historical classification remains exact.** Category remains part of strict full-shape classification. A repair never changes a `CUSTOM / CLASSIFIED` ledger row or reclassifies an unmanifested definition.
+2. **Discovery is conservative.** A candidate is ownerless, card-linked, ledgered `CUSTOM / CLASSIFIED`, attached to an owned card with one global product, and has exactly one child under that product matching every canonical field except category. Every non-null provider identity field must agree.
+3. **Explicit custom ownership excludes repair.** A same-owner or standalone custom definition is not a candidate even when its shape is otherwise similar.
+4. **A private manifest is write authority.** Category-only similarity, a checked-in ID list, a dashboard duplicate, or a fresh nearest match cannot authorize apply. The manifest binds the complete strict-custom inventory, source, ledger, owner, card, global target catalog keys, graph, destination, and per-entry digest.
+5. **Evidence is additive and semantically scoped.** One `GlobalBenefitCategoryRepair` is keyed one-to-one to the legacy definition and original migration ledger. Only exact `APPLIED_VALID` evidence grants suppression and canonical bridge capability. `APPLIED_INVALID`, `ROLLED_BACK`, and absent evidence grant none. Historical ledger state is unchanged.
+6. **Catalog keys survive cloning.** Parent and occurrence evidence retain target card/benefit catalog keys in addition to database relations and fingerprints. A destination clone must rebind by those keys, never source database IDs.
+7. **Occurrences pair exactly.** Pairing uses user, physical card, target global definition, exact persisted cycle start, exact persisted cycle end, and occurrence index. Non-exact overlap or duplicate destination blocks the complete definition.
+8. **Keeper history wins.** Preserve the meaningful/history-bearing status. If both candidates are pristine or exactly equal and unattached, preserve the legacy status. Never synthesize a merged state.
+9. **Losers are deletion-bounded.** Delete only an unattached pristine or exactly-equal loser after persisting its scalar ID, source kind, complete versioned JSON preimage, and plan fingerprint. Deleted-row IDs are evidence, not foreign keys.
+10. **Keeper state is immutable during apply.** Preserve keeper ID, owner, exact cycle instants, occurrence, used amount, completion, `completedAt`, usability, order, timestamps, audits, and provenance. Only exact planned canonical links and explicitly recorded repair audit metadata may be added.
+11. **Every definition is one serializable unit.** Re-read and re-plan the complete graph in transaction, compare all reviewed fingerprints, persist evidence before destructive CAS, and verify exact postimage and protected-state parity before commit.
+12. **Runtime authority is exact.** `APPLIED_VALID` evidence suppresses only its source custom definition, projects canonical read-only terms, and may authorize AMEX only when repair, owner, card, global definition, status, cycle, occurrence, action/source kind, and evidence versions all agree. Authenticated benefit/card deletion paths reject every intersecting `APPLIED` parent—including malformed `APPLIED_INVALID` evidence—so invalid rows cannot erase the evidence needed for diagnosis or recovery.
+13. **Rollback is evidence-scoped.** Rollback preserves current mutable keeper state, clears only repair-added links/audit metadata, recreates removed rows from exact snapshots, and marks the parent `ROLLED_BACK`. It stops on new attachment, provenance/AMEX activity, cycle/source drift, occupied identities, missing catalog binding, or cleanup.
+14. **Owned lifecycle is not permanently restricted.** Repair evidence cascades with its user-owned legacy benefit, historical ledger, owner, physical card, parent repair, or keeper status. These cascades are safe only after application-level active-repair guards pass and ensure `ROLLED_BACK` evidence cannot block normal owned-data deletion forever. Canonical `PredefinedCard` and `PredefinedBenefit` targets remain restrictive during the evidence window.
+15. **Generic migration cleanup is isolated.** Strict bridge cleanup/rollback ignores category-repair evidence and may not delete or invalidate an active repair source, keeper, or preimage.
+16. **No heuristic runtime deduplication.** Dashboard category, description, amount, timestamps, names, or a checked-in production ID set never hide or authorize rows. Blocked and unmanifested definitions remain ordinary visible custom benefits.
+17. **Fingerprint roles are distinct and clone-portable.** `graphFingerprint` binds the immutable reviewed graph; `reviewedCurrentGraphFingerprint` separately binds the mutable pre-apply graph required for rollback reconstruction. Fingerprints validate exact current relations before hashing but normalize environment-local global IDs to catalog-bound markers, so catalog-key rebinding does not invalidate otherwise identical evidence. Physical/source/status IDs and array order remain bound.
+18. **Occurrence evidence order is semantic.** Evidence is reconstructed and hashed by exact cycle start, cycle end, occurrence index, and keeper status ID—not random evidence-row UUID. Multi-occurrence apply/replay therefore produces the same postimage and plan fingerprints in every environment.
+19. **Runtime authority is four-state and centralized.** Only `APPLIED_VALID` grants suppression, canonical read-only projection, strict-migration replay exception, or AMEX authority. `APPLIED_INVALID` grants none but, like valid `APPLIED`, blocks authenticated deletion that could erase evidence. `ROLLED_BACK` and `NONE` grant neither authority nor an application deletion block.
+20. **Compatibility paths fail closed.** Generic strict cleanup/rollback and executable legacy template/status utilities stop before mutating an active repair source, keeper, physical card, target global product, or exact occurrence tuple. Cron reads are bounded at the SQL boundary, prioritize unrepaired custom candidates, and load repair evidence only for that bounded page.
+21. **Historical replay is manifest-scoped.** APPLIED replay and rollback use the original manifest/evidence authority for manifest-covered units and tolerate unrelated later inventory changes. Blocked, unmanifested rows on the same database page neither gain authority nor invalidate that historical replay.
+22. **Every database read is target-gated.** Discover, dry-run, rollback-preview, apply, and rollback reject before `readBatch` unless `targetVerified === true`. That flag attests a separately authorized, immediate target-identity check; it does not expose the target identity or replace recovery/effective-off/write confirmation gates.
+23. **Development rehearsal is fixture-scoped and non-authorizing.** The checked-in orchestrator validates the configured development URL host before constructing one client, independently verifies database/schema/branch through the destination identity machinery, repeats identity checks before every fixture write/operator write/CAS/provenance removal/cleanup, and never constructs a production client. It creates one first-page `example.invalid` fixture, bootstraps the ledger digest through adapter `readBatch` plus `legacyBenefitSourceFingerprint`, keeps manifests/fingerprints in memory, exercises apply/replay/runtime authority/CAS/rollback/reapply/provenance-drift/final rollback, and cleans only exact fixture rows after proving evidence rolled back or absent. A target change or active/invalid evidence leaves cleanup incomplete rather than authorizing force deletion.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Source is standalone, user-owned, unledgered, non-`CUSTOM`, or non-`CLASSIFIED` | Exclude; preserve ordinary custom behavior |
+| Zero/multiple same-product targets or any non-category shape/provider mismatch | Closed stop; write nothing for the definition |
+| Exact one category-only target but no reviewed manifest entry | Discovery evidence only; no write authority |
+| Inventory, manifest, page, graph, destination, definition, plan, or postimage fingerprint differs | Abort the unit before commit |
+| Occurrence tuple differs by either exact instant or occurrence index | Non-exact overlap; block the definition |
+| Both candidates carry conflicting meaningful state or attachments | Block; never choose, merge, or reset |
+| One candidate is meaningful and the loser is pristine/unattached | Preserve the meaningful keeper and store exact loser preimage before deletion |
+| Apply/rollback lacks target, recovery, effective-AMEX-off attestation, exact phrase, or reviewed fingerprints | Reject before writer invocation |
+| Apply reruns against exact `APPLIED` evidence/postimage | Idempotent aggregate result; no state rewrite |
+| Rollback sees new audit/provenance/AMEX activity, occupied removed ID, cleanup, or catalog-key failure | Refuse rollback; preserve current rows |
+| Repair classifies `ROLLED_BACK` or `NONE` | No suppression, canonical projection, application mutation block, or AMEX authority; later owned-data deletion may cascade historical rolled-back evidence |
+| Parent phase is `APPLIED` but semantic evidence classifies `APPLIED_INVALID` | Grant no suppression/projection/migration/AMEX authority, but block authenticated deletion that could erase the invalid evidence |
+| Active repair source/card/status/account deletion is requested | Reject in the authenticated application path before owned-data cascades can run |
+| Canonical global target deletion is requested while repair evidence exists | Restrictive foreign key blocks deletion; use a separately reviewed retirement/evidence lifecycle |
+| Production operation is proposed as implementation verification | Skip and report separately; code completion grants no authorization |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** One ownerless card-linked ledgered custom definition differs from one child of the linked global product only in category. Its meaningful legacy occurrence is preserved, the pristine canonical duplicate is snapshotted and removed, and active evidence projects canonical terms without altering keeper state.
+- **Good:** The canonical occurrence carries the only meaningful state. It remains the keeper, the unattached equal/pristine legacy occurrence receives a complete preimage before deletion, and the original ledger remains `CUSTOM / CLASSIFIED`.
+- **Base:** An exact category-only candidate has no overlapping canonical status. Apply may promote the legacy keeper only when the reviewed manifest, full graph, occurrence tuple, and all write gates agree.
+- **Base:** A genuine custom definition resembles a global row but is user-owned, standalone, unmanifested, or differs in another field. It remains mutable and independently materialized.
+- **Base:** After rollback, evidence grants no runtime authority. A later ordinary owner/card/status deletion may cascade the historical repair rows; active repair application paths still reject the same deletion before database mutation.
+- **Bad:** Change the strict classifier to ignore category, hide dashboard duplicates by content, infer a destination from production IDs, merge conflicting usage/completion, delete active repair evidence through a lifecycle cascade, or delete a loser before its exact preimage is durable.
+
+### 6. Tests Required
+
+Assert strict category-inclusive classification remains unchanged; ownerless/card-linked/ledgered eligibility; explicit custom and standalone exclusion; exact all-fields-except-category matching; non-null provider agreement; zero/multiple target and duplicate-destination stops; deterministic order reversal; complete inventory/manifest/entry/page/graph/reviewed-current-graph/destination/definition/plan/postimage fingerprints; catalog-bound normalization of environment-local global IDs only; opaque bounded pagination and aggregate-only CLI output with secure non-overwriting `0600` discovery manifests; target verification before every database-backed mode; read-only rollback-preview; exact write gates including effective AMEX `off`; full occurrence tuple equality including inclusive instants and semantic evidence ordering; pristine/meaningful/equal/conflicting action cases; attachment/provenance/audit relation blocking; evidence-before-delete ordering; scalar removed IDs and complete versioned preimages; keeper field/timestamp/audit/provenance preservation; serializable CAS rollback; idempotent replay; historical replay authority restricted to manifest-covered units despite unrelated later inventory; all four runtime authority states; valid-only suppression/projection/strict-migration/AMEX authority; valid-or-invalid APPLIED deletion guards; bounded cron candidate/evidence reads without suppression starvation; owned user/card/benefit/ledger/status evidence cascades after guards; restrictive canonical global targets; generic cleanup and executable legacy utility isolation; exact rollback restoration with current keeper state preserved; clone catalog-key rebinding, SQL-null absent preimages, parent/occurrence validation, and collision rejection; no checked-in IDs or runtime content heuristics; additive migration SQL; and explicit operational skips.
+
+For the development rehearsal harness, mocked tests additionally assert validation before lazy client construction, configured and database-side production identity rejection, exact raw/effective AMEX off, one development client and no production client, repair-table prerequisite checks before fixture writes, deterministic in-memory discover/dry-run equality, exact reviewed fingerprints into apply, idempotent replay, effective/AMEX injected-client verification, keeper CAS preservation, direct rollback-preview page authority, fresh reapply, provenance drift closure and exact removal, ordinary safe recovery, refusal to force-delete active evidence, and closed aggregate-only serialization. Running those tests does not execute or pass the authorized development rehearsal.
+
+Do not run Prisma generation/migration/seed/status, database-backed discovery/dry-run/apply/rollback, provider/browser actions, AMEX preview/confirmation, configuration changes, or production commands as routine verification.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: relaxed matching becomes runtime authority and silently chooses state.
+if (legacy.description === global.description && legacy.maxAmount === global.maxAmount) {
+  await deleteStatus(pristineLookingStatus.id);
+  return projectAsStandard(legacy, global);
+}
+```
+
+```ts
+// Correct: request paths require exact semantically valid persisted evidence;
+// only the separately gated operator may discover category-only candidates.
+const graph = await loadExactCategoryRepairGraph(legacy.id);
+const authority = classifyGlobalBenefitCategoryRepairAuthority(graph);
+if (authority !== "APPLIED_VALID") return projectOrdinaryCustom(legacy);
+return projectCanonicalReadOnly({
+  repair: graph.repair,
+  keeperStatus: graph.status,
+  globalDefinition: graph.benefit,
+});
+```

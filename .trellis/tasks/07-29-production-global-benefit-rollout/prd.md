@@ -24,6 +24,7 @@ Operationally migrate and validate the global-benefit model in development and p
 11. Publish/install the audited userscript only through an owner-approved procedure; live provider scan requires attended authorization.
 12. Enable `write` only after a separate decision based on sanitized preview evidence; first confirmation is bounded and reconciled against attempts, audits, provenance, and destination state.
 13. Set/retain mode `off` and stop on target uncertainty, migration/parity drift, catalog-key drift, non-exact mapping, ownership inconsistency, unexpected write/materialization, audit mismatch, privacy risk, or failed canary.
+14. Keep the first AMEX confirmation and legacy cleanup blocked after the category-drift duplicate audit. Any category repair requires its child implementation and verified-development rehearsal, a separately authorized production transition from current `write` to effective `off`, additive schema deployment, reviewed private manifest/apply/parity evidence, and a new decision before AMEX reactivation or cleanup.
 
 ## Acceptance Criteria
 
@@ -38,6 +39,7 @@ Operationally migrate and validate the global-benefit model in development and p
 - [x] Preview is authenticated and zero-write; userscript installation and live scan remain unperformed and separately gated.
 - [ ] Write, if authorized, is bounded and reconciles expected attempts/audits/provenance/status changes with no unrelated account effects.
 - [ ] Rollback to mode `off` and pre-cleanup bridge rollback are operationally verified; evidence is sanitized.
+- [ ] Category-drift repair is implemented, rehearsed on a verified development target, and separately reviewed/applied with effective production AMEX `off` before first confirmation or cleanup is reconsidered.
 
 ## Out of Scope
 

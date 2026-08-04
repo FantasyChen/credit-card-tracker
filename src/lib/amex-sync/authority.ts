@@ -61,6 +61,20 @@ export interface DestinationProvenanceSnapshot {
   sourceObservationDigest: string;
 }
 
+export type AmexDestinationLegacyAuthority =
+  | { kind: 'STRICT_STANDARD'; legacyBenefitId: string | null }
+  | {
+      kind: 'ACTIVE_CATEGORY_REPAIR';
+      repairId: string;
+      repairEvidenceVersion: number;
+      repairPostimageFingerprint: string;
+      repairPlanFingerprint: string;
+      targetCardCatalogKey: string;
+      targetBenefitCatalogKey: string;
+      legacyBenefitId: string;
+    }
+  | { kind: 'INVALID_RETAINED_BENEFIT' };
+
 export interface DestinationStatusSnapshot {
   id: string;
   benefitId: string | null;
@@ -76,6 +90,7 @@ export interface DestinationStatusSnapshot {
   isNotUsable: boolean;
   updatedAt: Date;
   provenance: DestinationProvenanceSnapshot | null;
+  legacyAuthority?: AmexDestinationLegacyAuthority;
 }
 
 export interface DestinationPredefinedBenefitSnapshot {
@@ -151,6 +166,7 @@ export interface AmexSyncPlanRow {
   destinationProductCatalogKey: string | null;
   /** Legacy bridge metadata only. Never destination authority. */
   destinationBenefitId: string | null;
+  destinationLegacyAuthority?: AmexDestinationLegacyAuthority | null;
   destinationPredefinedBenefitId: string | null;
   destinationBenefitCatalogKey: string | null;
   destinationDefinitionFingerprint: string | null;
@@ -300,6 +316,7 @@ function destinationBinding(input: {
   | "destinationPredefinedCardId"
   | "destinationProductCatalogKey"
   | "destinationBenefitId"
+  | "destinationLegacyAuthority"
   | "destinationPredefinedBenefitId"
   | "destinationBenefitCatalogKey"
   | "destinationDefinitionFingerprint"
@@ -315,6 +332,10 @@ function destinationBinding(input: {
     destinationPredefinedCardId: product?.id ?? null,
     destinationProductCatalogKey: product?.catalogKey ?? null,
     destinationBenefitId: status?.benefitId ?? null,
+    destinationLegacyAuthority: status?.legacyAuthority
+      ?? (status ? (status.benefitId === null
+        ? { kind: 'STRICT_STANDARD', legacyBenefitId: null }
+        : { kind: 'INVALID_RETAINED_BENEFIT' }) : null),
     destinationPredefinedBenefitId: benefit?.id ?? null,
     destinationBenefitCatalogKey: benefit?.catalogKey ?? null,
     destinationDefinitionFingerprint: product && benefit && sourceIdentity
@@ -326,6 +347,14 @@ function destinationBinding(input: {
     destinationCycleEndInstant: status?.cycleEndDate.toISOString() ?? null,
     beforeProvenance: provenanceSnapshot(status?.provenance ?? null),
   };
+}
+
+function statusHasAmexLegacyAuthority(status: DestinationStatusSnapshot): boolean {
+  const authority = status.legacyAuthority
+    ?? (status.benefitId === null
+      ? { kind: 'STRICT_STANDARD' as const, legacyBenefitId: null }
+      : { kind: 'INVALID_RETAINED_BENEFIT' as const });
+  return authority.kind === 'STRICT_STANDARD' || authority.kind === 'ACTIVE_CATEGORY_REPAIR';
 }
 
 function snapshot(status: DestinationStatusSnapshot): StatusStateProjection {
@@ -357,6 +386,7 @@ function skippedRow(input: {
   destinationPredefinedCardId?: string | null;
   destinationProductCatalogKey?: string | null;
   destinationBenefitId?: string | null;
+  destinationLegacyAuthority?: AmexDestinationLegacyAuthority | null;
   destinationPredefinedBenefitId?: string | null;
   destinationBenefitCatalogKey?: string | null;
   destinationDefinitionFingerprint?: string | null;
@@ -375,6 +405,7 @@ function skippedRow(input: {
     destinationPredefinedCardId: input.destinationPredefinedCardId ?? null,
     destinationProductCatalogKey: input.destinationProductCatalogKey ?? null,
     destinationBenefitId: input.destinationBenefitId ?? null,
+    destinationLegacyAuthority: input.destinationLegacyAuthority ?? null,
     destinationPredefinedBenefitId: input.destinationPredefinedBenefitId ?? null,
     destinationBenefitCatalogKey: input.destinationBenefitCatalogKey ?? null,
     destinationDefinitionFingerprint: input.destinationDefinitionFingerprint ?? null,
@@ -548,6 +579,7 @@ function expandPlatinumDecemberUber(input: {
     creditFamilyKey: variant.creditFamilyKey,
     periodKey: variant.periodKey,
     destinationBenefitId: null,
+    destinationLegacyAuthority: null,
     destinationPredefinedBenefitId: null,
     destinationBenefitCatalogKey: null,
     destinationDefinitionFingerprint: null,
@@ -602,6 +634,7 @@ function expandPlatinumDecemberUber(input: {
     const statuses = benefit.statuses.filter((status) => status.userId === userId
       && status.creditCardId === card.id
       && status.predefinedBenefitId === benefit.id
+      && statusHasAmexLegacyAuthority(status)
       && status.occurrenceIndex === 0
       && dateOnly(status.cycleStartDate) === sourceRow.sourcePeriod!.startDate
       && dateOnly(status.cycleEndDate) === sourceRow.sourcePeriod!.endDate);
@@ -812,6 +845,7 @@ export function planAmexSync(input: {
         status.userId === userId
         && status.creditCardId === cardResolution.id
         && status.predefinedBenefitId === benefit.id
+        && statusHasAmexLegacyAuthority(status)
         && status.occurrenceIndex === 0
         && dateOnly(status.cycleStartDate) === row.sourcePeriod!.startDate
         && dateOnly(status.cycleEndDate) === row.sourcePeriod!.endDate);

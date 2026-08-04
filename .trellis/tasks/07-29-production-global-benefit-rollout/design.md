@@ -67,3 +67,5 @@ Sanitized preview review requires zero unexpected matches/failures and dispositi
 ## 7. Stop and rollback
 
 Any uncertainty or drift stops before the next batch and keeps/returns mode off. Before cleanup, ledger-guided rollback clears only bridge-added links and returns to hybrid reads. After cleanup, use the recovery point or a reviewed forward fix. Never seed/reset production, overwrite conflicts, re-enable user-key authority, infer deletions, or blanket-reverse statuses.
+
+The category-drift duplicate audit adds a hold before both first AMEX confirmation and legacy cleanup. The repair child must first complete additive schema/tooling/runtime work and verified-development rehearsal. Any later production repair has separate off-transition, schema, discovery/manifest, apply, parity, and rollback gates; current `write` must be proven effectively `off` on the primary alias before repair writes. Repair success does not automatically resume AMEX or authorize cleanup.

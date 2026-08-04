@@ -98,3 +98,95 @@ registered env metadata
   + exact zero-write before/after proof
   => production preview gate passes
 ```
+
+## Scenario: category-repair production hold and rollout
+
+### 1. Scope / Trigger
+
+Use this contract whenever production schema deployment, repair discovery/apply/rollback, application release, AMEX configuration, first confirmation, or global-benefit cleanup could overlap with the category-drift repair. The repair implementation and checked-in migration grant no production authorization. The current production AMEX capability must be separately transitioned from `write` to effective `off` and verified on the primary alias before any repair write.
+
+### 2. Signatures
+
+```text
+repair implementation complete
+  -> reviewed additive migration
+  -> verified-development deployment and rehearsal
+  -> separate production hold approval
+  -> AMEX off configuration + Ready deployment + primary-alias identity match
+  -> authenticated/read-only effective-off proof
+  -> separate schema deploy approval
+  -> separate discovery/manifest review
+  -> separate bounded repair apply approval
+  -> parity and rollback evidence
+  -> separate decision for later AMEX preview/write or global cleanup
+```
+
+```ts
+interface ProductionCategoryRepairGate {
+  immutableDeploymentReady: true;
+  primaryAliasDeploymentMatches: true;
+  effectiveAmexMode: "off";
+  targetVerified: true;
+  recoveryPointVerified: true;
+}
+```
+
+### 3. Contracts
+
+1. First live AMEX confirmation and global-benefit cleanup remain blocked while the category-repair child is incomplete or any production repair/parity gate is pending.
+2. Moving AMEX from current `write` to `off` is a separately authorized provider configuration and deployment action. Do not infer effectiveness from environment registration or a Ready immutable deployment.
+3. Effective `off` requires primary alias and immutable deployment ID equality plus the narrowest authenticated/read-only runtime behavior proving confirmation cannot proceed. Evidence exposes no URL, token, secret, user, card, or provider data.
+4. Application release, schema deploy, database discovery, private manifest review, apply, rollback, cleanup, and later AMEX reactivation are separate approvals with separate stop conditions.
+5. Production schema deploy occurs only after checked-in additive SQL, static invariants, verified-development deployment, exact apply/rollback rehearsal, recovery evidence, and target verification pass.
+6. Private manifests, cursor payloads, fingerprints, database identities, and row values remain outside Git, console output, and sanitized rollout records. The repair CLI emits only mode, limit, `hasMore`, aggregate counts, action counts, and closed stop counts; sanitized operational records may retain those aggregates plus boolean gate results.
+7. Apply proceeds in bounded reviewed pages and stops on any fingerprint, parity, target, mode, deployment, or postimage drift. No operational workaround may relax classification or occurrence matching.
+8. Rollback is not an automatic response to a failed unit. Stop, preserve the recovery point, and decide between evidence-scoped rollback, forward repair, or database recovery after impact review.
+9. Successful repair does not automatically re-enable AMEX or authorize a confirmation. Re-enable preview/write only through the existing production configuration deployment and proposal review gates.
+10. Successful repair does not authorize strict-ledger cleanup or bulk deletion of category repair evidence/preimages. Those remain independent destructive boundaries. Ordinary user-owned lifecycle deletion after rollback may cascade its dependent evidence, while canonical global target deletion remains restrictive.
+11. Before schema deployment, review must prove active repair deletion is application-blocked and rolled-back evidence cannot permanently block user/card/status lifecycle; deployment must not substitute unconditional restrictive owned-data foreign keys for that phase-aware runtime policy.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Category repair implementation or verified-development rehearsal incomplete | Keep confirmation and cleanup blocked; no production repair |
+| Production AMEX still resolves to `write`/`preview` or is uncertain | Do not run repair apply/rollback |
+| Off-configured immutable deployment is Ready but primary alias differs | Stop; do not claim effective off |
+| Primary alias matches but narrow runtime behavior does not prove `off` | Stop and inspect routing/config delivery; never weaken repair gate |
+| Production schema migration is pending without separate deploy approval | Do not deploy or run repair discovery |
+| Apply page differs from reviewed private fingerprints | Stop before page writer |
+| Repair/parity succeeds | Keep AMEX off and cleanup blocked until their own reviewed decisions |
+| Any unexpected user-state, audit, provenance, or unrelated-row change appears | Stop; preserve evidence/recovery point; do not compensate automatically |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** Verified-development apply/rollback rehearsal passes. A later production hold moves AMEX to effective off with alias proof, then separately approved schema/discovery/apply gates run bounded and retain aggregate-only evidence.
+- **Base:** Implementation is complete but no production authorization exists. No provider, deployment, database, manifest, cleanup, or AMEX action occurs.
+- **Base:** Repair applies successfully. Production stays off until a new decision reviews parity and chooses whether to resume preview/write.
+- **Bad:** Confirm an AMEX proposal before repair, use cleanup to remove the duplicate symptom, or assume setting the environment name to `off` made the primary alias safe for repair writes.
+
+### 6. Tests Required
+
+Unit-test exact off-mode parsing and malformed/newline values; repair writer refusal for preview/write/unknown mode; production state-machine ordering; first-confirmation and cleanup holds; deployment/alias identity mismatch; zero-write effective-off probe shape; separate schema/discovery/apply/rollback-preview/rollback/reactivation approvals; aggregate-only CLI/evidence output; page stop behavior; active repair application deletion guards; rolled-back user-owned evidence cascades; restrictive canonical global targets; and no automatic AMEX reactivation or cleanup after repair. Operational deployment, configuration, database, and runtime probes are skipped during implementation unless separately authorized.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong:
+checked-in repair code + AMEX_WRITE_MODE=off somewhere
+  => run production migration, repair, cleanup, and first confirmation
+```
+
+```text
+Correct:
+implementation + static checks
+  => no production authorization
+
+separately approved off transition
+  + Ready immutable deployment
+  + primary alias deployment identity equality
+  + effective-off runtime proof
+  + verified target/recovery
+  + separate schema/discovery/manifest/apply approvals
+  => bounded production repair may begin while confirmation and cleanup stay blocked
+```

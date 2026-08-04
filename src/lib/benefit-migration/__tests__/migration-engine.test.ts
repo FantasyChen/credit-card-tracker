@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma';
 // Mock Prisma
 jest.mock('@/lib/prisma', () => ({
   prisma: {
+    $queryRaw: jest.fn(),
     $transaction: jest.fn(),
     predefinedCard: {
       findUnique: jest.fn(),
@@ -35,6 +36,7 @@ jest.mock('@/lib/prisma', () => ({
 }));
 
 const mockPrisma = prisma as unknown as {
+  $queryRaw: jest.Mock;
   $transaction: jest.Mock;
   predefinedCard: {
     findUnique: jest.Mock;
@@ -59,6 +61,7 @@ const mockPrisma = prisma as unknown as {
 describe('BenefitMigrationEngine', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPrisma.$queryRaw.mockResolvedValue([{ exists: false }]);
   });
 
   describe('Pre-migration checks', () => {
@@ -262,6 +265,7 @@ describe('BenefitMigrationEngine', () => {
           throw new Error('Simulated database error');
         }
         return callback({
+          $queryRaw: jest.fn().mockResolvedValue([{ exists: false }]),
           creditCard: { update: jest.fn() },
           benefit: { create: jest.fn().mockResolvedValue({ id: 'benefit1' }) },
           benefitStatus: { create: jest.fn() }
@@ -337,6 +341,7 @@ describe('BenefitMigrationEngine', () => {
 
       mockPrisma.$transaction.mockImplementation(async (callback: any) => {
         const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{ exists: false }]),
           benefitStatus: { 
             deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
             create: jest.fn().mockResolvedValue({ id: 'status1' })
@@ -357,7 +362,8 @@ describe('BenefitMigrationEngine', () => {
       // Verify only deletable benefits were removed (benefit3)
       const transactionCall = mockPrisma.$transaction.mock.calls[0][0];
       const mockTx = {
-        benefitStatus: { 
+        $queryRaw: jest.fn().mockResolvedValue([{ exists: false }]),
+        benefitStatus: {
           deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
           create: jest.fn().mockResolvedValue({ id: 'status1' })
         },
@@ -455,6 +461,7 @@ describe('BenefitMigrationEngine', () => {
 
       mockPrisma.$transaction.mockImplementation(async (callback: any) => {
         const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{ exists: false }]),
           benefitStatus: { deleteMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'ns1' }) },
           benefit: { deleteMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'nb1' }) },
           creditCard: { update: jest.fn().mockResolvedValue({}) },

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { PrismaClient } from "@/generated/prisma";
 import {
   PrismaUserCloneSource,
@@ -127,6 +128,34 @@ describe("Prisma single-user clone source snapshot", () => {
         ],
       },
     });
+    const rawQueries = transaction.$queryRaw.mock.calls
+      .map(([query]) => (query as { strings?: readonly string[] }).strings?.join("?") ?? "");
+    const repairQuery = rawQueries.find((query) =>
+      query.includes('FROM "GlobalBenefitCategoryRepair" r'));
+    expect(repairQuery).toContain('pc."catalogKey" AS "resolvedPredefinedCardCatalogKey"');
+    expect(repairQuery).toContain('pb."catalogKey" AS "resolvedPredefinedBenefitCatalogKey"');
+    expect(repairQuery).toContain('pb."predefinedCardId" = r."predefinedCardId"');
+    expect(rawQueries).toEqual(expect.arrayContaining([
+      expect.stringContaining("to_jsonb(bs) - 'creditCardId' - 'predefinedBenefitId'"),
+      expect.stringContaining("to_jsonb(r) - 'destinationPredefinedBenefitId'"),
+      expect.stringContaining('to_jsonb(p) AS "stateJson"'),
+    ]));
+    const occurrenceQuery = rawQueries
+      .find((query) => query.includes("GlobalBenefitCategoryRepairOccurrence"));
+    expect(occurrenceQuery).toContain('"removedStatusPreimage" IS NULL');
+    expect(occurrenceQuery).toContain('jsonb_typeof("removedStatusPreimage")');
+    expect(occurrenceQuery).toContain(
+      'ORDER BY "cycleStartDate", "cycleEndDate", "occurrenceIndex", "keeperStatusId", "id"',
+    );
+  });
+
+  it("keeps the occurrence tuple delimiter escaped in TypeScript source", () => {
+    const source = readFileSync(
+      "src/lib/amex-sync/single-user-clone.ts",
+      "utf8",
+    );
+    expect(source).not.toContain(String.fromCharCode(0));
+    expect(source).toContain('].join("\\u0000")');
   });
 });
 
