@@ -51,6 +51,53 @@
 - [ ] Exercise apply, suppression, effective/AMEX authority, rollback preserving later state, blocked provenance drift, and reapply against the verified development target.
 - [ ] Record sanitized aggregate evidence. Do not access or mutate production.
 
+## 8. Production compatibility decision and ordered runbook
+
+**Decision (2026-08-06): use migration-first; do not add a default-off runtime
+wrapper for the current implementation.** The authenticated effective-benefit,
+benefit/card mutation, cron, strict-migration, and AMEX repository paths already
+read the repair tables through raw SQL. Their ordinary path is therefore
+schema-dependent, not a schema-independent off path. A default-off capability
+would require a broad lazy-boundary refactor and a proof that every off path
+avoids both repair delegates and repair SQL. The deployment specification allows
+the simpler migration-first alternative, and the production alias is currently
+kept on the last schema-compatible deployment for exactly this reason.
+
+This is sequencing guidance, not authorization. No production schema, provider,
+application, repair, cleanup, or AMEX operation may be performed from this task;
+each step remains a separately approved and target-verified gate.
+
+The duplicate rows remain visible until the additive schema exists and a reviewed
+repair apply removes only the exact loser occurrences. The safe operational order
+is:
+
+1. Complete and record the separately authorized verified-development migration
+   and rehearsal gates above. Keep the rehearsal target private and emit only
+   aggregate evidence.
+2. Keep production on the schema-compatible deployment. Before any production
+   application release or repair write, separately transition the current AMEX
+   capability to effective `off` and verify the immutable deployment/primary-alias
+   identity and fail-closed runtime behavior.
+3. With a fresh recovery point and immediate target verification, separately apply
+   only the reviewed additive repair migration. Verify migration state independently;
+   a generated client or green build is not evidence that the tables exist.
+4. Release the schema-dependent application only after step 3 is independently
+   recorded. Run read-only category-repair discovery twice, privately review the
+   complete manifest/page fingerprints, and retain only aggregate sanitized output.
+5. Obtain the separate bounded apply approval. Re-verify target, recovery point,
+   effective AMEX `off`, manifest/inventory/page fingerprints, and exact phrase at
+   the writer boundary. Apply/replay one reviewed page at a time and stop on any
+   graph, state, CAS, provenance, catalog, or postimage drift.
+6. Verify duplicate suppression, canonical effective/AMEX authority, keeper-state
+   preservation, and aggregate parity. Keep AMEX `off`; do not run strict cleanup,
+   delete repair evidence, or reactivate preview/write as part of this repair.
+7. If any schema-dependent release reaches an alias before step 3, stop further
+   releases and roll back to the last schema-compatible deployment before reading
+   or mutating repair state. Verify authenticated reads/data visibility after the
+   rollback and preserve all database state. Do not substitute a friendly
+   missing-table catch, build success, or an environment-name observation for
+   migration evidence.
+
 ## Stop conditions
 
 Stop on ambiguous/zero target, non-category shape drift, explicit custom ownership, duplicate target, non-exact overlap, conflicting meaningful state, losing-side attachments, cross-owner relations, inventory/manifest/catalog/source drift, CAS mismatch, missing clone binding, target uncertainty, effective AMEX not off for writes, or failed postimage verification.
