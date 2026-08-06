@@ -1,0 +1,5 @@
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Review parity verifier coverage, complete diff/untracked paths, sensitive-output exclusions, and passed/failed/skipped reporting."}
+{"file":".trellis/spec/perks-reminder/global-benefit-definitions-and-migration.md","reason":"Review strict eligibility, all-account manifest coverage, exact keeper/loser semantics, four-state runtime authority, replay, and rollback safety."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Review target/recovery gates, additive-only isolated migration, no dotenv access, no compensating writes, and protected-state preservation."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Review migration-before-release ordering, immutable/alias identity equality, effective AMEX off, and separate cleanup/reactivation boundaries."}
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Review effective projection ownership, physical-card identity, user-owned state integrity, and authenticated dashboard behavior."}

@@ -971,12 +971,18 @@ function sourceIsStrictCustomForCard(
 }
 
 function completeCardGraphAgrees(unit: CategoryRepairUnitSnapshot): boolean {
-  const ids = unit.cardStrictCustomSources.map((source) => source.id);
+  // The card graph may also contain genuine same-owner custom definitions. They
+  // remain independently mutable/materialized and are intentionally excluded
+  // from the historical ownerless repair graph. Keep the complete source list in
+  // the immutable/current fingerprints so their later appearance or mutation
+  // still forces a fresh review, but do not let them block this candidate.
+  const eligibleSources = unit.cardStrictCustomSources.filter((source) => source.userId === null);
+  const ids = eligibleSources.map((source) => source.id);
   if (new Set(ids).size !== ids.length) return false;
-  const exactSource = unit.cardStrictCustomSources.filter((source) => source.id === unit.source.id);
+  const exactSource = eligibleSources.filter((source) => source.id === unit.source.id);
   return exactSource.length === 1
     && legacyBenefitSourceFingerprint(exactSource[0]) === legacyBenefitSourceFingerprint(unit.source)
-    && unit.cardStrictCustomSources.every((source) =>
+    && eligibleSources.every((source) =>
       sourceIsStrictCustomForCard(source, unit.card)
       && sourceRelationGraphAgrees(source, unit.card));
 }
@@ -1023,7 +1029,10 @@ function hasCompleteCardDuplicateTarget(
   definition: GlobalBenefitDefinition,
 ): boolean {
   return unit.cardStrictCustomSources
-    .filter((source) => source.id !== unit.source.id)
+    // Same-owner custom definitions are genuine user-owned rows. They must not
+    // participate in relaxed category-only matching or make an otherwise valid
+    // ownerless historical source look like a duplicate destination.
+    .filter((source) => source.id !== unit.source.id && source.userId === null)
     .some((source) => relaxedDestinationForSource(unit, source)?.id === definition.id);
 }
 
@@ -1829,8 +1838,20 @@ export async function runGlobalBenefitCategoryRepairOperator(input: {
     .filter((proposal) => !proposal.blocked)
     .map((proposal) => proposal.privateKey);
   const manifestProposalKeys = manifest?.entries.map((entry) => entry.privateKey) ?? safeProposalKeys;
-  if (manifest && !sameSortedIds(safeProposalKeys, manifestProposalKeys)) {
-    throw new GlobalBenefitCategoryRepairError("The private repair manifest does not cover the exact reviewed page.");
+  if (manifest) {
+    const proposalKeys = new Set(discovery.proposals.map((proposal) => proposal.privateKey));
+    const manifestKeys = new Set(manifestProposalKeys);
+    // A reviewed manifest may contain a definition that later becomes blocked
+    // by evidence/graph drift. Rollback-preview must report that closed stop so
+    // the operator can preserve the active evidence; it must not reject the
+    // page merely because a previously safe manifest entry is now blocked.
+    // Every currently safe proposal still needs manifest authority, and every
+    // manifest entry must still be present on this exact page.
+    const manifestCoversCurrentPage = manifestProposalKeys.every((key) => proposalKeys.has(key));
+    const safeProposalsAreManifestAuthorized = safeProposalKeys.every((key) => manifestKeys.has(key));
+    if (!manifestCoversCurrentPage || !safeProposalsAreManifestAuthorized) {
+      throw new GlobalBenefitCategoryRepairError("The private repair manifest does not cover the exact reviewed page.");
+    }
   }
   const discoveredManifest = mode === "discover"
     ? buildGlobalBenefitCategoryRepairManifest(discovery, {

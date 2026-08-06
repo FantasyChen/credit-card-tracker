@@ -11,6 +11,7 @@ import {
   type CategoryRepairEvidenceSnapshot,
   type CategoryRepairLegacyBenefitSnapshot,
   type CategoryRepairManifestEntry,
+  type GlobalBenefitCategoryRepairManifest,
   type CategoryRepairProposal,
   type CategoryRepairReviewedAuthorityContext,
   type CategoryRepairStatusAction,
@@ -29,6 +30,10 @@ import {
   type LegacyAuditRelation,
   type LegacyProvenanceRelation,
 } from "./global-benefit-migration";
+import type {
+  CategoryRepairParityAggregateState,
+  CategoryRepairParityScope,
+} from "./global-benefit-category-repair-parity";
 
 type QueryClient = Pick<PrismaClient, "$queryRaw" | "$executeRaw">;
 type TransactionClient = QueryClient;
@@ -713,6 +718,165 @@ async function readOneUnit(client: QueryClient, privateKey: string): Promise<Loa
   return graph;
 }
 
+type ParityTableName =
+  | "User"
+  | "CreditCard"
+  | "Benefit"
+  | "PredefinedCard"
+  | "PredefinedBenefit"
+  | "BenefitStatus"
+  | "AmexSyncRowAudit"
+  | "BenefitStatusSourceProvenance"
+  | "CatalogMigrationLedger"
+  | "GlobalBenefitCategoryRepair"
+  | "GlobalBenefitCategoryRepairOccurrence"
+  | "AmexSyncAttempt"
+  | "CreditCardEvent"
+  | "ExternalCardMapping";
+
+interface ParityAggregateRow { count: bigint | number; digest: string }
+
+function sqlIdList(values: readonly string[]): ReturnType<typeof Prisma.sql> {
+  return values.length === 0
+    ? Prisma.sql`FALSE`
+    : Prisma.sql`t."id" IN (${Prisma.join(values)})`;
+}
+
+function parityScopeCondition(
+  table: ParityTableName,
+  scope: CategoryRepairParityScope,
+): ReturnType<typeof Prisma.sql> {
+  switch (table) {
+    // These tables are never changed by a category repair. Keeping them in the
+    // unrelated digest makes an unexpected owner/card/catalog edit visible.
+    case "User":
+    case "CreditCard":
+    case "Benefit":
+    case "PredefinedCard":
+    case "PredefinedBenefit":
+    case "BenefitStatusSourceProvenance":
+    case "AmexSyncAttempt":
+    case "CreditCardEvent":
+    case "ExternalCardMapping":
+      return Prisma.sql`FALSE`;
+    case "BenefitStatus":
+      return sqlIdList(scope.statusIds);
+    case "AmexSyncRowAudit":
+      return sqlIdList(scope.auditIds);
+    case "CatalogMigrationLedger":
+      return scope.sourceBenefitIds.length === 0
+        ? Prisma.sql`FALSE`
+        : Prisma.sql`t."legacyBenefitId" IN (${Prisma.join(scope.sourceBenefitIds)})`;
+    case "GlobalBenefitCategoryRepair":
+      return scope.sourceBenefitIds.length === 0
+        ? Prisma.sql`FALSE`
+        : Prisma.sql`t."legacyBenefitId" IN (${Prisma.join(scope.sourceBenefitIds)})`;
+    case "GlobalBenefitCategoryRepairOccurrence": {
+      const sourceParent = scope.sourceBenefitIds.length === 0
+        ? Prisma.sql`FALSE`
+        : Prisma.sql`p."legacyBenefitId" IN (${Prisma.join(scope.sourceBenefitIds)})`;
+      const knownParent = scope.repairIds && scope.repairIds.length > 0
+        ? Prisma.sql`t."repairId" IN (${Prisma.join(scope.repairIds)})`
+        : Prisma.sql`FALSE`;
+      return Prisma.sql`(${knownParent} OR EXISTS (
+        SELECT 1 FROM "GlobalBenefitCategoryRepair" p
+        WHERE p."id" = t."repairId" AND ${sourceParent}
+      ))`;
+    }
+  }
+}
+
+function parityRowJson(table: ParityTableName): ReturnType<typeof Prisma.sql> {
+  // Never return row values to the application. Drop credential/card-number
+  // columns before hashing; those secrets are not repair authority and should
+  // not be read into a JS object even transiently.
+  if (table === "User") return Prisma.sql`to_jsonb(t) - ARRAY['password']::text[]`;
+  if (table === "CreditCard") return Prisma.sql`to_jsonb(t) - ARRAY['cardNumber']::text[]`;
+  return Prisma.sql`to_jsonb(t)`;
+}
+
+function parityAggregateQuery(
+  table: ParityTableName,
+  scope: CategoryRepairParityScope,
+): ReturnType<typeof Prisma.sql> {
+  const excluded = parityScopeCondition(table, scope);
+  const rowHash = Prisma.sql`encode(sha256(convert_to((${parityRowJson(table)})::text, 'UTF8')), 'hex')`;
+  const digest = Prisma.sql`encode(sha256(convert_to(COALESCE(
+    string_agg(${rowHash}, E'\\n' ORDER BY t."id") FILTER (WHERE NOT (${excluded})),
+    ''
+  ), 'UTF8')), 'hex')`;
+  switch (table) {
+    case "User": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "User" t`;
+    case "CreditCard": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "CreditCard" t`;
+    case "Benefit": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "Benefit" t`;
+    case "PredefinedCard": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "PredefinedCard" t`;
+    case "PredefinedBenefit": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "PredefinedBenefit" t`;
+    case "BenefitStatus": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "BenefitStatus" t`;
+    case "AmexSyncRowAudit": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "AmexSyncRowAudit" t`;
+    case "BenefitStatusSourceProvenance": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "BenefitStatusSourceProvenance" t`;
+    case "CatalogMigrationLedger": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "CatalogMigrationLedger" t`;
+    case "GlobalBenefitCategoryRepair": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "GlobalBenefitCategoryRepair" t`;
+    case "GlobalBenefitCategoryRepairOccurrence": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "GlobalBenefitCategoryRepairOccurrence" t`;
+    case "AmexSyncAttempt": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "AmexSyncAttempt" t`;
+    case "CreditCardEvent": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "CreditCardEvent" t`;
+    case "ExternalCardMapping": return Prisma.sql`SELECT count(*)::bigint AS "count", ${digest} AS "digest" FROM "ExternalCardMapping" t`;
+  }
+}
+
+async function readParityTableAggregate(
+  client: QueryClient,
+  table: ParityTableName,
+  scope: CategoryRepairParityScope,
+): Promise<ParityAggregateRow> {
+  const rows = await client.$queryRaw<ParityAggregateRow[]>(parityAggregateQuery(table, scope));
+  const row = rows[0];
+  if (!row || !/^[a-f0-9]{64}$/.test(row.digest)) {
+    throw new GlobalBenefitCategoryRepairError("The category-repair parity database returned malformed aggregate evidence.");
+  }
+  return row;
+}
+
+async function readCategoryRepairParityAggregate(
+  client: QueryClient,
+  scope: CategoryRepairParityScope,
+): Promise<CategoryRepairParityAggregateState> {
+  const tables: readonly ParityTableName[] = [
+    "User", "CreditCard", "Benefit", "PredefinedCard", "PredefinedBenefit", "BenefitStatus",
+    "AmexSyncRowAudit", "BenefitStatusSourceProvenance", "CatalogMigrationLedger",
+    "GlobalBenefitCategoryRepair", "GlobalBenefitCategoryRepairOccurrence", "AmexSyncAttempt",
+    "CreditCardEvent", "ExternalCardMapping",
+  ];
+  const rows = await Promise.all(tables.map((table) => readParityTableAggregate(client, table, scope)));
+  const count = (index: number): number => {
+    const value = rows[index].count;
+    const number = typeof value === "bigint" ? Number(value) : value;
+    if (!Number.isSafeInteger(number) || number < 0) {
+      throw new GlobalBenefitCategoryRepairError("The category-repair parity database returned malformed counts.");
+    }
+    return number;
+  };
+  const unrelatedRowsDigest = migrationFingerprint(tables.map((table, index) => [
+    table,
+    rows[index].digest,
+  ]));
+  return {
+    counts: {
+      users: count(0),
+      cards: count(1),
+      benefits: count(2),
+      predefinedCards: count(3),
+      predefinedBenefits: count(4),
+      statuses: count(5),
+      audits: count(6),
+      provenance: count(7),
+      ledgers: count(8),
+      repairs: count(9),
+      occurrences: count(10),
+    },
+    unrelatedRowsDigest,
+  };
+}
+
 function entryBody(entry: CategoryRepairManifestEntry): Omit<CategoryRepairManifestEntry, "entryFingerprint"> {
   const body = { ...entry } as Partial<CategoryRepairManifestEntry>;
   delete body.entryFingerprint;
@@ -1286,6 +1450,58 @@ function verifyRollback(
 export class PrismaGlobalBenefitCategoryRepairDatabase
 implements GlobalBenefitCategoryRepairDatabase {
   constructor(private readonly client: PrismaClient) {}
+
+  async readParitySnapshot(input: {
+    targetVerified?: boolean;
+    manifests: readonly GlobalBenefitCategoryRepairManifest[];
+    scope: CategoryRepairParityScope | null;
+  }): Promise<{
+    snapshot: CategoryRepairBatchSnapshot;
+    aggregate: CategoryRepairParityAggregateState;
+  }> {
+    if (input.targetVerified !== true) {
+      throw new GlobalBenefitCategoryRepairError("Category-repair parity requires target verification.");
+    }
+    try {
+      const readSnapshot = async (client: QueryClient): Promise<{
+        snapshot: CategoryRepairBatchSnapshot;
+        aggregate: CategoryRepairParityAggregateState;
+      }> => {
+        const keys = await client.$queryRaw<PrivateKeyRow[]>(Prisma.sql`
+        SELECT ('repair:' || l."legacyBenefitId")::text AS "privateKey"
+        FROM "CatalogMigrationLedger" l
+        JOIN "Benefit" b ON b."id" = l."legacyBenefitId"
+        JOIN "CreditCard" c ON c."id" = b."creditCardId"
+        WHERE l."classification" = 'CUSTOM' AND l."phase" = 'CLASSIFIED'
+          AND c."predefinedCardId" IS NOT NULL
+        ORDER BY "privateKey" ASC
+      `);
+        const sourceIds = keys.map((row) => row.privateKey.slice("repair:".length));
+        const graph = await readGraphBySourceIds(client, sourceIds);
+        const manifestKeys = input.manifests.flatMap((manifest) => manifest.entries.map((entry) => entry.privateKey));
+        const graphKeys = new Set(graph.units.map((unit) => unit.privateKey));
+        if (manifestKeys.some((key) => !graphKeys.has(key))) {
+          throw new GlobalBenefitCategoryRepairError("The private parity manifest is not covered by the current inventory.");
+        }
+        const inventoryFingerprint = await readInventoryFingerprint(client);
+        const emptyScope: CategoryRepairParityScope = {
+          sourceBenefitIds: [], ownerIds: [], cardIds: [], predefinedCardIds: [],
+          predefinedBenefitIds: [], statusIds: [], auditIds: [], provenanceIds: [], ledgerIds: [], repairIds: [],
+        };
+        const aggregate = await readCategoryRepairParityAggregate(client, input.scope ?? emptyScope);
+        return {
+          snapshot: { units: graph.units, hasMore: false, inventoryFingerprint },
+          aggregate,
+        };
+      };
+      return await this.client.$transaction(
+        (transaction) => readSnapshot(transaction as unknown as QueryClient),
+        { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+      );
+    } catch (error) {
+      throw sanitized(error);
+    }
+  }
 
   async readBatch(input: {
     mode: GlobalBenefitCategoryRepairMode;

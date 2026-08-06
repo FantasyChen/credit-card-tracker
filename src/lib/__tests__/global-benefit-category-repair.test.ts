@@ -445,6 +445,26 @@ describe("category-only global-benefit discovery", () => {
       unit({ source: first, cardStrictCustomSources: [first] }),
     ]));
   });
+
+  it("ignores same-owner custom siblings while preserving the ownerless repair candidate", () => {
+    const candidate = sourceBenefit();
+    const ownerCustom = sourceBenefit({
+      id: "owner-custom-benefit",
+      userId: "owner-1",
+      category: "User-defined category",
+    });
+    ownerCustom.ledger = {
+      ...ownerCustom.ledger!,
+      legacyBenefitId: ownerCustom.id,
+      sourceFingerprint: legacyBenefitSourceFingerprint(ownerCustom),
+    };
+    const proposal = planGlobalBenefitCategoryRepairUnit(unit({
+      source: candidate,
+      cardStrictCustomSources: [candidate, ownerCustom],
+    }));
+    expect(proposal).toMatchObject({ blocked: false, stopReasons: [] });
+    expect(proposal.predefinedBenefitId).toBe("global-benefit-1");
+  });
 });
 
 describe("status actions and reversible audit metadata", () => {
@@ -967,6 +987,44 @@ describe("bounded operator replay and rollback", () => {
     expect(preview.stops).toEqual({});
   });
 
+  it("reports manifest-covered provenance drift instead of rejecting rollback preview", async () => {
+    const before = unit();
+    const current = snapshot([before]);
+    const manifest = discoveryManifest(current);
+    const proposal = planGlobalBenefitCategoryRepairUnit(before);
+    const applied = appliedUnit(before, proposal, manifest);
+    const keeper = applied.source.statuses[0];
+    const driftedProvenance = {
+      id: "later-provenance",
+      benefitStatusId: keeper.id,
+      attemptUserId: "owner-1",
+    };
+    const driftedKeeper: CategoryRepairStatusSnapshot = {
+      ...keeper,
+      provenance: [attachment(driftedProvenance.id)],
+    };
+    const driftedSource = sourceBenefit({
+      ...applied.source,
+      statuses: [driftedKeeper],
+      provenance: [driftedProvenance],
+    });
+    driftedSource.ledger = applied.source.ledger;
+
+    const preview = await runGlobalBenefitCategoryRepairOperator({
+      mode: "rollback-preview",
+      manifest,
+      database: database(snapshot([unit({
+        ...applied,
+        source: driftedSource,
+        destinationStatuses: [driftedKeeper],
+        cardStrictCustomSources: [driftedSource],
+      })])),
+    });
+
+    expect(preview.counts).toMatchObject({ proposed: 0, blocked: 1 });
+    expect(preview.stops).toEqual({ repair_evidence_invalid: 1 });
+  });
+
   it("rolls back manifest entries without requiring blocked page rows to have repair evidence", async () => {
     const before = unit();
     const blockedSource = sourceBenefit({
@@ -1016,7 +1074,7 @@ describe("bounded operator replay and rollback", () => {
       .toBe("repair:legacy-benefit-1");
   });
 
-  it("blocks repaired source and keeper drift even when unrelated inventory changed", async () => {
+  it("reports repaired source and keeper drift even when unrelated inventory changed", async () => {
     const before = unit();
     const inventoryFingerprint = categoryRepairInventoryFingerprint([before]);
     const discovery = discoverGlobalBenefitCategoryRepairs([before], inventoryFingerprint);
@@ -1033,11 +1091,13 @@ describe("bounded operator replay and rollback", () => {
       cardStrictCustomSources: [driftedSource],
     });
     const db = database(snapshot([drifted], { inventoryFingerprint: "7".repeat(64) }));
-    await expect(runGlobalBenefitCategoryRepairOperator({
+    const sourcePreview = await runGlobalBenefitCategoryRepairOperator({
       mode: "rollback-preview",
       manifest,
       database: db,
-    })).rejects.toThrow("exact reviewed page");
+    });
+    expect(sourcePreview.counts).toMatchObject({ proposed: 0, blocked: 1 });
+    expect(sourcePreview.stops).toEqual({ repair_evidence_invalid: 1 });
     expect(db.applyRepair).not.toHaveBeenCalled();
     expect(db.rollbackRepair).not.toHaveBeenCalled();
 
@@ -1054,11 +1114,13 @@ describe("bounded operator replay and rollback", () => {
       cardStrictCustomSources: [keeperSource],
     });
     const keeperDb = database(snapshot([keeperDrift], { inventoryFingerprint: "6".repeat(64) }));
-    await expect(runGlobalBenefitCategoryRepairOperator({
+    const preview = await runGlobalBenefitCategoryRepairOperator({
       mode: "rollback-preview",
       manifest,
       database: keeperDb,
-    })).rejects.toThrow("exact reviewed page");
+    });
+    expect(preview.counts).toMatchObject({ proposed: 0, blocked: 1 });
+    expect(preview.stops).toEqual({ repair_evidence_invalid: 1 });
     expect(keeperDb.rollbackRepair).not.toHaveBeenCalled();
   });
 
@@ -1107,6 +1169,39 @@ describe("bounded operator replay and rollback", () => {
     const db = database(current);
     await expect(runGlobalBenefitCategoryRepairOperator({
       mode: "dry-run",
+      manifest: omitted,
+      database: db,
+    })).rejects.toThrow("exact reviewed page");
+    expect(db.applyRepair).not.toHaveBeenCalled();
+  });
+
+  it("never writes a currently safe proposal that is absent from the reviewed manifest", async () => {
+    const before = unit();
+    const current = snapshot([before]);
+    const reviewed = discoveryManifest(current);
+    const omitted = {
+      ...reviewed,
+      entries: [],
+      manifestFingerprint: "",
+    };
+    omitted.manifestFingerprint = categoryRepairManifestFingerprint({
+      version: omitted.version,
+      inventoryFingerprint: omitted.inventoryFingerprint,
+      pageFingerprint: omitted.pageFingerprint,
+      afterCursor: omitted.afterCursor,
+      nextCursor: omitted.nextCursor,
+      hasMore: omitted.hasMore,
+      entries: omitted.entries,
+    });
+    const db = database(current);
+    await expect(runGlobalBenefitCategoryRepairOperator({
+      mode: "apply",
+      recoveryPointVerified: true,
+      amexOffVerified: true,
+      confirmation: GLOBAL_BENEFIT_CATEGORY_REPAIR_APPLY_CONFIRMATION,
+      expectedInventoryFingerprint: reviewed.inventoryFingerprint,
+      expectedManifestFingerprint: omitted.manifestFingerprint,
+      expectedPageFingerprint: reviewed.pageFingerprint,
       manifest: omitted,
       database: db,
     })).rejects.toThrow("exact reviewed page");
