@@ -305,6 +305,9 @@ function createHarness(options: {
       throw new Error("private database host and row id leaked");
     }
     if (text.includes('AS "inventoryFingerprint"')) return [{ inventoryFingerprint }];
+    if (text.includes('AS "count"') && text.includes('AS "digest"')) {
+      return [{ count: BigInt(0), digest: "a".repeat(64) }];
+    }
     if (text.includes("md5('global-benefit-category-repair/v1:'")) {
       return [{ privateKey: "repair:legacy-benefit-1" }];
     }
@@ -552,6 +555,22 @@ function authority(
 }
 
 describe("Prisma category-repair graph loading", () => {
+  it("rejects parity reads before the first database query when target verification is absent", async () => {
+    const queryRaw = jest.fn(async () => {
+      throw new Error("database read should not occur");
+    });
+    const adapter = new PrismaGlobalBenefitCategoryRepairDatabase({
+      $queryRaw: queryRaw,
+      $executeRaw: jest.fn(),
+    } as unknown as PrismaClient);
+    await expect(adapter.readParitySnapshot({
+      targetVerified: false,
+      manifests: [],
+      scope: null,
+    })).rejects.toThrow("target verification");
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+
   it("resolves opaque cursors, returns the DB complete inventory, and loads off-page card siblings", async () => {
     const harness = createHarness({ sibling: true });
     const cursor = encodeGlobalBenefitCategoryRepairCursor("repair:previous");
@@ -576,6 +595,23 @@ describe("Prisma category-repair graph loading", () => {
     expect(inventorySql).toContain("jsonb_agg");
     expect(inventorySql).toContain('l."predefinedCardId" AS "ledgerPredefinedCardId"');
     expect(inventorySql).toContain('l."predefinedBenefitId" AS "ledgerPredefinedBenefitId"');
+  });
+
+  it("uses one-row database-side aggregate digests rather than materializing full table rows", async () => {
+    const harness = createHarness();
+    const reviewed = await review(harness);
+    harness.queryRaw.mockClear();
+    const result = await harness.adapter.readParitySnapshot({
+      targetVerified: true,
+      manifests: [reviewed.manifest],
+      scope: null,
+    });
+    expect(result.aggregate.unrelatedRowsDigest).toMatch(/^[a-f0-9]{64}$/);
+    const aggregateQueries = harness.queryRaw.mock.calls
+      .map(([query]) => sqlText(query))
+      .filter((text) => text.includes('AS "count"') && text.includes('AS "digest"'));
+    expect(aggregateQueries).toHaveLength(14);
+    expect(aggregateQueries.every((text) => !text.includes('SELECT to_jsonb(t) AS value'))).toBe(true);
   });
 });
 

@@ -34,7 +34,7 @@ The exact global-benefit bridge intentionally compares category as part of the f
 - [x] Conflicting state, attachments, overlap, ambiguity, inventory/manifest tampering, and source/catalog drift produce closed stop reasons and no writes.
 - [x] Clone support rebinds global targets by immutable catalog key and preserves rollback evidence.
 - [x] Targeted and full Jest, strict TypeScript, changed-source lint, Prisma/migration checks, public DB invariant, card-template/userscript checks, sensitive-pattern review, and diff checks pass.
-- [ ] Verified-development rehearsal demonstrates apply, runtime suppression, exact rollback, post-apply state preservation, blocked provenance drift, and reapply idempotency before any production authorization is requested.
+- [x] Verified-development rehearsal demonstrates apply, runtime suppression, exact rollback, post-apply state preservation, blocked provenance drift, and reapply idempotency before any production authorization is requested.
 
 ## Out of Scope
 

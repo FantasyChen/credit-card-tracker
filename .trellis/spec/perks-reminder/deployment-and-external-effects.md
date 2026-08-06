@@ -4,6 +4,7 @@
 
 - GitHub `main` deploys automatically through Vercel. Agents must not perform a manual production deployment unless the user explicitly requests it.
 - The generic build command must not include `prisma migrate deploy`. Local, CI, Vercel Preview, and production builds generate the client and compile only; migration deployment is a separately authorized, target-verified operation. See [Database and Data Safety](database-and-data-safety.md).
+- A merge to `main` is a production application release even when no one runs `vercel --prod`. Schema-dependent request-path code must not merge before its production migration, unless a reviewed default-off capability leaves the entire off path independent of the new tables, columns, enums, relations, and generated delegates. A successful build or friendly database-error fallback does not satisfy this gate.
 - The production domains are served by the Vercel `coupon-cycle` project even though a local checkout may be linked to a different project. Never infer the production target from ignored `.vercel/project.json` alone.
 - Provider environment values are managed in Vercel or other provider dashboards. Do not write secret values, project-local copies, or command output containing them to tracked files.
 
@@ -123,6 +124,7 @@ repair implementation complete
 
 ```ts
 interface ProductionCategoryRepairGate {
+  requestPathSchemaReady: true;
   immutableDeploymentReady: true;
   primaryAliasDeploymentMatches: true;
   effectiveAmexMode: "off";
@@ -132,6 +134,16 @@ interface ProductionCategoryRepairGate {
 ```
 
 ### 3. Contracts
+
+**Incident record — 2026-08-04.** An automatically deployed `main` release began
+reading the new `GlobalBenefitCategoryRepair` relation from authenticated
+request paths before the additive production migration had been applied.
+PostgreSQL returned `42P01` (`relation "GlobalBenefitCategoryRepair" does not
+exist`), so authenticated dashboard/effective-benefit reads failed while
+database-free public routes remained available. The release was Ready because
+the build generated the Prisma client and compiled the app, but did not prove
+that the migration was present. Recovery used the last schema-compatible
+deployment; this record authorizes no database or provider action.
 
 1. First live AMEX confirmation and global-benefit cleanup remain blocked while the category-repair child is incomplete or any production repair/parity gate is pending.
 2. Moving AMEX from current `write` to `off` is a separately authorized provider configuration and deployment action. Do not infer effectiveness from environment registration or a Ready immutable deployment.
@@ -144,6 +156,7 @@ interface ProductionCategoryRepairGate {
 9. Successful repair does not automatically re-enable AMEX or authorize a confirmation. Re-enable preview/write only through the existing production configuration deployment and proposal review gates.
 10. Successful repair does not authorize strict-ledger cleanup or bulk deletion of category repair evidence/preimages. Those remain independent destructive boundaries. Ordinary user-owned lifecycle deletion after rollback may cascade its dependent evidence, while canonical global target deletion remains restrictive.
 11. Before schema deployment, review must prove active repair deletion is application-blocked and rolled-back evidence cannot permanently block user/card/status lifecycle; deployment must not substitute unconditional restrictive owned-data foreign keys for that phase-aware runtime policy.
+12. Because `main` auto-deploys, category-repair request paths that reference the repair tables must not merge or be promoted while those tables are absent. The allowed alternatives are: deploy the reviewed additive migration first under its separate gate, or keep the code behind a reviewed default-off capability whose off path contains no repair-table delegate or raw-SQL reference. If an incompatible application release reaches the primary alias, stop new deployments and roll the alias back to the last schema-compatible deployment before continuing the rollout.
 
 ### 4. Validation & Error Matrix
 
@@ -154,6 +167,8 @@ interface ProductionCategoryRepairGate {
 | Off-configured immutable deployment is Ready but primary alias differs | Stop; do not claim effective off |
 | Primary alias matches but narrow runtime behavior does not prove `off` | Stop and inspect routing/config delivery; never weaken repair gate |
 | Production schema migration is pending without separate deploy approval | Do not deploy or run repair discovery |
+| `main` would auto-deploy request-path references before the repair tables exist | Do not merge or promote; use a schema-independent default-off gate or complete the separately approved migration first |
+| Primary alias serves an application build that queries an absent repair table | Stop further releases, roll back to the last schema-compatible deployment, verify authenticated reads, and preserve all database state |
 | Apply page differs from reviewed private fingerprints | Stop before page writer |
 | Repair/parity succeeds | Keep AMEX off and cleanup blocked until their own reviewed decisions |
 | Any unexpected user-state, audit, provenance, or unrelated-row change appears | Stop; preserve evidence/recovery point; do not compensate automatically |
@@ -161,13 +176,15 @@ interface ProductionCategoryRepairGate {
 ### 5. Good / Base / Bad Cases
 
 - **Good:** Verified-development apply/rollback rehearsal passes. A later production hold moves AMEX to effective off with alias proof, then separately approved schema/discovery/apply gates run bounded and retain aggregate-only evidence.
+- **Good:** A default-off application can merge before schema deployment only when tests prove every ordinary authenticated/cron/mutation off path avoids repair-table SQL and generated delegates; activation waits for migration and target evidence.
 - **Base:** Implementation is complete but no production authorization exists. No provider, deployment, database, manifest, cleanup, or AMEX action occurs.
+- **Base:** The implementation is complete but unconditionally reads the new repair tables. Keep production on the last schema-compatible deployment and do not merge/promote the implementation until the migration gate passes.
 - **Base:** Repair applies successfully. Production stays off until a new decision reviews parity and chooses whether to resume preview/write.
-- **Bad:** Confirm an AMEX proposal before repair, use cleanup to remove the duplicate symptom, or assume setting the environment name to `off` made the primary alias safe for repair writes.
+- **Bad:** Confirm an AMEX proposal before repair, use cleanup to remove the duplicate symptom, assume setting the environment name to `off` made the primary alias safe for repair writes, or merge unconditional repair-table reads because the Next build is green.
 
 ### 6. Tests Required
 
-Unit-test exact off-mode parsing and malformed/newline values; repair writer refusal for preview/write/unknown mode; production state-machine ordering; first-confirmation and cleanup holds; deployment/alias identity mismatch; zero-write effective-off probe shape; separate schema/discovery/apply/rollback-preview/rollback/reactivation approvals; aggregate-only CLI/evidence output; page stop behavior; active repair application deletion guards; rolled-back user-owned evidence cascades; restrictive canonical global targets; and no automatic AMEX reactivation or cleanup after repair. Operational deployment, configuration, database, and runtime probes are skipped during implementation unless separately authorized.
+Unit-test exact off-mode parsing and malformed/newline values; repair writer refusal for preview/write/unknown mode; production state-machine ordering; first-confirmation and cleanup holds; deployment/alias identity mismatch; zero-write effective-off probe shape; separate schema/discovery/apply/rollback-preview/rollback/reactivation approvals; aggregate-only CLI/evidence output; page stop behavior; active repair application deletion guards; rolled-back user-owned evidence cascades; restrictive canonical global targets; and no automatic AMEX reactivation or cleanup after repair. When code may precede schema, tests must also prove the default-off authenticated dashboard, API, cron, and mutation paths contain no repair-table delegate/raw-SQL access; otherwise the rollout test must keep merge/promotion blocked until migration evidence exists. Operational deployment, configuration, database, and runtime probes are skipped during implementation unless separately authorized.
 
 ### 7. Wrong vs Correct
 
@@ -175,12 +192,23 @@ Unit-test exact off-mode parsing and malformed/newline values; repair writer ref
 Wrong:
 checked-in repair code + AMEX_WRITE_MODE=off somewhere
   => run production migration, repair, cleanup, and first confirmation
+
+green application build + checked-in migration + unconditional repair-table JOIN
+  => merge to auto-deploying main before production migration
 ```
 
 ```text
 Correct:
 implementation + static checks
   => no production authorization
+
+schema-dependent request paths
+  => keep production on the last compatible deployment
+  => merge/promote only after the separately approved migration
+
+or reviewed schema-independent default-off paths
+  => merge while capability remains off
+  => activate only after migration and target evidence
 
 separately approved off transition
   + Ready immutable deployment

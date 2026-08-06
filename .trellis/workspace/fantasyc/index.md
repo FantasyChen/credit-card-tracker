@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 8
-- **Last Active**: 2026-07-28
+- **Total Sessions**: 9
+- **Last Active**: 2026-08-06
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~286 | Active |
+| `journal-1.md` | ~309 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 9 | 2026-08-06 | Repair category-drift duplicates and production outage | `1125393`, `77c4350`, `e74d80c` | `codex/category-repair-safe-rollout` |
 | 8 | 2026-07-28 | Complete and deploy AMEX sync reconciliation | `a035b7a`, `9f5dc22` | `chore/archive-complete-amex-sync-reconciliation` |
 | 7 | 2026-07-27 | Make AMEX observations product-independent | `05cc4f8`, `3b87f17` | `feat/amex-benefit-reader-phase-1` |
 | 6 | 2026-07-27 | Complete AMEX BenefitSync integration review | `fadce9f`, `339581b`, `0e0d114` | `feat/amex-benefit-reader-phase-1` |

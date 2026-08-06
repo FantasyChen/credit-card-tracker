@@ -284,3 +284,26 @@ Completed authoritative AMEX card and benefit reconciliation, exact-last-five ma
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Repair category-drift duplicates and production outage
+
+**Date**: 2026-08-06
+**Task**: Repair category-drift duplicates and production outage
+**Branch**: `codex/category-repair-safe-rollout`
+
+### Summary
+
+Restored production with a schema-compatible rollback, hardened migration-first deployment rules, fixed manifest-covered drift reporting, passed isolated development migration/rehearsal, and moved production AMEX to a Ready primary off-mode deployment. Production schema/data repair remains blocked pending authenticated runtime off proof.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1125393` | (see git log) |
+| `77c4350` | (see git log) |
+| `e74d80c` | (see git log) |
+
+### Status
+
+[OK] **Completed**
