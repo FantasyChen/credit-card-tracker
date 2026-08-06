@@ -1,0 +1,5 @@
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Defines immediate target verification, isolated Prisma migration execution, recovery requirements, state preservation, and production write boundaries."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Defines migration-first schema-dependent release sequencing, primary-alias identity proof, effective AMEX off, and independent production approvals."}
+{"file":".trellis/spec/perks-reminder/global-benefit-definitions-and-migration.md","reason":"Defines exact category-only eligibility, manifest authority, keeper preservation, evidence-before-delete, runtime authority, replay, and rollback contracts."}
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Defines effective-benefit ownership, physical-card identity, authenticated user scoping, and preservation of durable user state."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Defines aggregate-only category-repair verification, sensitive evidence handling, static checks, and truthful operational gate reporting."}
