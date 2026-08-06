@@ -445,6 +445,26 @@ describe("category-only global-benefit discovery", () => {
       unit({ source: first, cardStrictCustomSources: [first] }),
     ]));
   });
+
+  it("ignores same-owner custom siblings while preserving the ownerless repair candidate", () => {
+    const candidate = sourceBenefit();
+    const ownerCustom = sourceBenefit({
+      id: "owner-custom-benefit",
+      userId: "owner-1",
+      category: "User-defined category",
+    });
+    ownerCustom.ledger = {
+      ...ownerCustom.ledger!,
+      legacyBenefitId: ownerCustom.id,
+      sourceFingerprint: legacyBenefitSourceFingerprint(ownerCustom),
+    };
+    const proposal = planGlobalBenefitCategoryRepairUnit(unit({
+      source: candidate,
+      cardStrictCustomSources: [candidate, ownerCustom],
+    }));
+    expect(proposal).toMatchObject({ blocked: false, stopReasons: [] });
+    expect(proposal.predefinedBenefitId).toBe("global-benefit-1");
+  });
 });
 
 describe("status actions and reversible audit metadata", () => {
