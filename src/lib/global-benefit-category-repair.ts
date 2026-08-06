@@ -1838,8 +1838,20 @@ export async function runGlobalBenefitCategoryRepairOperator(input: {
     .filter((proposal) => !proposal.blocked)
     .map((proposal) => proposal.privateKey);
   const manifestProposalKeys = manifest?.entries.map((entry) => entry.privateKey) ?? safeProposalKeys;
-  if (manifest && !sameSortedIds(safeProposalKeys, manifestProposalKeys)) {
-    throw new GlobalBenefitCategoryRepairError("The private repair manifest does not cover the exact reviewed page.");
+  if (manifest) {
+    const proposalKeys = new Set(discovery.proposals.map((proposal) => proposal.privateKey));
+    const manifestKeys = new Set(manifestProposalKeys);
+    // A reviewed manifest may contain a definition that later becomes blocked
+    // by evidence/graph drift. Rollback-preview must report that closed stop so
+    // the operator can preserve the active evidence; it must not reject the
+    // page merely because a previously safe manifest entry is now blocked.
+    // Every currently safe proposal still needs manifest authority, and every
+    // manifest entry must still be present on this exact page.
+    const manifestCoversCurrentPage = manifestProposalKeys.every((key) => proposalKeys.has(key));
+    const safeProposalsAreManifestAuthorized = safeProposalKeys.every((key) => manifestKeys.has(key));
+    if (!manifestCoversCurrentPage || !safeProposalsAreManifestAuthorized) {
+      throw new GlobalBenefitCategoryRepairError("The private repair manifest does not cover the exact reviewed page.");
+    }
   }
   const discoveredManifest = mode === "discover"
     ? buildGlobalBenefitCategoryRepairManifest(discovery, {
