@@ -1,7 +1,9 @@
-import type { CreditCard as PrismaCreditCard } from '@/generated/prisma';
-import type {
-  EffectiveBenefitStatus,
-  EffectiveCreditCard,
+import type { CreditCard as PrismaCreditCard, Prisma, PrismaClient } from '@/generated/prisma';
+import {
+  fetchEffectiveBenefitStatuses,
+  fetchEffectiveCardTerms,
+  type EffectiveBenefitStatus,
+  type EffectiveCreditCard,
 } from '@/lib/effective-benefit';
 import { createCardDisplayNameMap } from '@/lib/cardDisplayUtils';
 
@@ -408,5 +410,193 @@ export function buildBenefitDashboardProjection({
     ...partitions,
     ...totals,
     ...roi,
+  };
+}
+
+type BenefitDashboardDatabase = Pick<
+  PrismaClient,
+  '$queryRaw' | 'benefitUsageWay' | 'creditCard' | 'user'
+>;
+
+export interface LoadedBenefitDashboard extends BenefitDashboardProjection {
+  cardCount: number;
+  notifyBenefitExpiration: boolean;
+  notifyExpirationDays: number;
+}
+
+export interface HomeDashboardSummary {
+  cardCount: number;
+  totalAnnualFees: number;
+  totalClaimedValue: number;
+  expiringSoonBenefits: EffectiveBenefitStatus[];
+  upcomingBenefits: EffectiveBenefitStatus[];
+}
+
+function calendarYearStart(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0));
+}
+
+function calendarYearEnd(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), 11, 31, 23, 59, 59, 999));
+}
+
+async function fetchDashboardBenefitStatuses(
+  database: BenefitDashboardDatabase,
+  userId: string,
+  now: Date
+): Promise<RawDisplayBenefitStatus[]> {
+  const historyStart = calendarYearStart(now);
+  const statuses = await fetchEffectiveBenefitStatuses(database, {
+    userId,
+    cycleEndOnOrAfter: historyStart,
+  });
+
+  return statuses.filter((status) =>
+    status.cycleEndDate >= now || status.isCompleted || status.isNotUsable
+  );
+}
+
+function buildRelevantBenefitSignatureWhere(
+  statuses: RawDisplayBenefitStatus[]
+): Prisma.PredefinedBenefitWhereInput | null {
+  const seen = new Set<string>();
+  const OR: Prisma.PredefinedBenefitWhereInput[] = [];
+
+  for (const status of statuses) {
+    if (status.usageWaySlug) continue;
+    const key = JSON.stringify([status.benefit.category, status.benefit.description]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    OR.push({
+      category: status.benefit.category,
+      description: status.benefit.description,
+    });
+  }
+
+  return OR.length > 0 ? { OR } : null;
+}
+
+async function fetchRelevantUsageWays(
+  database: BenefitDashboardDatabase,
+  statuses: RawDisplayBenefitStatus[]
+): Promise<UsageWayForDashboard[]> {
+  const predefinedBenefitWhere = buildRelevantBenefitSignatureWhere(statuses);
+  if (!predefinedBenefitWhere) return [];
+
+  const usageWays = await database.benefitUsageWay.findMany({
+    where: {
+      predefinedBenefits: {
+        some: predefinedBenefitWhere,
+      },
+    },
+    select: {
+      slug: true,
+      predefinedBenefits: {
+        where: predefinedBenefitWhere,
+        select: {
+          category: true,
+          description: true,
+          predefinedCard: {
+            select: { name: true },
+          },
+        },
+      },
+    },
+  });
+
+  return usageWays as UsageWayForDashboard[];
+}
+
+export async function loadBenefitDashboard(
+  database: BenefitDashboardDatabase,
+  input: { userId: string; now: Date }
+): Promise<LoadedBenefitDashboard> {
+  const { userId, now } = input;
+  const [storedUserCards, cardTerms, statuses, notificationSettings] = await Promise.all([
+    database.creditCard.findMany({ where: { userId } }),
+    fetchEffectiveCardTerms(database, userId),
+    fetchDashboardBenefitStatuses(database, userId, now),
+    database.user.findUnique({
+      where: { id: userId },
+      select: {
+        notifyBenefitExpiration: true,
+        notifyExpirationDays: true,
+      },
+    }),
+  ]);
+
+  const termsByCardId = new Map(cardTerms.map((card) => [card.creditCardId, card]));
+  const userCards = storedUserCards.map((card) => {
+    const terms = termsByCardId.get(card.id);
+    return terms ? { ...card, name: terms.name, issuer: terms.issuer } : card;
+  });
+  const usageWays = await fetchRelevantUsageWays(database, statuses);
+  const projection = buildBenefitDashboardProjection({
+    statuses,
+    userCards,
+    usageWays,
+    predefinedCardFees: cardTerms.map((card) => ({
+      name: card.name,
+      annualFee: card.annualFee,
+    })),
+    now,
+  });
+
+  return {
+    ...projection,
+    cardCount: userCards.length,
+    notifyBenefitExpiration: notificationSettings?.notifyBenefitExpiration ?? false,
+    notifyExpirationDays: notificationSettings?.notifyExpirationDays ?? 7,
+  };
+}
+
+export async function loadHomeDashboardSummary(
+  database: BenefitDashboardDatabase,
+  input: { userId: string; now: Date }
+): Promise<HomeDashboardSummary> {
+  const { userId, now } = input;
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const [cardTerms, currentYearStatuses, activeStatuses] = await Promise.all([
+    fetchEffectiveCardTerms(database, userId),
+    fetchEffectiveBenefitStatuses(database, {
+      userId,
+      cycleStartOnOrBefore: calendarYearEnd(now),
+      cycleEndOnOrAfter: calendarYearStart(now),
+    }),
+    fetchEffectiveBenefitStatuses(database, {
+      userId,
+      completed: false,
+      notUsable: false,
+      cycleStartOnOrBefore: now,
+      cycleEndOnOrAfter: now,
+    }),
+  ]);
+
+  const yearStart = calendarYearStart(now);
+  const yearEnd = calendarYearEnd(now);
+  const claimedStatuses = deduplicateBenefitStatusesForDashboard(
+    augmentBenefitStatusesForDashboard(
+      currentYearStatuses.filter((status) =>
+        status.cycleStartDate <= yearEnd && status.cycleEndDate >= yearStart
+      ),
+      [],
+      []
+    )
+  );
+  const totalClaimedValue = claimedStatuses.reduce((total, status) => {
+    return status.isNotUsable ? total : total + resolveBenefitClaimedValue(status);
+  }, 0);
+
+  return {
+    cardCount: cardTerms.length,
+    totalAnnualFees: cardTerms.reduce((total, card) => total + card.annualFee, 0),
+    totalClaimedValue,
+    expiringSoonBenefits: activeStatuses
+      .filter((status) => status.cycleEndDate <= sevenDaysFromNow)
+      .sort((left, right) => left.cycleEndDate.getTime() - right.cycleEndDate.getTime()),
+    upcomingBenefits: activeStatuses
+      .filter((status) => status.cycleEndDate > sevenDaysFromNow)
+      .sort((left, right) => left.cycleEndDate.getTime() - right.cycleEndDate.getTime())
+      .slice(0, 5),
   };
 }
