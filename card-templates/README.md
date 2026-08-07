@@ -1,36 +1,60 @@
-# Card Template Contributions
+# Card Catalog Contributions
 
-This folder is the public-friendly intake path for predefined card updates.
-Perks Reminder still seeds production catalog data from `prisma/seed.ts`, but
-new card and benefit corrections can start here as one JSON file per card.
+This directory is the contributor intake format for proposed Standard Card and
+Standard Benefit Definitions. The checked-in DB-free Catalog source is
+[`src/lib/static-catalog.ts`](../src/lib/static-catalog.ts); this directory is
+not a database seed or an existing-user rollout mechanism.
 
 ## Workflow
 
-1. Copy `examples/chase-sapphire-preferred-2026.json`.
-2. Replace the card metadata, benefits, and source links.
-3. Run `npm run card-template:validate -- path/to/template.json`.
-4. Open a PR with the template and any matching card image under
+1. Copy [`examples/chase-sapphire-preferred-2026.json`](examples/chase-sapphire-preferred-2026.json).
+2. Replace the card metadata, benefits, and source links. Keep the source
+   terms and access dates specific enough for review.
+3. Validate the file (or all examples):
+
+   ```bash
+   npm run card-template:validate -- path/to/template.json
+   ```
+
+4. Open a pull request with the template and any matching card image under
    `public/images/cards/`.
 
-Maintainers then convert accepted templates into `prisma/seed.ts` and, when
-needed, run the existing benefit migration flow so current users receive the
-updated benefits and materialized statuses.
+Maintainers verify the sources, then update the static Catalog with explicit,
+immutable `catalogKey` values and exact benefit parent keys. A checked-in
+Catalog change also needs a separately reviewed global synchronization plan,
+existing-Physical-Card status propagation disposition, and Benefit Usage Guide
+disposition. Read the [Catalog and Benefit Updates specification](../.trellis/spec/perks-reminder/catalog-and-benefit-updates.md)
+before changing the source.
+
+`prisma/seed.ts` consumes the static source for compatible database setup, but
+editing or running the seed does not synchronize existing users. Any
+database-backed synchronization is a separately authorized operation; the
+operator defaults to a dry-run and uses the exact gates in the specification:
+
+```bash
+npm run sync:global-catalog -- --dry-run
+```
+
+Do not use legacy per-card update scripts or infer identity from a card name,
+description, amount, array order, or database ID.
 
 ## Rules
 
-- Include official issuer terms whenever possible.
-- Use community or forum data points as supporting context, not as the only
-  source for issuer-published benefits.
-- Include recurring statement credits, promo credits, annual credits, spend
+- Include official issuer terms whenever possible and add community evidence
+  only as supporting context.
+- Include recurring statement or promotional credits, annual credits, spend
   thresholds, and certificate-style benefits that users can track.
-- Do not include always-on access, insurance, elite status, or earning
-  multipliers unless they are useful notes for reviewers.
-- Keep `imageUrl` pointed at an existing local file if the PR includes an image.
+- Do not model always-on access, insurance, elite status, or earning
+  multipliers as recurring benefits unless product requirements change.
+- Keep `imageUrl` pointed at an existing local file when the proposal includes
+  an image, and record image provenance in the relevant documentation.
+- Preserve existing `catalogKey` values. A genuinely new definition gets a new
+  key; a changed or retired definition is never deleted and recreated.
 
-## Benefit Fields
+## Benefit fields
 
 - `frequency`: `MONTHLY`, `QUARTERLY`, `YEARLY`, or `ONE_TIME`
 - `cycleAlignment`: `CARD_ANNIVERSARY` or `CALENDAR_FIXED`
 - `fixedCycleStartMonth`: 1-12, only for fixed calendar windows
-- `fixedCycleDurationMonths`: number of months in the fixed window
+- `fixedCycleDurationMonths`: positive number of months in the fixed window
 - `occurrencesInCycle`: optional count when multiple uses exist in one cycle
