@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 10
-- **Last Active**: 2026-08-06
+- **Total Sessions**: 11
+- **Last Active**: 2026-08-07
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~330 | Active |
+| `journal-1.md` | ~358 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 11 | 2026-08-07 | Architecture cleanup and module deepening | `06f4b65`, `6e2ef1f`, `afef8ac`, `3f95707`, `02deb43`, `a0ed391`, `47a3764`, `a7e577a` | `codex/architecture-cleanup` |
 | 10 | 2026-08-06 | Complete production category-drift repair | `b7c2a0b` | `codex/category-repair-safe-rollout` |
 | 9 | 2026-08-06 | Repair category-drift duplicates and production outage | `1125393`, `77c4350`, `e74d80c` | `codex/category-repair-safe-rollout` |
 | 8 | 2026-07-28 | Complete and deploy AMEX sync reconciliation | `a035b7a`, `9f5dc22` | `chore/archive-complete-amex-sync-reconciliation` |
