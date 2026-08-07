@@ -3,7 +3,7 @@
   "name": "orphan-code-assets-cleanup",
   "title": "Remove orphan code and assets",
   "description": "Delete verified orphan modules, routes, dependencies, scripts, and assets with external-consumer safeguards.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
