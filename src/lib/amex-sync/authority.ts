@@ -6,15 +6,15 @@ import {
   AMEX_WRITABLE_DESTINATIONS,
   type AmexCatalogBenefitIdentity,
   type AmexCatalogProductIdentity,
-} from "./catalog-registry";
+} from "@/lib/amex-catalog/catalog-registry";
 import {
   resolveServerAmexCredit,
   resolveServerAmexProduct,
   SERVER_AMEX_SOURCE_CREDITS,
 } from "./server-evidence";
-import { periodKeysForExactRange } from "./period-resolution";
+import { periodKeysForExactRange } from "@/lib/amex-catalog/period-resolution";
 
-export { periodKeyForExactRange, periodKeysForExactRange } from "./period-resolution";
+export { periodKeyForExactRange, periodKeysForExactRange } from "@/lib/amex-catalog/period-resolution";
 
 // Destination tuples come from the reviewed catalog, while provider evidence
 // authority is separately enumerated by the server and never trusts browser claims.

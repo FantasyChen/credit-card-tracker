@@ -1,5 +1,4 @@
-import { normalizeAmexSelectionText } from "@/lib/amex-benefit-reader/normalization";
-import type { SourcePeriodV2 } from "@/lib/amex-benefit-reader/contract";
+import { normalizeAmexSelectionText } from "./normalization";
 import type { AmexPeriodKey } from "./catalog-registry";
 import { periodKeysForExactRange } from "./period-resolution";
 
@@ -10,7 +9,12 @@ export interface AmexPolicyQuantity {
 }
 
 export interface AmexSourceCreditEvidence {
-  sourcePeriod?: SourcePeriodV2 | null;
+  sourcePeriod?: {
+    kind: "calendar_date_range";
+    startDate: string;
+    endDate: string;
+    timeZone: "UTC";
+  } | null;
   earnedOrUsed?: AmexPolicyQuantity | null;
 }
 

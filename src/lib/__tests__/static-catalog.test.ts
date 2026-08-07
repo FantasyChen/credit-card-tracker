@@ -1,5 +1,5 @@
 import { americanExpressCardCatalog } from '../american-express-card-catalog';
-import { AMEX_CATALOG_IDENTITY_REGISTRY, AMEX_WRITABLE_DESTINATIONS } from '../amex-sync/catalog-registry';
+import { AMEX_CATALOG_IDENTITY_REGISTRY, AMEX_WRITABLE_DESTINATIONS } from '../amex-catalog/catalog-registry';
 import {
   benefitUsageWays,
   calculateAnnualBenefitValue,

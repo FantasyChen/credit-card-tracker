@@ -1,5 +1,5 @@
 import { americanExpressCardCatalog } from "@/lib/american-express-card-catalog";
-import { AMEX_CATALOG_IDENTITY_REGISTRY, type AmexCatalogCardName } from "@/lib/amex-sync/catalog-registry";
+import { AMEX_CATALOG_IDENTITY_REGISTRY, type AmexCatalogCardName } from "@/lib/amex-catalog/catalog-registry";
 import {
   AMEX_BROWSER_PRODUCT_MATCH_MIN_MARGIN,
   AMEX_BROWSER_PRODUCT_MATCH_MIN_SCORE,
