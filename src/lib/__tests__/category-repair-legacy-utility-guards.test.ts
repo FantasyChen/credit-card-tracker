@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = process.cwd();
@@ -15,21 +15,13 @@ function expectOrdered(text: string, guard: string, write: string): void {
 }
 
 describe('superseded category-repair utility guards', () => {
-  it('blocks the broad migration engine before template and per-card writes', () => {
-    const text = source('src/lib/benefit-migration/migration-engine.ts');
-    expectOrdered(text, 'FROM "GlobalBenefitCategoryRepair" repair', 'await this.updatePredefinedCards');
-    expectOrdered(text, 'SELECT 1 FROM "GlobalBenefitCategoryRepair"', 'await tx.benefitStatus.deleteMany');
-    expect(text).toContain("repair.\"phase\" = 'APPLIED'");
-    expect(text).toContain('JOIN "PredefinedCard" target ON target."id" = repair."predefinedCardId"');
-    expect(text).toContain('target."name" = ${cardUpdate.cardName}');
-    expect(text).toContain("\"phase\" = 'APPLIED'");
-  });
-
-  it('blocks the unified card updater before card mutations and status batches', () => {
-    const text = source('scripts/update-card-benefits.ts');
-    expectOrdered(text, 'const activeRepairs = await tx.$queryRaw', 'await tx.benefit.create');
-    expectOrdered(text, 'const repairRows = await prisma.$queryRaw', 'await prisma.benefitStatus.createMany');
-    expect(text.match(/"phase" = 'APPLIED'/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  it('keeps superseded broad migration utilities absent', () => {
+    expect(existsSync(join(ROOT, 'src/lib/benefit-migration/migration-engine.ts'))).toBe(false);
+    expect(existsSync(join(ROOT, 'src/lib/benefit-migration/migration-cli.ts'))).toBe(false);
+    expect(existsSync(join(ROOT, 'scripts/update-card-benefits.ts'))).toBe(false);
+    expect(existsSync(join(ROOT, 'scripts/update-card-benefits.js'))).toBe(false);
+    expect(existsSync(join(ROOT, 'scripts/migrate-benefits.js'))).toBe(false);
+    expect(existsSync(join(ROOT, 'scripts/validate-migration.js'))).toBe(false);
   });
 
   it('blocks the narrow duplicate repair before creates or deletes', () => {
