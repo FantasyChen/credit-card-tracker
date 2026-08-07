@@ -1,17 +1,24 @@
 import {
   categoryRepairManifestEntryFingerprint,
+  categoryRepairPageFingerprint,
+  encodeGlobalBenefitCategoryRepairCursor,
+  normalizeCategoryRepairSiblingEffects,
   planGlobalBenefitCategoryRepairUnit,
   validateGlobalBenefitCategoryRepairManifest,
   type CategoryRepairBatchSnapshot,
   type CategoryRepairManifestEntry,
   type CategoryRepairProposal,
+  type CategoryRepairReviewedAuthorityContext,
   type CategoryRepairStatusAction,
   type CategoryRepairUnitSnapshot,
   type GlobalBenefitCategoryRepairManifest,
 } from "./global-benefit-category-repair";
 import { migrationFingerprint } from "./global-benefit-migration";
 
-export const GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_BASELINE_VERSION = 1 as const;
+// The page selector is part of the private baseline authority. Bump the
+// version so a baseline captured by the previous global-only shape cannot be
+// mistaken for this scoped shape.
+export const GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_BASELINE_VERSION = 2 as const;
 
 export type GlobalBenefitCategoryRepairParityMode = "capture" | "verify";
 
@@ -69,11 +76,24 @@ export interface CategoryRepairParityScope {
   repairIds?: readonly string[];
 }
 
+/**
+ * A page selector is bound to the complete, ordered manifest bundle by its
+ * index and both page fingerprints.  It deliberately carries no path or row
+ * authority; the CLI resolves the private path to this value only after all
+ * manifests have been validated.
+ */
+export interface CategoryRepairParityManifestScope {
+  pageIndex: number;
+  pageFingerprint: string;
+  manifestFingerprint: string;
+}
+
 export interface CategoryRepairParityDatabase {
   readParitySnapshot(input: {
     targetVerified?: boolean;
     manifests: readonly GlobalBenefitCategoryRepairManifest[];
     scope: CategoryRepairParityScope | null;
+    manifestScope?: CategoryRepairParityManifestScope | null;
   }): Promise<{
     snapshot: CategoryRepairBatchSnapshot;
     aggregate: CategoryRepairParityAggregateState;
@@ -96,6 +116,7 @@ export interface GlobalBenefitCategoryRepairParityBaseline {
   version: typeof GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_BASELINE_VERSION;
   inventoryFingerprint: string;
   bundleFingerprint: string;
+  scope: CategoryRepairParityManifestScope | null;
   manifests: GlobalBenefitCategoryRepairManifest[];
   units: CategoryRepairParityUnitBaseline[];
   aggregate: CategoryRepairParityAggregateState;
@@ -138,10 +159,30 @@ export interface CategoryRepairParityReport {
   stops: Partial<Record<CategoryRepairParityStopReason, number>>;
 }
 
+export type CategoryRepairParityAggregateReport = Pick<
+  CategoryRepairParityReport,
+  "mode" | "gates" | "counts" | "actions" | "stops"
+>;
+
 export class GlobalBenefitCategoryRepairParityError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "GlobalBenefitCategoryRepairParityError";
+  }
+}
+
+/**
+ * A post-read gate mismatch is a valid aggregate outcome, not an unavailable
+ * diagnostic. Keep only the already-closed report so callers can serialize
+ * counts/gates/actions/stops without retaining private authority or row data.
+ */
+export class GlobalBenefitCategoryRepairParityVerificationError extends GlobalBenefitCategoryRepairParityError {
+  readonly report: CategoryRepairParityAggregateReport;
+
+  constructor(report: CategoryRepairParityAggregateReport) {
+    super("Category-repair parity verification failed safely.");
+    this.name = "GlobalBenefitCategoryRepairParityVerificationError";
+    this.report = report;
   }
 }
 
@@ -154,7 +195,7 @@ const TABLE_COUNT_KEYS: readonly (keyof CategoryRepairParityTableCounts)[] = [
 
 const UNIT_KEYS = ["privateKey", "unit", "proposal"] as const;
 const BASELINE_KEYS = [
-  "version", "inventoryFingerprint", "bundleFingerprint", "manifests", "units", "aggregate",
+  "version", "inventoryFingerprint", "bundleFingerprint", "scope", "manifests", "units", "aggregate",
   "baselineFingerprint",
 ] as const;
 
@@ -238,25 +279,32 @@ function baselineFingerprintBody(value: Omit<GlobalBenefitCategoryRepairParityBa
     version: value.version,
     inventoryFingerprint: value.inventoryFingerprint,
     bundleFingerprint: value.bundleFingerprint,
+    scope: value.scope,
     manifests: value.manifests,
     units: value.units,
     aggregate: value.aggregate,
   };
 }
 
-function unitScope(units: readonly CategoryRepairParityUnitBaseline[]): CategoryRepairParityScope {
+function unitScope(
+  units: readonly CategoryRepairParityUnitBaseline[],
+  includeSiblingSources = true,
+): CategoryRepairParityScope {
   const unique = (values: readonly string[]) => Array.from(new Set(values)).sort();
-  const allSources = units.flatMap(({ unit }) => unit.cardStrictCustomSources);
-  const statuses = allSources.flatMap((source) => source.statuses)
+  const selectedSources = units.map(({ unit }) => unit.source);
+  const graphSources = includeSiblingSources
+    ? units.flatMap(({ unit }) => unit.cardStrictCustomSources)
+    : selectedSources;
+  const statuses = graphSources.flatMap((source) => source.statuses)
     .concat(units.flatMap(({ unit }) => unit.destinationStatuses));
-  const audits = allSources.flatMap((source) => [
+  const audits = graphSources.flatMap((source) => [
     ...source.audits,
     ...source.statuses.flatMap((status) => status.audits),
   ]).concat(units.flatMap(({ unit }) => [
     ...unit.source.audits,
     ...unit.destinationStatuses.flatMap((status) => status.audits),
   ]));
-  const provenance = allSources.flatMap((source) => [
+  const provenance = graphSources.flatMap((source) => [
     ...source.provenance,
     ...source.statuses.flatMap((status) => status.provenance),
   ]).concat(units.flatMap(({ unit }) => [
@@ -264,7 +312,7 @@ function unitScope(units: readonly CategoryRepairParityUnitBaseline[]): Category
     ...unit.destinationStatuses.flatMap((status) => status.provenance),
   ]));
   return {
-    sourceBenefitIds: unique(allSources.map((source) => source.id)),
+    sourceBenefitIds: unique(graphSources.map((source) => source.id)),
     ownerIds: unique(units.map(({ unit }) => unit.card.userId)),
     cardIds: unique(units.map(({ unit }) => unit.card.id)),
     predefinedCardIds: unique(units.map(({ unit }) => unit.predefinedCard.id)),
@@ -272,7 +320,7 @@ function unitScope(units: readonly CategoryRepairParityUnitBaseline[]): Category
     statusIds: unique(statuses.map((status) => status.id)),
     auditIds: unique(audits.map((audit) => audit.id)),
     provenanceIds: unique(provenance.map((row) => row.id)),
-    ledgerIds: unique(allSources.map((source) => source.ledger).filter(Boolean).map((ledger) => ledger!.legacyBenefitId)),
+    ledgerIds: unique(graphSources.map((source) => source.ledger).filter(Boolean).map((ledger) => ledger!.legacyBenefitId)),
     repairIds: unique(units.map(({ unit }) => unit.repairEvidence?.repairId).filter((id): id is string => id !== undefined)),
   };
 }
@@ -316,6 +364,7 @@ export function validateGlobalBenefitCategoryRepairParityManifests(
     if (page.entries.some((entry) => entry.privateKey.length === 0
       || !entry.privateKey.startsWith("repair:")
       || entry.privateKey === "repair:"
+      || entry.privateKey !== `repair:${entry.sourceBenefitId}`
       || [
         entry.sourceBenefitId,
         entry.ownerId,
@@ -335,7 +384,10 @@ export function validateGlobalBenefitCategoryRepairParityManifests(
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index];
     if ((index === 0 && page.afterCursor !== null)
-      || (index > 0 && page.afterCursor !== pages[index - 1].nextCursor)) {
+      || (index > 0 && (!pages[index - 1].hasMore
+        || pages[index - 1].nextCursor === null
+        || page.afterCursor !== pages[index - 1].nextCursor))
+      || (index < pages.length - 1 && (!page.hasMore || page.nextCursor === null))) {
       throw new GlobalBenefitCategoryRepairParityError("The private parity manifest page chain is invalid.");
     }
   }
@@ -352,8 +404,148 @@ export function validateGlobalBenefitCategoryRepairParityManifests(
   return { pages: [...pages], inventoryFingerprint, bundleFingerprint };
 }
 
-function expectedManifestEntries(bundle: GlobalBenefitCategoryRepairParityManifestBundle): Map<string, CategoryRepairManifestEntry> {
-  return new Map(bundle.pages.flatMap((page) => page.entries).map((entry) => [entry.privateKey, entry]));
+export function validateGlobalBenefitCategoryRepairParityScope(
+  bundle: GlobalBenefitCategoryRepairParityManifestBundle,
+  scope: CategoryRepairParityManifestScope | null | undefined,
+): CategoryRepairParityManifestScope | null {
+  if (scope === undefined || scope === null) return null;
+  if (!isPlainObject(scope)
+    || !exactKeys(scope, ["pageIndex", "pageFingerprint", "manifestFingerprint"])
+    || !Number.isSafeInteger(scope.pageIndex)
+    || !HEX_SHA256.test(scope.pageFingerprint)
+    || !HEX_SHA256.test(scope.manifestFingerprint)) {
+    throw new GlobalBenefitCategoryRepairParityError("The private parity page selector is invalid.");
+  }
+  if (scope.pageIndex < 0 || scope.pageIndex >= bundle.pages.length) {
+    throw new GlobalBenefitCategoryRepairParityError("The private parity page selector is outside the manifest bundle.");
+  }
+  const page = bundle.pages[scope.pageIndex];
+  if (page.pageFingerprint !== scope.pageFingerprint
+    || page.manifestFingerprint !== scope.manifestFingerprint) {
+    throw new GlobalBenefitCategoryRepairParityError("The private parity page selector is outside the manifest bundle.");
+  }
+  return {
+    pageIndex: scope.pageIndex,
+    pageFingerprint: scope.pageFingerprint,
+    manifestFingerprint: scope.manifestFingerprint,
+  };
+}
+
+function expectedManifestEntries(
+  bundle: GlobalBenefitCategoryRepairParityManifestBundle,
+  scope: CategoryRepairParityManifestScope | null = null,
+): Map<string, CategoryRepairManifestEntry> {
+  const pages = scope === null ? bundle.pages : [bundle.pages[scope.pageIndex]];
+  return new Map(pages.flatMap((page) => page.entries).map((entry) => [entry.privateKey, entry]));
+}
+
+interface CategoryRepairParityPageAuthority {
+  pageIndex: number;
+  pageFingerprint: string;
+  manifestFingerprint: string;
+  manifestEntryFingerprints: readonly string[];
+  afterCursor: string | null;
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+function pageAuthorityFromManifest(
+  page: GlobalBenefitCategoryRepairManifest,
+  pageIndex: number,
+): CategoryRepairParityPageAuthority {
+  return {
+    pageIndex,
+    pageFingerprint: page.pageFingerprint,
+    manifestFingerprint: page.manifestFingerprint,
+    manifestEntryFingerprints: page.entries.map((entry) => entry.entryFingerprint),
+    afterCursor: page.afterCursor,
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
+  };
+}
+
+/**
+ * Reconstruct page membership from the complete baseline rather than treating
+ * eligible manifest entries as the page boundary.  Page fingerprints include
+ * blocked proposals, so a boundary is accepted only when its exact proposal
+ * slice and cursor agree with the reviewed manifest.
+ */
+function pageAuthoritiesForBaseline(
+  units: readonly CategoryRepairParityUnitBaseline[],
+  bundle: GlobalBenefitCategoryRepairParityManifestBundle,
+  scope: CategoryRepairParityManifestScope | null,
+): Map<string, CategoryRepairParityPageAuthority> {
+  const authorities = bundle.pages.map(pageAuthorityFromManifest);
+  const result = new Map<string, CategoryRepairParityPageAuthority>();
+  if (scope !== null) {
+    const authority = authorities[scope.pageIndex];
+    if (!authority) {
+      throw new GlobalBenefitCategoryRepairParityError("The private parity page selector is outside the manifest bundle.");
+    }
+    for (const baseline of units) result.set(baseline.privateKey, authority);
+    return result;
+  }
+
+  let offset = 0;
+  for (const authority of authorities) {
+    const page = bundle.pages[authority.pageIndex];
+    const matches: number[] = [];
+    for (let end = offset; end <= units.length; end += 1) {
+      if (end === offset && !(offset === units.length && !page.hasMore && page.nextCursor === null)) continue;
+      const proposals = units.slice(offset, end).map(({ proposal }) => proposal);
+      if (categoryRepairPageFingerprint(proposals) !== page.pageFingerprint) continue;
+      const expectedNextCursor = end === offset || !page.hasMore
+        ? null
+        : encodeGlobalBenefitCategoryRepairCursor(units[end - 1].privateKey);
+      if (expectedNextCursor !== page.nextCursor || (expectedNextCursor !== null) !== page.hasMore) continue;
+      matches.push(end);
+    }
+    if (matches.length !== 1) {
+      throw new GlobalBenefitCategoryRepairParityError("The private parity page boundaries changed.");
+    }
+    const end = matches[0];
+    for (const baseline of units.slice(offset, end)) result.set(baseline.privateKey, authority);
+    offset = end;
+  }
+  if (offset !== units.length || result.size !== units.length) {
+    throw new GlobalBenefitCategoryRepairParityError("The private parity page boundaries changed.");
+  }
+  return result;
+}
+
+function manifestAuthoritiesForSiblingNormalization(
+  authorities: readonly CategoryRepairParityPageAuthority[],
+): CategoryRepairReviewedAuthorityContext["manifestAuthorities"] {
+  return authorities.map((authority) => ({
+    manifestFingerprint: authority.manifestFingerprint,
+    pageFingerprint: authority.pageFingerprint,
+    manifestEntryFingerprints: authority.manifestEntryFingerprints,
+  }));
+}
+
+function validateCurrentAllUnits(
+  snapshot: CategoryRepairBatchSnapshot,
+): readonly CategoryRepairUnitSnapshot[] {
+  const allUnits = snapshot.allUnits ?? snapshot.units;
+  if (snapshot.allUnits === undefined) return allUnits;
+  try {
+    validateSnapshotUnits({
+      units: allUnits,
+      hasMore: false,
+      inventoryFingerprint: snapshot.inventoryFingerprint,
+    });
+  } catch {
+    throw new GlobalBenefitCategoryRepairParityError("The current parity snapshot is invalid.");
+  }
+  const allByKey = new Map(allUnits.map((unit) => [unit.privateKey, unit]));
+  if (allByKey.size !== allUnits.length
+    || snapshot.units.some((unit) => {
+      const complete = allByKey.get(unit.privateKey);
+      return complete === undefined || migrationFingerprint(complete) !== migrationFingerprint(unit);
+    })) {
+    throw new GlobalBenefitCategoryRepairParityError("The current parity snapshot is invalid.");
+  }
+  return allUnits;
 }
 
 function validateSnapshotUnits(
@@ -371,6 +563,32 @@ function validateSnapshotUnits(
     || keys.some((key, index) => index > 0 && key <= keys[index - 1])) {
     throw new GlobalBenefitCategoryRepairParityError("The complete repair snapshot is not deterministic.");
   }
+}
+
+function scopedSnapshot(
+  snapshot: CategoryRepairBatchSnapshot,
+  bundle: GlobalBenefitCategoryRepairParityManifestBundle,
+  scope: CategoryRepairParityManifestScope | null,
+  expectedScopeKeys?: ReadonlySet<string>,
+): CategoryRepairBatchSnapshot {
+  validateSnapshotUnits(snapshot);
+  if (scope === null) return snapshot;
+  const page = bundle.pages[scope.pageIndex];
+  if (expectedScopeKeys === undefined) {
+    // Capture is pre-apply, so the page fingerprint can prove the complete
+    // page slice (including blocked proposals) without trusting entry count.
+    const pageFingerprint = categoryRepairPageFingerprint(snapshot.units.map((unit) =>
+      planGlobalBenefitCategoryRepairUnit(unit, "discover")));
+    if (pageFingerprint !== page.pageFingerprint) {
+      throw new GlobalBenefitCategoryRepairParityError("The parity snapshot crosses the selected manifest page.");
+    }
+  }
+  const allowed = expectedScopeKeys ?? new Set(page.entries.map((entry) => entry.privateKey));
+  if (snapshot.units.length !== allowed.size
+    || Array.from(allowed).some((privateKey) => !snapshot.units.some((unit) => unit.privateKey === privateKey))) {
+    throw new GlobalBenefitCategoryRepairParityError("The selected parity page is not fully covered.");
+  }
+  return snapshot;
 }
 
 function manifestEntryForProposal(proposal: CategoryRepairProposal): CategoryRepairManifestEntry | null {
@@ -403,8 +621,9 @@ function manifestEntryForProposal(proposal: CategoryRepairProposal): CategoryRep
 function validateManifestCoverage(
   units: readonly CategoryRepairParityUnitBaseline[],
   bundle: GlobalBenefitCategoryRepairParityManifestBundle,
+  scope: CategoryRepairParityManifestScope | null = null,
 ): void {
-  const entries = expectedManifestEntries(bundle);
+  const entries = expectedManifestEntries(bundle, scope);
   const unitKeys = new Set(units.map(({ privateKey }) => privateKey));
   if (unitKeys.size !== units.length
     || units.some(({ privateKey }, index) => index > 0 && privateKey <= units[index - 1].privateKey)) {
@@ -443,8 +662,9 @@ function proposalsExactlyEqual(left: CategoryRepairProposal, right: CategoryRepa
 function expectedCounts(
   units: readonly CategoryRepairParityUnitBaseline[],
   bundle: GlobalBenefitCategoryRepairParityManifestBundle,
+  scope: CategoryRepairParityManifestScope | null = null,
 ): CategoryRepairParityCounts {
-  const entries = expectedManifestEntries(bundle);
+  const entries = expectedManifestEntries(bundle, scope);
   const safe = units.filter(({ privateKey, proposal }) => !proposal.blocked && entries.has(privateKey));
   const removed = safe
     .filter(({ unit }) => unit.repairEvidence?.phase !== "APPLIED")
@@ -480,6 +700,7 @@ function baselineUnitFromSnapshot(
 export function captureGlobalBenefitCategoryRepairParityBaseline(input: {
   targetVerified?: boolean;
   manifests: unknown;
+  scope?: CategoryRepairParityManifestScope | null;
   snapshot: CategoryRepairBatchSnapshot;
   aggregate: CategoryRepairParityAggregateState;
 }): GlobalBenefitCategoryRepairParityBaseline {
@@ -487,18 +708,20 @@ export function captureGlobalBenefitCategoryRepairParityBaseline(input: {
     throw new GlobalBenefitCategoryRepairParityError("Category-repair parity requires target verification.");
   }
   const bundle = validateGlobalBenefitCategoryRepairParityManifests(input.manifests);
-  validateSnapshotUnits(input.snapshot);
+  const scope = validateGlobalBenefitCategoryRepairParityScope(bundle, input.scope);
+  const scoped = scopedSnapshot(input.snapshot, bundle, scope);
   const aggregate = validateAggregate(input.aggregate);
-  if (input.snapshot.inventoryFingerprint !== bundle.inventoryFingerprint
-    || !HEX_SHA256.test(input.snapshot.inventoryFingerprint)) {
+  if (scoped.inventoryFingerprint !== bundle.inventoryFingerprint
+    || !HEX_SHA256.test(scoped.inventoryFingerprint)) {
     throw new GlobalBenefitCategoryRepairParityError("The complete repair inventory fingerprint changed.");
   }
-  const units = input.snapshot.units.map(baselineUnitFromSnapshot);
-  validateManifestCoverage(units, bundle);
+  const units = scoped.units.map(baselineUnitFromSnapshot);
+  validateManifestCoverage(units, bundle, scope);
   const body = {
     version: GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_BASELINE_VERSION,
     inventoryFingerprint: bundle.inventoryFingerprint,
     bundleFingerprint: bundle.bundleFingerprint,
+    scope,
     manifests: bundle.pages,
     units,
     aggregate,
@@ -664,6 +887,17 @@ export function parseGlobalBenefitCategoryRepairParityBaseline(
     || bundle.bundleFingerprint !== value.bundleFingerprint) {
     throw new GlobalBenefitCategoryRepairParityError("The private parity baseline authority changed.");
   }
+  let scope: CategoryRepairParityManifestScope | null = null;
+  if (value.scope !== null) {
+    if (!isPlainObject(value.scope) || !exactKeys(value.scope, ["pageIndex", "pageFingerprint", "manifestFingerprint"])) {
+      throw new GlobalBenefitCategoryRepairParityError("The private parity baseline scope is invalid.");
+    }
+    scope = validateGlobalBenefitCategoryRepairParityScope(bundle, {
+      pageIndex: value.scope.pageIndex as number,
+      pageFingerprint: value.scope.pageFingerprint as string,
+      manifestFingerprint: value.scope.manifestFingerprint as string,
+    });
+  }
   const units: CategoryRepairParityUnitBaseline[] = value.units.map((raw) => {
     if (!isPlainObject(raw) || !exactKeys(raw, UNIT_KEYS)
       || typeof raw.privateKey !== "string" || !isPlainObject(raw.proposal)) {
@@ -687,17 +921,28 @@ export function parseGlobalBenefitCategoryRepairParityBaseline(
     };
   });
   const aggregate = validateAggregate(value.aggregate);
-  validateManifestCoverage(units, bundle);
+  validateManifestCoverage(units, bundle, scope);
   const body = {
     version: GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_BASELINE_VERSION,
     inventoryFingerprint: value.inventoryFingerprint,
     bundleFingerprint: value.bundleFingerprint,
+    scope,
     manifests: bundle.pages,
     units,
     aggregate,
   } satisfies Omit<GlobalBenefitCategoryRepairParityBaseline, "baselineFingerprint">;
   if (migrationFingerprint(baselineFingerprintBody(body)) !== value.baselineFingerprint) {
     throw new GlobalBenefitCategoryRepairParityError("The private parity baseline fingerprint is invalid.");
+  }
+  try {
+    if (scope === null) {
+      pageAuthoritiesForBaseline(units, bundle, null);
+    } else if (categoryRepairPageFingerprint(units.map(({ proposal }) => proposal))
+      !== bundle.pages[scope.pageIndex].pageFingerprint) {
+      throw new GlobalBenefitCategoryRepairParityError("The private parity baseline page authority is invalid.");
+    }
+  } catch {
+    throw new GlobalBenefitCategoryRepairParityError("The private parity baseline page authority is invalid.");
   }
   return { ...body, baselineFingerprint: value.baselineFingerprint };
 }
@@ -706,6 +951,7 @@ export function verifyGlobalBenefitCategoryRepairParity(input: {
   targetVerified?: boolean;
   baseline: unknown;
   manifests: unknown;
+  scope?: CategoryRepairParityManifestScope | null;
   snapshot: CategoryRepairBatchSnapshot;
   aggregate: CategoryRepairParityAggregateState;
 }): CategoryRepairParityReport {
@@ -748,32 +994,61 @@ export function verifyGlobalBenefitCategoryRepairParity(input: {
   }
   let baseline: GlobalBenefitCategoryRepairParityBaseline;
   let bundle: GlobalBenefitCategoryRepairParityManifestBundle;
+  let scope: CategoryRepairParityManifestScope | null;
   try {
     baseline = parseGlobalBenefitCategoryRepairParityBaseline(input.baseline);
     bundle = validateGlobalBenefitCategoryRepairParityManifests(input.manifests);
+    scope = validateGlobalBenefitCategoryRepairParityScope(bundle, input.scope);
   } catch {
     increment(report.stops, "baseline_invalid");
     throw new GlobalBenefitCategoryRepairParityError("The private parity authority is invalid.");
   }
   report.gates.baselineValid = true;
+  // A complete pre-repair baseline may be verified once per selected page
+  // after the bounded rollout has accumulated.  A page-scoped baseline remains
+  // bound to that same page; only the global baseline can be narrowed at verify
+  // time without synthesizing a post-repair baseline.
   if (baseline.bundleFingerprint !== bundle.bundleFingerprint
-    || baseline.inventoryFingerprint !== bundle.inventoryFingerprint) {
+    || baseline.inventoryFingerprint !== bundle.inventoryFingerprint
+    || (baseline.scope !== null && migrationFingerprint(baseline.scope) !== migrationFingerprint(scope))) {
     increment(report.stops, "manifest_drift");
     throw new GlobalBenefitCategoryRepairParityError("The private parity manifest authority changed.");
   }
   report.gates.manifestCoverage = true;
-  report.counts = expectedCounts(baseline.units, bundle);
-  let currentAggregate: CategoryRepairParityAggregateState;
+  let baselinePageAuthorities: Map<string, CategoryRepairParityPageAuthority> | null = null;
+  let pageAuthorities: Map<string, CategoryRepairParityPageAuthority>;
   try {
-    validateSnapshotUnits(input.snapshot);
+    baselinePageAuthorities = baseline.scope === null
+      ? pageAuthoritiesForBaseline(baseline.units, bundle, null)
+      : null;
+    pageAuthorities = baseline.scope === null
+      ? baselinePageAuthorities!
+      : pageAuthoritiesForBaseline(baseline.units, bundle, baseline.scope);
+  } catch {
+    increment(report.stops, "manifest_drift");
+    throw new GlobalBenefitCategoryRepairParityError("The private parity manifest authority changed.");
+  }
+  const scopedBaselineUnits = scope === null || baseline.scope !== null
+    ? baseline.units
+    : baseline.units.filter((entry) => baselinePageAuthorities!.get(entry.privateKey)?.pageIndex === scope.pageIndex);
+  report.counts = expectedCounts(scopedBaselineUnits, bundle, scope);
+  let currentAggregate: CategoryRepairParityAggregateState;
+  let currentSnapshot: CategoryRepairBatchSnapshot;
+  try {
+    currentSnapshot = scopedSnapshot(
+      input.snapshot,
+      bundle,
+      scope,
+      scope === null ? undefined : new Set(scopedBaselineUnits.map((entry) => entry.privateKey)),
+    );
     currentAggregate = validateAggregate(input.aggregate);
   } catch {
     increment(report.stops, "aggregate_mismatch");
     throw new GlobalBenefitCategoryRepairParityError("The current parity snapshot is invalid.");
   }
-  const baselineByKey = new Map(baseline.units.map((entry) => [entry.privateKey, entry]));
-  const currentByKey = new Map(input.snapshot.units.map((unit) => [unit.privateKey, unit]));
-  if (input.snapshot.inventoryFingerprint !== baseline.inventoryFingerprint) {
+  const baselineByKey = new Map(scopedBaselineUnits.map((entry) => [entry.privateKey, entry]));
+  const currentByKey = new Map(currentSnapshot.units.map((unit) => [unit.privateKey, unit]));
+  if (currentSnapshot.inventoryFingerprint !== baseline.inventoryFingerprint) {
     increment(report.stops, "inventory_drift");
     throw new GlobalBenefitCategoryRepairParityError("The complete repair inventory changed.");
   }
@@ -782,12 +1057,23 @@ export function verifyGlobalBenefitCategoryRepairParity(input: {
     increment(report.stops, baselineByKey.size > currentByKey.size ? "unit_missing" : "unit_unexpected");
     throw new GlobalBenefitCategoryRepairParityError("The complete repair inventory changed.");
   }
-  const entries = expectedManifestEntries(bundle);
-  const manifestFingerprints = new Map(bundle.pages.flatMap((page) =>
+  let allCurrentUnits: readonly CategoryRepairUnitSnapshot[];
+  try {
+    allCurrentUnits = validateCurrentAllUnits(currentSnapshot);
+  } catch {
+    increment(report.stops, "aggregate_mismatch");
+    throw new GlobalBenefitCategoryRepairParityError("The current parity snapshot is invalid.");
+  }
+  const allPageAuthorities = bundle.pages.map(pageAuthorityFromManifest);
+  const entries = expectedManifestEntries(bundle, scope);
+  const scopedPages = scope === null ? bundle.pages : [bundle.pages[scope.pageIndex]];
+  const manifestFingerprints = new Map(scopedPages.flatMap((page) =>
     page.entries.map((entry) => [entry.privateKey, page.manifestFingerprint] as const)));
   let authority = true;
   let protectedState = true;
   let observedRemoved = 0;
+  let observedRepairs = 0;
+  let observedOccurrences = 0;
   let appliedValid = 0;
   for (const [privateKey, baselineUnit] of Array.from(baselineByKey.entries())) {
     const current = currentByKey.get(privateKey)!;
@@ -809,16 +1095,43 @@ export function verifyGlobalBenefitCategoryRepairParity(input: {
       authority &&= result.authority;
       protectedState &&= result.protectedState;
       observedRemoved += result.removed;
+      if (baselineUnit.unit.repairEvidence === null && current.repairEvidence?.phase === "APPLIED") {
+        observedRepairs += 1;
+        observedOccurrences += current.repairEvidence.occurrences.length;
+      }
       if (result.duplicate) increment(report.stops, "duplicate_effective_authority");
       if (!result.authority) increment(report.stops, "repair_evidence_invalid");
       if (!result.protectedState) increment(report.stops, "keeper_state_changed");
       if (result.authority && result.protectedState && !result.duplicate) appliedValid += 1;
     } else {
-      const currentProposal = planGlobalBenefitCategoryRepairUnit(current, "discover");
+      const pageAuthority = pageAuthorities.get(privateKey);
+      let comparisonUnit = current;
+      let siblingNormalizationFailed = pageAuthority === undefined;
+      if (pageAuthority !== undefined) {
+        const siblingAuthority: CategoryRepairReviewedAuthorityContext = {
+          mode: "apply",
+          inventoryFingerprint: baseline.inventoryFingerprint,
+          manifestFingerprint: pageAuthority.manifestFingerprint,
+          pageFingerprint: pageAuthority.pageFingerprint,
+          afterCursor: pageAuthority.afterCursor,
+          nextCursor: pageAuthority.nextCursor,
+          hasMore: pageAuthority.hasMore,
+          manifestEntryFingerprints: pageAuthority.manifestEntryFingerprints,
+          manifestAuthorities: manifestAuthoritiesForSiblingNormalization(allPageAuthorities),
+        };
+        try {
+          comparisonUnit = normalizeCategoryRepairSiblingEffects(current, allCurrentUnits, siblingAuthority);
+          siblingNormalizationFailed = false;
+        } catch {
+          siblingNormalizationFailed = true;
+        }
+      }
+      const currentProposal = planGlobalBenefitCategoryRepairUnit(comparisonUnit, "discover");
       if (!currentProposal.blocked
         || currentProposal.stopReasons.join("|") !== baselineUnit.proposal.stopReasons.join("|")
         || currentProposal.currentGraphFingerprint !== baselineUnit.proposal.currentGraphFingerprint
-        || migrationFingerprint(current.repairEvidence) !== migrationFingerprint(baselineUnit.unit.repairEvidence)) {
+        || migrationFingerprint(comparisonUnit.repairEvidence) !== migrationFingerprint(baselineUnit.unit.repairEvidence)
+        || siblingNormalizationFailed) {
         protectedState = false;
         increment(report.stops, "blocked_unit_changed");
       } else {
@@ -832,17 +1145,28 @@ export function verifyGlobalBenefitCategoryRepairParity(input: {
   report.actions.expectedRemovedStatuses = report.counts.expectedRemovedStatuses;
   report.actions.observedRemovedStatuses = observedRemoved;
   report.actions.expectedAddedRepairs = report.counts.expectedAddedRepairs;
-  report.actions.observedAddedRepairs = currentAggregate.counts.repairs - baseline.aggregate.counts.repairs;
+  report.actions.observedAddedRepairs = observedRepairs;
   report.actions.expectedAddedOccurrences = report.counts.expectedAddedOccurrences;
-  report.actions.observedAddedOccurrences = currentAggregate.counts.occurrences - baseline.aggregate.counts.occurrences;
-  const countCheck = compareTableCounts(baseline.aggregate, currentAggregate, report.counts);
-  report.gates.allowedDelta = countCheck.ok && observedRemoved === report.counts.expectedRemovedStatuses;
+  report.actions.observedAddedOccurrences = observedOccurrences;
+  // Aggregate counts use the capture scope.  For a complete global baseline,
+  // a selected page is still verified against the complete manifest-authorized
+  // delta so effects already committed on other reviewed pages are allowed.
+  const aggregateExpected = baseline.scope === null && scope !== null
+    ? expectedCounts(baseline.units, bundle, null)
+    : report.counts;
+  const countCheck = compareTableCounts(baseline.aggregate, currentAggregate, aggregateExpected);
+  const selectedActionCheck = observedRemoved === report.counts.expectedRemovedStatuses
+    && observedRepairs === report.counts.expectedAddedRepairs
+    && observedOccurrences === report.counts.expectedAddedOccurrences;
+  report.gates.allowedDelta = countCheck.ok && selectedActionCheck;
   if (!report.gates.allowedDelta) increment(report.stops, "allowed_delta_mismatch");
   report.gates.unrelatedRows = baseline.aggregate.unrelatedRowsDigest === currentAggregate.unrelatedRowsDigest;
   if (!report.gates.unrelatedRows) increment(report.stops, "unrelated_rows_changed");
   if (!report.gates.repairAuthority) increment(report.stops, "canonical_authority_invalid");
   if (Object.values(report.gates).some((value) => !value)) {
-    throw new GlobalBenefitCategoryRepairParityError("Category-repair parity verification failed safely.");
+    throw new GlobalBenefitCategoryRepairParityVerificationError(
+      aggregateGlobalBenefitCategoryRepairParityReport(report),
+    );
   }
   report.counts.idempotent = report.counts.eligible;
   return report;
@@ -850,7 +1174,7 @@ export function verifyGlobalBenefitCategoryRepairParity(input: {
 
 export function aggregateGlobalBenefitCategoryRepairParityReport(
   report: CategoryRepairParityReport,
-): Pick<CategoryRepairParityReport, "mode" | "gates" | "counts" | "actions" | "stops"> {
+): CategoryRepairParityAggregateReport {
   return {
     mode: report.mode,
     gates: report.gates,
@@ -866,6 +1190,7 @@ export function captureGlobalBenefitCategoryRepairParityReport(
   const counts = expectedCounts(
     baseline.units,
     validateGlobalBenefitCategoryRepairParityManifests(baseline.manifests),
+    baseline.scope,
   );
   return {
     mode: "capture",
@@ -895,5 +1220,19 @@ export function captureGlobalBenefitCategoryRepairParityReport(
 export function parityScopeFromBaseline(
   baseline: GlobalBenefitCategoryRepairParityBaseline,
 ): CategoryRepairParityScope {
-  return unitScope(baseline.units);
+  // Preserve the global baseline's historical sibling exclusion. A selected
+  // page intentionally leaves off-page siblings in the unrelated digest.
+  return unitScope(baseline.units, baseline.scope === null);
+}
+
+/** Build the database aggregate exclusion scope for a freshly captured page. */
+export function parityScopeFromUnits(
+  units: readonly CategoryRepairUnitSnapshot[],
+  includeSiblingSources = true,
+): CategoryRepairParityScope {
+  return unitScope(units.map((unit) => ({
+    privateKey: unit.privateKey,
+    unit,
+    proposal: planGlobalBenefitCategoryRepairUnit(unit, "discover"),
+  })), includeSiblingSources);
 }
