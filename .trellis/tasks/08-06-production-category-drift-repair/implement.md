@@ -27,10 +27,22 @@ python3 ./.trellis/scripts/get_context.py --mode packages
 git diff --check
 ```
 
-Section 1 evidence: focused parity tests (7 passed) plus Prisma adapter parity
+Section 1 evidence: focused parity tests (11 passed) plus Prisma adapter parity
 regressions (2 passed), affected category-repair tests (119 passed), strict
 TypeScript (passed), changed-source ESLint (passed), public DB invariant (passed),
 package context (passed), and `git diff --check` (passed).
+
+The parity boundary now accepts an optional private `--scope-manifest` selector,
+but always validates the complete ordered manifest bundle first. A selected page
+is bound by its bundle index and page/manifest fingerprints; selectors outside the
+bundle, duplicate selectors, incomplete bundles, cross-page snapshots, and a
+page-scoped baseline verified with a different page are rejected before any
+database adapter read. Page baselines persist their scope authority. Aggregate
+counts retain complete-table semantics for immutable baseline compatibility, while
+the unrelated digest excludes the baseline's reviewed mutable graph. After a
+cumulative rollout, a selected page may be verified from the original complete
+baseline: page actions/state remain page-specific while other exact bundle-covered
+page deltas are allowed and unmanifested rows remain unrelated.
 
 The parity adapter reads the complete graph and table aggregates inside one
 repeatable-read transaction. It returns only counts and database-side digests;
@@ -97,23 +109,39 @@ table, schema divergence, or Prisma dotenv interaction.
 
 ## 4. Release the schema-dependent application
 
-- [ ] Release only the reviewed category-repair application revision after section 3 passes.
-- [ ] Require the immutable deployment to reach Ready.
-- [ ] Inspect the immutable deployment and primary alias; require exact deployment-ID equality.
-- [ ] Verify anonymous public availability and one narrow authenticated repair-table-backed read.
-- [ ] Reconfirm AMEX remains effectively `off` after the release.
+- [x] Release only the reviewed category-repair application revision after section 3 passes.
+- [x] Require the immutable deployment to reach Ready.
+- [x] Inspect the immutable deployment and primary alias; require exact deployment-ID equality.
+- [x] Verify anonymous public availability and one narrow authenticated repair-table-backed read.
+- [x] Reconfirm AMEX remains effectively `off` after the release.
+
+Application release evidence (2026-08-06): the reviewed hardened repair and parity
+revision passed both Vercel project checks in pull request #15 and merged to `main`.
+The exact merge deployment reached Ready, and the primary alias independently
+resolved to the same deployment ID. Three anonymous public routes returned HTTP
+200. A fresh signed-in dashboard reload displayed account data with no missing-table
+or loading failure. The authenticated handoff page's server-rendered runtime props
+serialized exact initial mode `off`, with neither `preview` nor `write`, proving the
+new primary-alias deployment retained the production hold without requiring cookie
+or secret extraction.
 
 **Stop:** deployment/alias mismatch, authenticated read failure, public regression,
 unexpected mode, or request-path database error.
 
 ## 5. Capture parity baseline and discover all eligible accounts twice
 
-- [ ] Run discovery pass A across every bounded page until `hasMore = false`, using a unique private `0600` manifest per page.
-- [ ] Run discovery pass B independently with new private paths and the same page size.
-- [ ] Privately compare page boundaries, inventory/manifest/page authority, entries, and digests; retain only sanitized aggregate count equality.
-- [ ] Review every blocked reason and verify blocked/ineligible units will receive no write.
-- [ ] Confirm the complete safely eligible inventory across all accounts is covered; do not stop after the requesting account or first page.
-- [ ] Run the new parity verifier in `capture` mode against the reviewed complete inventory and pass-A manifests, writing a new private `0600` baseline file.
+- [x] Run discovery pass A across every bounded page until `hasMore = false`, using a unique private `0600` manifest per page.
+- [x] Run discovery pass B independently with new private paths and the same page size.
+- [x] Privately compare page boundaries, inventory/manifest/page authority, entries, and digests; retain only sanitized aggregate count equality.
+- [x] Review every blocked reason and verify blocked/ineligible units will receive no write.
+- [x] Confirm the complete safely eligible inventory across all accounts is covered; do not stop after the requesting account or first page.
+- [x] Run the new parity verifier in `capture` mode against the reviewed complete inventory and pass-A manifests, writing a new private `0600` baseline file.
+
+Discovery evidence (2026-08-06): two complete all-account passes were byte-identical
+across two bounded pages. They examined 806 definitions, authorized 502 eligible
+definitions, left 304 blocked definitions unchanged, planned 1,877 occurrence
+actions, and expected 575 redundant status removals. The complete private manifest
+bundle and global/page baselines remain in `0600` operator storage outside Git.
 
 **Stop:** non-determinism, missing page, manifest overwrite/permission failure, private
 data leakage, new ambiguity, or any authority mismatch.
@@ -122,32 +150,66 @@ data leakage, new ambiguity, or any authority mismatch.
 
 For each page, in order:
 
-- [ ] Reverify target identity, recovery point, primary-alias deployment identity, and effective AMEX `off`.
-- [ ] Supply the exact private manifest plus reviewed inventory/manifest/page fingerprints and exact apply confirmation phrase.
-- [ ] Apply the page; allow only manifest-covered safe units and closed stops.
-- [ ] Replay the same page in apply mode and require every previously applied unit to report idempotent with no rewrite.
-- [ ] Run parity `verify` for the page and cumulative baseline; require exact allowed deltas and identical unrelated-row digests.
-- [ ] Record only aggregate examined/proposed/blocked/action/applied/idempotent counts and boolean gates.
+- [x] Reverify target identity, recovery point, primary-alias deployment identity, and effective AMEX `off`.
+- [x] Supply the exact private manifest plus reviewed inventory/manifest/page fingerprints and exact apply confirmation phrase.
+- [x] Apply the page; allow only manifest-covered safe units and closed stops.
+- [x] Replay the same page in apply mode and require every previously applied unit to report idempotent with no rewrite.
+- [x] Run parity `verify` for the page and cumulative baseline; require exact allowed deltas and identical unrelated-row digests.
+- [x] Record only aggregate examined/proposed/blocked/action/applied/idempotent counts and boolean gates.
+
+Apply evidence (2026-08-06): page 1 applied 336 eligible definitions after a
+fail-closed four-unit partial stop was resolved by reviewed forward fixes; resume
+applied the remaining 332, replayed the first four idempotently, and a complete
+page replay was idempotent. Page 2 applied 166 eligible definitions and its
+complete replay was idempotent. No rollback or compensating write ran. All 304
+blocked definitions remained outside write authority.
+
+Final scoped parity reruns against the original complete pre-repair baseline also
+passed after the cumulative rollout. Page 1 examined 500 definitions, proved 336
+eligible/idempotent and 164 blocked unchanged, with exact 379 removals, 336 parent
+repairs, and 1,186 occurrences. Page 2 examined 306 definitions, proved 166
+eligible/idempotent and 140 blocked unchanged, with exact 196 removals, 166 parent
+repairs, and 691 occurrences. Every page gate was true and both stop sets were empty.
 
 Do not continue to the next page after any graph, state, CAS, provenance, catalog,
 postimage, target, recovery, mode, deployment, manifest, or parity mismatch.
 
 ## 7. Final production verification
 
-- [ ] Run complete aggregate parity verification over all reviewed pages.
-- [ ] Prove each applied unit is `APPLIED_VALID`, duplicate suppression is exact, and one canonical effective status remains per repaired occurrence.
-- [ ] Prove keeper identity/state/timestamps/audit/provenance preservation and exact evidence-backed loser deletion.
-- [ ] Prove blocked/ineligible units and all unrelated rows are unchanged.
-- [ ] Repeat complete apply replay and require only idempotent outcomes.
-- [ ] Verify a representative authenticated repaired dashboard, including the reported account when eligible, shows one canonical entry with preserved usage/history.
-- [ ] Reconfirm public availability and effective AMEX `off`.
+- [x] Run complete aggregate parity verification over all reviewed pages.
+- [x] Prove each applied unit is `APPLIED_VALID`, duplicate suppression is exact, and one canonical effective status remains per repaired occurrence.
+- [x] Prove keeper identity/state/timestamps/audit/provenance preservation and exact evidence-backed loser deletion.
+- [x] Prove blocked/ineligible units and all unrelated rows are unchanged.
+- [x] Repeat complete apply replay and require only idempotent outcomes.
+- [x] Verify a representative authenticated repaired dashboard, including the reported account when eligible, shows one canonical entry with preserved usage/history.
+- [x] Reconfirm public availability and effective AMEX `off`.
+
+Final evidence (2026-08-06): the complete global verifier passed every gate with
+806 definitions examined, 502 manifest entries eligible / `APPLIED_VALID` /
+idempotent, 304 blocked definitions unchanged, 575 expected and observed status
+removals, 502 expected and observed repair parents, 1,877 expected and observed
+occurrences, and no stops. Protected keeper state and unrelated-row digests were
+identical. Independent aggregate reads confirmed 502 `APPLIED`, zero
+`ROLLED_BACK`, and 1,877 occurrence rows. The reported Capital One Venture X
+dashboard now shows one canonical $300 annual travel-credit entry with the
+existing $150 partial-use history. Three public routes returned HTTP 200 and the
+authenticated handoff runtime serialized exact mode `off`, with neither
+`preview` nor `write`.
 
 ## 8. Evidence handling and deferred work
 
-- [ ] Store only sanitized aggregate/boolean results in the task record.
-- [ ] Keep manifests, cursors, fingerprints, baselines, target identities, URLs, IDs, and row data in approved private temporary storage outside Git/chat/output.
-- [ ] Retain the recovery point and private rollback evidence through the reviewed observation window.
-- [ ] Do not run strict legacy cleanup, delete repair evidence/preimages, scan a provider, confirm an AMEX proposal, or reactivate preview/write.
+- [x] Store only sanitized aggregate/boolean results in the task record.
+- [x] Keep manifests, cursors, fingerprints, baselines, target identities, URLs, IDs, and row data in approved private temporary storage outside Git/chat/output.
+- [x] Retain the recovery point and private rollback evidence through the reviewed observation window.
+- [x] Do not run strict legacy cleanup, delete repair evidence/preimages, scan a provider, confirm an AMEX proposal, or reactivate preview/write.
+
+Final quality gate: the complete Jest suite passed 80 suites with 763 passed and
+1 intentionally skipped test (764 total). The final focused parity/repair/adapter
+gate passed 104 tests. Strict TypeScript, changed-source ESLint, public-DB,
+card-template, AMEX-userscript, task JSON/JSONL, package-context, sensitive/artifact,
+Markdown-link, complete-diff, and `git diff --check` reviews passed. Build, Prisma
+generation/status/migration, cleanup, provider scan, and AMEX confirmation remained
+outside this final static gate.
 - [ ] If rollback is proposed, stop and obtain a new explicit approval after reviewed rollback-preview evidence.
 
 ## Completion gate

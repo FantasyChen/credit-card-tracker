@@ -3,6 +3,7 @@ import { Prisma, type PrismaClient } from "@/generated/prisma";
 import {
   GlobalBenefitCategoryRepairError,
   categoryRepairManifestEntryFingerprint,
+  encodeGlobalBenefitCategoryRepairCursor,
   planGlobalBenefitCategoryRepairUnit,
   type CategoryRepairAttachmentSnapshot,
   type CategoryRepairAuditPatch,
@@ -32,11 +33,24 @@ import {
 } from "./global-benefit-migration";
 import type {
   CategoryRepairParityAggregateState,
+  CategoryRepairParityManifestScope,
   CategoryRepairParityScope,
 } from "./global-benefit-category-repair-parity";
+import { parityScopeFromUnits } from "./global-benefit-category-repair-parity";
 
 type QueryClient = Pick<PrismaClient, "$queryRaw" | "$executeRaw">;
 type TransactionClient = QueryClient;
+
+/**
+ * Parity reads cover the complete repair graph and aggregate every relevant
+ * table in one repeatable-read snapshot. Keep that potentially expensive
+ * interactive transaction bounded independently from the process-wide Prisma
+ * default, while still allowing enough time for a reviewed production page.
+ */
+export const GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_TRANSACTION_TIMEOUT_MS = 120_000;
+const GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_TRANSACTION_MAX_WAIT_MS = 5_000;
+const CATEGORY_REPAIR_PARITY_TRANSACTION_TIMEOUT_MESSAGE =
+  "The category-repair parity transaction timed out safely.";
 
 interface PrivateKeyRow { privateKey: string }
 interface InventoryRow { inventoryFingerprint: string }
@@ -185,6 +199,12 @@ interface StoredKeeperBaseline {
 interface LoadedGraph {
   units: CategoryRepairUnitSnapshot[];
   ledgerIds: Map<string, string>;
+  /**
+   * All strict-custom sources on the loaded physical cards.  `units` remains
+   * page/request scoped; the wider view lets the writer verify and normalize
+   * only exact APPLIED sibling effects that belong to the same reviewed page.
+   */
+  allUnits: CategoryRepairUnitSnapshot[];
 }
 
 const NON_CATEGORY_FIELDS = [
@@ -249,6 +269,30 @@ function sanitized(error: unknown): GlobalBenefitCategoryRepairError {
   if (error instanceof GlobalBenefitCategoryRepairError) return error;
   void sqlText(error);
   return new GlobalBenefitCategoryRepairError("The category-repair database operation failed safely.");
+}
+
+function isParityTransactionTimeout(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const candidate = error as {
+    code?: unknown;
+    message?: unknown;
+    meta?: { error?: unknown };
+  };
+  if (candidate.code !== "P2028") return false;
+  const message = [
+    candidate.message,
+    candidate.meta?.error,
+  ].filter((value): value is string => typeof value === "string").join(" ");
+  if (message.length === 0) return false;
+  return /(?:timed?\s*out|timeout|expired|transaction\s+(?:already\s+)?(?:closed|not\s+found))/i
+    .test(message);
+}
+
+function sanitizedParity(error: unknown): GlobalBenefitCategoryRepairError {
+  if (isParityTransactionTimeout(error)) {
+    return new GlobalBenefitCategoryRepairError(CATEGORY_REPAIR_PARITY_TRANSACTION_TIMEOUT_MESSAGE);
+  }
+  return sanitized(error);
 }
 
 function emptyResult(): CategoryRepairWriteResult {
@@ -467,7 +511,7 @@ async function readGraphBySourceIds(
   client: QueryClient,
   requestedSourceIds: readonly string[],
 ): Promise<LoadedGraph> {
-  if (requestedSourceIds.length === 0) return { units: [], ledgerIds: new Map() };
+  if (requestedSourceIds.length === 0) return { units: [], ledgerIds: new Map(), allUnits: [] };
   const pageSources = await client.$queryRaw<PageSourceRow[]>(Prisma.sql`
     SELECT b."id", b."creditCardId"
     FROM "Benefit" b
@@ -677,18 +721,19 @@ async function readGraphBySourceIds(
   const definitionById = new Map(definitions.map((definition) => [definition.id, definition]));
   const repairBySource = new Map(repairs.map((repair) => [repair.legacyBenefitId, repair]));
   const sourceRowById = new Map(sources.map((source) => [source.id, source]));
-  const units = requestedSourceIds.map((sourceId): CategoryRepairUnitSnapshot => {
+  const allUnits = sources.map((sourceRow): CategoryRepairUnitSnapshot => {
+    const sourceId = sourceRow.id;
     const source = sourceSnapshots.get(sourceId);
-    const sourceRow = sourceRowById.get(sourceId);
-    if (!source || !sourceRow) {
+    const loadedSourceRow = sourceRowById.get(sourceId);
+    if (!source || !loadedSourceRow) {
       throw new GlobalBenefitCategoryRepairError("A repair source disappeared while its graph was assembled.");
     }
-    const card = cardById.get(sourceRow.creditCardId);
+    const card = cardById.get(loadedSourceRow.creditCardId);
     const definition = card ? definitionById.get(card.predefinedCardId) : undefined;
     if (!card || !definition) {
       throw new GlobalBenefitCategoryRepairError("A repair card or global product disappeared while its graph was assembled.");
     }
-    const target = relaxedDestination(sourceRow, definition);
+    const target = relaxedDestination(loadedSourceRow, definition);
     const repair = repairBySource.get(sourceId);
     return {
       privateKey: `repair:${sourceId}`,
@@ -704,7 +749,48 @@ async function readGraphBySourceIds(
       repairEvidence: repair ? repairEvidence(repair, occurrences) : null,
     };
   });
-  return { units, ledgerIds };
+  const requested = requestedSourceIds.map((sourceId) => {
+    const unit = allUnits.find((candidate) => candidate.source.id === sourceId);
+    if (!unit) {
+      throw new GlobalBenefitCategoryRepairError("A requested repair definition disappeared while its graph was assembled.");
+    }
+    return unit;
+  });
+  return {
+    units: requested,
+    ledgerIds,
+    // `validateCurrentAllUnits` requires deterministic private-key order;
+    // the SQL source query is card-ordered because it serves same-card graph
+    // loading, so normalize the private view before returning it.
+    allUnits: allUnits.sort((left, right) => left.privateKey.localeCompare(right.privateKey)),
+  };
+}
+
+function selectManifestPageKeys(
+  allKeys: readonly PrivateKeyRow[],
+  page: GlobalBenefitCategoryRepairManifest,
+): PrivateKeyRow[] {
+  const cursorIndex = (cursor: string | null): number | null => {
+    if (cursor === null) return null;
+    const index = allKeys.findIndex((row) =>
+      encodeGlobalBenefitCategoryRepairCursor(row.privateKey).slice("gbr1.".length) === cursor.slice("gbr1.".length));
+    if (index < 0) {
+      throw new GlobalBenefitCategoryRepairError("The private parity manifest cursor is not covered by the current inventory.");
+    }
+    return index;
+  };
+  const afterIndex = cursorIndex(page.afterCursor);
+  const nextIndex = cursorIndex(page.nextCursor);
+  if ((page.hasMore !== (page.nextCursor !== null))
+    || (afterIndex !== null && nextIndex !== null && afterIndex >= nextIndex)) {
+    throw new GlobalBenefitCategoryRepairError("The private parity manifest page chain is invalid.");
+  }
+  const start = afterIndex === null ? 0 : afterIndex + 1;
+  const end = nextIndex === null ? allKeys.length : nextIndex + 1;
+  if (start > end) {
+    throw new GlobalBenefitCategoryRepairError("The private parity manifest page chain is invalid.");
+  }
+  return allKeys.slice(start, end);
 }
 
 async function readOneUnit(client: QueryClient, privateKey: string): Promise<LoadedGraph> {
@@ -890,6 +976,11 @@ function validateWriterAuthority(input: {
   authority: CategoryRepairReviewedAuthorityContext;
 }): void {
   const { proposal, entry, authority } = input;
+  const manifestEntryFingerprints = authority.manifestEntryFingerprints;
+  const validEntryAuthorities = manifestEntryFingerprints === undefined
+    || (manifestEntryFingerprints.length > 0
+      && manifestEntryFingerprints.every((fingerprint) => /^[a-f0-9]{64}$/.test(fingerprint))
+      && new Set(manifestEntryFingerprints).size === manifestEntryFingerprints.length);
   if (authority.mode !== input.expectedMode
     || !/^[a-f0-9]{64}$/.test(authority.inventoryFingerprint)
     || !/^[a-f0-9]{64}$/.test(authority.manifestFingerprint)
@@ -905,6 +996,8 @@ function validateWriterAuthority(input: {
     || entry.targetBenefitCatalogKey !== proposal.targetBenefitCatalogKey
     || entry.definitionFingerprint !== proposal.definitionFingerprint
     || entry.immutableGraphFingerprint !== proposal.immutableGraphFingerprint
+    || !validEntryAuthorities
+    || (manifestEntryFingerprints !== undefined && !manifestEntryFingerprints.includes(entry.entryFingerprint))
     || (input.expectedMode === "apply" && (
       entry.currentGraphFingerprint !== proposal.currentGraphFingerprint
       || entry.destinationFingerprint !== proposal.destinationFingerprint
@@ -1234,6 +1327,313 @@ function snapshotFromPreimage(
   };
 }
 
+function sortedById<T extends { id: string }>(values: readonly T[]): T[] {
+  return [...values].sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function exactAppliedAuditBaseline(
+  status: CategoryRepairStatusSnapshot,
+  action: CategoryRepairStatusAction,
+): boolean {
+  const expectedAudits = action.keeperAuditBaseline.map((baseline) => {
+    const patch = action.repairAddedAuditMetadata.find((candidate) => candidate.auditId === baseline.id);
+    return patch ? {
+      ...baseline,
+      destinationPredefinedBenefitId: patch.after.destinationPredefinedBenefitId,
+      destinationDefinitionFingerprint: patch.after.destinationDefinitionFingerprint,
+    } : baseline;
+  });
+  const expectedProvenance = action.keeperProvenanceBaseline;
+  return migrationFingerprint(sortedById(status.audits)) === migrationFingerprint(sortedById(expectedAudits))
+    && migrationFingerprint(sortedById(status.provenance)) === migrationFingerprint(sortedById(expectedProvenance));
+}
+
+function exactAppliedKeeperState(
+  status: CategoryRepairStatusSnapshot,
+  action: CategoryRepairStatusAction,
+): boolean {
+  const expected = action.keeperSourceKind === "legacy"
+    ? {
+      ...action.keeperBaseline,
+      creditCardId: action.creditCardId,
+      predefinedBenefitId: action.predefinedBenefitId,
+    }
+    : action.keeperBaseline;
+  return migrationFingerprint(currentPreimage(status)) === migrationFingerprint(expected)
+    && exactAppliedAuditBaseline(status, action);
+}
+
+function allCurrentStatuses(
+  unit: CategoryRepairUnitSnapshot,
+): Map<string, CategoryRepairStatusSnapshot> | null {
+  const statuses = new Map<string, CategoryRepairStatusSnapshot>();
+  for (const status of [...unit.source.statuses, ...unit.destinationStatuses]) {
+    const existing = statuses.get(status.id);
+    if (existing && migrationFingerprint(existing) !== migrationFingerprint(status)) return null;
+    statuses.set(status.id, status);
+  }
+  return statuses;
+}
+
+function sourceAttachmentGraphIsExact(unit: CategoryRepairUnitSnapshot): boolean {
+  const source = unit.source;
+  const sourceStatusIds = new Set(source.statuses.map((status) => status.id));
+  const auditIds = new Set(source.audits.map((audit) => audit.id));
+  const provenanceIds = new Set(source.provenance.map((row) => row.id));
+  if (sourceStatusIds.size !== source.statuses.length
+    || auditIds.size !== source.audits.length
+    || provenanceIds.size !== source.provenance.length
+    || source.statuses.some((status) => status.userId !== unit.card.userId
+      || status.benefitId !== source.id)
+    || source.audits.some((audit) => audit.attemptUserId !== unit.card.userId
+      || (audit.destinationCardId !== null && audit.destinationCardId !== unit.card.id)
+      || (audit.destinationBenefitId !== null && audit.destinationBenefitId !== source.id)
+      || (audit.destinationStatusId !== null && !sourceStatusIds.has(audit.destinationStatusId)))
+    || source.provenance.some((row) => !sourceStatusIds.has(row.benefitStatusId)
+      || (row.attemptUserId !== null && row.attemptUserId !== unit.card.userId))) {
+    return false;
+  }
+  const attachedAuditIds = new Set(source.statuses.flatMap((status) => status.audits.map((audit) => audit.id)));
+  const attachedProvenanceIds = new Set(source.statuses.flatMap((status) => status.provenance.map((row) => row.id)));
+  if (attachedAuditIds.size !== source.audits.length
+    || Array.from(attachedAuditIds).some((id) => !auditIds.has(id))
+    || attachedProvenanceIds.size !== source.provenance.length
+    || Array.from(attachedProvenanceIds).some((id) => !provenanceIds.has(id))) return false;
+  return source.statuses.every((status) => {
+    const expectedAudits = source.audits.filter((audit) => audit.destinationStatusId === status.id);
+    const expectedProvenance = source.provenance.filter((row) => row.benefitStatusId === status.id);
+    return sameIds(status.audits.map((audit) => audit.id), expectedAudits.map((audit) => audit.id))
+      && status.audits.every((audit) => {
+        const relation = expectedAudits.find((candidate) => candidate.id === audit.id);
+        return relation !== undefined
+          && audit.ownerId === relation.attemptUserId
+          && audit.destinationCardId === relation.destinationCardId
+          && audit.destinationBenefitId === relation.destinationBenefitId
+          && audit.destinationStatusId === relation.destinationStatusId
+          && audit.destinationPredefinedBenefitId === relation.destinationPredefinedBenefitId
+          && audit.destinationDefinitionFingerprint === relation.destinationDefinitionFingerprint
+          && audit.stateFingerprint === relation.stateFingerprint;
+      })
+      && sameIds(status.provenance.map((row) => row.id), expectedProvenance.map((row) => row.id))
+      && status.provenance.every((row) => {
+        const relation = expectedProvenance.find((candidate) => candidate.id === row.id);
+        return relation !== undefined
+          && row.ownerId === relation.attemptUserId;
+      });
+  });
+}
+
+function sameIds(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((id, index) => id === sortedRight[index]);
+}
+
+function siblingEvidenceIsAuthorized(
+  sibling: CategoryRepairUnitSnapshot,
+  authority: CategoryRepairReviewedAuthorityContext,
+): boolean {
+  const evidence = sibling.repairEvidence;
+  if (!evidence || evidence.phase !== "APPLIED"
+    || evidence.inventoryFingerprint !== authority.inventoryFingerprint
+    || evidence.manifestFingerprint !== authority.manifestFingerprint
+    || authority.manifestEntryFingerprints === undefined
+    || !authority.manifestEntryFingerprints.includes(evidence.manifestEntryFingerprint)) {
+    return false;
+  }
+  const replay = planGlobalBenefitCategoryRepairUnit(sibling, "apply");
+  if (replay.blocked || replay.intent !== "APPLY_REPLAY") return false;
+  const statuses = allCurrentStatuses(sibling);
+  const keeperIds = new Set(evidence.occurrences.map((action) => action.keeperStatusId));
+  if (!statuses || statuses.size !== keeperIds.size
+    || Array.from(statuses.keys()).some((id) => !keeperIds.has(id))
+    || !sourceAttachmentGraphIsExact(sibling)) return false;
+  for (const action of evidence.occurrences) {
+    const keeper = findStatus(sibling, action.keeperStatusId);
+    if (!keeper || !exactAppliedKeeperState(keeper, action)) return false;
+    if (action.removedStatusId !== null && findStatus(sibling, action.removedStatusId) !== null) return false;
+  }
+  return true;
+}
+
+function normalizeSiblingRepairEffects(
+  unit: CategoryRepairUnitSnapshot,
+  allUnits: readonly CategoryRepairUnitSnapshot[],
+  authority: CategoryRepairReviewedAuthorityContext,
+): CategoryRepairUnitSnapshot {
+  const siblings = allUnits
+    .filter((candidate) => candidate.card.id === unit.card.id && candidate.source.id !== unit.source.id)
+    .filter((candidate) => candidate.repairEvidence !== null);
+  if (siblings.length === 0) return unit;
+  if (siblings.some((sibling) => !siblingEvidenceIsAuthorized(sibling, authority))) {
+    throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+  }
+
+  const statuses = new Map<string, CategoryRepairStatusSnapshot>();
+  const audits = new Map<string, LegacyAuditRelation>();
+  const provenance = new Map<string, LegacyProvenanceRelation>();
+  for (const candidate of allUnits.filter((entry) => entry.card.id === unit.card.id)) {
+    for (const status of candidate.destinationStatuses) {
+      const existing = statuses.get(status.id);
+      if (existing && migrationFingerprint(existing) !== migrationFingerprint(status)) {
+        throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+      }
+      statuses.set(status.id, status);
+      for (const audit of status.audits) {
+        const relation: LegacyAuditRelation = {
+          id: audit.id,
+          attemptUserId: audit.ownerId ?? "",
+          destinationCardId: audit.destinationCardId,
+          destinationBenefitId: audit.destinationBenefitId,
+          destinationPredefinedBenefitId: audit.destinationPredefinedBenefitId,
+          destinationStatusId: audit.destinationStatusId,
+          destinationDefinitionFingerprint: audit.destinationDefinitionFingerprint,
+          stateFingerprint: audit.stateFingerprint,
+        };
+        const existingAudit = audits.get(audit.id);
+        if (existingAudit && migrationFingerprint(existingAudit) !== migrationFingerprint(relation)) {
+          throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+        }
+        audits.set(audit.id, relation);
+      }
+      for (const row of status.provenance) {
+        const relation: LegacyProvenanceRelation = {
+          id: row.id,
+          benefitStatusId: status.id,
+          attemptUserId: row.ownerId,
+        };
+        const existingProvenance = provenance.get(row.id);
+        if (existingProvenance && migrationFingerprint(existingProvenance) !== migrationFingerprint(relation)) {
+          throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+        }
+        provenance.set(row.id, relation);
+      }
+    }
+    for (const source of candidate.cardStrictCustomSources) {
+      for (const status of source.statuses) {
+        const existing = statuses.get(status.id);
+        if (existing && migrationFingerprint(existing) !== migrationFingerprint(status)) {
+          throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+        }
+        statuses.set(status.id, status);
+      }
+      for (const audit of source.audits) {
+        const existing = audits.get(audit.id);
+        if (existing && migrationFingerprint(existing) !== migrationFingerprint(audit)) {
+          throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+        }
+        audits.set(audit.id, audit);
+      }
+      for (const row of source.provenance) {
+        const existing = provenance.get(row.id);
+        if (existing && migrationFingerprint(existing) !== migrationFingerprint(row)) {
+          throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+        }
+        provenance.set(row.id, row);
+      }
+    }
+  }
+
+  for (const sibling of siblings) {
+    const evidence = sibling.repairEvidence!;
+    for (const action of evidence.occurrences) {
+      const keeper = statuses.get(action.keeperStatusId);
+      if (!keeper || !exactAppliedKeeperState(keeper, action)) {
+        throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+      }
+      statuses.set(action.keeperStatusId, snapshotFromPreimage(
+        action.keeperBaseline,
+        action.keeperAuditBaseline,
+        action.keeperProvenanceBaseline,
+      ));
+      if (action.removedStatusId !== null && action.removedPreimage !== null) {
+        if (statuses.has(action.removedStatusId)) {
+          throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+        }
+        statuses.set(action.removedStatusId, snapshotFromPreimage(action.removedPreimage));
+      }
+      for (const patch of action.repairAddedAuditMetadata) {
+        const audit = audits.get(patch.auditId);
+        if (!audit
+          || audit.destinationCardId !== patch.destinationCardId
+          || audit.destinationBenefitId !== patch.destinationBenefitId
+          || audit.destinationStatusId !== patch.destinationStatusId
+          || audit.destinationPredefinedBenefitId !== patch.after.destinationPredefinedBenefitId
+          || audit.destinationDefinitionFingerprint !== patch.after.destinationDefinitionFingerprint
+          || audit.stateFingerprint !== patch.after.stateFingerprint) {
+          throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+        }
+        audits.set(patch.auditId, {
+          ...audit,
+          destinationPredefinedBenefitId: patch.before.destinationPredefinedBenefitId,
+          destinationDefinitionFingerprint: patch.before.destinationDefinitionFingerprint,
+        });
+      }
+    }
+  }
+
+  const statusSnapshot = (status: CategoryRepairStatusSnapshot): CategoryRepairStatusSnapshot => ({
+    ...status,
+    audits: status.audits.map((audit) => {
+      const relation = audits.get(audit.id);
+      if (!relation) throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+      return {
+        ...audit,
+        ownerId: relation.attemptUserId,
+        destinationCardId: relation.destinationCardId,
+        destinationBenefitId: relation.destinationBenefitId,
+        destinationStatusId: relation.destinationStatusId,
+        destinationPredefinedBenefitId: relation.destinationPredefinedBenefitId,
+        destinationDefinitionFingerprint: relation.destinationDefinitionFingerprint,
+      };
+    }),
+    provenance: status.provenance.map((attachment) => {
+      const relation = provenance.get(attachment.id);
+      if (!relation) throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+      return { ...attachment, ownerId: relation.attemptUserId };
+    }),
+  });
+
+  const rebuiltSources = new Map<string, CategoryRepairLegacyBenefitSnapshot>();
+  for (const candidate of allUnits.filter((entry) => entry.card.id === unit.card.id)) {
+    for (const source of candidate.cardStrictCustomSources) {
+      if (rebuiltSources.has(source.id)) continue;
+      const sourceStatuses = sortedById(Array.from(statuses.values()).filter((status) => status.benefitId === source.id))
+        .map(statusSnapshot);
+      const sourceStatusIds = new Set(sourceStatuses.map((status) => status.id));
+      rebuiltSources.set(source.id, {
+        ...source,
+        statuses: sourceStatuses,
+        audits: sortedById(Array.from(audits.values()).filter((audit) =>
+          audit.destinationBenefitId === source.id
+          || (audit.destinationStatusId !== null && sourceStatusIds.has(audit.destinationStatusId)))),
+        provenance: sortedById(Array.from(provenance.values()).filter((row) => sourceStatusIds.has(row.benefitStatusId))),
+      });
+    }
+  }
+
+  const rebuildUnit = (candidate: CategoryRepairUnitSnapshot): CategoryRepairUnitSnapshot => {
+    const source = rebuiltSources.get(candidate.source.id);
+    if (!source) throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
+    const targets = candidate.predefinedCard.benefits
+      .filter((definition) => definition.predefinedCardId === candidate.predefinedCard.id)
+      .filter((definition) => NON_CATEGORY_FIELDS.every((field) => source[field] === definition[field]));
+    const target = targets.length === 1 ? targets[0] : null;
+    const destinationStatuses = target === null ? [] : sortedById(Array.from(statuses.values())
+      .filter((status) => status.creditCardId === candidate.card.id && status.predefinedBenefitId === target.id))
+      .map(statusSnapshot);
+    return {
+      ...candidate,
+      source,
+      destinationStatuses,
+      cardStrictCustomSources: Array.from(rebuiltSources.values())
+        .filter((sourceSnapshot) => sourceSnapshot.creditCardId === candidate.card.id),
+    };
+  };
+  return rebuildUnit(unit);
+}
+
 function reviewedGraphStillMatches(
   unit: CategoryRepairUnitSnapshot,
   evidence: CategoryRepairEvidenceSnapshot,
@@ -1455,6 +1855,7 @@ implements GlobalBenefitCategoryRepairDatabase {
     targetVerified?: boolean;
     manifests: readonly GlobalBenefitCategoryRepairManifest[];
     scope: CategoryRepairParityScope | null;
+    manifestScope?: CategoryRepairParityManifestScope | null;
   }): Promise<{
     snapshot: CategoryRepairBatchSnapshot;
     aggregate: CategoryRepairParityAggregateState;
@@ -1462,12 +1863,20 @@ implements GlobalBenefitCategoryRepairDatabase {
     if (input.targetVerified !== true) {
       throw new GlobalBenefitCategoryRepairError("Category-repair parity requires target verification.");
     }
+    if (input.manifestScope !== undefined && input.manifestScope !== null) {
+      const page = input.manifests[input.manifestScope.pageIndex];
+      if (!page
+        || page.pageFingerprint !== input.manifestScope.pageFingerprint
+        || page.manifestFingerprint !== input.manifestScope.manifestFingerprint) {
+        throw new GlobalBenefitCategoryRepairError("The private parity page selector is outside the manifest bundle.");
+      }
+    }
     try {
       const readSnapshot = async (client: QueryClient): Promise<{
         snapshot: CategoryRepairBatchSnapshot;
         aggregate: CategoryRepairParityAggregateState;
       }> => {
-        const keys = await client.$queryRaw<PrivateKeyRow[]>(Prisma.sql`
+        const completeKeys = await client.$queryRaw<PrivateKeyRow[]>(Prisma.sql`
         SELECT ('repair:' || l."legacyBenefitId")::text AS "privateKey"
         FROM "CatalogMigrationLedger" l
         JOIN "Benefit" b ON b."id" = l."legacyBenefitId"
@@ -1476,30 +1885,50 @@ implements GlobalBenefitCategoryRepairDatabase {
           AND c."predefinedCardId" IS NOT NULL
         ORDER BY "privateKey" ASC
       `);
+        const keys = input.manifestScope === undefined || input.manifestScope === null
+          ? completeKeys
+          : selectManifestPageKeys(completeKeys, input.manifests[input.manifestScope.pageIndex]);
         const sourceIds = keys.map((row) => row.privateKey.slice("repair:".length));
         const graph = await readGraphBySourceIds(client, sourceIds);
-        const manifestKeys = input.manifests.flatMap((manifest) => manifest.entries.map((entry) => entry.privateKey));
+        const manifestKeys = (input.manifestScope === undefined || input.manifestScope === null
+          ? input.manifests
+          : [input.manifests[input.manifestScope.pageIndex]])
+          .flatMap((manifest) => manifest.entries.map((entry) => entry.privateKey));
         const graphKeys = new Set(graph.units.map((unit) => unit.privateKey));
         if (manifestKeys.some((key) => !graphKeys.has(key))) {
           throw new GlobalBenefitCategoryRepairError("The private parity manifest is not covered by the current inventory.");
         }
         const inventoryFingerprint = await readInventoryFingerprint(client);
-        const emptyScope: CategoryRepairParityScope = {
-          sourceBenefitIds: [], ownerIds: [], cardIds: [], predefinedCardIds: [],
-          predefinedBenefitIds: [], statusIds: [], auditIds: [], provenanceIds: [], ledgerIds: [], repairIds: [],
-        };
-        const aggregate = await readCategoryRepairParityAggregate(client, input.scope ?? emptyScope);
+        const aggregate = await readCategoryRepairParityAggregate(
+          client,
+          input.scope ?? parityScopeFromUnits(
+            graph.units,
+            input.manifestScope === undefined || input.manifestScope === null,
+          ),
+        );
         return {
-          snapshot: { units: graph.units, hasMore: false, inventoryFingerprint },
+          // Keep the selected page in `units`, but retain the complete
+          // same-card source graph privately so parity can reverse exact
+          // APPLIED sibling effects when a card spans multiple pages.
+          snapshot: {
+            units: graph.units,
+            allUnits: graph.allUnits,
+            hasMore: false,
+            inventoryFingerprint,
+          },
           aggregate,
         };
       };
       return await this.client.$transaction(
         (transaction) => readSnapshot(transaction as unknown as QueryClient),
-        { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+        {
+          maxWait: GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_TRANSACTION_MAX_WAIT_MS,
+          timeout: GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_TRANSACTION_TIMEOUT_MS,
+          isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+        },
       );
     } catch (error) {
-      throw sanitized(error);
+      throw sanitizedParity(error);
     }
   }
 
@@ -1514,7 +1943,7 @@ implements GlobalBenefitCategoryRepairDatabase {
         readInventoryFingerprint(this.client),
       ]);
       const graph = await readGraphBySourceIds(this.client, page.sourceIds);
-      return { units: graph.units, hasMore: page.hasMore, inventoryFingerprint };
+      return { units: graph.units, allUnits: graph.allUnits, hasMore: page.hasMore, inventoryFingerprint };
     } catch (error) {
       throw sanitized(error);
     }
@@ -1530,7 +1959,7 @@ implements GlobalBenefitCategoryRepairDatabase {
       return await this.client.$transaction(async (transaction) => {
         const tx = transaction as unknown as TransactionClient;
         const graph = await readOneUnit(tx, proposal.privateKey);
-        const unit = graph.units[0];
+        const unit = normalizeSiblingRepairEffects(graph.units[0], graph.allUnits, authority);
         const current = planGlobalBenefitCategoryRepairUnit(unit, "apply");
         if (!proposalsExactlyEqual(current, proposal)) {
           throw new GlobalBenefitCategoryRepairError("The repair graph changed; review a new page.");
