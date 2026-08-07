@@ -328,3 +328,31 @@ Applied and verified all-account category repair: 502 valid repairs, 304 blocked
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: Architecture cleanup and module deepening
+
+**Date**: 2026-08-07
+**Task**: Architecture cleanup and module deepening
+**Branch**: `codex/architecture-cleanup`
+
+### Summary
+
+Consolidated domain and project docs, removed orphan code/assets/dependencies, collapsed legacy subscription policy, deepened dashboard/home projections, retired superseded catalog migrations, moved AMEX identity and matching policy into a neutral module, and passed the full safe verification suite.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `06f4b65` | (see git log) |
+| `6e2ef1f` | (see git log) |
+| `afef8ac` | (see git log) |
+| `3f95707` | (see git log) |
+| `02deb43` | (see git log) |
+| `a0ed391` | (see git log) |
+| `47a3764` | (see git log) |
+| `a7e577a` | (see git log) |
+
+### Status
+
+[OK] **Completed**
