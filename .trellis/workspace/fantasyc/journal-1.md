@@ -307,3 +307,24 @@ Restored production with a schema-compatible rollback, hardened migration-first 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 10: Complete production category-drift repair
+
+**Date**: 2026-08-06
+**Task**: Complete production category-drift repair
+**Branch**: `codex/category-repair-safe-rollout`
+
+### Summary
+
+Applied and verified all-account category repair: 502 valid repairs, 304 blocked unchanged, exact parity and preserved dashboard history; merged PR #16, verified Ready live deployment, and kept AMEX off.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b7c2a0b` | (see git log) |
+
+### Status
+
+[OK] **Completed**
