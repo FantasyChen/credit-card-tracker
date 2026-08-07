@@ -10,7 +10,7 @@ import {
   type CatalogBackfillExecutionReport,
   type CatalogBackfillTemplateCardShape,
 } from "./catalog-backfill";
-import { AMEX_CATALOG_IDENTITY_REGISTRY } from "./catalog-registry";
+import { AMEX_CATALOG_IDENTITY_REGISTRY } from "@/lib/amex-catalog/catalog-registry";
 
 export { AMEX_CATALOG_BACKFILL_SUPERSEDED_ERROR } from "./catalog-backfill";
 export const AMEX_CATALOG_BACKFILL_APPLY_CONFIRMATION =

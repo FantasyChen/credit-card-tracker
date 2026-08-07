@@ -2,7 +2,7 @@ import {
   AMEX_CATALOG_IDENTITY_REGISTRY,
   AMEX_PERIOD_KEYS,
   type AmexSourceSemantics,
-} from "../amex-sync/catalog-registry";
+} from "../amex-catalog/catalog-registry";
 import type { StaticPredefinedBenefit, StaticPredefinedCard } from "../static-catalog";
 
 const CATALOG_KEY_PATTERN = /^(?:card|benefit):[a-z0-9]+(?:[a-z0-9-]*)(?::[a-z0-9]+(?:[a-z0-9-]*))*$/;

@@ -3,7 +3,7 @@ import { Prisma, PrismaClient } from "@/generated/prisma";
 import {
   AMEX_CATALOG_IDENTITY_REGISTRY,
   type AmexCatalogBenefitIdentity,
-} from "@/lib/amex-sync/catalog-registry";
+} from "@/lib/amex-catalog/catalog-registry";
 import {
   resolveAmexGlobalDefinitionAuthority,
   type DestinationPredefinedBenefitSnapshot,
