@@ -5,14 +5,9 @@ import { redirect } from 'next/navigation';
 import BenefitsDisplayClient from '@/components/BenefitsDisplayClient';
 import { Metadata } from 'next';
 import {
-  buildBenefitDashboardProjection,
+  loadBenefitDashboard,
   type DisplayBenefitStatus,
 } from '@/lib/benefit-dashboard';
-import {
-  fetchDashboardBenefitStatuses,
-  fetchRelevantUsageWays,
-} from '@/lib/benefit-dashboard-data';
-import { fetchEffectiveCardTerms } from '@/lib/effective-benefit';
 
 export const metadata: Metadata = {
   title: "Benefits Dashboard - Track All Your Credit Card Benefits",
@@ -37,49 +32,7 @@ export default async function BenefitsDashboardPage() {
     redirect('/api/auth/signin?callbackUrl=/benefits');
   }
   const userId = session.user.id;
-  const now = new Date(); // Revert to actual system time
+  const dashboard = await loadBenefitDashboard(prisma, { userId, now: new Date() });
 
-  // Fetch source records, then let the dashboard projection module own display shaping.
-  const [storedUserCards, cardTerms, allStatusesRaw, notificationSettings] = await Promise.all([
-    prisma.creditCard.findMany({
-      where: { userId },
-    }),
-    fetchEffectiveCardTerms(prisma, userId),
-    fetchDashboardBenefitStatuses(prisma, userId, now),
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        notifyBenefitExpiration: true,
-        notifyExpirationDays: true,
-      },
-    }),
-  ]);
-
-  const termsByCardId = new Map(cardTerms.map((card) => [card.creditCardId, card]));
-  const userCards = storedUserCards.map((card) => {
-    const terms = termsByCardId.get(card.id);
-    return terms ? { ...card, name: terms.name, issuer: terms.issuer } : card;
-  });
-  const usageWays = await fetchRelevantUsageWays(prisma, allStatusesRaw);
-
-  const projection = buildBenefitDashboardProjection({
-    statuses: allStatusesRaw,
-    userCards,
-    usageWays,
-    predefinedCardFees: cardTerms.map((card) => ({
-      name: card.name,
-      annualFee: card.annualFee,
-    })),
-    now,
-  });
-
-  // --- Render Component ---
-  return (
-    <BenefitsDisplayClient
-      {...projection}
-      cardCount={userCards.length}
-      notifyBenefitExpiration={notificationSettings?.notifyBenefitExpiration ?? false}
-      notifyExpirationDays={notificationSettings?.notifyExpirationDays ?? 7}
-    />
-  );
+  return <BenefitsDisplayClient {...dashboard} />;
 }
