@@ -820,6 +820,101 @@ describe("bounded operator replay and rollback", () => {
     })).rejects.toThrow("page boundary changed");
   });
 
+  it("reconstructs a mixed apply page with APPLIED replay, fresh siblings, and an unmanifested blocked source", async () => {
+    const secondSource = sourceBenefit({
+      id: "legacy-benefit-2",
+      category: "Entertainment",
+      description: "Second exact terms",
+      statuses: [status("legacy", { id: "legacy-status-2", benefitId: "legacy-benefit-2" })],
+    });
+    const blockedSource = sourceBenefit({
+      id: "legacy-blocked",
+      userId: "owner-1",
+      category: "Blocked",
+      description: "Blocked terms",
+      statuses: [],
+    });
+    const catalog = predefinedCard([
+      definition(),
+      definition({ id: "global-benefit-2", catalogKey: "card:benefit-2", category: "Shopping", description: "Second exact terms" }),
+    ]);
+    const first = unit({ predefinedCard: catalog });
+    const second = unit({
+      privateKey: "repair:legacy-benefit-2",
+      predefinedCard: catalog,
+      source: secondSource,
+      destinationStatuses: [status("canonical", { id: "canonical-status-2", predefinedBenefitId: "global-benefit-2" })],
+    });
+    const blocked = unit({
+      privateKey: "repair:legacy-blocked",
+      predefinedCard: catalog,
+      source: blockedSource,
+      destinationStatuses: [],
+    });
+    const sources = [first.source, second.source, blocked.source];
+    const beforeUnits = [first, second, blocked].map((candidate) => ({
+      ...candidate,
+      cardStrictCustomSources: sources,
+    }));
+    const beforeSnapshot = snapshot(beforeUnits);
+    const reviewed = discoverGlobalBenefitCategoryRepairs(
+      beforeUnits,
+      beforeSnapshot.inventoryFingerprint,
+      "discover",
+    );
+    const manifest = buildGlobalBenefitCategoryRepairManifest(reviewed);
+    const firstProposal = reviewed.proposals.find((proposal) => proposal.sourceBenefitId === "legacy-benefit-1")!;
+    const appliedFirst = appliedUnit(first, firstProposal, manifest);
+    const currentSources = [appliedFirst.source, second.source, blocked.source];
+    const currentUnits = [appliedFirst, second, blocked].map((candidate) => ({
+      ...candidate,
+      cardStrictCustomSources: currentSources,
+    }));
+    const current = snapshot(currentUnits, {
+      inventoryFingerprint: beforeSnapshot.inventoryFingerprint,
+      allUnits: currentUnits,
+    });
+    const db = database(current);
+    (db.applyRepair as jest.Mock).mockImplementation(async (proposal: CategoryRepairProposal) =>
+      writeResult(proposal.intent === "APPLY_REPLAY" ? { idempotent: 1 } : { applied: 1 }));
+
+    const report = await runGlobalBenefitCategoryRepairOperator({
+      mode: "apply",
+      targetVerified: true,
+      recoveryPointVerified: true,
+      amexOffVerified: true,
+      confirmation: GLOBAL_BENEFIT_CATEGORY_REPAIR_APPLY_CONFIRMATION,
+      expectedInventoryFingerprint: manifest.inventoryFingerprint,
+      expectedManifestFingerprint: manifest.manifestFingerprint,
+      expectedPageFingerprint: manifest.pageFingerprint,
+      manifest,
+      database: db,
+    });
+
+    expect(report.pageFingerprint).toBe(manifest.pageFingerprint);
+    expect(report.counts).toMatchObject({ proposed: 2, blocked: 1, applied: 1, idempotent: 1 });
+    expect((db.applyRepair as jest.Mock).mock.calls.map(([proposal]) => proposal.intent))
+      .toEqual(["APPLY_REPLAY", "APPLY"]);
+    expect((db.applyRepair as jest.Mock).mock.calls.map(([proposal]) => proposal.sourceBenefitId))
+      .toEqual(["legacy-benefit-1", "legacy-benefit-2"]);
+
+    blockedSource.category = "Changed after review";
+    (db.applyRepair as jest.Mock).mockClear();
+    await expect(runGlobalBenefitCategoryRepairOperator({
+      mode: "apply",
+      targetVerified: true,
+      recoveryPointVerified: true,
+      amexOffVerified: true,
+      confirmation: GLOBAL_BENEFIT_CATEGORY_REPAIR_APPLY_CONFIRMATION,
+      expectedInventoryFingerprint: manifest.inventoryFingerprint,
+      expectedManifestFingerprint: manifest.manifestFingerprint,
+      expectedPageFingerprint: manifest.pageFingerprint,
+      manifest,
+      database: db,
+    })).rejects.toThrow("repair page changed");
+    expect(db.applyRepair).not.toHaveBeenCalled();
+  });
+
   it("passes immutable complete-inventory/page authority to the writer", async () => {
     const completeInventory = "e".repeat(64);
     const current = snapshot([unit()], { inventoryFingerprint: completeInventory });

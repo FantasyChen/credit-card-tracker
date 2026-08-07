@@ -6,9 +6,12 @@ import {
   captureGlobalBenefitCategoryRepairParityReport,
   aggregateGlobalBenefitCategoryRepairParityReport,
   GlobalBenefitCategoryRepairParityError,
+  GlobalBenefitCategoryRepairParityVerificationError,
   parseGlobalBenefitCategoryRepairParityBaseline,
   parityScopeFromBaseline,
+  type CategoryRepairParityManifestScope,
   validateGlobalBenefitCategoryRepairParityManifests,
+  validateGlobalBenefitCategoryRepairParityScope,
   verifyGlobalBenefitCategoryRepairParity,
   type CategoryRepairParityDatabase,
   type GlobalBenefitCategoryRepairParityMode,
@@ -18,6 +21,7 @@ interface ParsedArguments {
   mode: GlobalBenefitCategoryRepairParityMode;
   targetVerified: boolean;
   manifestPaths: string[];
+  scopeManifestPath?: string;
   baselinePath?: string;
   baselineOutputPath?: string;
 }
@@ -31,6 +35,7 @@ function parseArguments(args: readonly string[]): ParsedArguments {
   }
   if (args.some((arg) => !BOOLEAN_FLAGS.has(arg)
     && !arg.startsWith("--manifest=")
+    && !arg.startsWith("--scope-manifest=")
     && !arg.startsWith("--baseline=")
     && !arg.startsWith("--baseline-output="))) {
     throw new GlobalBenefitCategoryRepairParityError("An unsupported parity option was provided.");
@@ -46,6 +51,19 @@ function parseArguments(args: readonly string[]): ParsedArguments {
   }
   if (new Set(manifestPaths).size !== manifestPaths.length) {
     throw new GlobalBenefitCategoryRepairParityError("A parity manifest path was provided more than once.");
+  }
+  const scopePaths = args
+    .filter((arg) => arg.startsWith("--scope-manifest="))
+    .map((arg) => arg.slice("--scope-manifest=".length));
+  if (scopePaths.length > 1) {
+    throw new GlobalBenefitCategoryRepairParityError("A parity scope selector was provided more than once.");
+  }
+  const scopeManifestPath = scopePaths[0];
+  if (scopeManifestPath !== undefined && scopeManifestPath.length === 0) {
+    throw new GlobalBenefitCategoryRepairParityError("A parity scope selector has an empty value.");
+  }
+  if (scopeManifestPath !== undefined && !manifestPaths.includes(scopeManifestPath)) {
+    throw new GlobalBenefitCategoryRepairParityError("The parity scope selector must match one provided manifest path.");
   }
   const baselines = args.filter((arg) => arg.startsWith("--baseline="));
   const outputs = args.filter((arg) => arg.startsWith("--baseline-output="));
@@ -68,6 +86,7 @@ function parseArguments(args: readonly string[]): ParsedArguments {
     mode,
     targetVerified: args.includes("--target-verified"),
     manifestPaths,
+    scopeManifestPath,
     baselinePath,
     baselineOutputPath,
   };
@@ -142,20 +161,44 @@ async function main(): Promise<void> {
   }
   const manifestValues = await readManifests(parsed.manifestPaths);
   const manifestBundle = validateGlobalBenefitCategoryRepairParityManifests(manifestValues);
+  const scope: CategoryRepairParityManifestScope | null = parsed.scopeManifestPath === undefined
+    ? null
+    : (() => {
+      const pageIndex = parsed.manifestPaths.indexOf(parsed.scopeManifestPath!);
+      const page = manifestBundle.pages[pageIndex];
+      if (pageIndex < 0 || !page) {
+        throw new GlobalBenefitCategoryRepairParityError(
+          "The parity scope selector must match one provided manifest path.",
+        );
+      }
+      return {
+        pageIndex,
+        pageFingerprint: page.pageFingerprint,
+        manifestFingerprint: page.manifestFingerprint,
+      };
+    })();
+  const validatedScope = validateGlobalBenefitCategoryRepairParityScope(manifestBundle, scope);
   const loadedBaseline = parsed.mode === "verify"
     ? parseGlobalBenefitCategoryRepairParityBaseline(await readJson(parsed.baselinePath!))
     : null;
+  if (loadedBaseline
+    && loadedBaseline.scope !== null
+    && JSON.stringify(loadedBaseline.scope) !== JSON.stringify(validatedScope)) {
+    throw new GlobalBenefitCategoryRepairParityError("The private parity baseline scope does not match the selected manifest page.");
+  }
   const loaded = await loadDatabase();
   try {
     const state = await loaded.database.readParitySnapshot({
       targetVerified: parsed.targetVerified,
       manifests: manifestBundle.pages,
       scope: loadedBaseline ? parityScopeFromBaseline(loadedBaseline) : null,
+      manifestScope: validatedScope,
     });
     if (parsed.mode === "capture") {
       const baseline = captureGlobalBenefitCategoryRepairParityBaseline({
         targetVerified: parsed.targetVerified,
         manifests: manifestBundle.pages,
+        scope: validatedScope,
         snapshot: state.snapshot,
         aggregate: state.aggregate,
       });
@@ -169,6 +212,7 @@ async function main(): Promise<void> {
       targetVerified: parsed.targetVerified,
       baseline: loadedBaseline,
       manifests: manifestBundle.pages,
+      scope: validatedScope,
       snapshot: state.snapshot,
       aggregate: state.aggregate,
     });
@@ -178,14 +222,20 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirectExecution = process.argv[1]?.endsWith("verify-global-benefit-category-repair-parity.ts") === true;
-if (isDirectExecution) {
-  void main().catch((error: unknown) => {
+export function handleGlobalBenefitCategoryRepairParityFailure(error: unknown): void {
+  if (error instanceof GlobalBenefitCategoryRepairParityVerificationError) {
+    console.log(JSON.stringify(error.report, null, 2));
+  } else {
     console.error(error instanceof GlobalBenefitCategoryRepairParityError
       ? error.message
       : "The category-repair parity check failed safely.");
-    process.exitCode = 1;
-  });
+  }
+  process.exitCode = 1;
+}
+
+const isDirectExecution = process.argv[1]?.endsWith("verify-global-benefit-category-repair-parity.ts") === true;
+if (isDirectExecution) {
+  void main().catch(handleGlobalBenefitCategoryRepairParityFailure);
 }
 
 export { parseArguments as parseGlobalBenefitCategoryRepairParityArguments };
