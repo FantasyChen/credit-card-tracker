@@ -1,0 +1,29 @@
+{
+  "id": "finish-architecture-cleanup-delivery",
+  "name": "finish-architecture-cleanup-delivery",
+  "title": "Finish architecture cleanup delivery",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "fantasyc",
+  "assignee": "fantasyc",
+  "createdAt": "2026-08-07",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-07-publish-and-merge-architecture-cleanup",
+    "08-07-resolve-dependency-release-warnings"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
