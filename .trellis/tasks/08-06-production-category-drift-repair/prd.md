@@ -41,18 +41,18 @@ repair discovery or write has run.
 
 ## Acceptance Criteria
 
-- [ ] A fresh production recovery point and exact application/direct target identity are verified without exposing private values.
-- [ ] The additive repair migration is the only intended schema change, applies successfully, and independent status/table checks pass.
-- [ ] The reviewed application deployment is Ready and the primary alias resolves to the same deployment before repair-table access.
-- [ ] A reviewed parity verifier captures private pre-apply baselines and emits only closed aggregate/boolean results.
-- [ ] Two discovery passes produce identical bounded aggregate plans and private manifests with no leaked identities or fingerprints.
-- [ ] Every safely eligible manifest-covered unit across all production accounts is applied or idempotently replayed; no eligible page is silently omitted.
-- [ ] Every applied unit preserves its keeper status identity and exact protected/mutable user state while removing only the reviewed redundant occurrence.
-- [ ] Conflicting or ineligible units are reported as closed aggregate stops and receive no write.
-- [ ] Bounded apply replay is idempotent and post-repair aggregate parity reports no unexpected user, status, audit, provenance, or unrelated-row effect.
-- [ ] Authenticated dashboard verification shows one canonical entry with preserved usage/history for a representative repaired duplicate.
-- [ ] AMEX remains effectively `off`; cleanup/reactivation remain separately gated.
-- [ ] All operational results are recorded as sanitized aggregates and all private manifests/temporary credentials remain outside Git.
+- [x] A fresh production recovery point and exact application/direct target identity are verified without exposing private values.
+- [x] The additive repair migration is the only intended schema change, applies successfully, and independent status/table checks pass.
+- [x] The reviewed application deployment is Ready and the primary alias resolves to the same deployment before repair-table access.
+- [x] A reviewed parity verifier captures private pre-apply baselines and emits only closed aggregate/boolean results.
+- [x] Two discovery passes produce identical bounded aggregate plans and private manifests with no leaked identities or fingerprints.
+- [x] Every safely eligible manifest-covered unit across all production accounts is applied or idempotently replayed; no eligible page is silently omitted.
+- [x] Every applied unit preserves its keeper status identity and exact protected/mutable user state while removing only the reviewed redundant occurrence.
+- [x] Conflicting or ineligible units are reported as closed aggregate stops and receive no write.
+- [x] Bounded apply replay is idempotent and post-repair aggregate parity reports no unexpected user, status, audit, provenance, or unrelated-row effect.
+- [x] Authenticated dashboard verification shows one canonical entry with preserved usage/history for a representative repaired duplicate.
+- [x] AMEX remains effectively `off`; cleanup/reactivation remain separately gated.
+- [x] All operational results are recorded as sanitized aggregates and all private manifests/temporary credentials remain outside Git.
 
 ## Out of Scope
 

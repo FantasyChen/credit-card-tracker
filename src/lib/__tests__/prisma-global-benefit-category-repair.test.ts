@@ -9,7 +9,10 @@ import {
   type GlobalBenefitCategoryRepairManifest,
 } from "../global-benefit-category-repair";
 import { migrationFingerprint } from "../global-benefit-migration";
-import { PrismaGlobalBenefitCategoryRepairDatabase } from "../prisma-global-benefit-category-repair";
+import {
+  GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_TRANSACTION_TIMEOUT_MS,
+  PrismaGlobalBenefitCategoryRepairDatabase,
+} from "../prisma-global-benefit-category-repair";
 
 const START = new Date("2026-01-01T00:00:00.000Z");
 const END = new Date("2026-01-31T23:59:59.999Z");
@@ -108,6 +111,7 @@ function auditJson(audit: MutableAudit): object {
 function createHarness(options: {
   direction?: "promote" | "retain" | "suppression";
   sibling?: boolean;
+  safeSibling?: boolean;
   failWriteContaining?: string;
   nativeFailureContaining?: string;
   mutateOnPromote?: boolean;
@@ -134,6 +138,15 @@ function createHarness(options: {
     periodKey: "calendar-month",
     retiredAt: null,
   };
+  const definitions = options.safeSibling
+    ? [definition, {
+      ...definition,
+      id: "global-benefit-2",
+      catalogKey: "card:benefit-2",
+      category: "Shopping",
+      description: "Second exact terms",
+    }]
+    : [definition];
   const sources = [{
     id: "legacy-benefit-1",
     category: "Travel",
@@ -160,12 +173,12 @@ function createHarness(options: {
     ledgerSourceFingerprint: "b".repeat(64),
     ledgerDestinationFingerprint: null,
   }];
-  if (options.sibling) {
+  if (options.sibling || options.safeSibling) {
     sources.push({
       ...sources[0],
       id: "legacy-benefit-off-page",
       category: "Entertainment",
-      description: "Different source",
+      description: options.safeSibling ? "Second exact terms" : "Different source",
       ledgerId: "ledger-off-page",
       ledgerSourceFingerprint: "c".repeat(64),
     });
@@ -218,6 +231,26 @@ function createHarness(options: {
       cycleEndDate: secondEnd,
     });
   }
+  if (options.safeSibling && direction !== "suppression") {
+    statuses.push({
+      ...cloneStatus(statuses[0]),
+      id: "legacy-status-off-page",
+      benefitId: "legacy-benefit-off-page",
+      usedAmount: null,
+      isCompleted: false,
+      completedAt: null,
+      orderIndex: null,
+    }, {
+      ...cloneStatus(statuses[1]),
+      id: "canonical-status-off-page",
+      benefitId: null,
+      predefinedBenefitId: "global-benefit-2",
+      usedAmount: null,
+      isCompleted: false,
+      completedAt: null,
+      orderIndex: null,
+    });
+  }
   const audits: MutableAudit[] = direction === "promote" ? [{
     id: "audit-1",
     attemptUserId: "owner-1",
@@ -259,7 +292,8 @@ function createHarness(options: {
     reviewedCurrentGraphFingerprint: repair.proposal.currentGraphFingerprint,
     destinationFingerprint: repair.proposal.destinationFingerprint,
     manifestFingerprint: repair.manifest.manifestFingerprint,
-    manifestEntryFingerprint: repair.manifest.entries[0].entryFingerprint,
+    manifestEntryFingerprint: repair.manifest.entries
+      .find((entry) => entry.sourceBenefitId === repair!.proposal.sourceBenefitId)!.entryFingerprint,
     planFingerprint: repair.proposal.planFingerprint,
     postimageFingerprint: repair.proposal.postimageFingerprint,
     evidenceVersion: 1,
@@ -309,13 +343,29 @@ function createHarness(options: {
       return [{ count: BigInt(0), digest: "a".repeat(64) }];
     }
     if (text.includes("md5('global-benefit-category-repair/v1:'")) {
-      return [{ privateKey: "repair:legacy-benefit-1" }];
+      return options.safeSibling
+        ? [{ privateKey: "repair:legacy-benefit-1" }, { privateKey: "repair:legacy-benefit-off-page" }]
+        : [{ privateKey: "repair:legacy-benefit-1" }];
     }
     if (text.includes("SELECT ('repair:' || l.\"legacyBenefitId\")")
       && text.includes('ORDER BY "privateKey"')) {
-      return [{ privateKey: "repair:legacy-benefit-1" }];
+      return options.safeSibling
+        ? [{ privateKey: "repair:legacy-benefit-1" }, { privateKey: "repair:legacy-benefit-off-page" }]
+        : [{ privateKey: "repair:legacy-benefit-1" }];
     }
     if (text.includes('SELECT b."id", b."creditCardId"')) {
+      const requestedIds = sqlValues(query)
+        .filter((value): value is string => typeof value === "string" && value.startsWith("legacy-benefit"));
+      if (options.safeSibling && requestedIds.includes("legacy-benefit-off-page")
+        && requestedIds.includes("legacy-benefit-1")) {
+        return [
+          { id: "legacy-benefit-1", creditCardId: "owned-card-1" },
+          { id: "legacy-benefit-off-page", creditCardId: "owned-card-1" },
+        ];
+      }
+      if (options.safeSibling && requestedIds.includes("legacy-benefit-off-page")) {
+        return [{ id: "legacy-benefit-off-page", creditCardId: "owned-card-1" }];
+      }
       return [{ id: "legacy-benefit-1", creditCardId: "owned-card-1" }];
     }
     if (text.includes('FROM "CreditCard" c')) {
@@ -330,7 +380,7 @@ function createHarness(options: {
       productKey: "product-1",
       retiredAt: null,
     }];
-    if (text.includes('FROM "PredefinedBenefit"')) return [definition];
+    if (text.includes('FROM "PredefinedBenefit"')) return definitions;
     if (text.includes('FROM "BenefitStatus" bs') && text.includes('to_jsonb(bs)')) {
       return statuses.map((status) => ({ ...status, stateJson: statusJson(status) }));
     }
@@ -420,9 +470,9 @@ function createHarness(options: {
         && statuses.some((status) => status.id === candidate.keeperStatusId
           && status.creditCardId === null && status.predefinedBenefitId === null));
       const keeper = statuses.find((status) => status.id === action?.keeperStatusId);
-      if (!keeper || keeper.creditCardId !== null || keeper.predefinedBenefitId !== null) return 0;
-      keeper.creditCardId = "owned-card-1";
-      keeper.predefinedBenefitId = "global-benefit-1";
+      if (!action || !keeper || keeper.creditCardId !== null || keeper.predefinedBenefitId !== null) return 0;
+      keeper.creditCardId = action.creditCardId;
+      keeper.predefinedBenefitId = action.predefinedBenefitId;
       if (options.mutateOnPromote) keeper.usedAmount = 999;
       return 1;
     }
@@ -478,29 +528,32 @@ function createHarness(options: {
   });
 
   const transaction = { $queryRaw: queryRaw, $executeRaw: executeRaw };
+  const transactionMock = jest.fn(async (
+    callback: (value: typeof transaction) => Promise<unknown>,
+  ) => {
+    const snapshot = {
+      statuses: statuses.map(cloneStatus),
+      audits: audits.map((audit) => ({ ...audit })),
+      provenance: provenance.map((row) => ({ ...row, stateJson: { ...row.stateJson } })),
+      repair: repair === null ? null : {
+        ...repair,
+        occurrences: [...repair.occurrences],
+      },
+    };
+    try {
+      return await callback(transaction);
+    } catch (error) {
+      statuses.splice(0, statuses.length, ...snapshot.statuses);
+      audits.splice(0, audits.length, ...snapshot.audits);
+      provenance.splice(0, provenance.length, ...snapshot.provenance);
+      repair = snapshot.repair;
+      throw error;
+    }
+  });
   const client = {
     $queryRaw: queryRaw,
     $executeRaw: executeRaw,
-    $transaction: jest.fn(async (callback: (value: typeof transaction) => Promise<unknown>) => {
-      const snapshot = {
-        statuses: statuses.map(cloneStatus),
-        audits: audits.map((audit) => ({ ...audit })),
-        provenance: provenance.map((row) => ({ ...row, stateJson: { ...row.stateJson } })),
-        repair: repair === null ? null : {
-          ...repair,
-          occurrences: [...repair.occurrences],
-        },
-      };
-      try {
-        return await callback(transaction);
-      } catch (error) {
-        statuses.splice(0, statuses.length, ...snapshot.statuses);
-        audits.splice(0, audits.length, ...snapshot.audits);
-        provenance.splice(0, provenance.length, ...snapshot.provenance);
-        repair = snapshot.repair;
-        throw error;
-      }
-    }),
+    $transaction: transactionMock,
   } as unknown as PrismaClient;
   const adapter = new PrismaGlobalBenefitCategoryRepairDatabase(client);
 
@@ -511,10 +564,12 @@ function createHarness(options: {
     operations,
     executeRaw,
     queryRaw,
+    transaction: transactionMock,
     get repair() { return repair; },
     set inventory(value: string) { inventoryFingerprint = value; },
     set occupied(value: boolean) { occupiedRestore = value; },
     set failure(value: string | undefined) { failWriteContaining = value; },
+    set phase(value: "APPLIED" | "ROLLED_BACK") { if (repair) repair.phase = value; },
     set provenance(value: typeof provenance) {
       provenance.splice(0, provenance.length, ...value);
     },
@@ -536,6 +591,17 @@ async function review(harness: ReturnType<typeof createHarness>) {
   const proposal = discovery.proposals[0];
   harness.authorize(proposal, manifest);
   return { snapshot, proposal, manifest };
+}
+
+async function reviewAll(harness: ReturnType<typeof createHarness>) {
+  const snapshot = await harness.adapter.readBatch({ mode: "discover", afterCursorDigest: null, limit: 2 });
+  const discovery = discoverGlobalBenefitCategoryRepairs(
+    snapshot.units,
+    snapshot.inventoryFingerprint,
+    "discover",
+  );
+  const manifest = buildGlobalBenefitCategoryRepairManifest(discovery);
+  return { snapshot, discovery, manifest };
 }
 
 function authority(
@@ -611,11 +677,306 @@ describe("Prisma category-repair graph loading", () => {
       .map(([query]) => sqlText(query))
       .filter((text) => text.includes('AS "count"') && text.includes('AS "digest"'));
     expect(aggregateQueries).toHaveLength(14);
+    expect(aggregateQueries.every((text) => text.includes('count(*)::bigint AS "count"'))).toBe(true);
     expect(aggregateQueries.every((text) => !text.includes('SELECT to_jsonb(t) AS value'))).toBe(true);
+  });
+
+  it("retains deterministic same-card allUnits for scoped parity normalization", async () => {
+    const harness = createHarness({ safeSibling: true });
+    const reviewed = await reviewAll(harness);
+    const first = buildGlobalBenefitCategoryRepairManifest(
+      { inventoryFingerprint: reviewed.snapshot.inventoryFingerprint, proposals: [reviewed.discovery.proposals[0]] },
+      { nextCursor: encodeGlobalBenefitCategoryRepairCursor(reviewed.discovery.proposals[0].privateKey), hasMore: true },
+    );
+    const second = buildGlobalBenefitCategoryRepairManifest(
+      { inventoryFingerprint: reviewed.snapshot.inventoryFingerprint, proposals: [reviewed.discovery.proposals[1]] },
+      { afterCursor: first.nextCursor, hasMore: false },
+    );
+    const result = await harness.adapter.readParitySnapshot({
+      targetVerified: true,
+      manifests: [first, second],
+      scope: null,
+      manifestScope: {
+        pageIndex: 1,
+        pageFingerprint: second.pageFingerprint,
+        manifestFingerprint: second.manifestFingerprint,
+      },
+    });
+    expect(result.snapshot.units.map((unit) => unit.privateKey)).toEqual([
+      "repair:legacy-benefit-off-page",
+    ]);
+    expect(result.snapshot.allUnits?.map((unit) => unit.privateKey)).toEqual([
+      "repair:legacy-benefit-1",
+      "repair:legacy-benefit-off-page",
+    ]);
+  });
+
+  it("bounds the repeatable-read parity transaction with explicit wait and timeout options", async () => {
+    const harness = createHarness();
+    const reviewed = await review(harness);
+
+    await harness.adapter.readParitySnapshot({
+      targetVerified: true,
+      manifests: [reviewed.manifest],
+      scope: null,
+    });
+
+    expect(harness.transaction).toHaveBeenCalledWith(expect.any(Function), {
+      maxWait: 5_000,
+      timeout: GLOBAL_BENEFIT_CATEGORY_REPAIR_PARITY_TRANSACTION_TIMEOUT_MS,
+      isolationLevel: "RepeatableRead",
+    });
+  });
+
+  it("classifies only recognizable Prisma parity transaction expiry errors without leaking native details", async () => {
+    const expired = {
+      code: "P2028",
+      message: "Transaction API error: transaction already closed after timeout; private host and row id",
+    };
+    const expiredTransaction = jest.fn(async () => {
+      throw expired;
+    });
+    const expiredAdapter = new PrismaGlobalBenefitCategoryRepairDatabase({
+      $transaction: expiredTransaction,
+    } as unknown as PrismaClient);
+
+    await expect(expiredAdapter.readParitySnapshot({
+      targetVerified: true,
+      manifests: [],
+      scope: null,
+    })).rejects.toThrow("The category-repair parity transaction timed out safely.");
+    await expect(expiredAdapter.readParitySnapshot({
+      targetVerified: true,
+      manifests: [],
+      scope: null,
+    })).rejects.not.toThrow("private host and row id");
+
+    const unrelated = {
+      code: "P2028",
+      message: "private transaction state conflict",
+    };
+    const unrelatedTransaction = jest.fn(async () => {
+      throw unrelated;
+    });
+    const unrelatedAdapter = new PrismaGlobalBenefitCategoryRepairDatabase({
+      $transaction: unrelatedTransaction,
+    } as unknown as PrismaClient);
+    await expect(unrelatedAdapter.readParitySnapshot({
+      targetVerified: true,
+      manifests: [],
+      scope: null,
+    })).rejects.toThrow("The category-repair database operation failed safely.");
+    await expect(unrelatedAdapter.readParitySnapshot({
+      targetVerified: true,
+      manifests: [],
+      scope: null,
+    })).rejects.not.toThrow("private transaction state conflict");
   });
 });
 
 describe("Prisma category-repair apply", () => {
+  it("applies safe same-card definitions sequentially from one reviewed page and replays the first", async () => {
+    const harness = createHarness({ safeSibling: true });
+    const reviewed = await reviewAll(harness);
+    expect(reviewed.discovery.proposals).toHaveLength(2);
+    expect(reviewed.discovery.proposals.every((proposal) => !proposal.blocked)).toBe(true);
+    const pageAuthority = {
+      ...authority("apply", reviewed.manifest),
+      manifestEntryFingerprints: reviewed.manifest.entries.map((entry) => entry.entryFingerprint),
+    };
+
+    harness.authorize(reviewed.discovery.proposals[0], reviewed.manifest);
+    await expect(harness.adapter.applyRepair(
+      reviewed.discovery.proposals[0],
+      reviewed.manifest.entries[0],
+      pageAuthority,
+    )).resolves.toEqual({ applied: 1, rolledBack: 0, idempotent: 0 });
+
+    const replaySnapshot = await harness.adapter.readBatch({ mode: "apply", afterCursorDigest: null, limit: 2 });
+    const firstReplay = planGlobalBenefitCategoryRepairUnit(
+      replaySnapshot.units.find((unit) => unit.source.id === "legacy-benefit-1")!,
+      "apply",
+    );
+    harness.authorize(firstReplay, reviewed.manifest);
+    await expect(harness.adapter.applyRepair(
+      firstReplay,
+      reviewed.manifest.entries[0],
+      pageAuthority,
+    )).resolves.toEqual({ applied: 0, rolledBack: 0, idempotent: 1 });
+
+    harness.authorize(reviewed.discovery.proposals[1], reviewed.manifest);
+    await expect(harness.adapter.applyRepair(
+      reviewed.discovery.proposals[1],
+      reviewed.manifest.entries[1],
+      pageAuthority,
+    )).resolves.toEqual({ applied: 1, rolledBack: 0, idempotent: 0 });
+  });
+
+  it("normalizes an applied sibling with canonical keeper attachments", async () => {
+    const harness = createHarness({ safeSibling: true, direction: "retain" });
+    harness.audits.push({
+      id: "canonical-audit-1",
+      attemptUserId: "owner-1",
+      destinationCardId: "owned-card-1",
+      destinationBenefitId: null,
+      destinationPredefinedBenefitId: null,
+      destinationStatusId: "canonical-status-1",
+      destinationDefinitionFingerprint: null,
+      reasonCode: "canonical-preserve-me",
+    });
+    const reviewed = await reviewAll(harness);
+    const pageAuthority = {
+      ...authority("apply", reviewed.manifest),
+      manifestEntryFingerprints: reviewed.manifest.entries.map((entry) => entry.entryFingerprint),
+    };
+    harness.authorize(reviewed.discovery.proposals[0], reviewed.manifest);
+    await expect(harness.adapter.applyRepair(
+      reviewed.discovery.proposals[0],
+      reviewed.manifest.entries[0],
+      pageAuthority,
+    )).resolves.toEqual({ applied: 1, rolledBack: 0, idempotent: 0 });
+    harness.authorize(reviewed.discovery.proposals[1], reviewed.manifest);
+    await expect(harness.adapter.applyRepair(
+      reviewed.discovery.proposals[1],
+      reviewed.manifest.entries[1],
+      pageAuthority,
+    )).resolves.toEqual({ applied: 1, rolledBack: 0, idempotent: 0 });
+  });
+
+  it("keeps an unchanged no-evidence sibling eligible but rejects its graph drift", async () => {
+    const harness = createHarness({ safeSibling: true });
+    const reviewed = await reviewAll(harness);
+    const pageAuthority = {
+      ...authority("apply", reviewed.manifest),
+      manifestEntryFingerprints: reviewed.manifest.entries.map((entry) => entry.entryFingerprint),
+    };
+    harness.authorize(reviewed.discovery.proposals[0], reviewed.manifest);
+    await expect(harness.adapter.applyRepair(
+      reviewed.discovery.proposals[0],
+      reviewed.manifest.entries[0],
+      pageAuthority,
+    )).resolves.toEqual({ applied: 1, rolledBack: 0, idempotent: 0 });
+
+    const freshHarness = createHarness({ safeSibling: true });
+    const freshReview = await reviewAll(freshHarness);
+    freshHarness.statuses.find((status) => status.id === "legacy-status-off-page")!.usedAmount = 11;
+    freshHarness.authorize(freshReview.discovery.proposals[0], freshReview.manifest);
+    await expect(freshHarness.adapter.applyRepair(
+      freshReview.discovery.proposals[0],
+      freshReview.manifest.entries[0],
+      {
+        ...authority("apply", freshReview.manifest),
+        manifestEntryFingerprints: freshReview.manifest.entries.map((entry) => entry.entryFingerprint),
+      },
+    )).rejects.toThrow("repair graph changed");
+  });
+
+  it("blocks an applied sibling with an extra destination status", async () => {
+    const harness = createHarness({ safeSibling: true });
+    const reviewed = await reviewAll(harness);
+    const pageAuthority = {
+      ...authority("apply", reviewed.manifest),
+      manifestEntryFingerprints: reviewed.manifest.entries.map((entry) => entry.entryFingerprint),
+    };
+    harness.authorize(reviewed.discovery.proposals[0], reviewed.manifest);
+    await harness.adapter.applyRepair(
+      reviewed.discovery.proposals[0],
+      reviewed.manifest.entries[0],
+      pageAuthority,
+    );
+    const keeper = harness.statuses.find((status) => status.id === "legacy-status-1")!;
+    harness.statuses.push({
+      ...cloneStatus(keeper),
+      id: "unexpected-destination-status",
+      benefitId: null,
+      creditCardId: "owned-card-1",
+      predefinedBenefitId: "global-benefit-1",
+      usedAmount: null,
+      isCompleted: false,
+      completedAt: null,
+      orderIndex: null,
+    });
+    harness.authorize(reviewed.discovery.proposals[1], reviewed.manifest);
+    await expect(harness.adapter.applyRepair(
+      reviewed.discovery.proposals[1],
+      reviewed.manifest.entries[1],
+      pageAuthority,
+    )).rejects.toThrow("repair graph changed");
+  });
+
+  it("produces the same repaired status relations when same-card page order is reversed", async () => {
+    const applyOrder = async (order: readonly number[]) => {
+      const harness = createHarness({ safeSibling: true });
+      const reviewed = await reviewAll(harness);
+      const pageAuthority = {
+        ...authority("apply", reviewed.manifest),
+        manifestEntryFingerprints: reviewed.manifest.entries.map((entry) => entry.entryFingerprint),
+      };
+      for (const index of order) {
+        harness.authorize(reviewed.discovery.proposals[index], reviewed.manifest);
+        await harness.adapter.applyRepair(
+          reviewed.discovery.proposals[index],
+          reviewed.manifest.entries[index],
+          pageAuthority,
+        );
+      }
+      return harness.statuses
+        .map((status) => ({ id: status.id, benefitId: status.benefitId, creditCardId: status.creditCardId, predefinedBenefitId: status.predefinedBenefitId }))
+        .sort((left, right) => left.id.localeCompare(right.id));
+    };
+
+    await expect(applyOrder([0, 1])).resolves.toEqual(await applyOrder([1, 0]));
+  });
+
+  it.each([
+    ["rolled-back sibling evidence", (harness: ReturnType<typeof createHarness>) => { harness.phase = "ROLLED_BACK"; }],
+    ["sibling mutable-state drift", (harness: ReturnType<typeof createHarness>) => {
+      harness.statuses.find((status) => status.id === "legacy-status-off-page")!.usedAmount = 11;
+    }],
+  ] as const)("blocks %s instead of normalizing it as an applied sibling", async (_label, mutate) => {
+    const harness = createHarness({ safeSibling: true });
+    const reviewed = await reviewAll(harness);
+    const pageAuthority = {
+      ...authority("apply", reviewed.manifest),
+      manifestEntryFingerprints: reviewed.manifest.entries.map((entry) => entry.entryFingerprint),
+    };
+    harness.authorize(reviewed.discovery.proposals[0], reviewed.manifest);
+    await harness.adapter.applyRepair(
+      reviewed.discovery.proposals[0],
+      reviewed.manifest.entries[0],
+      pageAuthority,
+    );
+    mutate(harness);
+    harness.authorize(reviewed.discovery.proposals[1], reviewed.manifest);
+    await expect(harness.adapter.applyRepair(
+      reviewed.discovery.proposals[1],
+      reviewed.manifest.entries[1],
+      pageAuthority,
+    )).rejects.toThrow("repair graph changed");
+  });
+
+  it("blocks a same-card sibling from a different manifest authority", async () => {
+    const harness = createHarness({ safeSibling: true });
+    const reviewed = await reviewAll(harness);
+    const pageAuthority = {
+      ...authority("apply", reviewed.manifest),
+      inventoryFingerprint: "b".repeat(64),
+      manifestEntryFingerprints: reviewed.manifest.entries.map((entry) => entry.entryFingerprint),
+    };
+    harness.authorize(reviewed.discovery.proposals[0], reviewed.manifest);
+    await harness.adapter.applyRepair(
+      reviewed.discovery.proposals[0],
+      reviewed.manifest.entries[0],
+      { ...pageAuthority, inventoryFingerprint: reviewed.manifest.inventoryFingerprint },
+    );
+    harness.authorize(reviewed.discovery.proposals[1], reviewed.manifest);
+    await expect(harness.adapter.applyRepair(
+      reviewed.discovery.proposals[1],
+      reviewed.manifest.entries[1],
+      pageAuthority,
+    )).rejects.toThrow("repair graph changed");
+  });
+
   it("persists complete parent/child evidence before deleting and promotes only relations", async () => {
     const harness = createHarness({ direction: "promote" });
     const { proposal, manifest } = await review(harness);
