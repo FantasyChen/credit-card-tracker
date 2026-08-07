@@ -36,8 +36,8 @@ The visual architecture review is complete. The user selected all six candidates
 - [ ] The report explicitly accounts for the absent domain glossary/ADRs and uses existing Trellis domain language instead.
 - [ ] No application code, runtime configuration, database state, generated artifact, or external system is changed during the review phase.
 - [x] The user selected all six candidates.
-- [ ] Each child task passes its own tests and review gate before the parent integration review.
-- [ ] The final repository has one canonical catalog-change workflow, a deeper dashboard projection module, a neutral AMEX identity owner, a minimal free-product compatibility surface, no verified orphan island, and current domain/contributor documentation.
+- [x] Each child task passes its own tests and review gate before the parent integration review.
+- [x] The final repository has one canonical catalog-change workflow, a deeper dashboard projection module, a neutral AMEX identity owner, a minimal free-product compatibility surface, no verified orphan island, and current domain/contributor documentation.
 
 ## Out of Scope for the Review Phase
 
