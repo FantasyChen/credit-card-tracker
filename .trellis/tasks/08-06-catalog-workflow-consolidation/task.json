@@ -3,7 +3,7 @@
   "name": "catalog-workflow-consolidation",
   "title": "Consolidate catalog change workflow",
   "description": "Retire superseded catalog migration code and align operator documentation with the key-preserving global catalog workflow.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
