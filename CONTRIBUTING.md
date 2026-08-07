@@ -1,345 +1,111 @@
 # Contributing to Perks Reminder
 
-Thank you for considering contributing to Perks Reminder! 🎉 This guide provides detailed information for developers and contributors who want to help improve the project.
+Thank you for helping improve Perks Reminder. Contributions should preserve the project vocabulary in [CONTEXT.md](CONTEXT.md) and the executable contracts under `.trellis/spec/`.
 
-## 📋 Table of Contents
+## Before you begin
 
-- [Development Setup](#development-setup)
-- [Updating Credit Card Information](#updating-credit-card-information)
-- [Development Guidelines](#development-guidelines)
-- [Testing](#testing)
-- [Submitting Changes](#submitting-changes)
-- [Issue Guidelines](#issue-guidelines)
-- [Pull Request Process](#pull-request-process)
+1. Read [AGENTS.md](AGENTS.md).
+2. Read [.trellis/spec/perks-reminder/index.md](.trellis/spec/perks-reminder/index.md).
+3. For frontend changes, also read [.trellis/spec/frontend/index.md](.trellis/spec/frontend/index.md).
+4. Follow the linked checklist documents for the files and behavior you will change.
 
-## 🚀 Development Setup
+Never read, create, copy, or modify `.env`. Do not run database, build, deployment, cron, email, notification, Vercel, or live-provider operations without satisfying the target-verification and authorization rules in the specs.
 
-### Prerequisites
+## Development
 
-Before you begin, ensure you have:
-- Node.js 18 or higher
-- npm or yarn package manager
-- Git for version control
-- A Google account (for OAuth testing)
-- Basic knowledge of React, Next.js, and TypeScript
-
-### Detailed Setup Instructions
-
-1. **Fork and clone the repository**
-   ```bash
-   git clone https://github.com/your-username/perks-reminder.git
-   cd perks-reminder
-   npm install
-   ```
-
-2. **Environment Configuration**
-   Create `.env` from the template and fill in all values:
-   ```bash
-   cp .env.example .env
-   ```
-
-   > **📄 Complete Environment Setup:** See the detailed environment configuration section in [AGENT.md](AGENT.md#environment-setup) for all required and optional environment variables.
-
-3. **Database Setup**
-   > **⚠️ Database Safety:** Always use the development database branch for testing. See [docs/safe-migration-guide.md](docs/safe-migration-guide.md) for complete safety procedures.
-   
-   ```bash
-   # Switch to development database branch first
-   export DATABASE_URL=$DATABASE_URL_DEV
-   
-   # Then run setup commands
-   npx prisma generate
-   npx prisma migrate dev
-   npx prisma db seed
-   npm run dev
-   ```
-
-### Project Structure
-
-```
-src/
-├── app/                    # Next.js App Router
-│   ├── api/               # API routes and cron jobs
-│   ├── benefits/          # Benefits dashboard
-│   ├── cards/            # Card management
-│   ├── loyalty/          # Loyalty program tracking
-│   └── settings/         # User preferences
-├── components/           # Reusable React components
-├── lib/                 # Core business logic
-│   ├── actions/         # Server actions
-│   ├── benefit-cycle.ts # Benefit cycle calculations
-│   └── auth.ts          # Authentication config
-└── types/               # TypeScript definitions
-```
-
-### Helpful Development Scripts
+With an already configured local environment:
 
 ```bash
-# List available predefined cards
-node scripts/list-available-cards.cjs
-
-# Download a card image into public/images/cards/
-node scripts/download-card-image.js --name "Chase Sapphire Preferred"
-
-# DB connection check and environment verification
-node scripts/check-database-connection.js
-
-# Validate benefit ordering and ROI logic
-node scripts/test-drag-drop.cjs
-node scripts/test-annual-fee-roi.cjs
-
-# Test email sending (requires RESEND_API_KEY)
-node scripts/test-email.cjs
+npm install
+npm run dev
 ```
 
-## 💳 Updating Credit Card Information
+The repository uses strict TypeScript, Next.js App Router, React Server and Client modules, Prisma, Jest, and Playwright.
 
-**This is one of the most valuable ways to contribute!** Credit card benefits and annual fees change frequently, and community help is essential.
+## Repository structure
 
-### 📚 Reliable Sources (In Order of Preference)
-
-1. **Official bank websites** (chase.com, americanexpress.com, etc.)
-2. **[US Credit Card Guide](https://www.uscreditcardguide.com/)** - Comprehensive benefit details
-3. **[Doctor of Credit](https://www.doctorofcredit.com/)** - Timely updates and changes
-4. **Bank press releases** - Official announcements
-
-### 📋 What to Update
-
-#### High Priority:
-- **Annual fee changes** - Banks adjust these regularly
-- **Benefit value changes** - Credit amounts often change
-- **New benefits added** - Cards frequently add perks
-- **Benefits removed** - Important to remove discontinued perks
-- **Benefit frequency changes** - From monthly to quarterly, etc.
-
-#### Medium Priority:
-- **Benefit description clarifications**
-- **New credit cards from major issuers**
-- **Discontinued cards** - Mark as no longer available
-
-### 🛠️ Two Ways to Contribute Updates
-
-#### Option A: In-App Suggestion System (Recommended)
-1. Sign in to [Perks Reminder](https://www.perks-reminder.com/)
-2. Go to `Settings → Suggest`
-3. Submit a JSON payload with your updates and source links
-4. Moderators review suggestions in `Settings → Review`
-
-#### Option B: Direct Code Changes
-1. **Locate the card in `prisma/seed.ts`**
-2. **Update the information following our criteria**
-3. **Test your changes**
-4. **Submit a pull request**
-
-### 📝 Benefit Inclusion Criteria
-
-**Include These:**
-- Cyclical benefits with trackable resets (monthly/quarterly/yearly)
-- Statement credits with specific dollar amounts
-- Free nights, upgrades, or services with clear cycles
-- Benefits that users can "use up" and then reset
-
-**Exclude These:**
-- Always-on perks (points multipliers, insurance, status)
-- Memberships without cycles (Priority Pass, lounge access)
-- One-time signup bonuses
-- Benefits without specific dollar values
-
-**Example of Good Benefits:**
-```typescript
-{
-  description: '$300 Annual Travel Credit',
-  category: 'Travel',
-  maxAmount: 300,
-  frequency: BenefitFrequency.YEARLY,
-  percentage: 0,
-}
+```text
+src/app/          routes, pages, server actions, and cron entrypoints
+src/components/   shared UI modules
+src/lib/          reusable domain and application logic
+src/userscripts/  AMEX userscript entry and runtime modules
+prisma/           schema and migration history
+scripts/          explicit operational or verification tooling
+card-templates/   contributor-facing Catalog intake
+docs/             current runbooks, provenance, and archived history
+.trellis/spec/    durable engineering contracts
 ```
 
-### 🧪 Testing Card Updates
+## Catalog and benefit updates
+
+Use `card-templates/` for structured contribution intake and `src/lib/static-catalog.ts` as the checked-in DB-free Catalog source.
 
 ```bash
-# Verify seed data is valid
-npx prisma db seed
-
-# Build to check for errors
-npm run build
-
-# Check what cards are available
-node scripts/list-available-cards.cjs
+npm run card-template:validate
 ```
 
-### 📤 Pull Request Guidelines for Card Updates
+Every Standard Card Definition and Standard Benefit Definition has an immutable `catalogKey`. Do not rename or reuse keys, infer identity from mutable text, or treat a seed edit as an existing-user rollout.
 
-#### PR Title Format:
-`Update [Card Name]: [Brief description]`
+A complete Catalog change addresses:
 
-#### PR Description Template:
-```markdown
-## Card Information Update
+1. verified source terms and provenance;
+2. the key-preserving static Catalog edit;
+3. global synchronization disposition;
+4. missing Benefit Status propagation for existing active Physical Cards;
+5. Benefit Usage Guide and retired/prior-status disposition.
 
-**Card**: Chase Sapphire Preferred
-**Issuer**: Chase
+Follow [.trellis/spec/perks-reminder/catalog-and-benefit-updates.md](.trellis/spec/perks-reminder/catalog-and-benefit-updates.md). Database-backed synchronization remains separately authorized even in dry-run mode.
 
-### Changes Made:
-- [ ] Annual fee updated ($95 → $120)
-- [ ] New benefit added: $60 Annual DoorDash Credit
-- [ ] Existing benefit modified: Hotel credit increased to $60
+## Card images
 
-### Source Verification:
-- [x] Verified with official Chase website
-- [x] Cross-checked with US Credit Card Guide
-- [x] Source: https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred
+Use the documented ingestion and provenance process:
 
-### Testing:
-- [x] Seed data runs without errors
-- [x] Build completes successfully
-```
+- [docs/card-image-ingestion.md](docs/card-image-ingestion.md)
+- [docs/card-image-sources.md](docs/card-image-sources.md)
 
-## 🔧 Development Guidelines
+Do not download or replace images without recording an approved source.
 
-### Code Standards
+## Code changes
+
+- Keep domain behavior behind its owning module.
+- Prefer deep modules with a small interface and test through that interface.
+- Search before changing constants, payload fields, shared types, or helper logic.
+- Preserve authenticated ownership checks and server-side validation for durable mutations.
+- Keep anonymous public Catalog routes DB-free.
+- Keep Physical Cards distinct by `CreditCard.id`.
+- Add explicit types at wire and caller-branching interfaces.
+- Preserve accessibility, loading, error, empty, and populated states for changed UI.
+
+## Tests and safe checks
+
+Choose checks from [.trellis/spec/perks-reminder/verification.md](.trellis/spec/perks-reminder/verification.md). Common safe checks include:
 
 ```bash
-# Before submitting any PR
-npm run lint
-npm test
-npm run build
+npm test -- --runInBand
+npx tsc --noEmit --pretty false --incremental false
+npm run check:public-db
+npm run card-template:validate
+npm run check:amex-userscripts
+git diff --check
 ```
 
-### Naming Conventions
-- **Components**: PascalCase (`BenefitCard.tsx`)
-- **Files**: kebab-case (`benefit-cycle.ts`)
-- **Variables**: camelCase (`benefitAmount`)
-- **Database**: snake_case (`created_at`)
+Run focused tests first, then the broader safe suite appropriate to the change. Do not substitute a production-affecting command for a static check.
 
-### TypeScript Guidelines
-- Use strict TypeScript configuration
-- Define proper types for all props and function parameters
-- Avoid `any` type - use proper typing
-- Use Prisma-generated types when possible
+## Pull requests
 
-### Component Guidelines
-- Use functional components with hooks
-- Keep components small and focused
-- Use proper prop types
-- Handle loading and error states
-- Follow accessibility best practices
+Describe:
 
-## 🧪 Testing
+- the user-visible or domain outcome;
+- the owning modules and interfaces changed;
+- relevant invariants and safety constraints;
+- tests run and checks intentionally skipped;
+- Catalog provenance or migration disposition when applicable;
+- rollback considerations for risky changes.
 
-### Writing Tests
-- Write tests for new features and bug fixes
-- Use descriptive test names
-- Test both happy path and edge cases
-- Mock external dependencies appropriately
+Keep changes scoped. Unrelated cleanup belongs in a separate task unless it is required for the selected implementation.
 
-### Running Tests
-```bash
-npm test              # Run all tests
-```
+## Reporting data issues
 
-### Test Structure
-```typescript
-describe('BenefitCard Component', () => {
-  it('should display benefit information correctly', () => {
-    // Test implementation
-  });
+Use the correction links on card, benefit, and Benefit Usage Guide surfaces, or open a GitHub issue with the affected card/benefit, current source, expected terms, and supporting issuer/community evidence.
 
-  it('should handle missing data gracefully', () => {
-    // Test implementation
-  });
-});
-```
-
-## 📤 Submitting Changes
-
-### Before Submitting
-1. **Test thoroughly** - Run all tests and build
-2. **Update documentation** if needed
-3. **Add tests** for new functionality
-4. **Check accessibility** compliance
-5. **Follow code standards**
-
-### Commit Guidelines
-Use clear, descriptive commit messages following conventional commits:
-
-```bash
-# Examples
-git commit -m "feat: add drag and drop benefit reordering"
-git commit -m "fix: correct annual fee calculation for multiple cards"
-git commit -m "docs: update setup instructions for new contributors"
-
-# Format: type(scope): description
-# Types: feat, fix, docs, style, refactor, test, chore
-```
-
-## 🐛 Issue Guidelines
-
-### Reporting Bugs
-Include:
-- **Clear title** and description
-- **Steps to reproduce** the issue
-- **Expected vs actual behavior**
-- **Screenshots** if applicable
-- **Environment details** (OS, browser, Node version)
-- **Error messages** if any
-
-### Feature Requests
-Provide:
-- **Clear use case** for the feature
-- **Detailed description** of proposed functionality
-- **Mockups or wireframes** if applicable
-- **Consideration of alternatives**
-
-## 🔄 Pull Request Process
-
-### PR Checklist
-- [ ] Branch is up to date with main
-- [ ] All tests pass
-- [ ] Build completes successfully
-- [ ] Documentation is updated
-- [ ] PR description explains the changes
-- [ ] Related issues are referenced
-
-### PR Description Template
-```markdown
-## Description
-Brief description of changes
-
-## Type of Change
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Documentation update
-- [ ] Refactoring
-
-## Testing
-- [ ] Unit tests added/updated
-- [ ] Manual testing completed
-- [ ] All existing tests pass
-
-## Screenshots
-If applicable, add screenshots
-
-## Related Issues
-Fixes #123
-```
-
-### Review Process
-1. **Automated checks** must pass
-2. **Code review** by maintainers
-3. **Testing** by maintainers
-4. **Approval** and merge
-
-## 📞 Getting Help
-
-- **GitHub Issues** - Bug reports and feature requests
-- **GitHub Discussions** - General questions and discussions
-- **Email** - Contact form on website for sensitive issues
-
-### Response Times
-- **Critical bugs** - Within 24 hours
-- **General issues** - Within 1 week
-- **Pull requests** - Within 1 week
-
-Thank you for contributing to Perks Reminder! 🚀
+See [docs/community-data-quality-loop.md](docs/community-data-quality-loop.md) for the maintainer review flow.
