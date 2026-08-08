@@ -356,3 +356,26 @@ Consolidated domain and project docs, removed orphan code/assets/dependencies, c
 ### Status
 
 [OK] **Completed**
+
+
+## Session 12: Ship architecture cleanup
+
+**Date**: 2026-08-07
+**Task**: Ship architecture cleanup
+**Branch**: `main`
+
+### Summary
+
+Resolved dependency warnings within current majors, fixed client/server and App Router build boundaries, passed full tests/build and both Vercel previews, merged PR #18, and archived the delivery tasks.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1f67a3b` | (see git log) |
+| `a123151` | (see git log) |
+| `7c42836` | (see git log) |
+
+### Status
+
+[OK] **Completed**

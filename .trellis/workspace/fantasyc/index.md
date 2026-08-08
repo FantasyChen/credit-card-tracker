@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 11
+- **Total Sessions**: 12
 - **Last Active**: 2026-08-07
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~358 | Active |
+| `journal-1.md` | ~381 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 12 | 2026-08-07 | Ship architecture cleanup | `1f67a3b`, `a123151`, `7c42836` | `main` |
 | 11 | 2026-08-07 | Architecture cleanup and module deepening | `06f4b65`, `6e2ef1f`, `afef8ac`, `3f95707`, `02deb43`, `a0ed391`, `47a3764`, `a7e577a` | `codex/architecture-cleanup` |
 | 10 | 2026-08-06 | Complete production category-drift repair | `b7c2a0b` | `codex/category-repair-safe-rollout` |
 | 9 | 2026-08-06 | Repair category-drift duplicates and production outage | `1125393`, `77c4350`, `e74d80c` | `codex/category-repair-safe-rollout` |
