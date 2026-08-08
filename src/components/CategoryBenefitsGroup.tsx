@@ -3,9 +3,9 @@
 import React, { useState, useTransition } from 'react';
 import BenefitCardClient from '@/components/BenefitCardClient';
 import { batchCompleteBenefitsByCategoryAction } from '@/app/benefits/actions';
-import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard';
+import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard-client';
 import { formatDate } from '@/lib/dateUtils';
-import { calculateBenefitGroupSummary } from '@/lib/benefit-dashboard';
+import { calculateBenefitGroupSummary } from '@/lib/benefit-dashboard-client';
 
 interface CategoryBenefitsGroupProps {
   category: string;

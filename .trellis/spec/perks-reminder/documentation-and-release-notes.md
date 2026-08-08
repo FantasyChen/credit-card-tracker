@@ -6,7 +6,7 @@
 - `.trellis/tasks/` owns scoped requirements, research, plans, decisions, and implementation evidence.
 - `PLAN.md` remains a retained product/history record; do not treat old parked or archived items as current requirements without review.
 - Detailed procedures remain in their owning `docs/` runbooks. Update a runbook when its operator behavior changes rather than duplicating the procedure in a general spec.
-- Do not recreate Context Harness cards, indexes, `NOW.md`, `CONTEXT.md`, session hooks, or indexing scripts.
+- Do not recreate Context Harness cards, indexes, `NOW.md`, session hooks, or indexing scripts. A root `CONTEXT.md` is allowed only as the implementation-free domain glossary defined by the domain-modeling workflow; it must not contain task state, code contracts, session memory, or indexing metadata.
 
 When work establishes a durable invariant or corrects an existing one, update the relevant indexed spec. Task-only observations stay in the active task, not in global project guidance.
 

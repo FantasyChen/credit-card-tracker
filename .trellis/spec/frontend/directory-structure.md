@@ -10,7 +10,7 @@
 | Route-local `.tsx` files | Components whose meaning belongs to one route | `src/app/loyalty/LoyaltyAccountsClient.tsx` |
 | `src/components/` | Components reused by multiple routes or feature surfaces | `src/components/BenefitsDisplayClient.tsx`, `src/components/SearchInput.tsx` |
 | `src/components/ui/` | Low-level visual primitives and shared page furniture | `src/components/ui/button.tsx`, `src/components/ui/PageHeader.tsx` |
-| `src/lib/` | Reusable domain projections, transitions, materialization, adapters, and utilities | `src/lib/benefit-dashboard.ts`, `src/lib/benefit-status-transitions.ts` |
+| `src/lib/` | Reusable domain projections, client-safe contracts, transitions, materialization, adapters, and utilities | `src/lib/benefit-dashboard.ts`, `src/lib/benefit-dashboard-client.ts`, `src/lib/benefit-status-transitions.ts` |
 | `src/lib/hooks/` | Generic hooks with more than one plausible UI consumer | `src/lib/hooks/useDebounce.ts` |
 | `src/generated/` | Prisma-generated output | Imported from application code; excluded from lint |
 
@@ -20,6 +20,7 @@
 - Colocate a component with its route when it is route-specific; promote it to `src/components/` only when it has a genuine cross-route role.
 - Put domain calculations in `src/lib/`, not inside JSX or route handlers. The benefit dashboard, cycle materialization, status transitions, notification digest, and card lifecycle modules are the established owners.
 - Keep API routes and Server Actions as boundaries: authenticate, parse, validate, invoke domain logic, persist, and shape a response.
+- Keep App Router convention-file exports framework-valid. Helpers tested independently of `GET`, `POST`, or other supported route exports belong in an adjacent library module, such as `src/lib/cron/check-benefits.ts` or `src/lib/monitoring/error-report.ts`.
 - Never hand-edit `src/generated/`; regenerate Prisma output only under the database safety rules in `../perks-reminder/database-and-data-safety.md`.
 
 ## Naming Reality

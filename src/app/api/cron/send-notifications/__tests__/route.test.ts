@@ -3,12 +3,11 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
 import { fetchEffectiveBenefitStatuses } from '@/lib/effective-benefit';
-// import { BenefitStatus, User, Benefit, CreditCard } from '@/generated/prisma'; // Types for mock data
 
 // --- Mocks ---
 jest.mock('@/lib/prisma', () => ({
   prisma: {
-    user: { findMany: jest.fn() },
+    user: { findMany: jest.fn(), update: jest.fn() },
     loyaltyAccount: { findMany: jest.fn() },
     loyaltyCertificate: { findMany: jest.fn() },
   },
@@ -116,20 +115,12 @@ describe('/api/cron/send-notifications', () => {
         notifyExpirationDays?: number;
         notifyPointsExpiration?: boolean;
         pointsExpirationDays?: number;
-        subscriptionTier?: 'FREE' | 'PRO';
-        isBetaUser?: boolean;
-        emailAlertsUsed?: number;
-        emailAlertsResetAt?: Date | null;
     }
 
     const mockUser = (prefs: PartialUserPrefs = {}) => ({
         id: 'user1', email: 'user1@example.com', name: 'Test User',
         notifyNewBenefit: true, notifyBenefitExpiration: true, notifyExpirationDays: 7,
         notifyPointsExpiration: true, pointsExpirationDays: 30,
-        subscriptionTier: 'PRO' as const,
-        isBetaUser: false,
-        emailAlertsUsed: 0,
-        emailAlertsResetAt: null,
         ...prefs
     });
 
@@ -257,6 +248,7 @@ describe('/api/cron/send-notifications', () => {
         await GET(createMockReq());
 
         expect(sendEmail).toHaveBeenCalledTimes(1);
+        expect(prisma.user.update).not.toHaveBeenCalled();
         expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
             to: 'user1@example.com',
             subject: 'Benefits Expiring Soon!',
@@ -302,8 +294,6 @@ describe('/api/cron/send-notifications', () => {
         jest.useFakeTimers().setSystemTime(systemTime);
         (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([
             mockUser({
-                subscriptionTier: 'FREE',
-                isBetaUser: false,
                 notifyExpirationDays: 30,
                 notifyNewBenefit: false,
                 notifyPointsExpiration: false,

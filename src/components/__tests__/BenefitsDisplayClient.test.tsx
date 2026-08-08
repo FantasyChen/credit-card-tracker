@@ -5,7 +5,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import BenefitsDisplayClient from '../BenefitsDisplayClient';
-import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard';
+import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard-client';
 
 jest.mock('../BenefitCardClient', () => {
   return function MockBenefitCardClient({ status }: { status: DisplayBenefitStatus }) {

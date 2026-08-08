@@ -1,0 +1,5 @@
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Defines merge-as-release semantics and prohibits unauthorized manual deployment/provider actions."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Defines complete-diff review, local quality gates, and truthful operational skips."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Defines schema-dependent merge gates and prohibited database operations."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Defines the required Server/Client Component import boundary for the build fix."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Defines type-only imports and shared domain type ownership."}

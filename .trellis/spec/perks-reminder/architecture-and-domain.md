@@ -10,10 +10,11 @@
 ## Business-logic owners
 
 - `src/lib/effective-benefit.ts` owns the standard/bridge/custom/legacy source union and projects global or custom definitions plus user status state into the compatible server DTO. Dashboard, home, authenticated APIs, notifications, calendar, and guide consumers must not reimplement source selection.
-- `src/lib/benefit-dashboard.ts` shapes effective benefit statuses into dashboard tabs, totals, usage-guide links, and per-card ROI. Do not duplicate that projection in pages/components.
+- `src/lib/benefit-dashboard.ts` loads and shapes effective benefit statuses into dashboard tabs, totals, usage-guide links, per-card ROI, and the authenticated home summary. `src/lib/benefit-dashboard-client.ts` owns the browser-safe dashboard DTOs, constants, and pure interactive helpers; Client Components must not import the server orchestration module. Pages do not recreate that orchestration. Home claimed value uses current-calendar-year effective statuses and compares them with current annual fees.
 - `src/lib/benefit-cycle-materialization.ts` owns cycle coordinates; `src/lib/global-benefit-materialization.ts` adapts global-standard and custom sources into insert-only status plans. Cron, card creation, and custom-benefit creation share these owners.
 - `src/lib/benefit-status-transitions.ts` owns completion, partial completion, reset, direct amount edits, and not-usable transitions. Server actions validate through it before persistence.
-- `src/lib/notification-digest.ts` owns notification selection, user reminder windows, digest assembly, quota checks, batching, and delivery. Cron routes should stay limited to authorization/date parsing and response handling.
+- `src/lib/notification-digest.ts` owns notification selection, user reminder windows, digest assembly, batching, and delivery. The free product has no email quota branch or counter write. Cron routes should stay limited to authorization/date parsing and response handling.
+- `src/lib/amex-catalog/` owns pure AMEX product/benefit identity, period resolution, text normalization, and source-credit matching policy. Public Catalog modules, browser observation modules, and server reconciliation modules consume this neutral owner; browser modules must not import `amex-sync` implementation ownership.
 - Physical cards are keyed by `CreditCard.id`; display names may include nickname/last digits. Never group duplicate products solely by product name.
 
 ## Durable product invariants
