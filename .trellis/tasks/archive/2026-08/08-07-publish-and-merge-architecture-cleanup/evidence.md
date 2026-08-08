@@ -7,6 +7,7 @@ Recorded 2026-08-07 for `codex/architecture-cleanup`; updated after PR preview f
 - `origin/main` resolved to `8f5422234398afb6b8843b8a1fe74b6879a2be07` before publication; the branch had no commits behind.
 - The dependency-remediation child is archived at `.trellis/tasks/archive/2026-08/08-07-resolve-dependency-release-warnings/`, with `task.json.status: completed` and evidence retained.
 - PR #18 was opened from `codex/architecture-cleanup` against `main`.
+- PR #18 passed Vercel Preview Comments plus both `coupon-cycle` and `credit-card-tracker` preview deployments, then merged with merge commit `7c42836b12247a0460765cc872cc5ea0bb11095d` at 2026-08-08T00:42:45Z.
 - Complete pre-publication review covered 146 changed paths. No Prisma schema/migration, `vercel.json`, GitHub workflow, or provider configuration path changed.
 
 ## Preview failure and remediation
@@ -34,6 +35,8 @@ Passed on the final local commit candidate:
 - Local Markdown link audit across changed Markdown files — passed.
 
 Read-only Vercel preview-log inspection and local build/Prisma generation were explicitly authorized after CI failed. Skipped: Prisma status/migration/seed, database-backed audits or rehearsals, provider configuration/alias changes, cron/email/notification calls, live production probes, and manual deployment. These skips are not claims of production runtime health.
+
+The merge triggered the repository's automatic production release path. This task verified the merged GitHub state and preview checks only; it did not run a production runtime probe or claim primary-alias health.
 
 ## Sensitive and stale-reference review
 

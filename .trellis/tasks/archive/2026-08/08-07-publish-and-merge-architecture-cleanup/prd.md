@@ -23,12 +23,12 @@ Deliver the verified architecture cleanup and dependency remediation through Git
 
 ## Acceptance Criteria
 
-- [ ] Final local verification passes on the exact commit pushed.
-- [ ] The branch is pushed and a ready pull request exists against `main`.
-- [ ] The PR description accurately covers architecture changes, dependency remediation, verification, and operational skips.
-- [ ] Required GitHub CI completes successfully.
-- [ ] The PR is merged into `main` using the repository-supported merge method.
-- [ ] The merged commit/PR state is recorded without claiming manual deployment or unobserved production health.
+- [x] Final local verification passes on the exact commit pushed.
+- [x] The branch is pushed and a ready pull request exists against `main`.
+- [x] The PR description accurately covers architecture changes, dependency remediation, verification, and operational skips.
+- [x] Required GitHub CI completes successfully.
+- [x] The PR is merged into `main` using the repository-supported merge method.
+- [x] The merged commit/PR state is recorded without claiming manual deployment or unobserved production health.
 
 ## Out of Scope
 

@@ -29,11 +29,11 @@ Ship the completed architecture cleanup safely by resolving its known dependency
 
 ## Acceptance Criteria
 
-- [ ] Both child tasks pass their acceptance criteria and are archived.
-- [ ] The complete branch diff receives a final integration review.
-- [ ] The pull request is merged into `main` only after required CI passes.
-- [ ] No manual deployment or unauthorized external/database operation is run.
-- [ ] The final record identifies any residual dependency findings or skipped operational gates truthfully.
+- [x] Both child tasks pass their acceptance criteria and are archived.
+- [x] The complete branch diff receives a final integration review.
+- [x] The pull request is merged into `main` only after required CI passes.
+- [x] No manual deployment or unauthorized external/database operation is run.
+- [x] The final record identifies any residual dependency findings or skipped operational gates truthfully.
 
 ## Out of Scope
 
