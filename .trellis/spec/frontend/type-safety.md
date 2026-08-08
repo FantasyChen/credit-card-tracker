@@ -13,7 +13,7 @@ Prefer `import type` when an import is type-only; newer domain modules such as `
 ## Type Ownership
 
 - Prisma owns persisted record and enum shapes.
-- The relevant `src/lib` domain module owns reusable projections and transition inputs/outputs. Examples: `DisplayBenefitStatus` and `CardLevelRoi` in `src/lib/benefit-dashboard.ts`.
+- The relevant `src/lib` domain module owns reusable projections and transition inputs/outputs. Client-render DTOs such as `DisplayBenefitStatus` and `CardLevelRoi` live in `src/lib/benefit-dashboard-client.ts`; server loading/projection orchestration lives in `src/lib/benefit-dashboard.ts`.
 - Components own component-specific props, such as `SearchInputProps`.
 - Route handlers own their wire request/response DTOs and must validate untrusted values before persistence.
 

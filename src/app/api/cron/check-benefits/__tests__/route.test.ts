@@ -2,12 +2,13 @@ import { BenefitCycleAlignment, BenefitFrequency } from '@/generated/prisma';
 import { calculateBenefitCycle } from '@/lib/benefit-cycle';
 import { globalDefinitionFingerprint } from '@/lib/global-benefit-migration';
 import { prisma } from '@/lib/prisma';
+import { insertMissingBenefitStatuses } from '@/lib/cron/check-benefits';
 import {
   amexSyncAuditRetentionCutoff,
   deleteExpiredAmexSyncRowAudits,
 } from '@/lib/amex-sync/repository';
 import { NextResponse } from 'next/server';
-import { GET, POST, insertMissingBenefitStatuses } from '../route';
+import { GET, POST } from '../route';
 
 jest.mock('@/lib/prisma', () => ({
   prisma: {

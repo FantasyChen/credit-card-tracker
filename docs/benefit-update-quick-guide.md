@@ -1,178 +1,69 @@
-# Quick Guide: Updating Credit Card Benefits
+# Quick Guide: Updating Catalog Benefits
 
-This guide shows you how to add, change, or remove benefits from existing credit cards.
+This guide covers changes to shared Standard Card and Standard Benefit
+Definitions. It does not authorize database access or an existing-user
+rollout; follow the linked specifications for those gates.
 
-## 🎯 The Problem
+## 1. Prepare the change
 
-When you update benefits in `prisma/seed.ts`, **only new users who add the card will see the changes**. Existing users still have the old benefit structure until you migrate them.
+1. Verify the terms against issuer documentation and recent trustworthy
+   evidence. Record provenance and the relevant Benefit Usage Guide.
+2. Start with a file in [`card-templates/`](../card-templates/), then update
+   the matching definition in [`src/lib/static-catalog.ts`](../src/lib/static-catalog.ts).
+3. Preserve every existing immutable `catalogKey` and each benefit's exact
+   `parentCatalogKey`. A genuinely new definition receives a new key; a
+   removed definition is retired rather than deleted or recreated.
+4. Run the intake validator:
 
-## ✅ The Solution: 3-Step Process
+   ```bash
+   npm run card-template:validate
+   ```
 
-1. **Update Templates** - Edit seed file (affects future users)
-2. **Migrate Existing Users** - Update current user cards
-3. **Create Benefit Statuses** - Make benefits visible in dashboard
+## 2. Review the rollout dispositions
 
-## 🚀 Quick Start (Recommended Method)
+For every Catalog change, document:
 
-### Step 1: Edit the Seed File
+- the key-preserving global synchronization plan (`create`, `adopt`, `update`,
+  `retire`, or `unchanged`);
+- missing standard statuses for existing active Physical Cards and their
+  insert-only materialization disposition; and
+- Benefit Usage Guide linkage plus the treatment of prior/retired statuses.
 
-Edit `prisma/seed.ts` and add/remove/change the benefits:
+The checked-in source is DB-free and powers anonymous Catalog reads. A seed
+change or static edit alone does not update existing users.
 
-```typescript
-{
-  name: 'American Express Business Platinum Card',
-  issuer: 'American Express',
-  annualFee: 895,
-  benefits: [
-    // ... existing benefits ...
-    
-    // NEW BENEFIT: Add this
-    {
-      description: '$50 Quarterly Hilton Credit (Hilton properties)',
-      category: 'Travel',
-      maxAmount: 50,
-      frequency: BenefitFrequency.QUARTERLY,
-      percentage: 0,
-      cycleAlignment: BenefitCycleAlignment.CARD_ANNIVERSARY,
-      occurrencesInCycle: 1,
-    },
-  ],
-}
-```
+## 3. Database-backed operations (separately authorized)
 
-### Step 2: Update the Template
+The global Catalog operator defaults to a database-reading dry-run:
 
 ```bash
-npx prisma db seed
+npm run sync:global-catalog -- --dry-run
 ```
 
-This updates the predefined card template for new users.
-
-### Step 3: Run the Unified Update Script
+Apply additionally requires immediate target verification and the exact
+`SYNC_GLOBAL_CATALOG` confirmation. Legacy copied-definition work is a
+separate, exact-gated operator and is never part of ordinary Catalog updates:
 
 ```bash
-# Preview changes (safe - no data modified)
-node scripts/update-card-benefits.js \
-  --card "American Express Business Platinum Card" \
-  --dry-run
-
-# Execute the update (migrates all existing users)
-node scripts/update-card-benefits.js \
-  --card "American Express Business Platinum Card" \
-  --force
+npm run migrate:global-benefits -- --dry-run
 ```
 
-**That's it!** All users (new and existing) now have the updated benefits.
+Do not run either command merely to validate documentation. Before any
+database-backed operation, read:
 
-## 📊 What the Script Does
+- [Catalog and Benefit Updates](../.trellis/spec/perks-reminder/catalog-and-benefit-updates.md)
+- [Global Benefit Definitions and Migration](../.trellis/spec/perks-reminder/global-benefit-definitions-and-migration.md)
+- [Database and Data Safety](../.trellis/spec/perks-reminder/database-and-data-safety.md)
 
-The unified script automatically:
+## Common mistakes
 
-1. ✅ **Verifies** the predefined card exists
-2. ✅ **Finds** all existing user cards for that card type
-3. ✅ **Migrates** each user's card with the new benefit structure
-4. ✅ **Creates** benefit status records (makes benefits visible)
-5. ✅ **Uses transactions** (rollback on failure)
-6. ✅ **Shows progress** for each user
+- Editing `prisma/seed.ts` as the source of truth.
+- Running a seed and assuming current users received new benefits.
+- Renaming/reusing keys or matching by mutable card names and descriptions.
+- Deleting/recreating global definitions or rewriting existing Benefit Status
+  cycles and completion state.
+- Using a legacy per-card migration script for a shared Catalog change.
 
-## 🔍 Example Output
-
-```
-╔═══════════════════════════════════════════════════════════╗
-║   Credit Card Benefit Update Script                      ║
-╚═══════════════════════════════════════════════════════════╝
-
-🎯 Target Card: American Express Business Platinum Card
-📋 Mode: LIVE UPDATE
-
-📝 Step 1: Updating predefined card template...
-   ✅ Template updated
-
-👥 Step 2: Migrating existing user cards...
-   📊 Found 75 existing user card(s)
-   📊 Template has 8 benefits
-   📊 User cards have 7 benefits
-   🔄 Updating user cards...
-   
-   📊 Migration Results:
-      ✅ Success: 75
-      ❌ Errors: 0
-
-📊 Step 3: Creating benefit statuses...
-   📊 Found 75 benefit(s) needing status records
-   ✅ Created 75 benefit status record(s)
-
-╔═══════════════════════════════════════════════════════════╗
-║   ✅ SUCCESS - All steps completed!                      ║
-╚═══════════════════════════════════════════════════════════╝
-
-🎉 All users now have the updated benefits in their dashboard!
-```
-
-## ⚠️ Common Mistakes to Avoid
-
-### ❌ Mistake 1: Only Running Seed
-```bash
-# This only helps NEW users!
-npx prisma db seed  # ❌ Existing users won't see changes
-```
-
-### ❌ Mistake 2: Forgetting Benefit Statuses
-Without benefit statuses, users won't see benefits in their dashboard even though the benefits exist in the database.
-
-### ✅ Correct: Use the Unified Script
-```bash
-npx prisma db seed  # Update template
-node scripts/update-card-benefits.js --card "Card Name" --force  # Complete migration
-```
-
-## 🛡️ Safety Features
-
-- **Dry Run Mode**: Always test with `--dry-run` first
-- **Transaction Safety**: Changes rollback if any step fails
-- **Progress Tracking**: See exactly which users were migrated
-- **Error Handling**: Individual user failures don't stop the entire migration
-- **Advanced (migrate-benefits.js)**: Use `--backup` with `--force` to save a JSON snapshot of affected user data before applying; see AGENTS.md for details.
-
-## 📝 Use Cases
-
-### Adding a New Benefit
-1. Add benefit to `prisma/seed.ts`
-2. Run seed: `npx prisma db seed`
-3. Run migration: `node scripts/update-card-benefits.js --card "Card Name" --force`
-
-### Removing a Benefit
-1. Remove benefit from `prisma/seed.ts`
-2. Run seed: `npx prisma db seed`
-3. Run migration: `node scripts/update-card-benefits.js --card "Card Name" --force`
-
-### Changing a Benefit
-1. Edit benefit in `prisma/seed.ts`
-2. Run seed: `npx prisma db seed`
-3. Run migration: `node scripts/update-card-benefits.js --card "Card Name" --force`
-
-## 🔧 Troubleshooting
-
-### "Card not found" error
-- Check the exact card name in the database
-- Card names must match exactly (case-sensitive)
-
-### Users not seeing benefits
-- Check if benefit statuses were created
-- Users may need to refresh their browser
-- Check the console for any errors
-
-### Migration failed for some users
-- Check the error message
-- Individual failures don't affect other users
-- You can re-run the script to retry failed users
-
-## 📚 For More Information
-
-See **AGENTS.md** section "Updating Existing Card Benefits" for detailed documentation, advanced migration framework (`migrate-benefits.js`), and backup options.
-
----
-
-**Last Updated**: October 2025  
-**Script Location**: `/scripts/update-card-benefits.js`  
-**Full Documentation**: `/AGENTS.md`
+For the complete contracts and operator gates, see [Catalog and Benefit
+Updates](../.trellis/spec/perks-reminder/catalog-and-benefit-updates.md) and
+[Community Data Quality Loop](community-data-quality-loop.md).

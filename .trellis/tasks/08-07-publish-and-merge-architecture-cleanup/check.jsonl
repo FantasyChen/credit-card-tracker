@@ -1,0 +1,4 @@
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Owns final local checks, complete branch review, and sensitive-path inspection."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Checks that GitHub merge is the only release action and manual provider actions are skipped."}
+{"file":".trellis/spec/perks-reminder/documentation-and-release-notes.md","reason":"Checks durable documentation ownership and prevents an unrequested release-note bump."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Defines focused frontend tests, strict TypeScript, and diff checks for the fix."}

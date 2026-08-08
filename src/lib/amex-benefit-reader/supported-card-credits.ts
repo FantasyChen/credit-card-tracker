@@ -2,18 +2,16 @@ import { americanExpressCardCatalog } from "@/lib/american-express-card-catalog"
 import {
   AMEX_CATALOG_IDENTITY_REGISTRY,
   type AmexCatalogCardName,
-} from "@/lib/amex-sync/catalog-registry";
-import { normalizeAmexSelectionText } from "./normalization";
-import type { AmexPeriodKey } from "@/lib/amex-sync/catalog-registry";
+} from "@/lib/amex-catalog/catalog-registry";
+import { normalizeAmexSelectionText } from "@/lib/amex-catalog/normalization";
+import type { AmexPeriodKey } from "@/lib/amex-catalog/catalog-registry";
 import {
   evidenceSatisfiesAmexPolicy,
   GENERIC_FORBIDDEN_AMEX_CREDIT_TOKEN_GROUPS,
   titleSatisfiesAmexPolicy,
   type AmexSourceCreditEvidence,
   type AmexSourceCreditPolicy,
-} from "@/lib/amex-sync/source-credit-policy";
-
-export { normalizeAmexSelectionText } from "./normalization";
+} from "@/lib/amex-catalog/source-credit-policy";
 
 function containsPhrase(value: string, phrase: string): boolean {
   return ` ${value} `.includes(` ${normalizeAmexSelectionText(phrase)} `);

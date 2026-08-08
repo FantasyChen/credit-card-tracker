@@ -14,8 +14,6 @@ import { PRIMARY_SITE_URL, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import DomainMigrationBanner from "@/components/DomainMigrationBanner";
 import IosInstallPrompt from "@/components/IosInstallPrompt";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
-// import { ThemeProviders } from "@/components/ThemeProviders"; // Removed
-// import { ensureCurrentBenefitStatuses } from "@/lib/actions/benefitActions"; // Keep import commented out or remove
 
 const geistSans = GeistSans;
 const geistMono = GeistMono;
@@ -126,8 +124,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // ensureCurrentBenefitStatuses(); // <-- REMOVE THIS CALL
-
   // Get the session server-side to prevent authentication flash
   const session = await getServerSession(authOptions);
 

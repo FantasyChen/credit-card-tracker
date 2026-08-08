@@ -1,174 +1,94 @@
-# Perks Reminder 💳
+# Perks Reminder
 
-**Stop losing hundreds of dollars in credit card benefits every year.**
+Perks Reminder is a free, open-source credit card benefit tracker. It tracks recurring credits, Benefit Cycles, claimed value, annual fees, loyalty expirations, and practical Benefit Usage Guides without connecting to bank accounts.
 
-Perks Reminder is a free, open-source tool that tracks your credit card perks and ensures you never miss valuable benefits again. Track, optimize, and maximize your credit card rewards like a pro.
+[Open Perks Reminder](https://www.perks-reminder.com/)
 
-[![Perks Reminder Hero](public/hero-image.jpg)](https://www.perks-reminder.com/)
+## Product model
 
-## 🚀 Try It Now
+- A Physical Card is always tracked separately, even when a user owns several copies of the same product.
+- Standard Card Definitions and Standard Benefit Definitions come from the shared Catalog.
+- Custom Benefit Definitions remain user-owned.
+- Benefit Status stores usage state for one Benefit Cycle.
+- Every account receives unlimited cards, reminders, custom reminder timing, loyalty tracking, and import/export.
 
-**[Launch Perks Reminder →](https://www.perks-reminder.com/)**
+See [CONTEXT.md](CONTEXT.md) for the project vocabulary.
 
-## What It Tracks
+## Features
 
-| Area | Examples |
-| --- | --- |
-| Card benefits | Monthly credits, annual credits, statement credits, limited-time perks |
-| Welcome bonuses | Signup bonus deadlines, progress notes, card-specific reminders |
-| Annual fees | Renewal dates, retention notes, ROI checks |
-| Loyalty programs | Miles, points, free nights, certificates, expiration dates |
-| Usage guidance | Practical guides for using recurring credits before they expire |
+- Monthly, quarterly, yearly, anniversary, and multi-year Benefit Cycles
+- Completion, partial completion, and not-usable tracking
+- Claimed-value and annual-fee ROI summaries
+- Duplicate Physical Card labels using nickname and stored ending digits
+- Benefit Usage Guides with qualification, timing, and caveats
+- Email reminders and loyalty-expiration tracking
+- Data import/export and bulk card onboarding
+- Optional manual AMEX Observation and confirmation workflow
+- Installable PWA and focused Capacitor iOS shell
 
-### 📱 Install on Your Phone
-This is a Progressive Web App (PWA) - install it for a native app experience:
-- **iPhone/iPad:** Open in Safari → Share → "Add to Home Screen"
-- **Android:** Open in Chrome → Menu (⋮) → "Install app"
+## Technology
 
-## ✨ Why Perks Reminder?
+- Next.js 15, React 19, and TypeScript
+- PostgreSQL through Prisma
+- NextAuth authentication
+- Resend transactional email
+- Vercel hosting and cron scheduling
+- Jest and Playwright tests
 
-Credit card users lose an average of **$300-600 annually** by forgetting to use benefits that expire. Perks Reminder solves this with:
+## Local development
 
-- **🔔 Smart Notifications** - Get reminders before benefits expire
-- **📊 ROI Tracking** - See if your annual fees are worth it
-- **🏆 Maximize Rewards** - Track all your cards and loyalty programs in one place
-- **📱 Mobile-First** - Works perfectly on your phone
-- **🔒 Privacy-Focused** - No ads, no data selling, completely free
+Install dependencies and start the application using an already configured local environment:
 
-## 💡 Perfect For
-
-- **Travel Hackers** - Track airline/hotel credits and free nights
-- **Churners** - Manage multiple cards and their unique benefits
-- **Busy Professionals** - Automated reminders for dining, Uber, and other credits
-- **Anyone with 2+ Credit Cards** - Centralized benefit management
-
-## 🎯 Key Features
-
-- **50+ Predefined Cards** - Chase, Amex, Capital One, and more
-- **Smart Notifications** - Email alerts before benefits expire
-- **Loyalty Program Tracking** - Monitor airline miles and hotel points
-- **Drag & Drop Prioritization** - Organize benefits by importance
-- **ROI Analysis** - See if your annual fees are worth it
-- **Data Export/Import** - Complete ownership of your information
-
-## 🤝 Help Keep Data Current
-
-Credit card benefits change frequently. **Help keep our data current!**
-
-### Quick Ways to Contribute:
-1. **Report outdated info** - Use the in-app suggestion system (`Settings → Suggest`)
-2. **Verify benefit amounts** - Check against official bank websites
-3. **Add new cards** - Submit popular cards we're missing
-
-**Reliable Sources:**
-- [US Credit Card Guide](https://www.uscreditcardguide.com/) (comprehensive)
-- [Doctor of Credit](https://www.doctorofcredit.com/) (timely updates)
-- Official bank websites (definitive)
-
-## 🛠️ For Developers
-
-### Quick Start
 ```bash
-git clone https://github.com/lifan-builds/perks-reminder.git
-cd perks-reminder
 npm install
-npx prisma migrate dev
 npm run dev
 ```
 
-### Tech Stack
-- **Frontend:** Next.js 15, React 19, Tailwind CSS 4
-- **Backend:** Next.js API Routes + Server Actions  
-- **Database:** PostgreSQL (Neon main + Neon dev branch)
-- **ORM:** Prisma with generated client
-- **Auth:** NextAuth.js (Google OAuth)
-- **Email:** Resend API for notifications
-- **Deployment:** Vercel with automated cron jobs
+Secrets and runtime configuration are intentionally not documented in tracked project files. Do not create or copy `.env` files from repository instructions. Project operators manage configuration through approved local state and provider dashboards.
 
-> **📄 Complete Documentation:** See [AGENTS.md](AGENTS.md) for detailed system architecture, development guidelines, and implementation details.
+Before any database command, read:
 
-### Testing
-```bash
-npm test   # Jest: unit, API routes, server actions, component tests
-```
+- [.trellis/spec/perks-reminder/database-and-data-safety.md](.trellis/spec/perks-reminder/database-and-data-safety.md)
+- [.trellis/spec/perks-reminder/deployment-and-external-effects.md](.trellis/spec/perks-reminder/deployment-and-external-effects.md)
 
-### Database Environments (Dev + Prod)
+## Safe verification
 
-Perks Reminder uses Neon PostgreSQL with two URLs:
-
-- `DATABASE_URL` = production (Neon main branch)
-- `DATABASE_URL_DEV` = development branch (safe for testing migrations)
-
-Use this workflow:
+These checks do not require a database or production access:
 
 ```bash
-# 1) Verify target before any DB command
-node scripts/check-database-connection.js
-
-# 2) Run migrations on dev first
-DATABASE_URL="$DATABASE_URL_DEV" npx prisma migrate deploy
-
-# 3) Verify migration state on dev
-DATABASE_URL="$DATABASE_URL_DEV" npx prisma migrate status
-
-# 4) Apply to prod only when ready
-DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy
-
-# 5) Verify migration state on prod
-DATABASE_URL="$DATABASE_URL" npx prisma migrate status
+npm test -- --runInBand
+npx tsc --noEmit --pretty false --incremental false
+npm run check:public-db
+npm run card-template:validate
+npm run check:amex-userscripts
 ```
 
-Troubleshooting and safety notes are documented in `docs/safe-migration-guide.md`.
+Do not use `npm run build` as a routine verification command. Follow [.trellis/spec/perks-reminder/verification.md](.trellis/spec/perks-reminder/verification.md) when selecting checks.
 
-### Contribution Guidelines
-See our **[Contributing Guide](CONTRIBUTING.md)** for complete development setup, database safety practices, and pull request process.
+## Catalog contributions
 
-## 🏠 Self-Hosting
-
-Want complete control over your data? Self-hosting Perks Reminder gives you full ownership of your credit card tracking.
+The checked-in DB-free Catalog lives in `src/lib/static-catalog.ts`. `card-templates/` is the contributor intake format:
 
 ```bash
-git clone https://github.com/lifan-builds/perks-reminder.git
-cd perks-reminder
-npm install
-npx prisma migrate deploy
-npm run build
-npm start
+npm run card-template:validate
 ```
 
-**Deployment Options:**
-- **Vercel (Recommended):** Connect your GitHub repo - automatic deployments on push
-- **Self-hosted:** Deploy anywhere that supports Node.js and PostgreSQL
+A Catalog change is not complete until immutable keys, global synchronization, existing-card status propagation, and Benefit Usage Guide disposition are addressed. `prisma/seed.ts` consumes the shared source but is not the normal rollout mechanism.
 
-> **📄 Complete Self-Hosting Guide:** See [AGENTS.md](AGENTS.md) for detailed deployment instructions, environment setup, and troubleshooting.
+Read:
 
-## 🗺️ What's Next
+- [.trellis/spec/perks-reminder/catalog-and-benefit-updates.md](.trellis/spec/perks-reminder/catalog-and-benefit-updates.md)
+- [card-templates/README.md](card-templates/README.md)
+- [docs/community-data-quality-loop.md](docs/community-data-quality-loop.md)
 
-- [x] **Loyalty Program Tracking** - Points/miles expiration monitoring
-- [x] **Progressive Web App** - Native mobile experience
-- [x] **Data Export/Import** - Complete data portability
-- [ ] **Custom Cards** - Add non-predefined cards and benefits
-- [ ] **Advanced Analytics** - Detailed spending and benefit reports
-- [ ] **Multi-User Support** - Household account management
+## Project guidance
 
-Have ideas? [Open an issue](https://github.com/lifan-builds/perks-reminder/issues) and let's discuss!
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution workflow
+- [AGENTS.md](AGENTS.md) — Trellis entry point and safety boundary
+- [.trellis/spec/perks-reminder/index.md](.trellis/spec/perks-reminder/index.md) — domain, database, catalog, AMEX, and deployment contracts
+- [.trellis/spec/frontend/index.md](.trellis/spec/frontend/index.md) — frontend engineering contracts
+- [docs/version-history.md](docs/version-history.md) — user-facing release history
 
-## 💖 Support the Project
+## License
 
-Perks Reminder is **completely free** with no ads or hidden costs. If it saves you money, consider:
-
-- ⭐ **Starring the repo** - Helps others discover the project
-- 🐛 **Reporting issues** - Makes the tool better for everyone  
-- 💡 **Contributing updates** - Keep card data current
-- ☕ **[Buy me a coffee](https://coff.ee/fantasy_c)** - Supports continued development
-
-## 📄 License & Legal
-
-- **License:** MIT - Free for personal and commercial use
-- **Privacy:** [Privacy Policy](PRIVACY.md) - No data selling, minimal collection
-- **Terms:** [Terms of Use](TERMS.md) - Standard usage guidelines
-- **Code of Conduct:** [Community Standards](CODE_OF_CONDUCT.md)
-
----
-
-**Built by [@fantasy_c](https://github.com/lifan-builds)** • **[Live App](https://www.perks-reminder.com/)** • **[Issues](https://github.com/lifan-builds/perks-reminder/issues)** • **[Discussions](https://github.com/lifan-builds/perks-reminder/discussions)**
+MIT. See [LICENSE](LICENSE), [PRIVACY.md](PRIVACY.md), and [TERMS.md](TERMS.md).

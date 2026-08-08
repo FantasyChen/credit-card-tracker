@@ -1,5 +1,5 @@
 import { BROWSER_AMEX_SOURCE_CREDIT_DESCRIPTORS } from "@/lib/amex-benefit-reader/supported-card-credits";
-import { AMEX_WRITABLE_DESTINATIONS } from "../catalog-registry";
+import { AMEX_WRITABLE_DESTINATIONS } from "@/lib/amex-catalog/catalog-registry";
 import {
   AMEX_SERVER_PRODUCT_MATCH_MIN_MARGIN,
   AMEX_SERVER_PRODUCT_MATCH_MIN_SCORE,

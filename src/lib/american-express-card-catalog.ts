@@ -2,7 +2,7 @@ import {
   AMEX_CATALOG_IDENTITY_REGISTRY,
   type AmexCatalogCardName,
   type AmexSourceSemantics,
-} from "./amex-sync/catalog-registry";
+} from "./amex-catalog/catalog-registry";
 
 export type AmericanExpressCatalogFrequency = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY" | "ONE_TIME";
 export type AmericanExpressCatalogCycleAlignment = "CARD_ANNIVERSARY" | "CALENDAR_FIXED";

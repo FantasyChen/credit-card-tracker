@@ -258,14 +258,14 @@ export default async function Home() {
   const userId = session.user.id;
 
   try {
-    const { loadHomeDashboardData } = await import('@/lib/home-dashboard-data');
+    const { loadHomeDashboardSummaryForUser } = await import('@/lib/benefit-dashboard-server');
     const {
       cardCount,
       totalAnnualFees,
       totalClaimedValue,
       expiringSoonBenefits,
       upcomingBenefits,
-    } = await loadHomeDashboardData(userId);
+    } = await loadHomeDashboardSummaryForUser(userId);
 
     const netRoi = totalClaimedValue - totalAnnualFees;
 

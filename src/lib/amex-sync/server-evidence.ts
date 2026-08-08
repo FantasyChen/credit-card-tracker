@@ -1,12 +1,12 @@
-import { normalizeAmexSelectionText } from "@/lib/amex-benefit-reader/normalization";
-import type { AmexPeriodKey } from "./catalog-registry";
+import { normalizeAmexSelectionText } from "@/lib/amex-catalog/normalization";
+import type { AmexPeriodKey } from "@/lib/amex-catalog/catalog-registry";
 import {
   evidenceSatisfiesAmexPolicy,
   GENERIC_FORBIDDEN_AMEX_CREDIT_TOKEN_GROUPS,
   titleSatisfiesAmexPolicy,
   type AmexSourceCreditEvidence,
   type AmexSourceCreditPolicy,
-} from "./source-credit-policy";
+} from "@/lib/amex-catalog/source-credit-policy";
 
 interface ServerProductDescriptor {
   productKey: string;

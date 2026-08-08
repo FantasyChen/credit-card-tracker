@@ -1,8 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
 import { SITE_NAME } from '@/lib/site';
-import { getEffectiveExpirationDays, getEffectiveTier, TIER_LIMITS } from '@/lib/subscription';
-import { BenefitFrequency, type SubscriptionTier } from '@/generated/prisma';
+import { BenefitFrequency } from '@/generated/prisma';
 import { fetchEffectiveBenefitStatuses } from '@/lib/effective-benefit';
 
 const MIN_EMAILABLE_BENEFIT_CYCLE_MS = 28 * 24 * 60 * 60 * 1000 - 1;
@@ -42,10 +41,6 @@ export async function runNotificationDigest({
         notifyNewBenefit: true, notifyBenefitExpiration: true,
         notifyExpirationDays: true, notifyPointsExpiration: true,
         pointsExpirationDays: true,
-        subscriptionTier: true,
-        isBetaUser: true,
-        emailAlertsUsed: true,
-        emailAlertsResetAt: true,
       },
     });
 
@@ -59,7 +54,7 @@ export async function runNotificationDigest({
     const effectiveExpirationDaysByUser = new Map(
       usersToNotify.map((user) => [
         user.id,
-        getEffectiveExpirationDays(getEffectiveTier(user), user.notifyExpirationDays),
+        user.notifyExpirationDays,
       ])
     );
 
@@ -161,7 +156,7 @@ export async function runNotificationDigest({
     });
 
     let emailsSent = 0;
-    let emailsSkippedByLimit = 0;
+    const emailsSkippedByLimit = 0;
 
     if (dryRun) {
       console.log(`🔍 [DRY RUN] Would send ${emailTasks.length} digest emails — skipping`);
@@ -175,21 +170,7 @@ export async function runNotificationDigest({
         const batch = emailTasks.slice(i, i + BATCH);
         const results = await Promise.allSettled(
           batch.map(async (task) => {
-            const user = userMap.get(task.userId);
-            const allowed = user ? canSendEmailAlertForUser(user, today) : false;
-            if (!allowed) {
-              console.log(`⏭️ Skipping email to ${task.to} because alert delivery is not allowed`);
-              emailsSkippedByLimit++;
-              return null;
-            }
-            const sent = await sendEmail({ to: task.to, subject: task.subject, html: task.html });
-            if (sent) {
-              const tier = user ? getEffectiveTier(user) : 'FREE';
-              if (TIER_LIMITS[tier].maxEmailAlertsPerMonth !== Infinity) {
-                await incrementEmailAlertCountForUser(task.userId, today);
-              }
-            }
-            return sent;
+            return sendEmail({ to: task.to, subject: task.subject, html: task.html });
           })
         );
 
@@ -418,46 +399,6 @@ function isEmailEligibleBenefitStatus(status: EmailBenefitStatus): boolean {
   return status.cycleEndDate.getTime() - status.cycleStartDate.getTime() >= MIN_EMAILABLE_BENEFIT_CYCLE_MS;
 }
 
-function canSendEmailAlertForUser(user: NotificationUser, today: Date): boolean {
-  const tier = getEffectiveTier(user);
-  const limits = TIER_LIMITS[tier];
-  if (limits.maxEmailAlertsPerMonth === Infinity) return true;
-
-  if (isDifferentUtcMonth(today, user.emailAlertsResetAt)) {
-    return true;
-  }
-
-  return user.emailAlertsUsed < limits.maxEmailAlertsPerMonth;
-}
-
-async function incrementEmailAlertCountForUser(userId: string, today: Date): Promise<void> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { subscriptionTier: true, isBetaUser: true, emailAlertsResetAt: true },
-  });
-  if (!user || TIER_LIMITS[getEffectiveTier(user)].maxEmailAlertsPerMonth === Infinity) {
-    return;
-  }
-
-  if (isDifferentUtcMonth(today, user.emailAlertsResetAt)) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        emailAlertsUsed: 1,
-        emailAlertsResetAt: today,
-      },
-    });
-    return;
-  }
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      emailAlertsUsed: { increment: 1 },
-    },
-  });
-}
-
 function reminderWindow(today: Date, days: number): { dayStart: Date; dayEnd: Date } {
   const reminderDate = new Date(today);
   reminderDate.setDate(today.getDate() + days);
@@ -465,12 +406,6 @@ function reminderWindow(today: Date, days: number): { dayStart: Date; dayEnd: Da
     dayStart: new Date(Date.UTC(reminderDate.getUTCFullYear(), reminderDate.getUTCMonth(), reminderDate.getUTCDate(), 0, 0, 0, 0)),
     dayEnd: new Date(Date.UTC(reminderDate.getUTCFullYear(), reminderDate.getUTCMonth(), reminderDate.getUTCDate(), 23, 59, 59, 999)),
   };
-}
-
-function isDifferentUtcMonth(referenceDate: Date, previousDate: Date | null): boolean {
-  return !previousDate ||
-    referenceDate.getUTCMonth() !== previousDate.getUTCMonth() ||
-    referenceDate.getUTCFullYear() !== previousDate.getUTCFullYear();
 }
 
 function digestSubjectForSection(label: string): string {
@@ -522,10 +457,6 @@ interface NotificationUser {
   notifyExpirationDays: number;
   notifyPointsExpiration: boolean | null;
   pointsExpirationDays: number | null;
-  subscriptionTier: SubscriptionTier;
-  isBetaUser: boolean;
-  emailAlertsUsed: number;
-  emailAlertsResetAt: Date | null;
 }
 
 interface EmailBenefitStatus {
