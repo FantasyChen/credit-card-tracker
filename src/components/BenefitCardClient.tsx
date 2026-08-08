@@ -10,7 +10,7 @@ import {
   addPartialCompletionAction,
   markFullCompletionAction,
 } from '@/app/benefits/actions';
-import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard';
+import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard-client';
 import { calculateCompletionPercentage } from '@/lib/partial-completion';
 import SuggestCorrectionLink from '@/components/SuggestCorrectionLink';
 

@@ -14,7 +14,7 @@ import {
   type CardLevelRoi,
   type BenefitDashboardFrequency,
   type DisplayBenefitStatus,
-} from '@/lib/benefit-dashboard';
+} from '@/lib/benefit-dashboard-client';
 
 interface BenefitsDisplayProps {
   upcomingBenefits: DisplayBenefitStatus[];
