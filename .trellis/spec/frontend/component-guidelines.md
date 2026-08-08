@@ -22,10 +22,67 @@ return <BenefitsDisplayClient {...projection} />;
 
 Do not move Prisma, secrets, or authorization decisions into a Client Component.
 
+## Scenario: client-safe domain contracts
+
+### 1. Scope / Trigger
+
+Use this contract when an interactive Client Component needs types, constants, or pure helpers from a domain module that also owns server loading, Prisma access, Node built-ins, authentication, or other server-only dependencies.
+
+### 2. Signatures
+
+```ts
+// src/lib/benefit-dashboard-client.ts
+export type DisplayBenefitStatus = /* render DTO */;
+export function resolveBenefitClaimedValue(status: BenefitDashboardStatus): number;
+
+// src/lib/benefit-dashboard.ts
+export { resolveBenefitClaimedValue } from '@/lib/benefit-dashboard-client';
+export async function loadBenefitDashboard(/* server database boundary */): Promise<LoadedBenefitDashboard>;
+```
+
+### 3. Contracts
+
+1. Client Components import runtime helpers and render DTOs from the dedicated client-safe module, not from the server orchestration module.
+2. A client-safe module may use `import type` for server-owned structural types because those imports are erased; it must not value-import Prisma clients, auth, Node built-ins, server actions, or server orchestration modules.
+3. The server owner may import and re-export client-safe contracts to preserve server/test API compatibility.
+4. App Router `page.tsx`, `layout.tsx`, and `route.ts` modules export only framework-supported entry points and configuration fields. Move testable helpers/constants into an adjacent `src/lib` or route-local non-convention module.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Client module value-imports a server owner or Node built-in | Reject in review; production build must not contain the server dependency trace |
+| Client module uses an erased `import type` for a render DTO | Allowed when strict TypeScript and the boundary regression pass |
+| Route convention file exports a helper such as a sanitizer or persistence function | Move it out; generated `.next/types` must accept the route exports |
+| Production build reports `UnhandledSchemeError` for `node:*` | Trace the Client Component import graph and split the first mixed client/server owner |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** `BenefitsDisplayClient` imports dashboard DTOs/helpers from `benefit-dashboard-client.ts`; the server page loads through `benefit-dashboard.ts`.
+- **Base:** Server-only tests and pages continue importing re-exported contracts from `benefit-dashboard.ts` for compatibility.
+- **Bad:** A `'use client'` component imports `benefit-dashboard.ts`, which reaches `effective-benefit.ts` and Node-only migration fingerprinting.
+
+### 6. Tests Required
+
+- A static boundary test asserts every owning Client Component imports the client-safe module and not the server owner.
+- The client-safe module test rejects runtime imports of the server owner/effective loader.
+- Run focused component/domain tests, strict TypeScript after generating current `.next/types`, changed-source ESLint, and the authorized production build when release verification permits it.
+- Confirm Prisma generation/build creates no tracked generated diff.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: pulls a server graph into a Client Component.
+import { resolveBenefitClaimedValue } from '@/lib/benefit-dashboard';
+
+// Correct: imports only the browser-safe contract.
+import { resolveBenefitClaimedValue } from '@/lib/benefit-dashboard-client';
+```
+
 ## Props and Feature DTOs
 
 - Define props next to the component when they are component-specific, as in `BenefitsDisplayProps` and `SearchInputProps`.
-- Import shared domain shapes from their owning module, such as `DisplayBenefitStatus` and `CardLevelRoi` from `src/lib/benefit-dashboard.ts`.
+- Import shared render shapes from their client-safe owner, such as `DisplayBenefitStatus` and `CardLevelRoi` from `src/lib/benefit-dashboard-client.ts`; server loaders and projections remain in `src/lib/benefit-dashboard.ts`.
 - Give optional props defaults at destructuring time when omission is supported.
 - Preserve stable physical-card identity: use `CreditCard.id` for keys/grouping; labels may use `displayName`, nickname, or last digits.
 

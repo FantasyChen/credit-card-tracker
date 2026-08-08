@@ -3,7 +3,7 @@ import {
   isAmexHandoffUrl,
   parseMonitoringErrorReport,
   sanitizeMonitoringUrl,
-} from "@/app/api/monitoring/errors/route";
+} from "@/lib/monitoring/error-report";
 import { ErrorBoundary, sanitizedClientUrl } from "../errorBoundary";
 
 function ThrowingChild(): React.ReactNode {

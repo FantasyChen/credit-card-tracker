@@ -2,53 +2,38 @@ import type { CreditCard as PrismaCreditCard, Prisma, PrismaClient } from '@/gen
 import {
   fetchEffectiveBenefitStatuses,
   fetchEffectiveCardTerms,
-  type EffectiveBenefitStatus,
-  type EffectiveCreditCard,
 } from '@/lib/effective-benefit';
+import type { EffectiveBenefitStatus } from '@/lib/effective-benefit';
 import { createCardDisplayNameMap } from '@/lib/cardDisplayUtils';
 
-export type BenefitDashboardFrequency =
-  | 'ALL'
-  | 'WEEKLY'
-  | 'MONTHLY'
-  | 'QUARTERLY'
-  | 'YEARLY'
-  | 'ONE_TIME';
+import {
+  CUSTOM_BENEFITS_CARD_NAME,
+  resolveBenefitClaimedValue,
+} from '@/lib/benefit-dashboard-client';
+import type {
+  CardLevelRoi,
+  DisplayBenefitStatus,
+} from '@/lib/benefit-dashboard-client';
 
-export const CUSTOM_BENEFITS_CARD_NAME = '⭐ Custom Benefits';
-
-export type DashboardCreditCard = Pick<
-  PrismaCreditCard,
-  'id' | 'name' | 'issuer' | 'lastFourDigits' | 'nickname'
-> & Partial<PrismaCreditCard>;
-
-export type CreditCardWithDisplayName = Omit<EffectiveCreditCard, 'predefinedCardId'> & {
-  predefinedCardId?: string | null;
-  displayName: string;
-};
-
-export interface DisplayBenefitStatus extends Omit<
-  EffectiveBenefitStatus,
-  | 'benefit'
-  | 'creditCardId'
-  | 'predefinedBenefitId'
-  | 'source'
-  | 'usageWaySlug'
-  | 'isCustomBenefit'
-  | 'canMutateDefinition'
-> {
-  benefit: Omit<EffectiveBenefitStatus['benefit'], 'creditCard'> & {
-    creditCard: CreditCardWithDisplayName | null;
-  };
-  creditCardId?: string | null;
-  predefinedBenefitId?: string | null;
-  source?: EffectiveBenefitStatus['source'];
-  usageWaySlug?: string | null;
-  isCustomBenefit?: boolean;
-  canMutateDefinition?: boolean;
-}
-
-export type RawDisplayBenefitStatus = EffectiveBenefitStatus;
+// Keep the established dashboard module as the server orchestration owner,
+// while preserving its shared type/helper API for existing server consumers.
+export {
+  applyBenefitDashboardFilters,
+  calculateBenefitGroupSummary,
+  CUSTOM_BENEFITS_CARD_NAME,
+  isFreeNightOrCertificateBenefit,
+  resolveBenefitClaimedValue,
+} from '@/lib/benefit-dashboard-client';
+export type {
+  BenefitDashboardFilters,
+  BenefitDashboardFrequency,
+  BenefitDashboardStatus,
+  BenefitGroupSummary,
+  CardLevelRoi,
+  CreditCardWithDisplayName,
+  DashboardCreditCard,
+  DisplayBenefitStatus,
+} from '@/lib/benefit-dashboard-client';
 
 export interface UsageWayForDashboard {
   slug: string;
@@ -66,15 +51,6 @@ export interface PredefinedCardFee {
   annualFee: number;
 }
 
-export interface CardLevelRoi {
-  cardId: string | null;
-  cardDisplayName: string;
-  cardName: string;
-  annualFee: number;
-  claimedValue: number;
-  netRoi: number;
-}
-
 export interface BenefitDashboardProjection {
   upcomingBenefits: DisplayBenefitStatus[];
   completedBenefits: DisplayBenefitStatus[];
@@ -87,99 +63,7 @@ export interface BenefitDashboardProjection {
   cardLevelRoi: CardLevelRoi[];
 }
 
-export interface BenefitDashboardFilters {
-  frequency: BenefitDashboardFrequency;
-  freeNightOnly: boolean;
-}
-
-export interface BenefitDashboardStatus {
-  id: string;
-  cycleEndDate: Date | string;
-  isCompleted: boolean;
-  isNotUsable?: boolean;
-  usedAmount: number | null;
-  benefit: {
-    description: string;
-    category: string;
-    frequency: string;
-    maxAmount: number | null;
-  };
-}
-
-export interface BenefitGroupSummary {
-  remainingValue: number;
-  claimedValue: number;
-  partialCount: number;
-  soonestDueDate: Date | null;
-}
-
-const FREE_NIGHT_TERMS = [
-  'free night',
-  'award night',
-  'certificate',
-  'cert',
-  'companion',
-];
-
-export function isFreeNightOrCertificateBenefit(status: BenefitDashboardStatus): boolean {
-  const description = status.benefit.description.toLowerCase();
-  return FREE_NIGHT_TERMS.some((term) => description.includes(term));
-}
-
-export function applyBenefitDashboardFilters<T extends BenefitDashboardStatus>(
-  benefits: T[],
-  filters: BenefitDashboardFilters
-): T[] {
-  return benefits.filter((status) => {
-    const matchesFrequency =
-      filters.frequency === 'ALL' || status.benefit.frequency === filters.frequency;
-    const matchesFreeNight =
-      !filters.freeNightOnly || isFreeNightOrCertificateBenefit(status);
-
-    return matchesFrequency && matchesFreeNight;
-  });
-}
-
-export function resolveBenefitClaimedValue(status: BenefitDashboardStatus): number {
-  const usedAmount = Math.max(0, status.usedAmount ?? 0);
-  if (status.isCompleted && usedAmount === 0) {
-    return Math.max(0, status.benefit.maxAmount ?? 0);
-  }
-  return usedAmount;
-}
-
-export function calculateBenefitGroupSummary(
-  benefits: BenefitDashboardStatus[]
-): BenefitGroupSummary {
-  return benefits.reduce<BenefitGroupSummary>(
-    (summary, status) => {
-      const maxAmount = Math.max(0, status.benefit.maxAmount ?? 0);
-      const claimedValue = resolveBenefitClaimedValue(status);
-      const remainingValue = status.isCompleted || status.isNotUsable
-        ? 0
-        : Math.max(0, maxAmount - claimedValue);
-      const cycleEndDate = new Date(status.cycleEndDate);
-
-      return {
-        remainingValue: summary.remainingValue + remainingValue,
-        claimedValue: summary.claimedValue + claimedValue,
-        partialCount:
-          summary.partialCount +
-          (claimedValue > 0 && !status.isCompleted && !status.isNotUsable ? 1 : 0),
-        soonestDueDate:
-          summary.soonestDueDate === null || cycleEndDate < summary.soonestDueDate
-            ? cycleEndDate
-            : summary.soonestDueDate,
-      };
-    },
-    {
-      remainingValue: 0,
-      claimedValue: 0,
-      partialCount: 0,
-      soonestDueDate: null,
-    }
-  );
-}
+export type RawDisplayBenefitStatus = EffectiveBenefitStatus;
 
 export function buildUsageWaySlugMap(usageWays: UsageWayForDashboard[]): Map<string, string> {
   const usageWayMap = new Map<string, string>();
