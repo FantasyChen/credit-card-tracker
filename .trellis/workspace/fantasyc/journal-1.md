@@ -379,3 +379,24 @@ Resolved dependency warnings within current majors, fixed client/server and App 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 13: Set up branded support email
+
+**Date**: 2026-08-09
+**Task**: Set up branded support email
+**Branch**: `main`
+
+### Summary
+
+Created support@perks-reminder.com forwarding through Spaceship, verified independent Inbox delivery, updated the shared public contact address, and documented the inbound/outbound email boundary.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `97f8367` | (see git log) |
+
+### Status
+
+[OK] **Completed**
