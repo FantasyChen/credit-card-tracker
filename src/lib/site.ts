@@ -4,7 +4,7 @@ export const SITE_DESCRIPTION =
 export const ROOT_DOMAIN = 'perks-reminder.com';
 export const PRIMARY_SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || `https://www.${ROOT_DOMAIN}`;
-export const SUPPORT_EMAIL = 'coupon.cycle@gmail.com';
+export const SUPPORT_EMAIL = 'support@perks-reminder.com';
 
 export function getRootDomain(hostname: string): string | null {
   if (!hostname || hostname.includes('localhost')) return null;

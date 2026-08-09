@@ -1,0 +1,4 @@
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Provider, DNS, email, domain, authorization, rollback, and external-effect rules."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Safe static checks and truthful reporting requirements."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend/TypeScript guidance index for the public contact constant and test."}
+{"file":".trellis/tasks/08-09-business-domain-email/design.md","reason":"Approved provider, DNS, privacy, source, and rollback boundaries."}
