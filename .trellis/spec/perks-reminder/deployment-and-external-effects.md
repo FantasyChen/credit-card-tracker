@@ -28,6 +28,73 @@ Before any Vercel, DNS, cron, email, or production-domain action:
 
 `docs/vercel-domains-and-deploy.md` and `docs/supabase-fallback.md` retain detailed operator procedures. Specs define the safety contract; do not duplicate or casually rewrite provider commands in unrelated changes.
 
+## Scenario: public support email forwarding
+
+### 1. Scope / Trigger
+
+Use this contract when changing the public support address, its inbound forwarding destination, or the provider-managed mail records for `perks-reminder.com`. Inbound support forwarding is separate from Resend transactional delivery and from any hosted mailbox or branded-reply capability.
+
+### 2. Signatures
+
+```ts
+// src/lib/site.ts
+export const SUPPORT_EMAIL = 'support@perks-reminder.com';
+```
+
+```text
+public alias: support@perks-reminder.com
+provider: Spaceship Domain Manager email forwarding
+destination: user-approved provider state; never checked in
+```
+
+### 3. Contracts
+
+1. `support@perks-reminder.com` is the public inbound contact identity. Its private forwarding destination exists only in the provider account and authorized operator session.
+2. Spaceship's individual forwarding rule owns inbound MX/SPF configuration. Do not replace nameservers or web records to create the alias.
+3. Resend remains outbound transactional authority. Preserve its DKIM record, DMARC, `RESEND_API_KEY`, and provider-managed `FROM_EMAIL`; an inbound forwarding change does not authorize changing them.
+4. Forwarding does not promise a hosted mailbox or branded replies. A later send-as/mailbox feature needs its own provider and authentication design.
+5. Obtain action-time confirmation before submitting a rule, charge, DNS change, recipient verification, or test message. Never expose the private destination, credentials, provider identifiers, or message content in tracked evidence.
+6. The checked-in contact constant changes only after the provider rule is ready. A push to auto-deploying `main` remains a separate production release action.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Domain/account is not exactly the established Perks Reminder owner | Stop before editing or submitting |
+| Provider shows a charge or recurring plan | Report exact price/renewal terms and obtain purchase confirmation |
+| Forwarding setup would replace Resend DKIM/DMARC or web records | Stop; do not submit |
+| Destination appears in Git, task evidence, logs, or screenshots | Remove/redact it and fail the privacy gate |
+| Test originates from the destination mailbox itself | Treat it as inconclusive because Gmail can deduplicate its own Message-ID |
+| Distinct-sender test is searchable at the destination with the Inbox label | Accept inbound delivery as verified |
+| MX/SPF exists but no independent message arrives | Keep the task open and inspect propagation/provider state; do not claim success |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** The exact Spaceship domain receives one individual support alias, preserves Resend and Vercel records, and an independent sender reaches the private destination Inbox.
+- **Base:** Public DNS is correct but no distinct sender is available. Report DNS ready and delivery unverified rather than using a self-sent message as proof.
+- **Bad:** Publish the private Gmail destination, create a catch-all rule, replace outbound authentication, or trigger production notification endpoints as a delivery test.
+
+### 6. Tests Required
+
+- Assert `SUPPORT_EMAIL` equals the public alias in a narrow unit test.
+- Check public MX and SPF after the rule is active; separately confirm DMARC, Resend DKIM, and `www` / `loyalty` routing remain present.
+- Send one uniquely titled message from a distinct user-controlled mailbox and verify it appears in the approved destination account with the Inbox label.
+- Run safe TypeScript/test/diff checks. Do not build, deploy, access a database, or trigger cron/notification routes merely to validate forwarding.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong:
+destination Gmail -> public alias -> same Gmail Sent/All Mail
+  => claim forwarding works
+
+Correct:
+distinct sender -> public alias -> private destination Inbox label
+  + MX/SPF present
+  + Resend DKIM/DMARC and web routing preserved
+  => inbound forwarding verified
+```
+
 ## Scenario: production configuration deployment and alias verification
 
 ### 1. Scope / Trigger

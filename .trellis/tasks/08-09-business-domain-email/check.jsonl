@@ -1,0 +1,4 @@
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Verify provider/email actions stayed within explicit authorization and preserved Resend/web routing."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Verify the selected checks, complete diff review, and sensitive-data scan."}
+{"file":".trellis/tasks/08-09-business-domain-email/prd.md","reason":"Verify acceptance criteria and scope."}
+{"file":".trellis/tasks/08-09-business-domain-email/design.md","reason":"Verify execution and rollback match the approved design."}
