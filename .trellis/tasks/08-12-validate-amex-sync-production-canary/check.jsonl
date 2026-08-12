@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Check browser read isolation, synthetic corner cases, storage/privacy, and exact installed userscript scope."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Check duplicate prevention, exact-five ownership, proposal freshness, transactional writes, and replay."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Check target/recovery proof and absence of unauthorized database operations or leaked private evidence."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Check separate preview/write/off deployments and primary-alias equality."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Check proportional command selection and truthful gate reporting."}
+{"file":".trellis/tasks/archive/2026-08/08-06-production-category-drift-repair/implement.md","reason":"Check that category repair completed and no later canary violates the retained off/reactivation boundary."}

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { BrowserContext, Page, Request, Route } from "@playwright/test";
 
@@ -7,9 +7,21 @@ export const SYNTHETIC_AMEX_URL = "https://global.americanexpress.com/card-benef
 export const SYNTHETIC_AMEX_NON_BENEFITS_URL = "https://global.americanexpress.com/account-overview";
 export const SYNTHETIC_HANDOFF_TRANSFER_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 export const SYNTHETIC_HANDOFF_URL = `https://www.perks-reminder.com/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
+export const SYNTHETIC_HANDOFF_NO_QUERY_URL = "https://www.perks-reminder.com/integrations/amex-sync" as const;
+export const SYNTHETIC_HANDOFF_SIBLING_PATH_URL = `https://www.perks-reminder.com/integrations/amex-sync-other?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
+export const SYNTHETIC_HANDOFF_ALTERNATE_ORIGIN_URL = `https://perks-reminder.com/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
+export const SYNTHETIC_HANDOFF_ALTERNATE_SCHEME_URL = `http://www.perks-reminder.com/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
+export const SYNTHETIC_HANDOFF_ALTERNATE_PORT_URL = `https://www.perks-reminder.com:8443/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
 export const SYNTHETIC_LOCAL_HANDOFF_URL = `http://localhost:3000/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
 export type SyntheticAmexDocumentUrl = typeof SYNTHETIC_AMEX_URL | typeof SYNTHETIC_AMEX_NON_BENEFITS_URL;
-export type SyntheticHandoffDocumentUrl = typeof SYNTHETIC_HANDOFF_URL | typeof SYNTHETIC_LOCAL_HANDOFF_URL;
+export type SyntheticHandoffDocumentUrl =
+  | typeof SYNTHETIC_HANDOFF_URL
+  | typeof SYNTHETIC_HANDOFF_NO_QUERY_URL
+  | typeof SYNTHETIC_HANDOFF_SIBLING_PATH_URL
+  | typeof SYNTHETIC_HANDOFF_ALTERNATE_ORIGIN_URL
+  | typeof SYNTHETIC_HANDOFF_ALTERNATE_SCHEME_URL
+  | typeof SYNTHETIC_HANDOFF_ALTERNATE_PORT_URL
+  | typeof SYNTHETIC_LOCAL_HANDOFF_URL;
 export type SyntheticDocumentUrl = SyntheticAmexDocumentUrl | SyntheticHandoffDocumentUrl;
 export const STORE_KEY = "perksReminder.amexBenefitReader.store.v1";
 export const IDENTITY_SECRET_KEY = "perksReminder.amexBenefitReader.identitySecret.v1";
@@ -32,6 +44,26 @@ const SECONDARY_TOKEN = "invented-e2e-secondary-primary-token";
 const EXCLUDED_SUPPLEMENTARY_TOKEN = "invented-e2e-excluded-supplementary-token";
 const EMPTY_BENEFITS_TOKEN = "invented-e2e-empty-benefits-token";
 const SYNTHETIC_ORIGIN = "https://global.americanexpress.com";
+
+function metadataPatternMatches(pattern: string, value: string): boolean {
+  const expression = pattern
+    .split("*")
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join(".*");
+  return new RegExp(`^${expression}$`).test(value);
+}
+
+async function bundleActivatesAt(bundlePath: string, url: string): Promise<boolean> {
+  const source = await readFile(bundlePath, "utf8");
+  const metadataEnd = source.indexOf("// ==/UserScript==");
+  assert.notEqual(metadataEnd, -1, "userscript metadata is missing");
+  const metadata = source.slice(0, metadataEnd);
+  const patterns = Array.from(
+    metadata.matchAll(/^\/\/ @(?:match|include)\s+(.+)$/gm),
+    (match) => match[1].trim(),
+  );
+  return patterns.some((pattern) => metadataPatternMatches(pattern, url));
+}
 
 export type HarnessScenario = "complete" | "benefit_empty" | "all_benefit_empty" | "reviewed_exclusions" | "approved_v3_products" | "conflict_diagnostics" | "catalog_failure" | "cancellation" | "rescan_tracker_failure" | "high_scale";
 export type ApiOperation = "member" | "tracker" | "catalog";
@@ -159,6 +191,11 @@ const syntheticDocuments = new Map<SyntheticDocumentUrl, string>([
   [SYNTHETIC_AMEX_URL, syntheticBenefitsDocument],
   [SYNTHETIC_AMEX_NON_BENEFITS_URL, syntheticNonBenefitsDocument],
   [SYNTHETIC_HANDOFF_URL, syntheticHandoffDocument],
+  [SYNTHETIC_HANDOFF_NO_QUERY_URL, syntheticHandoffDocument],
+  [SYNTHETIC_HANDOFF_SIBLING_PATH_URL, syntheticHandoffDocument],
+  [SYNTHETIC_HANDOFF_ALTERNATE_ORIGIN_URL, syntheticHandoffDocument],
+  [SYNTHETIC_HANDOFF_ALTERNATE_SCHEME_URL, syntheticHandoffDocument],
+  [SYNTHETIC_HANDOFF_ALTERNATE_PORT_URL, syntheticHandoffDocument],
   [SYNTHETIC_LOCAL_HANDOFF_URL, syntheticHandoffDocument],
 ]);
 
@@ -931,20 +968,25 @@ export class SyntheticAmexHarness {
     mailbox: unknown,
     target: "production" | "local" = "production",
     documentTarget: "production" | "local" = target,
+    options: { respectMetadata?: boolean; documentUrl?: SyntheticHandoffDocumentUrl } = {},
   ): Promise<void> {
     const bundlePath = target === "local" ? LOCAL_BUNDLE_PATH : BUNDLE_PATH;
-    const handoffUrl = documentTarget === "local" ? SYNTHETIC_LOCAL_HANDOFF_URL : SYNTHETIC_HANDOFF_URL;
+    const handoffUrl = options.documentUrl
+      ?? (documentTarget === "local" ? SYNTHETIC_LOCAL_HANDOFF_URL : SYNTHETIC_HANDOFF_URL);
     await access(bundlePath);
+    const shouldInject = !options.respectMetadata || await bundleActivatesAt(bundlePath, handoffUrl);
     this.storage.set(SYNC_MAILBOX_KEY, clone(mailbox));
     this.currentDocumentUrl = handoffUrl;
     await this.runExpectedNavigation(
       handoffUrl,
       () => this.page.goto(handoffUrl, { waitUntil: "domcontentloaded" }),
     );
-    this.expectedHandoffHistoryCleanupOrigin = target === documentTarget
+    this.expectedHandoffHistoryCleanupOrigin = shouldInject && target === documentTarget
       ? new URL(handoffUrl).origin
       : null;
-    await this.page.addScriptTag({ path: bundlePath });
+    if (shouldInject) {
+      await this.page.addScriptTag({ path: bundlePath });
+    }
     await this.page.evaluate(() => window.dispatchEvent(new Event("amex-e2e-bundle-injected")));
   }
 

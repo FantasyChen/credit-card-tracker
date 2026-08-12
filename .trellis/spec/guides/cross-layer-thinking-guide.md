@@ -121,6 +121,19 @@ After implementation:
 - [ ] Checked that derived state points back to the source event identifier
       (`seq`, `id`, `version`) instead of inventing a second cursor
 
+### Browser extension execution worlds
+
+For userscripts and browser extensions, the page realm and the isolated script
+realm are separate layers even when both expose a value named `window`.
+Same-window protocols that require `event.source === window` must identify the
+page-realm window explicitly (for Tampermonkey, through a reviewed
+`unsafeWindow` grant) and keep exact origin, path, message-schema, and integrity
+checks at that boundary. A bundle injected directly with `addScriptTag` executes
+in the page realm and cannot by itself prove isolated-world behavior. Pair that
+test with an artifact assertion for the required grant and page-window binding,
+then validate one real installed handoff while the destination remains
+zero-write.
+
 ---
 
 ## Cross-Platform Template Consistency

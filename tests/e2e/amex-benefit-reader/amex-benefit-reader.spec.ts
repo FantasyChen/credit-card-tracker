@@ -11,6 +11,12 @@ import {
   V3_SELECTION_COMPATIBILITY_VALUE,
   SYNTHETIC_AMEX_NON_BENEFITS_URL,
   SYNTHETIC_HANDOFF_TRANSFER_ID,
+  SYNTHETIC_HANDOFF_NO_QUERY_URL,
+  SYNTHETIC_HANDOFF_SIBLING_PATH_URL,
+  SYNTHETIC_HANDOFF_ALTERNATE_ORIGIN_URL,
+  SYNTHETIC_HANDOFF_ALTERNATE_SCHEME_URL,
+  SYNTHETIC_HANDOFF_ALTERNATE_PORT_URL,
+  SYNTHETIC_LOCAL_HANDOFF_URL,
   SyntheticAmexHarness,
 } from "./harness";
 
@@ -184,7 +190,7 @@ test("shows only real scan progress until the built reader reaches a terminal re
   await harness.openAndInject();
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.5.1");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "0.5.3");
   const scanButton = page.getByRole("button", { name: "Scan all cards" });
   expect(harness.apiRequests()).toHaveLength(0);
   await scanButton.click();
@@ -404,13 +410,41 @@ test("bridges one strict storage-only mailbox on the exact production handoff br
   const harness = new SyntheticAmexHarness(context, page, "complete");
   await harness.installBeforeNavigation();
 
-  await harness.openHandoffAndInject(await createSyntheticHandoffMailbox());
+  await harness.openHandoffAndInject(await createSyntheticHandoffMailbox(), "production", "production", {
+    respectMetadata: true,
+  });
   await expect(page.locator("body")).toHaveAttribute("data-handoff-state", "accepted");
   await expect(page.locator("body")).not.toHaveAttribute("data-premature-payload", "true");
   expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(false);
   await expect(page.locator("#perks-reminder-amex-reader")).toHaveCount(0);
   expect(harness.apiRequests()).toHaveLength(0);
   harness.assertNetworkStayedSynthetic();
+});
+
+test("does not activate the production artifact outside the exact transfer handoff URL", async ({ context, page }) => {
+  const excludedUrls = [
+    SYNTHETIC_HANDOFF_NO_QUERY_URL,
+    SYNTHETIC_HANDOFF_SIBLING_PATH_URL,
+    SYNTHETIC_HANDOFF_ALTERNATE_ORIGIN_URL,
+    SYNTHETIC_HANDOFF_ALTERNATE_SCHEME_URL,
+    SYNTHETIC_HANDOFF_ALTERNATE_PORT_URL,
+    SYNTHETIC_LOCAL_HANDOFF_URL,
+  ] as const;
+
+  const harness = new SyntheticAmexHarness(context, page, "complete");
+  await harness.installBeforeNavigation();
+  for (const excludedUrl of excludedUrls) {
+    await harness.openHandoffAndInject(await createSyntheticHandoffMailbox(), "production", "production", {
+      respectMetadata: true,
+      documentUrl: excludedUrl,
+    });
+    await expect(page.locator("body")).toHaveAttribute("data-ready-announced", "true");
+    await expect(page.locator("body")).toHaveAttribute("data-handoff-state", "waiting");
+    await expect(page.locator("#perks-reminder-amex-reader")).toHaveCount(0);
+    expect(harness.storage.has(SYNC_MAILBOX_KEY)).toBe(true);
+    expect(harness.apiRequests()).toHaveLength(0);
+    harness.assertNetworkStayedSynthetic();
+  }
 });
 
 test("bridges the local artifact only on the exact localhost handoff branch", async ({ context, page }) => {
