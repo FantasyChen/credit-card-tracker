@@ -9,14 +9,15 @@ const artifacts = [
     path: resolve(root, "build/amex-benefit-reader.user.js"),
     name: "Perks Reminder — Amex Benefit Reader",
     namespace: "https://perks-reminder.com/",
-    version: "0.5.1",
+    version: "0.5.3",
     targetName: "production",
     matches: [
       "https://global.americanexpress.com/*",
-      "https://www.perks-reminder.com/integrations/amex-sync",
     ],
-    includes: [],
-    grants: ["GM.getValue", "GM.setValue", "GM.deleteValue"],
+    includes: [
+      "https://www.perks-reminder.com/integrations/amex-sync?transfer=*",
+    ],
+    grants: ["GM.getValue", "GM.setValue", "GM.deleteValue", "unsafeWindow"],
   },
   {
     label: "local",
@@ -71,7 +72,7 @@ function compareNumericVersions(left, right) {
   return 0;
 }
 
-const previouslyInstalledProductionVersion = "0.5.0";
+const previouslyInstalledProductionVersion = "0.5.2";
 const approvedArtifactOrigins = new Set([
   "http://localhost:3000",
   "https://functions.americanexpress.com",
@@ -111,6 +112,22 @@ assert.equal(matchPatternHasPort("http://localhost:3000/*"), true, "port-bearing
 assert.equal(matchPatternHasPort("https://global.americanexpress.com/*"), false);
 
 const localInclude = artifacts[1].includes[0];
+const productionInclude = artifacts[0].includes[0];
+assert.equal(
+  includePatternMatches(productionInclude, "https://www.perks-reminder.com/integrations/amex-sync?transfer=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+  true,
+  "production @include must cover the transfer handoff URL",
+);
+for (const excludedUrl of [
+  "https://www.perks-reminder.com/integrations/amex-sync",
+  "https://www.perks-reminder.com/integrations/amex-sync-other?transfer=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "http://www.perks-reminder.com/integrations/amex-sync?transfer=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "https://perks-reminder.com/integrations/amex-sync?transfer=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "https://www.perks-reminder.com:8443/integrations/amex-sync?transfer=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "http://localhost:3000/integrations/amex-sync?transfer=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+]) {
+  assert.equal(includePatternMatches(productionInclude, excludedUrl), false, `production @include unexpectedly covers ${excludedUrl}`);
+}
 assert.equal(
   includePatternMatches(localInclude, "http://localhost:3000/integrations/amex-sync?transfer=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
   true,
@@ -149,6 +166,12 @@ for (const artifact of artifacts) {
   assert.equal(metadata.includes("@require"), false);
 
   assert.equal(
+    source.includes('const pageWindow = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;'),
+    true,
+    `${artifact.label} handoff must use the page-realm window exposed by Tampermonkey`,
+  );
+
+  assert.equal(
     source.includes(`resolveAmexSyncHandoffTarget("${artifact.targetName}")`),
     true,
     `${artifact.label} build target was not compiled into the artifact`,
@@ -174,4 +197,4 @@ assert.notEqual(artifacts[0].name, artifacts[1].name);
 assert.notEqual(artifacts[0].namespace, artifacts[1].namespace);
 assert.notEqual(artifacts[0].version, artifacts[1].version);
 
-console.log("Verified strict production version increase, target separation, and the port-aware local include.");
+console.log("Verified strict production version increase, exact transfer includes, target separation, and port-aware local include.");

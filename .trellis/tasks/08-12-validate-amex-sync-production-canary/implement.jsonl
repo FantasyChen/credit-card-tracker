@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Owns live browser-read, generated-bundle, normalized persistence, Tampermonkey update, and privacy contracts."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Owns exact-card/global destination authority, duplicate exclusion, preview, confirmation, replay, and category-repair authority."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Owns production target verification, recovery, database privacy, and operational stop rules."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Owns production configuration deployment, immutable deployment/alias equality, effective-mode proof, and rollback."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Owns safe static checks and truthful pass/fail/blocked/skipped reporting."}
+{"file":".trellis/tasks/archive/2026-08/08-06-production-category-drift-repair/implement.md","reason":"Provides the completed production repair/parity evidence and the explicit AMEX-off/reactivation boundary."}

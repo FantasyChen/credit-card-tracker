@@ -43,7 +43,7 @@ function isExactHandoffPage(): boolean {
 
 function mountHandoffBridge(): void {
   const storage = new HandoffMailboxStorage();
-  const pageWindow = AMEX_SYNC_HANDOFF_TARGET.name === "local" && typeof unsafeWindow !== "undefined"
+  const pageWindow = typeof unsafeWindow !== "undefined"
     ? unsafeWindow
     : window;
   let activeMailbox: Awaited<ReturnType<typeof loadAmexSyncMailbox>> | null = null;

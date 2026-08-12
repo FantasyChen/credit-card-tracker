@@ -553,7 +553,7 @@ Local-only rows remain visible but produce no envelope row. Browser mapping and 
 
 ## Historical scenario: envelope-V2 reviewed handoff and confirmed AMEX synchronization
 
-> **Superseded:** This section records the original Platinum-only `amex-sync-envelope/2` contract. The current production userscript `0.5.1`, envelope V3, global-definition catalog authority, exact-last-five matching, status reconciliation, and grouped persistence live in [AMEX Sync Reconciliation](amex-sync-reconciliation.md); global catalog and legacy transition contracts live in [Global Benefit Definitions and Migration](global-benefit-definitions-and-migration.md). Preserve the reusable privacy, authentication, proposal, provenance, idempotency, and audit principles below, but do not reintroduce V2 manual mappings, its narrow allowlist, or per-user destination-key authority.
+> **Superseded:** This section records the original Platinum-only `amex-sync-envelope/2` contract. The current production userscript `0.5.3`, envelope V3, global-definition catalog authority, exact-last-five matching, status reconciliation, and grouped persistence live in [AMEX Sync Reconciliation](amex-sync-reconciliation.md); global catalog and legacy transition contracts live in [Global Benefit Definitions and Migration](global-benefit-definitions-and-migration.md). Preserve the reusable privacy, authentication, proposal, provenance, idempotency, and audit principles below, but do not reintroduce V2 manual mappings, its narrow allowlist, or per-user destination-key authority.
 
 ### 1. Scope / Trigger
 
@@ -744,7 +744,7 @@ For every reviewed browser-to-first-party synchronization:
 
 - assert no acknowledgement in `off`, after preview HTTP failure, or after a malformed preview body; assert exactly one matching acknowledgement only after typed preview success and mailbox deletion only after acceptance or terminal cleanup;
 - assert successful preview/confirmation responses reject missing and unknown fields, incomplete nested state/change objects, oversized arrays/strings, impossible phase dispositions, invalid disposition/reason combinations, and inconsistent `updatedCount`; assert mapping options are active, owned, limited to source-envelope product keys, deterministically sorted, capped, and labeled within 200 characters;
-- assert exact two userscript match scopes, storage-only grants, `@noframes`, top-frame checks, no provider runtime on the handoff, and no side effects on unrelated origins/paths;
+- assert exact userscript provider/handoff scopes, the three storage grants plus reviewed page-realm `unsafeWindow`, `@noframes`, top-frame checks, no provider runtime on the handoff, and no side effects on unrelated origins/paths;
 - assert V1/V2 remain review-only, non-current envelope/mailbox/parser versions fail closed, current-parser V3 selection is latest/current/complete/fresh/successful, local observations contain no destination keys, browser product/title mapping is exact, duplicate destination families exclude the card, server product/family authority is independently exact, and structured source ranges resolve exactly one current cycle/occurrence;
 - assert older, equal-identical, equal-conflicting, newer-applied, and newer-already-current provenance ordering;
 - assert transaction-local ownership/card/benefit/cycle/before-state/provenance revalidation, a scoped status compare-and-set, and atomic status/provenance/audit persistence;
