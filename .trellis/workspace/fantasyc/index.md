@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 13
-- **Last Active**: 2026-08-09
+- **Total Sessions**: 14
+- **Last Active**: 2026-08-12
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~402 | Active |
+| `journal-1.md` | ~423 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-08-12 | Validate production AMEX sync canary | `5854a48` | `main` |
 | 13 | 2026-08-09 | Set up branded support email | `97f8367` | `main` |
 | 12 | 2026-08-07 | Ship architecture cleanup | `1f67a3b`, `a123151`, `7c42836` | `main` |
 | 11 | 2026-08-07 | Architecture cleanup and module deepening | `06f4b65`, `6e2ef1f`, `afef8ac`, `3f95707`, `02deb43`, `a0ed391`, `47a3764`, `a7e577a` | `codex/architecture-cleanup` |

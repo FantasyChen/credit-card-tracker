@@ -400,3 +400,24 @@ Created support@perks-reminder.com forwarding through Spaceship, verified indepe
 ### Status
 
 [OK] **Completed**
+
+
+## Session 14: Validate production AMEX sync canary
+
+**Date**: 2026-08-12
+**Task**: Validate production AMEX sync canary
+**Branch**: `main`
+
+### Summary
+
+Installed and live-tested userscript 0.5.3, confirmed five production status updates exactly once, proved replay and fresh-preview idempotency with no duplicates, and returned production AMEX sync to effective off.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5854a48` | (see git log) |
+
+### Status
+
+[OK] **Completed**
