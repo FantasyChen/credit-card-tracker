@@ -10,6 +10,7 @@ const publicSurfaceFiles = [
   'src/app/benefits/how-to-use/page.tsx',
   'src/app/benefits/how-to-use/[slug]/page.tsx',
   'src/app/referrals/page.tsx',
+  'src/app/integrations/amex-sync/setup/page.tsx',
   'src/app/sitemap.ts',
   'src/components/SupportedCreditCards.tsx',
 ];

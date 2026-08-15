@@ -11,6 +11,7 @@ import {
   UserCircleIcon,
   ShieldCheckIcon,
   SparklesIcon,
+  PuzzlePieceIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/ui/PageHeader';
 
@@ -82,6 +83,13 @@ export default async function SettingsPage() {
       icon: <ArrowDownTrayIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />,
       title: 'Import & Export Data',
       description: 'Backup your data or import from a previous export.',
+    },
+    {
+      href: '/integrations/amex-sync/setup',
+      icon: <PuzzlePieceIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />,
+      title: 'Amex reader setup',
+      description: 'Install the Greasy Fork reader and review the manual, local-only scan flow.',
+      badge: 'Optional',
     },
   ];
 

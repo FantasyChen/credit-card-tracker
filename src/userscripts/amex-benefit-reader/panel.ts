@@ -11,6 +11,7 @@ import type { ScanProgress, ScanReporter } from "@/lib/amex-benefit-reader/scan-
 import { formatAmexBenefitTitle } from "./provider-text";
 
 export const AMEX_READER_HOST_ID = "perks-reminder-amex-reader";
+export const PERKS_REMINDER_MARK_SVG = `<svg viewBox="0 0 40 40" role="img" aria-label="Perks Reminder" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="12" fill="#172033"/><path d="M11 20a9 9 0 0 1 15.2-6.5M29 20a9 9 0 0 1-15.2 6.5" fill="none" stroke="#8fe3c1" stroke-width="3" stroke-linecap="round"/><path d="m25 10 2 4-4 1M15 30l-2-4 4-1" fill="none" stroke="#ffcf70" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 export interface PanelActions {
   startScan(): Promise<void>;
@@ -486,16 +487,19 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     this.root.replaceChildren();
     const style = element("style");
     style.textContent = `
-      :host { all: initial; --pr-bg: #f8fafc; --pr-card: #ffffff; --pr-text: #1f2937; --pr-muted: #667085; --pr-border: #e4e7ec; --pr-primary: #27313d; --pr-primary-hover: #1f2933; --pr-amber: #d97706; --pr-amber-bg: #fffbeb; --pr-amber-border: #fde68a; --pr-blue: #2563eb; --pr-blue-bg: #eff6ff; --pr-blue-border: #bfdbfe; --pr-green: #059669; --pr-green-bg: #ecfdf5; --pr-green-border: #a7f3d0; --pr-red: #dc2626; --pr-red-bg: #fef2f2; --pr-red-border: #fecaca; }
+      :host { all: initial; --pr-bg: #f8fafc; --pr-card: #ffffff; --pr-text: #1f2937; --pr-muted: #667085; --pr-control: #475467; --pr-amount: #111827; --pr-muted-surface: #f8fafc; --pr-muted-surface-text: #667085; --pr-filter-active-bg: #eef2f6; --pr-filter-active-text: #1f2937; --pr-empty-border: #cbd5e1; --pr-border: #e4e7ec; --pr-primary: #27313d; --pr-primary-hover: #1f2933; --pr-amber: #d97706; --pr-amber-bg: #fffbeb; --pr-amber-border: #fde68a; --pr-blue: #2563eb; --pr-blue-bg: #eff6ff; --pr-blue-border: #bfdbfe; --pr-green: #059669; --pr-green-bg: #ecfdf5; --pr-green-border: #a7f3d0; --pr-red: #dc2626; --pr-red-bg: #fef2f2; --pr-red-border: #fecaca; }
       * { box-sizing: border-box; }
-      .launcher { position: fixed; z-index: 2147483647; top: 16px; right: 16px; display: grid; width: 48px; min-height: 48px; padding: 0; place-items: center; border: 1px solid #475467; border-radius: 14px; background: var(--pr-primary); color: #fff; box-shadow: 0 8px 24px rgba(15,23,42,.2); font: 800 13px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: .04em; }
+      .launcher { position: fixed; z-index: 2147483647; top: 16px; right: 16px; display: grid; width: 52px; min-height: 52px; padding: 7px; place-items: center; border: 1px solid #475467; border-radius: 16px; background: var(--pr-primary); color: #fff; box-shadow: 0 8px 24px rgba(15,23,42,.2); }
       .launcher:hover { background: var(--pr-primary-hover); }
-      .panel { position: fixed; z-index: 2147483647; top: 16px; right: 16px; width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; border: 1px solid var(--pr-border); border-radius: 16px; background: var(--pr-bg); color: var(--pr-text); box-shadow: 0 18px 50px rgba(15,23,42,.18); font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .launcher svg { width: 36px; height: 36px; }
+      .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+      .panel { position: fixed; z-index: 2147483647; top: 16px; right: 16px; width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; border: 1px solid var(--pr-border); border-radius: 20px; background: var(--pr-bg); color: var(--pr-text); box-shadow: 0 18px 50px rgba(15,23,42,.18); font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       h2,h3,h4,p { margin: 0; } h2 { font-size: 19px; line-height: 1.2; } h3 { font-size: 16px; line-height: 1.3; } h4 { font-size: 14px; line-height: 1.35; } ul { margin: 0; }
       .top { padding: 18px; border-bottom: 1px solid var(--pr-border); background: var(--pr-card); border-radius: 16px 16px 0 0; }
       .brand-row { display: flex; align-items: center; gap: 10px; }
-      .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; background: var(--pr-primary); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
-      .collapse-button { min-height: 34px; margin-left: auto; padding: 6px 9px; color: #475467; font-size: 12px; }
+      .brand-mark { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 12px; background: var(--pr-primary); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .04em; overflow: hidden; }
+      .brand-mark svg { width: 34px; height: 34px; }
+      .collapse-button { min-height: 34px; margin-left: auto; padding: 6px 9px; color: var(--pr-control); font-size: 12px; }
       .eyebrow { margin-top: 2px; color: var(--pr-muted); font-size: 12px; }
       .privacy-banner { margin-top: 14px; padding: 10px 12px; border: 1px solid #dbeafe; border-radius: 10px; background: #f0f7ff; color: #334155; font-size: 12px; }
       .privacy-banner strong { display: block; margin-bottom: 2px; color: #1e3a5f; font-size: 13px; }
@@ -508,7 +512,7 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       button:focus-visible, summary:focus-visible { outline: 3px solid rgba(71,85,105,.28); outline-offset: 2px; }
       button:disabled { opacity: .52; cursor: default; transform: none; }
       .scan-workspace { display: grid; gap: 14px; padding: 22px 18px; }
-      .scan-status { padding: 10px 12px; border: 1px solid var(--pr-border); border-radius: 10px; background: #f8fafc; color: #475467; font-size: 13px; }
+      .scan-status { padding: 10px 12px; border: 1px solid var(--pr-border); border-radius: 10px; background: var(--pr-muted-surface); color: var(--pr-muted-surface-text); font-size: 13px; }
       .scan-progress { width: 100%; height: 10px; accent-color: var(--pr-primary); }
       .scan-cancel { width: 100%; }
       .notice { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
@@ -520,8 +524,8 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       .card-summary { margin-top: 4px; color: var(--pr-muted); font-size: 12px; }
       .status-pill { display: inline-flex; align-items: center; flex: 0 0 auto; border: 1px solid; border-radius: 999px; font-size: 11px; font-weight: 750; white-space: nowrap; padding: 3px 7px; }
       .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-      .filter-button { min-height: 40px; padding: 7px 10px; color: #475467; font-size: 13px; }
-      .filter-button[aria-pressed="true"] { border-color: #94a3b8; background: #eef2f6; color: #1f2937; box-shadow: inset 0 0 0 1px rgba(71,85,105,.08); }
+      .filter-button { min-height: 40px; padding: 7px 10px; color: var(--pr-control); font-size: 13px; }
+      .filter-button[aria-pressed="true"] { border-color: #94a3b8; background: var(--pr-filter-active-bg); color: var(--pr-filter-active-text); box-shadow: inset 0 0 0 1px rgba(71,85,105,.08); }
       .benefit-list { display: grid; gap: 10px; padding: 0; margin-top: 12px; list-style: none; }
       .benefit-card { position: relative; overflow: hidden; padding: 13px 13px 12px 16px; border: 1px solid var(--pr-border); border-radius: 11px; background: var(--pr-card); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
       .benefit-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: #94a3b8; }
@@ -531,27 +535,31 @@ export class AmexBenefitReaderPanel implements ScanReporter {
       .status-pill.tone-amber { border-color: var(--pr-amber-border); background: var(--pr-amber-bg); color: #92400e; }
       .status-pill.tone-blue { border-color: var(--pr-blue-border); background: var(--pr-blue-bg); color: #1d4ed8; }
       .status-pill.tone-green { border-color: var(--pr-green-border); background: var(--pr-green-bg); color: #047857; }
-      .status-pill.tone-muted { border-color: var(--pr-border); background: #f8fafc; color: #667085; }
+      .status-pill.tone-muted { border-color: var(--pr-border); background: var(--pr-muted-surface); color: var(--pr-muted-surface-text); }
       .benefit-essentials { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; margin-top: 7px; }
-      .amount { color: #111827; font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; }
+      .amount { color: var(--pr-amount); font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; }
       .period { color: var(--pr-muted); font-size: 12px; }
       details { margin-top: 10px; }
-      summary { color: #475467; font-size: 12px; font-weight: 700; cursor: pointer; }
-      .empty-state { margin-top: 12px; padding: 18px 12px; border: 1px dashed #cbd5e1; border-radius: 10px; color: var(--pr-muted); text-align: center; }
+      summary { color: var(--pr-control); font-size: 12px; font-weight: 700; cursor: pointer; }
+      .empty-state { margin-top: 12px; padding: 18px 12px; border: 1px dashed var(--pr-empty-border); border-radius: 10px; color: var(--pr-muted); text-align: center; }
       .footer { padding: 0 16px 16px; }
       .privacy-details p { margin-top: 8px; color: var(--pr-muted); font-size: 12px; }
       .clear-button { width: 100%; margin-top: 10px; padding: 8px 10px; border-color: var(--pr-red-border); color: #b91c1c; }
+      @media (prefers-color-scheme: dark) { :host { --pr-bg:#111827; --pr-card:#1f2937; --pr-text:#f8fafc; --pr-muted:#cbd5e1; --pr-control:#e2e8f0; --pr-amount:#f8fafc; --pr-muted-surface:#172033; --pr-muted-surface-text:#cbd5e1; --pr-filter-active-bg:#374151; --pr-filter-active-text:#f8fafc; --pr-empty-border:#4b5563; --pr-border:#374151; --pr-primary:#0f766e; --pr-primary-hover:#115e59; } .privacy-banner { background:#172554; color:#dbeafe; border-color:#1d4ed8; } .privacy-banner strong { color:#fef3c7; } }
       @media (max-width: 520px) { .panel { top: 8px; right: 8px; width: calc(100vw - 16px); max-height: calc(100vh - 16px); } }
       @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
     `;
 
     if (this.collapsed) {
-      const launcher = element("button", "PR");
+      const launcher = element("button");
       launcher.type = "button";
       launcher.className = "launcher";
       launcher.setAttribute("aria-label", "Open Perks Reminder Amex benefit reader");
       launcher.setAttribute("aria-expanded", "false");
       launcher.setAttribute("aria-controls", "pr-reader-panel");
+      launcher.innerHTML = PERKS_REMINDER_MARK_SVG;
+      launcher.append(element("span", "PR"));
+      launcher.lastElementChild!.className = "sr-only";
       launcher.addEventListener("click", () => {
         this.collapsed = false;
         this.render();
@@ -600,9 +608,10 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     top.className = "top";
     const brand = element("div");
     brand.className = "brand-row";
-    const brandMark = element("div", "PR");
+    const brandMark = element("div");
     brandMark.className = "brand-mark";
     brandMark.setAttribute("aria-hidden", "true");
+    brandMark.innerHTML = PERKS_REMINDER_MARK_SVG;
     brand.append(brandMark);
     const brandText = element("div");
     const title = element("h2", "Amex benefits");

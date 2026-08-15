@@ -8,6 +8,8 @@ export const SYNTHETIC_AMEX_NON_BENEFITS_URL = "https://global.americanexpress.c
 export const SYNTHETIC_HANDOFF_TRANSFER_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 export const SYNTHETIC_HANDOFF_URL = `https://www.perks-reminder.com/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
 export const SYNTHETIC_HANDOFF_NO_QUERY_URL = "https://www.perks-reminder.com/integrations/amex-sync" as const;
+export const SYNTHETIC_HANDOFF_EXTRA_QUERY_URL = `https://www.perks-reminder.com/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}&extra=1` as const;
+export const SYNTHETIC_HANDOFF_INVALID_TRANSFER_URL = "https://www.perks-reminder.com/integrations/amex-sync?transfer=not-a-transfer" as const;
 export const SYNTHETIC_HANDOFF_SIBLING_PATH_URL = `https://www.perks-reminder.com/integrations/amex-sync-other?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
 export const SYNTHETIC_HANDOFF_ALTERNATE_ORIGIN_URL = `https://perks-reminder.com/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
 export const SYNTHETIC_HANDOFF_ALTERNATE_SCHEME_URL = `http://www.perks-reminder.com/integrations/amex-sync?transfer=${SYNTHETIC_HANDOFF_TRANSFER_ID}` as const;
@@ -17,6 +19,8 @@ export type SyntheticAmexDocumentUrl = typeof SYNTHETIC_AMEX_URL | typeof SYNTHE
 export type SyntheticHandoffDocumentUrl =
   | typeof SYNTHETIC_HANDOFF_URL
   | typeof SYNTHETIC_HANDOFF_NO_QUERY_URL
+  | typeof SYNTHETIC_HANDOFF_EXTRA_QUERY_URL
+  | typeof SYNTHETIC_HANDOFF_INVALID_TRANSFER_URL
   | typeof SYNTHETIC_HANDOFF_SIBLING_PATH_URL
   | typeof SYNTHETIC_HANDOFF_ALTERNATE_ORIGIN_URL
   | typeof SYNTHETIC_HANDOFF_ALTERNATE_SCHEME_URL
@@ -51,6 +55,14 @@ function metadataPatternMatches(pattern: string, value: string): boolean {
     .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .join(".*");
   return new RegExp(`^${expression}$`).test(value);
+}
+
+function runtimeAcceptsHandoffUrl(url: string, target: "production" | "local"): boolean {
+  const parsed = new URL(url);
+  const expectedOrigin = target === "production" ? "https://www.perks-reminder.com" : "http://localhost:3000";
+  if (parsed.origin !== expectedOrigin || parsed.pathname !== "/integrations/amex-sync") return false;
+  return Array.from(parsed.searchParams.keys()).length === 1
+    && /^[a-f0-9]{32}$/.test(parsed.searchParams.get("transfer") ?? "");
 }
 
 async function bundleActivatesAt(bundlePath: string, url: string): Promise<boolean> {
@@ -192,6 +204,8 @@ const syntheticDocuments = new Map<SyntheticDocumentUrl, string>([
   [SYNTHETIC_AMEX_NON_BENEFITS_URL, syntheticNonBenefitsDocument],
   [SYNTHETIC_HANDOFF_URL, syntheticHandoffDocument],
   [SYNTHETIC_HANDOFF_NO_QUERY_URL, syntheticHandoffDocument],
+  [SYNTHETIC_HANDOFF_EXTRA_QUERY_URL, syntheticHandoffDocument],
+  [SYNTHETIC_HANDOFF_INVALID_TRANSFER_URL, syntheticHandoffDocument],
   [SYNTHETIC_HANDOFF_SIBLING_PATH_URL, syntheticHandoffDocument],
   [SYNTHETIC_HANDOFF_ALTERNATE_ORIGIN_URL, syntheticHandoffDocument],
   [SYNTHETIC_HANDOFF_ALTERNATE_SCHEME_URL, syntheticHandoffDocument],
@@ -981,7 +995,9 @@ export class SyntheticAmexHarness {
       handoffUrl,
       () => this.page.goto(handoffUrl, { waitUntil: "domcontentloaded" }),
     );
-    this.expectedHandoffHistoryCleanupOrigin = shouldInject && target === documentTarget
+    this.expectedHandoffHistoryCleanupOrigin = shouldInject
+      && target === documentTarget
+      && runtimeAcceptsHandoffUrl(handoffUrl, target)
       ? new URL(handoffUrl).origin
       : null;
     if (shouldInject) {

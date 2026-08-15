@@ -17,7 +17,7 @@ export default function PrivacyPage() {
         Privacy Policy
       </h1>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
-        Last updated: February 2025
+        Last updated: August 2026
       </p>
 
       <div className="prose prose-gray dark:prose-invert max-w-none space-y-6 text-gray-700 dark:text-gray-300">
@@ -45,6 +45,9 @@ export default function PrivacyPage() {
             <li>
               <strong>Notification preferences:</strong> Email notification settings you choose in Settings.
             </li>
+            <li>
+              <strong>Browser reader observations:</strong> If you install the Perks Reminder AMEX reader, it reads only named first-party benefit endpoints after you manually start a scan from a signed-in American Express page. It does not inspect passwords, cookies, MFA values, authorization headers, or opaque provider tokens, and it does not save raw provider responses.
+            </li>
           </ul>
         </section>
 
@@ -54,6 +57,18 @@ export default function PrivacyPage() {
           </h2>
           <p>
             Your data is used only to run the app: to show your benefits dashboard, send optional email reminders, and support import/export. We do not sell, rent, or share your data with third parties for marketing or advertising.
+          </p>
+          <p>
+            The browser reader stores normalized benefit observations and a local installation fingerprint in browser extension or userscript storage. You can clear this local data from the reader panel; clearing removes the observations and identity secret. Choosing <strong>Sync reviewed</strong> sends only the validated normalized handoff to the Perks Reminder site for its separate preview/confirmation flow. No handoff occurs automatically, and no provider data is sold, used for ads, analytics, or shared with unrelated parties.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mt-8 mb-3">
+            Browser reader distribution
+          </h2>
+          <p>
+            The Chrome extension and Greasy Fork userscript are alternate distributions of the same in-page reader. Install one, not both, because enabling both would mount duplicate reader controls. Perks Reminder is independent and is not affiliated with or endorsed by American Express.
           </p>
         </section>
 

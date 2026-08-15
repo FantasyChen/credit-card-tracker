@@ -1,0 +1,157 @@
+import { createInstallationSecret, fingerprintCardToken } from "@/lib/amex-benefit-reader/identity";
+import type { CardIdentityService, PreparedCardIdentity, ResultStore } from "@/lib/amex-benefit-reader/scan-engine";
+import {
+  IDENTITY_SECRET_KEY,
+  STORE_KEY,
+  createEmptyStore,
+  loadStoreValue,
+  mergeCardAttempt,
+  mergeScanSummary,
+  type CardAttemptResult,
+} from "@/lib/amex-benefit-reader/storage-policy";
+import type { ScanSummaryV1, StoreEnvelopeV1, StoredCardRecordV1 } from "@/lib/amex-benefit-reader/contract";
+import {
+  AMEX_SYNC_MAILBOX_KEY,
+  LEGACY_AMEX_SYNC_MAILBOX_KEY,
+  type MailboxStorage,
+} from "@/lib/amex-benefit-reader/sync-mailbox";
+
+/** Distribution-neutral asynchronous key/value storage. */
+export interface ReaderStorage {
+  getValue(key: string, defaultValue?: unknown): Promise<unknown>;
+  setValue(key: string, value: unknown): Promise<void>;
+  deleteValue(key: string): Promise<void>;
+}
+
+export const PRIMARY_ONLY_COMPATIBILITY_KEY = "perksReminder.amexBenefitReader.compat.primaryOnly.v1" as const;
+export const PRIMARY_ONLY_COMPATIBILITY_VALUE = "primary-only/1" as const;
+export const V3_SELECTION_COMPATIBILITY_KEY = "perksReminder.amexBenefitReader.compat.v3Selection.v1" as const;
+export const V3_SELECTION_COMPATIBILITY_VALUE = "v3-selection/1" as const;
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function invalidateObservations(store: StoreEnvelopeV1, invalidatedAt: string): StoreEnvelopeV1 {
+  if (Object.keys(store.cards).length === 0 && store.lastScan === null) return store;
+  return {
+    ...store,
+    revision: store.revision + 1,
+    updatedAt: invalidatedAt,
+    cards: {},
+    lastScan: null,
+  };
+}
+
+function invalidateSelectionIncompleteObservations(
+  store: StoreEnvelopeV1,
+  invalidatedAt: string,
+): StoreEnvelopeV1 {
+  const cards = Object.fromEntries(Object.entries(store.cards).filter(([, record]) =>
+    record.latest === null || record.latest.contractVersion === "amex-benefits/3"));
+  if (Object.keys(cards).length === Object.keys(store.cards).length && store.lastScan === null) return store;
+  return {
+    ...store,
+    revision: store.revision + 1,
+    updatedAt: invalidatedAt,
+    cards,
+    lastScan: null,
+  };
+}
+
+export class BrowserResultStore implements ResultStore {
+  constructor(protected readonly storage: ReaderStorage) {}
+
+  private async deletePendingMailboxes(): Promise<void> {
+    await this.storage.deleteValue(LEGACY_AMEX_SYNC_MAILBOX_KEY);
+    await this.storage.deleteValue(AMEX_SYNC_MAILBOX_KEY);
+  }
+
+  async load(): Promise<StoreEnvelopeV1> {
+    const migratedAt = nowIso();
+    const primaryCompatibility = await this.storage.getValue(PRIMARY_ONLY_COMPATIBILITY_KEY, null);
+    const v3Compatibility = await this.storage.getValue(V3_SELECTION_COMPATIBILITY_KEY, null);
+    const rawStore = await this.storage.getValue(STORE_KEY, null);
+    let loaded = loadStoreValue(rawStore, migratedAt);
+
+    if (primaryCompatibility !== PRIMARY_ONLY_COMPATIBILITY_VALUE) {
+      const invalidated = invalidateObservations(loaded, migratedAt);
+      await this.deletePendingMailboxes();
+      if (invalidated !== loaded) await this.storage.setValue(STORE_KEY, invalidated);
+      await this.storage.setValue(PRIMARY_ONLY_COMPATIBILITY_KEY, PRIMARY_ONLY_COMPATIBILITY_VALUE);
+      loaded = invalidated;
+    }
+
+    if (v3Compatibility !== V3_SELECTION_COMPATIBILITY_VALUE) {
+      const invalidated = invalidateSelectionIncompleteObservations(loaded, migratedAt);
+      await this.deletePendingMailboxes();
+      if (invalidated !== loaded) await this.storage.setValue(STORE_KEY, invalidated);
+      await this.storage.setValue(V3_SELECTION_COMPATIBILITY_KEY, V3_SELECTION_COMPATIBILITY_VALUE);
+      loaded = invalidated;
+    }
+
+    return loaded;
+  }
+
+  async commitCard(result: CardAttemptResult): Promise<StoredCardRecordV1> {
+    const current = await this.load();
+    const merged = mergeCardAttempt(current, result);
+    await this.storage.setValue(STORE_KEY, merged.store);
+    return merged.record;
+  }
+
+  async recordScanSummary(summary: ScanSummaryV1): Promise<void> {
+    const current = await this.load();
+    await this.storage.setValue(STORE_KEY, mergeScanSummary(current, summary));
+  }
+
+  async clear(): Promise<void> {
+    await Promise.all([
+      this.storage.deleteValue(STORE_KEY),
+      this.storage.deleteValue(IDENTITY_SECRET_KEY),
+      this.storage.deleteValue(AMEX_SYNC_MAILBOX_KEY),
+      this.storage.deleteValue(LEGACY_AMEX_SYNC_MAILBOX_KEY),
+      this.storage.deleteValue(PRIMARY_ONLY_COMPATIBILITY_KEY),
+      this.storage.deleteValue(V3_SELECTION_COMPATIBILITY_KEY),
+    ]);
+  }
+
+  async initializeIfNeeded(): Promise<void> {
+    const value = await this.storage.getValue(STORE_KEY, null);
+    if (value == null) await this.storage.setValue(STORE_KEY, createEmptyStore(nowIso()));
+  }
+}
+
+export class BrowserMailboxStorage implements MailboxStorage {
+  constructor(protected readonly storage: ReaderStorage) {}
+
+  getValue(key: string, defaultValue?: unknown): Promise<unknown> {
+    return this.storage.getValue(key, defaultValue);
+  }
+
+  setValue(key: string, value: unknown): Promise<void> {
+    return this.storage.setValue(key, value);
+  }
+
+  deleteValue(key: string): Promise<void> {
+    return this.storage.deleteValue(key);
+  }
+}
+
+export class BrowserCardIdentityService implements CardIdentityService {
+  constructor(protected readonly storage: ReaderStorage) {}
+
+  private async loadSecret(): Promise<string> {
+    const stored = await this.storage.getValue(IDENTITY_SECRET_KEY, null);
+    if (typeof stored === "string" && /^[a-f0-9]{64}$/.test(stored)) return stored;
+    if (stored != null) throw new Error("The local identity secret is malformed.");
+    const secret = createInstallationSecret();
+    await this.storage.setValue(IDENTITY_SECRET_KEY, secret);
+    return secret;
+  }
+
+  async prepareCard(input: { rawAccountToken: string; productName: string; endingDigits: string }): Promise<PreparedCardIdentity> {
+    const sourceFingerprint = await fingerprintCardToken(await this.loadSecret(), input.rawAccountToken);
+    return { sourceFingerprint, productName: input.productName, endingDigits: input.endingDigits };
+  }
+}

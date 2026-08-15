@@ -11,7 +11,7 @@ const targetConfigurations = Object.freeze({
     output: "build/amex-benefit-reader.user.js",
     userscriptName: "Perks Reminder — Amex Benefit Reader",
     namespace: "https://perks-reminder.com/",
-    version: "0.5.3",
+    version: "1.0.0",
     handoffMatch: null,
     handoffInclude: "https://www.perks-reminder.com/integrations/amex-sync?transfer=*",
     unsafeWindowGrant: true,

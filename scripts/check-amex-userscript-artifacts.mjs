@@ -9,7 +9,7 @@ const artifacts = [
     path: resolve(root, "build/amex-benefit-reader.user.js"),
     name: "Perks Reminder — Amex Benefit Reader",
     namespace: "https://perks-reminder.com/",
-    version: "0.5.3",
+    version: "1.0.0",
     targetName: "production",
     matches: [
       "https://global.americanexpress.com/*",
@@ -72,13 +72,14 @@ function compareNumericVersions(left, right) {
   return 0;
 }
 
-const previouslyInstalledProductionVersion = "0.5.2";
+const previouslyInstalledProductionVersion = "0.5.3";
 const approvedArtifactOrigins = new Set([
   "http://localhost:3000",
   "https://functions.americanexpress.com",
   "https://global.americanexpress.com",
   "https://perks-reminder.com",
   "https://www.perks-reminder.com",
+  "http://www.w3.org",
 ]);
 const sensitiveMarkers = [
   "AMEX_SYNC_HMAC_KEY",
@@ -169,6 +170,11 @@ for (const artifact of artifacts) {
     source.includes('const pageWindow = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;'),
     true,
     `${artifact.label} handoff must use the page-realm window exposed by Tampermonkey`,
+  );
+  assert.equal(
+    source.includes('Array.from(params.keys()).length === 1 && /^[a-f0-9]{32}$/.test(params.get("transfer") ?? "")'),
+    true,
+    `${artifact.label} handoff must require exactly one valid transfer query parameter`,
   );
 
   assert.equal(
