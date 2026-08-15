@@ -56,7 +56,10 @@ export class AmexApiClient {
   private readonly timeoutMs: number;
 
   constructor(options: AmexApiClientOptions = {}) {
-    this.fetchImpl = options.fetch ?? fetch;
+    // Native browser fetch requires the global receiver in some isolated
+    // extension worlds. Store a receiver-neutral wrapper rather than the bare
+    // platform function so calling it as this.fetchImpl(...) stays valid.
+    this.fetchImpl = options.fetch ?? ((url, init) => globalThis.fetch(url, init));
     this.timeoutMs = options.timeoutMs ?? AMEX_API_TIMEOUT_MS;
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0) {
       throw new Error("The Amex read timeout must be positive.");

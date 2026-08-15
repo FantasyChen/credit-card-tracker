@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowRightIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { AMEX_READER_SETUP_PATH } from '@/lib/amex-benefit-reader/public-links';
 
 function getSwitchUrl(isLoyaltyContext: boolean): string {
   if (!isLoyaltyContext) {
@@ -36,6 +37,7 @@ const Footer = () => {
       { name: 'Cards', href: '/cards' },
       { name: 'Loyalty Programs', href: '/loyalty' },
       { name: 'How It Works', href: '/guide' },
+      { name: 'Amex reader setup', href: AMEX_READER_SETUP_PATH },
     ],
     settings: [
       { name: 'Notifications', href: '/settings/notifications' },

@@ -33,6 +33,8 @@
     "build:amex-userscript": "node scripts/build-amex-benefit-reader.mjs",
     "build:amex-userscript:local": "node scripts/build-amex-benefit-reader.mjs local",
     "check:amex-userscripts": "node scripts/check-amex-userscript-artifacts.mjs",
+    "build:amex-reader-extension": "node scripts/build-amex-reader-extension.mjs",
+    "check:amex-reader-extension": "node scripts/check-amex-reader-extension.mjs",
     "test:e2e:amex": "npm run build:amex-userscript && npm run build:amex-userscript:local && playwright test --config playwright.amex.config.ts",
     "test:e2e:amex:visual": "npm run build:amex-userscript && npm run build:amex-userscript:local && AMEX_READER_E2E_VISUAL=1 playwright test --config playwright.amex.config.ts --headed --grep @visual",
     "usage-guides:audit": "node scripts/audit-usage-guide-links.cjs",

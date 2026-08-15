@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Implement manual session reads, local storage, synthetic validation, exact handoff, installed-script, and browser execution-world contracts."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Preserve current envelope, exact handoff, duplicate/idempotency, and production-off boundaries."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Implement accessible interactive panel and popup UI."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Select frontend, accessibility, and visual checks."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Respect public privacy deployment and external publication approval gates."}
+{"file":".trellis/tasks/08-12-publish-amex-reader-extension/research/store-policy-and-repository-evidence.md","reason":"Use current Chrome Web Store, Greasy Fork, repository brand, license, and privacy evidence."}

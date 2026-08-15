@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Verify provider isolation, exact permissions/grants, privacy, parity, install/upgrade, and no-autoscan behavior."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Verify sync authority, duplicate prevention, handoff and production-off invariants remain unchanged."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check semantics, keyboard behavior, focus, responsiveness, and accessibility."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Run proportional unit, E2E, visual, type, and lint checks."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Classify static, browser, deployment, and external publication evidence truthfully."}
+{"file":".trellis/tasks/08-12-publish-amex-reader-extension/research/store-policy-and-repository-evidence.md","reason":"Check listing assets, policy claims, license, privacy statements, and submission gates against researched requirements."}

@@ -13,6 +13,8 @@ import {
   TampermonkeyMailboxStorage,
   TampermonkeyResultStore,
 } from "./tampermonkey-storage";
+import type { CardIdentityService, ResultStore } from "@/lib/amex-benefit-reader/scan-engine";
+import type { MailboxStorage } from "@/lib/amex-benefit-reader/sync-mailbox";
 import {
   AmexVisibleContextGuard,
   isPrimaryAmexBenefitsRoute,
@@ -23,14 +25,31 @@ function markMountedReaderVersion(version: string): void {
   document.getElementById(AMEX_READER_HOST_ID)?.setAttribute("data-reader-version", version);
 }
 
+export interface ReaderRuntimeAdapters {
+  store: ResultStore;
+  mailboxStorage: MailboxStorage;
+  identity: CardIdentityService;
+}
+
+export interface ReaderRuntimeOptions {
+  initiallyCollapsed?: boolean;
+  adapters?: ReaderRuntimeAdapters;
+}
+
 export async function mountAmexBenefitReader(
   version: string,
   handoffTargetName: AmexSyncHandoffTargetName = "production",
+  options: ReaderRuntimeOptions = {},
 ): Promise<void> {
   if (!isSupportedAmexOrigin() || document.getElementById(AMEX_READER_HOST_ID)) return;
 
-  const initiallyCollapsed = !isPrimaryAmexBenefitsRoute();
-  const store = new TampermonkeyResultStore();
+  const initiallyCollapsed = options.initiallyCollapsed ?? !isPrimaryAmexBenefitsRoute();
+  const store = options.adapters?.store ?? new TampermonkeyResultStore();
+  const adapters = options.adapters ?? {
+    store,
+    mailboxStorage: new TampermonkeyMailboxStorage(),
+    identity: new TampermonkeyCardIdentityService(),
+  };
   try {
     const initialStore = await store.load();
     if (document.getElementById(AMEX_READER_HOST_ID)) return;
@@ -54,9 +73,8 @@ export async function mountAmexBenefitReader(
               ? "Run and review a fresh complete scan before syncing."
               : "No complete reviewed card observations are available to sync.");
           }
-          const mailboxStorage = new TampermonkeyMailboxStorage();
           const mailbox = await createAmexSyncMailbox(projection.envelope);
-          await storeAmexSyncMailbox(mailboxStorage, mailbox);
+          await storeAmexSyncMailbox(adapters.mailboxStorage, mailbox);
           popup.location.replace(amexSyncHandoffUrl(mailbox.transferId, handoffTargetName));
         } catch (error) {
           popup.close();
@@ -70,7 +88,7 @@ export async function mountAmexBenefitReader(
       new AmexApiClient(),
       new AmexVisibleContextGuard(),
       store,
-      new TampermonkeyCardIdentityService(),
+      adapters.identity,
       reporter,
     );
     window.addEventListener("beforeunload", () => engine?.cancel(), { once: true });

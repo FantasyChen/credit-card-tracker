@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next'
 import { PRIMARY_SITE_URL } from '@/lib/site'
 import { benefitUsageWays, getPublicStaticCards, STATIC_CATALOG_UPDATED_AT } from '@/lib/static-catalog'
+import { AMEX_READER_SETUP_PATH } from '@/lib/amex-benefit-reader/public-links'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = PRIMARY_SITE_URL
@@ -65,6 +66,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${baseUrl}/contact`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}${AMEX_READER_SETUP_PATH}`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.6,

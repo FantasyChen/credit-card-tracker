@@ -12,6 +12,8 @@ import {
   SYNTHETIC_AMEX_NON_BENEFITS_URL,
   SYNTHETIC_HANDOFF_TRANSFER_ID,
   SYNTHETIC_HANDOFF_NO_QUERY_URL,
+  SYNTHETIC_HANDOFF_EXTRA_QUERY_URL,
+  SYNTHETIC_HANDOFF_INVALID_TRANSFER_URL,
   SYNTHETIC_HANDOFF_SIBLING_PATH_URL,
   SYNTHETIC_HANDOFF_ALTERNATE_ORIGIN_URL,
   SYNTHETIC_HANDOFF_ALTERNATE_SCHEME_URL,
@@ -190,7 +192,7 @@ test("shows only real scan progress until the built reader reaches a terminal re
   await harness.openAndInject();
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
-  await expect(readerHost).toHaveAttribute("data-reader-version", "0.5.3");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "1.0.0");
   const scanButton = page.getByRole("button", { name: "Scan all cards" });
   expect(harness.apiRequests()).toHaveLength(0);
   await scanButton.click();
@@ -424,6 +426,8 @@ test("bridges one strict storage-only mailbox on the exact production handoff br
 test("does not activate the production artifact outside the exact transfer handoff URL", async ({ context, page }) => {
   const excludedUrls = [
     SYNTHETIC_HANDOFF_NO_QUERY_URL,
+    SYNTHETIC_HANDOFF_EXTRA_QUERY_URL,
+    SYNTHETIC_HANDOFF_INVALID_TRANSFER_URL,
     SYNTHETIC_HANDOFF_SIBLING_PATH_URL,
     SYNTHETIC_HANDOFF_ALTERNATE_ORIGIN_URL,
     SYNTHETIC_HANDOFF_ALTERNATE_SCHEME_URL,

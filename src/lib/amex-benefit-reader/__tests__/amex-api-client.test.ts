@@ -36,6 +36,22 @@ function endpointUrl(endpoint: { origin: string; path: string }): string {
 }
 
 describe("allowlisted Amex private read client", () => {
+  it("calls the native default fetch through the global receiver", async () => {
+    const originalFetch = globalThis.fetch;
+    const receiverCheckedFetch = jest.fn(function (this: unknown, url: string) {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(response(url, accountsFixture));
+    });
+    globalThis.fetch = receiverCheckedFetch as unknown as typeof fetch;
+    try {
+      const client = new AmexApiClient();
+      await expect(client.discoverAccounts(new AbortController().signal)).resolves.toBeDefined();
+      expect(receiverCheckedFetch).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("constructs only the three exact reviewed tuples, headers, and bodies", async () => {
     const fetchMock = jest.fn<Promise<Response>, [string, RequestInit?]>(async (url) => {
       if (url === endpointUrl(MEMBER_READ_ENDPOINT)) return response(String(url), accountsFixture);
