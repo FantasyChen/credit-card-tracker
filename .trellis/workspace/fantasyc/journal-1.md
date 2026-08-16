@@ -421,3 +421,25 @@ Installed and live-tested userscript 0.5.3, confirmed five production status upd
 ### Status
 
 [OK] **Completed**
+
+
+## Session 15: Publish and validate public AMEX reader
+
+**Date**: 2026-08-16
+**Task**: Publish and validate public AMEX reader
+**Branch**: `main`
+
+### Summary
+
+Validated the exact public userscript, stable live scans, zero-write production preview, safe-off restoration, and updated Trellis.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1edfe51` | (see git log) |
+| `19fff71` | (see git log) |
+
+### Status
+
+[OK] **Completed**
