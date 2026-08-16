@@ -1,0 +1,7 @@
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Manual read-only AMEX scan, Computer Use, privacy, exact public artifact, idle mount, and no-autoscan contracts."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Envelope V3 preview/write separation, exact destination authority, proposal binding, confirmation, audit/provenance, replay, and idempotency contracts."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Production target/recovery verification, database authorization, no-.env boundary, aggregate-only evidence, and rollback safety."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Exact provider input bytes, production deployment authorization, Ready/primary-alias identity, runtime probes, and safe-off rollback."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Proportionate safe-check matrix and truthful passed/failed/blocked/skipped reporting."}
+{"file":".trellis/tasks/archive/2026-08/08-12-validate-amex-sync-production-canary/research/production-operational-playbook.md","reason":"Historical operator sequence and stop conditions; provider input newline guidance is superseded by the current deployment spec."}
+{"file":".trellis/tasks/archive/2026-08/08-12-publish-amex-reader-extension/implement.md","reason":"Fresh public 1.0.0 install, stable scan, zero-write preview, exact-off restoration, and current zero-proposal evidence."}
