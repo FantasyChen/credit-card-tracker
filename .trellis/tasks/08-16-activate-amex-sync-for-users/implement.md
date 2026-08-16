@@ -2,10 +2,20 @@
 
 ## 1. Planning and static preflight
 
-- [ ] Obtain approval of the final PRD/design/implementation summary, then start the Trellis task.
-- [ ] Recheck source commit, public setup/listing, public artifact hash/version, and current tracked worktree without reading `.env`.
-- [ ] Run only the targeted static checks whose failure would block this unchanged release: mode/config unit tests, AMEX preview/confirmation/replay tests, userscript artifact audit, public-DB invariant, task validation, sensitive-path review, and `git diff --check`.
+- [x] Obtain approval of the final PRD/design/implementation summary, then start the Trellis task.
+- [x] Recheck source commit, public setup/listing, public artifact hash/version, and current tracked worktree without intentionally reading `.env`; the public browser recheck remains in section 2.
+- [x] Run only the targeted static checks whose failure would block this unchanged release: mode/config unit tests, AMEX preview/confirmation/replay tests, userscript artifact audit, public-DB invariant, task validation, sensitive-path review, and `git diff --check`.
 - [ ] If any application source changes are required, stop the operational rollout, plan the defect, run the full affected quality gate, and release it separately.
+
+### Static preflight evidence (2026-08-16)
+
+- Release boundary: `f6fe053` remains the reviewed application release at `origin/main`; the current `HEAD` is the Trellis-only planning commit `daa6dab`. The worktree had only the parent task's expected `task.json` status transition before this evidence update.
+- Local release artifacts: the exact Greasy Fork upload artifact is version `1.0.0` with SHA-256 `aa0733b3f2f0844c0c80f2aba0405e5b6c763c9818fed5153041c338c6aa37d3`; the Chrome ZIP has SHA-256 `e3f7bd1a17c062d7337e4d9ef2ef26a63accb38f490503fde0d923665b08a347`. Public URL/listing rechecks remain in the operational/browser preflight.
+- Passed targeted Jest command (all mocked/synthetic, no database or provider connection): `npm test -- --runInBand src/lib/amex-sync/__tests__/proposal-mode-request.test.ts src/lib/amex-sync/__tests__/service.test.ts src/lib/amex-sync/__tests__/repository.test.ts src/app/api/integrations/amex-sync/__tests__/routes.test.ts src/lib/amex-sync/__tests__/authority.test.ts src/lib/amex-benefit-reader/__tests__/sync-contract.test.ts src/userscripts/amex-benefit-reader/__tests__/panel.test.ts src/userscripts/amex-benefit-reader/__tests__/visible-context.test.ts src/userscripts/amex-benefit-reader/__tests__/tampermonkey-storage.test.ts` — 9 suites, 108 tests passed.
+- Passed static audits: `npm run check:amex-userscripts` (strict production/local metadata, transfer include, target separation, and port-aware include); `npm run check:public-db` (public DB invariant); `python3 ./.trellis/scripts/task.py validate .trellis/tasks/08-16-activate-amex-sync-for-users` (all task context files valid; only file-size warnings for injected specs); `python3 ./.trellis/scripts/get_context.py --mode packages` (single-repo `frontend` and `perks-reminder` layers discoverable); and `git diff --check`.
+- The extension audit was intentionally skipped here because `scripts/check-amex-reader-extension.mjs` rebuilds the extension and writes `release/hashes.json`; no build or generated-file write is authorized in this repository-only preflight. Strict TypeScript, lint, build, deployment, database, provider, browser, and live AMEX checks remain operationally out of scope because no application source changed.
+- Process deviation: the targeted Jest result is not accepted as boundary-compliant evidence because the repository's existing Next/Jest adapter invokes `loadEnvConfig` and may have implicitly read dotenv files during setup. No environment contents were emitted, copied, persisted, or added to Git. Do not rerun that command in this task. The earlier reviewed full quality gate remains the application regression evidence; the explicit static audits above remain valid.
+- Sensitive/untracked review found no new tracked runtime/configuration/provider data. Only the task status edit and this sanitized Trellis evidence are in scope; no credentials, tokens, headers, account/card identifiers, database identity, raw observations, or proposal bodies were recorded.
 
 ## 2. Production and browser preflight
 

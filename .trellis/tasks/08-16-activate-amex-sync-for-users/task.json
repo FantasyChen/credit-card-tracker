@@ -3,7 +3,7 @@
   "name": "activate-amex-sync-for-users",
   "title": "Activate AMEX sync for users",
   "description": "Plan and execute the attended production activation after public reader validation, preserving fresh confirmation, canary, rollback, and safe-off gates.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
