@@ -104,7 +104,7 @@ Apply this contract whenever a production runtime capability depends on newly ad
 ### 2. Signatures
 
 ```text
-vercel env add <NAME> production --force [--sensitive]
+printf %s <VALUE> | vercel env add <NAME> production --force [--sensitive]
 vercel env ls production
 vercel --prod --yes
 vercel inspect <immutable-deployment-or-primary-alias>
@@ -117,6 +117,7 @@ vercel alias set <immutable-deployment> <existing-primary-alias>
 ### 3. Contracts
 
 - Secret values use provider-sensitive storage and must never be printed, committed, copied into evidence, or inferred as absent merely because `vercel env pull` omits them.
+- Exact finite configuration values must enter `vercel env add` without a trailing newline or carriage return. Use EOF-terminated stdin such as `printf %s preview`, not `echo preview` or `printf '%s\n' preview`; the current CLI can preserve the line terminator, and exact mode parsing then fails closed to `off` even though registration, deployment readiness, and alias identity all pass.
 - Verify environment registration by name, target, and provider metadata; verify effectiveness through the narrowest runtime behavior that depends on the value.
 - Resolve the intended public origin from the application's production-site contract, not from an immutable deployment URL or a regex that assumes the exported URL is a string literal.
 - After deployment, inspect both the immutable Ready deployment and the primary alias. Their deployment IDs must match before the rollout is reported as live.
@@ -128,6 +129,7 @@ vercel alias set <immutable-deployment> <existing-primary-alias>
 | Condition | Required behavior |
 | --- | --- |
 | Sensitive value is absent from a pulled environment file but registered as sensitive | Treat omission as expected; do not replace it with a non-sensitive value. |
+| Exact mode input contains a trailing newline or carriage return | Treat the capability as effectively `off`; replace the provider value with no-line-terminator stdin, redeploy, and repeat the runtime probe. |
 | Deployment is Ready but primary-alias deployment ID differs | Do not claim rollout success or diagnose runtime behavior from the alias as if it were current. |
 | `promote` succeeds but IDs still differ | Stop; use an explicitly authorized `alias set` for the existing primary alias, then compare IDs again. |
 | Authenticated capability probe returns fail-closed `503 sync_off` | Verify alias routing and runtime environment delivery; never weaken mode or secret validation. |
@@ -137,9 +139,9 @@ vercel alias set <immutable-deployment> <existing-primary-alias>
 
 ### 5. Good / Base / Bad Cases
 
-- **Good:** sensitive configuration is registered, a new deployment is Ready, the primary alias and immutable deployment IDs match, and one synthetic authenticated probe succeeds with exactly unchanged scoped counts.
+- **Good:** an exact finite value is written with `printf %s`, sensitive configuration is registered, a new deployment is Ready, the primary alias and immutable deployment IDs match, and one synthetic authenticated probe succeeds with exactly unchanged scoped counts.
 - **Base:** the endpoint remains fail-closed because configuration is intentionally absent; no deployment or alias action is needed.
-- **Bad:** a Ready deployment is assumed live, the stale primary alias returns `sync_off`, and the implementation's secret-length requirement is weakened instead of verifying routing.
+- **Bad:** `echo preview` writes a line-terminated mode, a Ready deployment is assumed live, the authenticated probe returns `sync_off`, and mode validation is weakened instead of correcting the provider value and redeploying.
 
 ### 6. Tests Required
 
@@ -153,12 +155,14 @@ vercel alias set <immutable-deployment> <existing-primary-alias>
 #### Wrong
 
 ```text
+echo preview | vercel env add AMEX_SYNC_MODE production --force --sensitive
 Ready deployment + registered env names => production capability is live
 ```
 
 #### Correct
 
 ```text
+printf %s preview | vercel env add AMEX_SYNC_MODE production --force --sensitive
 registered env metadata
   + Ready immutable deployment
   + primary alias resolves to the same deployment ID

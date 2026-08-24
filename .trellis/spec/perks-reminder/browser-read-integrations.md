@@ -959,20 +959,38 @@ interface InstalledReaderMountEvidence {
 
 Browser responsibility is split by authority:
 
-- **Playwriter** owns explicit task-created HTTP(S) pages for the loopback handoff and sanitized provider-page DOM evaluation.
-- **Peekaboo** owns only the protected `chrome-extension://...` Tampermonkey confirmation UI that page automation cannot control.
+- **Chrome/Browser structured automation** owns explicit task-created HTTP(S)
+  pages for the loopback handoff and sanitized provider-page DOM evaluation.
+- **Computer Use** owns only the protected `chrome-extension://...`
+  Tampermonkey confirmation UI that structured page automation cannot control.
+  When the owner explicitly selects Computer for that protected step, choose it
+  before initializing Chrome/Browser automation for the installer tab. If a
+  structured browser tool has already returned a hard no-alternate-surface
+  rejection, stop for user action; do not switch tools to circumvent it.
 
 ### 3. Contracts
 
 1. **Recorded authorization scope**: before the consequential action, identify the userscript name, namespace, incoming version, currently installed version, exact match scope, and grants. Proceed only when the observed metadata matches the built artifact and either the owner authorized that exact update or a recorded durable authorization explicitly covers monotonic updates with the same name/namespace/match/grants and read-only purpose. Any metadata or authority expansion requires fresh authorization.
 2. **Observable version transition**: bump the canonical build version, rebuild, and require the Tampermonkey **Userscript update** page to show `incomingVersion > installedVersion`. Do not use a same-version reinstall, timestamp, page refresh, or click-delivery result as proof.
-3. **Least-authoritative routing**: use a task-owned Playwriter page to open the loopback `.user.js` URL. Switch to Peekaboo only after Tampermonkey opens its protected confirmation page; do not attach DevTools or inspect browser-profile state to bypass the extension boundary.
+3. **Least-authoritative routing**: use a task-owned structured browser page to
+   open the loopback `.user.js` URL only when that tool can hand off without
+   claiming the protected installer. When the workflow requires interacting
+   with the protected Tampermonkey page and the owner selected Computer, route
+   that UI step to Computer Use from the outset. Do not attach DevTools, inspect
+   browser-profile state, or switch to Computer after a structured browser
+   rejection that explicitly forbids alternate surfaces.
 4. **Fresh protected-UI observation**: observe only a narrow installer region containing the script identity/version and confirmation controls. Do not take broad browser accessibility dumps or screenshots that include unrelated tabs, bookmarks, account pages, messages, email, password-manager UI, or browser history.
 5. **Confirmed native action**: prefer a semantic native control when exposed. If Tampermonkey does not expose **Update** through Accessibility, use fresh narrow visual evidence plus keyboard focus navigation: prove the visible focus ring moved from the default **Cancel** control to **Update**, then send Return. Coordinate clicks are a last resort and are not successful merely because the input tool reports delivery.
 6. **Post-install proof**: require the update confirmation tab to close or transition, then reopen the same loopback artifact. Tampermonkey must report the new version as **INSTALLED VERSION** on the resulting same-version re-installation page. Cancel that verification page; do not reinstall again.
 7. **Sanitized live mount proof**: on a task-owned exact-origin provider page, query only the reader host/shadow-root and known reader controls. Confirm one host, expected collapsed/expanded presentation, and no active status/cancel state. Expansion and collapse are allowed, but mount proof does not press the scan button. A subsequent scan is a separate consequential action and requires either exact-scan authorization or a recorded durable unchanged-scope read-only-scan authorization; installation authority alone never implies scan authority.
-8. **Tool-overlay isolation**: if Playwriter's own toolbar intercepts a fixed reader control, remove or close only the tool-owned `[data-playwriter-toolbar]` overlay before retrying a fresh strict locator. Never remove, hide, or mutate provider-page elements to make validation pass.
-9. **Cleanup**: close task-owned provider pages, cancel the verification installer, delete the Playwriter session, and stop the loopback server. Temporary narrow installer captures remain outside the repository and must not be copied into task artifacts.
+8. **Tool-overlay isolation**: if the structured browser tool's own overlay
+   intercepts a fixed reader control, remove or close only the positively
+   identified tool-owned overlay before retrying a fresh strict locator. Never
+   remove, hide, or mutate provider-page elements to make validation pass.
+9. **Cleanup**: close task-owned provider pages, cancel the verification
+   installer, end the task-owned browser session, and stop the loopback server.
+   Temporary narrow installer captures remain outside the repository and must
+   not be copied into task artifacts.
 
 ### 4. Validation & Error Matrix
 
@@ -982,6 +1000,7 @@ Browser responsibility is split by authority:
 | Script name, namespace, match scope, grants, or incoming version differs from the built artifact or recorded authorization scope | Cancel; do not install |
 | Neither exact-action nor applicable durable authorization covers the consequential update | Stop at the protected confirmation page |
 | Durable authorization exists but the update broadens matches, grants, purpose, provider mutation authority, or credential/raw-data access | Treat it as out of scope and obtain fresh authorization |
+| Structured Chrome/Browser automation rejects the protected URL and explicitly forbids alternate surfaces | Stop for user action; do not retry the same operation through Computer Use |
 | Tampermonkey shows the expected old → new version and **Update** | Freshly observe the control, invoke one native action, then verify post-install state |
 | Accessibility does not expose **Update** | Use a narrow visual region and verified keyboard focus; do not guess from a broad screenshot or stale coordinates |
 | Input delivery reports success but the page neither closes/transitions nor later reports the new installed version | Treat the update as unverified, not successful |
@@ -994,7 +1013,9 @@ Browser responsibility is split by authority:
 ### 5. Good / Base / Bad Cases
 
 - **Good**: the canonical artifact advances from `0.2.5` to `0.2.6`; Tampermonkey shows **Userscript update** with installed `0.2.5`; verified keyboard focus activates **Update**; reopening reports installed `0.2.6`; an exact-origin page mounts one idle launcher; all task-owned resources are cleaned up.
-- **Base**: the installer exposes **Update** through Accessibility. Peekaboo invokes that semantic action directly, then the same post-install version and sanitized mount checks prove completion.
+- **Base**: the installer exposes **Update** through Accessibility. Computer Use
+  invokes that semantic action directly, then the same post-install version and
+  sanitized mount checks prove completion.
 - **Bad**: repeatedly click **Reinstall** for an already-installed version, infer success from a click tool's acknowledgment, inspect all Chrome tabs to find the prompt, retain installer screenshots in Git, or start a provider scan as part of installation verification.
 
 ### 6. Tests Required
@@ -1029,7 +1050,7 @@ console.log("updated"); // input delivery is not installation evidence
 
 ```ts
 await buildCanonicalArtifact({ from: "0.2.5", to: "0.2.6" });
-await playwriterPage.goto(loopbackUserscriptUrl);
+await structuredBrowserPage.goto(loopbackUserscriptUrl);
 
 const before = await observeNarrowTampermonkeyUpdate();
 assert.deepEqual(before, {

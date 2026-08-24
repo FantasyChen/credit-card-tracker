@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Check canary eligibility, one-row confirmation, transaction-time authority, audit/provenance deltas, replay, and no duplication."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Check exact target/recovery gates, no unauthorized database operation, aggregate-only evidence, and no compensating writes."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Check no-newline configuration input, deployment readiness, alias identity equality, effective mode, and off rollback proof."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Check that every claimed operational result is observed and correctly classified."}
+{"file":".trellis/tasks/archive/2026-08/08-12-validate-amex-sync-production-canary/prd.md","reason":"Check the fresh action-time confirmation, bounded canary, idempotency, privacy, and exact-off requirements retained from the prior canary."}
+{"file":".trellis/tasks/archive/2026-08/08-12-publish-amex-reader-extension/implement.md","reason":"Check the public artifact hashes, latest live aggregates, zero-proposal blocker, and final safe-off evidence used as planning input."}

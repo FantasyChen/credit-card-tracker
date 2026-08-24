@@ -22,21 +22,13 @@ describe('superseded category-repair utility guards', () => {
     expect(existsSync(join(ROOT, 'scripts/update-card-benefits.js'))).toBe(false);
     expect(existsSync(join(ROOT, 'scripts/migrate-benefits.js'))).toBe(false);
     expect(existsSync(join(ROOT, 'scripts/validate-migration.js'))).toBe(false);
+    expect(existsSync(join(ROOT, 'scripts/fix-duplicate-benefit-statuses.cjs'))).toBe(false);
   });
 
   it('blocks the narrow duplicate repair before creates or deletes', () => {
     const text = source('scripts/fix-duplicate-active-benefit-statuses.ts');
     expectOrdered(text, 'const intersections = await tx.$queryRaw', 'await tx.benefitStatus.upsert');
     expectOrdered(text, 'const intersections = await tx.$queryRaw', 'await tx.benefitStatus.deleteMany');
-    expect(text).toContain("repair.\"phase\" = 'APPLIED'");
-    expect(text).toContain('evidence."keeperStatusId"');
-    expect(text).toContain('evidence."occurrenceIndex"');
-  });
-
-  it('blocks the broad duplicate repair before its first force write', () => {
-    const text = source('scripts/fix-duplicate-benefit-statuses.cjs');
-    expectOrdered(text, 'const intersections = await prisma.$queryRaw', 'await prisma.benefitStatus.deleteMany');
-    expectOrdered(text, 'const intersections = await prisma.$queryRaw', 'await prisma.benefitStatus.update');
     expect(text).toContain("repair.\"phase\" = 'APPLIED'");
     expect(text).toContain('evidence."keeperStatusId"');
     expect(text).toContain('evidence."occurrenceIndex"');

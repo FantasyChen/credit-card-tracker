@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
-- **Last Active**: 2026-08-12
+- **Total Sessions**: 15
+- **Last Active**: 2026-08-16
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~423 | Active |
+| `journal-1.md` | ~445 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-08-16 | Publish and validate public AMEX reader | `1edfe51`, `19fff71` | `main` |
 | 14 | 2026-08-12 | Validate production AMEX sync canary | `5854a48` | `main` |
 | 13 | 2026-08-09 | Set up branded support email | `97f8367` | `main` |
 | 12 | 2026-08-07 | Ship architecture cleanup | `1f67a3b`, `a123151`, `7c42836` | `main` |

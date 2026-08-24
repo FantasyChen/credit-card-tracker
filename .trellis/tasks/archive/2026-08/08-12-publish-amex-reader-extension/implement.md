@@ -53,9 +53,9 @@
   generated E2E for both channels, visual screenshot review, public-DB invariant,
   task parsing, sensitive scan, and `git diff --check`.
 - [x] Run independent Trellis check and update durable browser-integration specs.
-- [ ] Present final package hashes, exact permissions/grants, parity results,
+- [x] Present final package hashes, exact permissions/grants, parity results,
   screenshots, listing copy, privacy answers, and known review risks to the user.
-- [ ] Reinstall or update the exact public Greasy Fork `1.0.0` artifact, run the
+- [x] Reinstall or update the exact public Greasy Fork `1.0.0` artifact, run the
   final bounded zero-write/read canary, and retain only sanitized aggregate
   evidence before production activation.
 - [ ] For the remaining production release, verify the target/recovery gates,
@@ -145,3 +145,46 @@
   evidence. No scan, provider request, handoff, preview, configuration,
   deployment, database operation, confirmation, or `.env` action occurred in
   this review.
+
+## Public artifact production-release evidence (2026-08-16)
+
+- The exact public Greasy Fork post-install flow completed for script `591349`.
+  The installed production identity was enabled at version `1.0.0`; the exact
+  AMEX benefits route then exposed one idle reader host, one manual scan
+  control, and no reader progress/cancel state. The public artifact SHA-256 was
+  independently re-fetched as
+  `516d3be8ed7eacc84d2e410329bc0a75f78e004c4992d3b3b33a9149176d150f`.
+- Two owner-authorized read-only scans plus the fresh preview scan were stable:
+  five physical-card groups, 44 visible normalized observations, 26 Remaining,
+  18 Used, and zero duplicate physical identities. No provider mutation,
+  provider payload, token, card ending, account identifier, or raw normalized
+  row entered task evidence.
+- Production target/recovery preflight reverified the reviewed production
+  project, a unique 24-hour production recovery profile, existing Ready
+  recovery branches, registered sensitive mode/HMAC names, a Ready immutable
+  deployment, and exact primary-alias deployment identity. Deployment source
+  was the reviewed release commit `f6fe053`; isolated upload trees excluded
+  every `.env*` path plus Trellis task/workspace/runtime evidence.
+- A newline-terminated `preview` provider input remained fail-closed at runtime
+  despite successful registration, Ready deployment, and alias equality. The
+  value was replaced through EOF-terminated stdin without a line terminator;
+  after a fresh deployment and alias proof, the authenticated runtime handoff
+  resolved exact preview mode. The reusable provider-input contract is now in
+  `deployment-and-external-effects.md`.
+- The zero-write preview returned 0 proposed, 13 unchanged, 1 skipped
+  (`destination_not_usable`), and 0 failed rows. Fifteen local observations were
+  excluded in one `partial` bucket, and four destination cards still require
+  exact five-digit identity. No duplicate/ambiguous source, destination, or
+  card classification appeared. The server explicitly reported preview-only,
+  no-write behavior and exposed no confirmation control.
+- Because the fresh preview contained zero proposed rows, there was no valid
+  one-row canary to confirm. Write mode was not enabled and no action-time write
+  confirmation was requested; manufacturing a change would violate the
+  provider-read-only and exact-proposal gates. Exact `off` was redeployed from
+  `f6fe053`; the immutable deployment and primary alias matched, and a fresh
+  authenticated retained-envelope probe returned `Amex sync is currently
+  turned off. No data was changed.` with zero confirmation controls.
+- The repository-local Trellis runtime was updated from `0.6.12` to `0.6.14`
+  with ten managed templates refreshed. The customized `.trellis/config.yaml`,
+  task/spec data, and user workspace were preserved; the global CLI was not
+  upgraded to npm `0.6.15`.

@@ -23,7 +23,8 @@
     "07-29-global-benefit-runtime",
     "07-29-legacy-global-benefit-migration",
     "07-29-amex-global-definition-authority",
-    "07-29-production-global-benefit-rollout"
+    "07-29-production-global-benefit-rollout",
+    "08-16-activate-amex-sync-for-users"
   ],
   "parent": null,
   "relatedFiles": [],
