@@ -137,14 +137,27 @@ export async function runNotificationDigest({
     );
 
     const newByUser = groupByUserId(emailEligibleNewStatuses);
-    const expiringByUser = filterExpiringStatusesByUser(
+    const expiringByUser = filterByReminderWindow(
       emailEligibleExpiringStatuses,
       userMap,
-      effectiveExpirationDaysByUser,
-      today
+      today,
+      (user) => effectiveExpirationDaysByUser.get(user.id),
+      (status) => status.cycleEndDate,
     );
-    const loyaltyByUser = filterExpiringLoyaltyByUser(expiringLoyalty, userMap, today);
-    const certificatesByUser = filterExpiringCertificatesByUser(expiringCertificates, userMap, today);
+    const loyaltyByUser = filterByReminderWindow(
+      expiringLoyalty,
+      userMap,
+      today,
+      (user) => user.pointsExpirationDays,
+      (account) => account.expirationDate,
+    );
+    const certificatesByUser = filterByReminderWindow(
+      expiringCertificates,
+      userMap,
+      today,
+      (user) => user.pointsExpirationDays,
+      (certificate) => certificate.expirationDate,
+    );
     const emailTasks = buildDigestEmailTasks({
       usersToNotify,
       newByUser,
@@ -220,66 +233,29 @@ function groupByUserId<T extends { userId: string }>(items: T[]): Map<string, T[
   return grouped;
 }
 
-function filterExpiringStatusesByUser<T extends { userId: string; cycleEndDate: Date }>(
-  statuses: T[],
+function filterByReminderWindow<T extends { userId: string }>(
+  items: T[],
   userMap: Map<string, NotificationUser>,
-  effectiveExpirationDaysByUser: Map<string, number>,
-  today: Date
+  today: Date,
+  daysForUser: (user: NotificationUser) => number | null | undefined,
+  dateForItem: (item: T) => Date | null | undefined,
 ): Map<string, T[]> {
-  const expiringByUser = new Map<string, T[]>();
-  for (const status of statuses) {
-    const user = userMap.get(status.userId);
-    const effectiveExpirationDays = user ? effectiveExpirationDaysByUser.get(user.id) : undefined;
-    if (!effectiveExpirationDays) continue;
+  const itemsByUser = new Map<string, T[]>();
 
-    const { dayStart, dayEnd } = reminderWindow(today, effectiveExpirationDays);
-    if (status.cycleEndDate >= dayStart && status.cycleEndDate <= dayEnd) {
-      const list = expiringByUser.get(status.userId) ?? [];
-      list.push(status);
-      expiringByUser.set(status.userId, list);
-    }
+  for (const item of items) {
+    const user = userMap.get(item.userId);
+    const days = user ? daysForUser(user) : undefined;
+    const expirationDate = dateForItem(item);
+    if (!days || !expirationDate) continue;
+
+    const { dayStart, dayEnd } = reminderWindow(today, days);
+    if (!(expirationDate >= dayStart && expirationDate <= dayEnd)) continue;
+
+    const list = itemsByUser.get(item.userId) ?? [];
+    list.push(item);
+    itemsByUser.set(item.userId, list);
   }
-  return expiringByUser;
-}
-
-function filterExpiringLoyaltyByUser<T extends { userId: string; expirationDate: Date | null }>(
-  accounts: T[],
-  userMap: Map<string, NotificationUser>,
-  today: Date
-): Map<string, T[]> {
-  const loyaltyByUser = new Map<string, T[]>();
-  for (const account of accounts) {
-    const user = userMap.get(account.userId);
-    if (!user?.pointsExpirationDays || !account.expirationDate) continue;
-
-    const { dayStart, dayEnd } = reminderWindow(today, user.pointsExpirationDays);
-    if (account.expirationDate >= dayStart && account.expirationDate <= dayEnd) {
-      const list = loyaltyByUser.get(account.userId) ?? [];
-      list.push(account);
-      loyaltyByUser.set(account.userId, list);
-    }
-  }
-  return loyaltyByUser;
-}
-
-function filterExpiringCertificatesByUser<T extends { userId: string; expirationDate: Date }>(
-  certificates: T[],
-  userMap: Map<string, NotificationUser>,
-  today: Date
-): Map<string, T[]> {
-  const certificatesByUser = new Map<string, T[]>();
-  for (const certificate of certificates) {
-    const user = userMap.get(certificate.userId);
-    if (!user?.pointsExpirationDays) continue;
-
-    const { dayStart, dayEnd } = reminderWindow(today, user.pointsExpirationDays);
-    if (certificate.expirationDate >= dayStart && certificate.expirationDate <= dayEnd) {
-      const list = certificatesByUser.get(certificate.userId) ?? [];
-      list.push(certificate);
-      certificatesByUser.set(certificate.userId, list);
-    }
-  }
-  return certificatesByUser;
+  return itemsByUser;
 }
 
 function buildDigestEmailTasks({

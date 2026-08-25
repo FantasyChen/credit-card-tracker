@@ -194,42 +194,6 @@ describe('/api/cron/send-notifications', () => {
         };
     };
 
-    it.skip('should send digest email for new benefit cycles', async () => {
-        const systemTime = utcDate(2023, 8, 15, 10, 30, 0);
-        const queryStartDate = utcDate(2023, 8, 15);
-        const queryEndDate = utcDate(2023, 8, 16);
-        
-        jest.useFakeTimers().setSystemTime(systemTime);
-        
-        (prisma.user.findMany as jest.Mock).mockResolvedValueOnce([mockUser({ id: 'user-new-benefit' })]);
-        
-        (fetchEffectiveBenefitStatuses as jest.Mock)
-            .mockImplementationOnce(async (args) => {
-                const userIdMatch = args.where.userId === 'user-new-benefit';
-                const cycleStartDateExists = !!args.where.cycleStartDate;
-                const gteExists = !!args.where.cycleStartDate?.gte;
-                const gteTimeMatch = args.where.cycleStartDate?.gte?.getTime() === queryStartDate.getTime();
-                const ltExists = !!args.where.cycleStartDate?.lt;
-                const ltTimeMatch = args.where.cycleStartDate?.lt?.getTime() === queryEndDate.getTime();
-
-                if (userIdMatch && cycleStartDateExists && gteExists && gteTimeMatch && ltExists && ltTimeMatch) {
-                    return [mockBenefitStatus('new', queryStartDate, utcDate(2023, 9, 14), 'user-new-benefit')];
-                }
-                return [];
-            })
-            .mockImplementationOnce(async () => []); 
-
-        await GET(createMockReq());
-
-        expect(sendEmail).toHaveBeenCalledTimes(1);
-        
-        const sendEmailArgs = (sendEmail as jest.Mock).mock.calls[0][0];
-        expect(sendEmailArgs.to).toBe('user1@example.com');
-        expect(sendEmailArgs.subject).toBe('New Benefit Cycles Have Started!');
-        expect(sendEmailArgs.html).toContain('New Benefit Cycles');
-        expect(sendEmailArgs.html).toContain('Perks Reminder Update');
-    });
-
     it('should send digest email for expiring benefits', async () => {
         const systemTime = utcDate(2023, 8, 15, 11, 0, 0); 
         const userNotifyDays = 7;
@@ -571,25 +535,6 @@ describe('/api/cron/send-notifications', () => {
     });
 
     // More detailed tests for logic will follow
-  });
-
-  // Test with NODE_ENV=development for mockDate functionality
-  describe('runSendNotificationsLogic with mockDate (NODE_ENV=development)', () => {
-    beforeEach(() => {
-        // Ensure CRON_SECRET is set for authorization
-        // Use jest.replaceProperty for all env changes to ensure proper restoration
-        jest.replaceProperty(process, 'env', { 
-            ...originalProcessEnv, // Start with a clean slate of original env
-            NODE_ENV: 'development', 
-            CRON_SECRET: 'test-secret', // Ensure it's authorized
-            NEXTAUTH_URL: 'http://localhost:3000' // Ensure this is also present
-        });
-    });
-
-    it('should handle mockDate parameter in development', async () => {
-      // TODO: Add test implementation for mockDate functionality
-      expect(true).toBe(true);
-    });
   });
 
 }); 
