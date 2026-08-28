@@ -52,7 +52,7 @@ export interface PublicStaticCard extends Omit<StaticPredefinedCard, 'benefits'>
   updatedAt: string;
 }
 
-export const STATIC_CATALOG_UPDATED_AT = '2026-06-26';
+export const STATIC_CATALOG_UPDATED_AT = '2026-08-27';
 
 export const predefinedCardsData = [
     {
@@ -964,6 +964,94 @@ export const predefinedCardsData = [
           percentage: 0,
           cycleAlignment: 'CARD_ANNIVERSARY',
           fixedCycleDurationMonths: 48, // 4 years
+        },
+      ],
+    },
+    {
+      catalogKey: 'card:bilt-blue',
+      name: 'Bilt Blue Card',
+      issuer: 'Bilt',
+      annualFee: 0,
+      imageUrl: null,
+      benefits: [],
+    },
+    {
+      catalogKey: 'card:bilt-obsidian',
+      name: 'Bilt Obsidian Card',
+      issuer: 'Bilt',
+      annualFee: 95,
+      imageUrl: null,
+      benefits: [
+        {
+          catalogKey: 'benefit:bilt-obsidian:50-semi-annual-bilt-travel-hotel-credit-jan-jun',
+          parentCatalogKey: 'card:bilt-obsidian',
+          description: '$50 Semi-Annual Bilt Travel Hotel Credit (Jan-Jun)',
+          category: 'Travel',
+          maxAmount: 50,
+          frequency: 'YEARLY',
+          percentage: 0,
+          cycleAlignment: 'CALENDAR_FIXED',
+          fixedCycleStartMonth: 1, // Jan-Jun window
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          catalogKey: 'benefit:bilt-obsidian:50-semi-annual-bilt-travel-hotel-credit-jul-dec',
+          parentCatalogKey: 'card:bilt-obsidian',
+          description: '$50 Semi-Annual Bilt Travel Hotel Credit (Jul-Dec)',
+          category: 'Travel',
+          maxAmount: 50,
+          frequency: 'YEARLY',
+          percentage: 0,
+          cycleAlignment: 'CALENDAR_FIXED',
+          fixedCycleStartMonth: 7, // Jul-Dec window
+          fixedCycleDurationMonths: 6,
+        },
+      ],
+    },
+    {
+      catalogKey: 'card:bilt-palladium',
+      name: 'Bilt Palladium Card',
+      issuer: 'Bilt',
+      annualFee: 495,
+      imageUrl: null,
+      benefits: [
+        {
+          catalogKey: 'benefit:bilt-palladium:200-semi-annual-bilt-travel-hotel-credit-jan-jun',
+          parentCatalogKey: 'card:bilt-palladium',
+          description: '$200 Semi-Annual Bilt Travel Hotel Credit (Jan-Jun)',
+          category: 'Travel',
+          maxAmount: 200,
+          frequency: 'YEARLY',
+          percentage: 0,
+          cycleAlignment: 'CALENDAR_FIXED',
+          fixedCycleStartMonth: 1, // Jan-Jun window
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          catalogKey: 'benefit:bilt-palladium:200-semi-annual-bilt-travel-hotel-credit-jul-dec',
+          parentCatalogKey: 'card:bilt-palladium',
+          description: '$200 Semi-Annual Bilt Travel Hotel Credit (Jul-Dec)',
+          category: 'Travel',
+          maxAmount: 200,
+          frequency: 'YEARLY',
+          percentage: 0,
+          cycleAlignment: 'CALENDAR_FIXED',
+          fixedCycleStartMonth: 7, // Jul-Dec window
+          fixedCycleDurationMonths: 6,
+        },
+        {
+          // Bilt Cash expires December 31 regardless of deposit date, so the
+          // trackable window is the calendar year rather than the anniversary.
+          catalogKey: 'benefit:bilt-palladium:200-annual-bilt-cash-credit',
+          parentCatalogKey: 'card:bilt-palladium',
+          description: '$200 Annual Bilt Cash Credit',
+          category: 'Bonus',
+          maxAmount: 200,
+          frequency: 'YEARLY',
+          percentage: 0,
+          cycleAlignment: 'CALENDAR_FIXED',
+          fixedCycleStartMonth: 1,
+          fixedCycleDurationMonths: 12,
         },
       ],
     },

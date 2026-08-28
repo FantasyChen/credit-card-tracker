@@ -1,0 +1,47 @@
+{
+  "$schema": "../schema.json",
+  "name": "Bilt Obsidian Card",
+  "issuer": "Bilt",
+  "annualFee": 95,
+  "imageUrl": "/images/cards/bilt-obsidian.png",
+  "sources": [
+    {
+      "label": "Bilt newsroom: Meet Bilt Card 2.0",
+      "url": "https://newsroom.biltrewards.com/meetbiltcard2.0",
+      "accessed": "2026-08-27"
+    },
+    {
+      "label": "Doctor of Credit: Three brand new Bilt 2.0 cards",
+      "url": "https://www.doctorofcredit.com/three-brand-new-bilt-2-0-cards-blue-obsidian-palladium/",
+      "accessed": "2026-08-27"
+    },
+    {
+      "label": "Upgraded Points: Bilt new credit card details",
+      "url": "https://upgradedpoints.com/news/bilt-new-credit-card-details/",
+      "accessed": "2026-08-27"
+    }
+  ],
+  "benefits": [
+    {
+      "description": "$50 Semi-Annual Bilt Travel Hotel Credit (Jan-Jun)",
+      "category": "Travel",
+      "maxAmount": 50,
+      "frequency": "YEARLY",
+      "cycleAlignment": "CALENDAR_FIXED",
+      "fixedCycleStartMonth": 1,
+      "fixedCycleDurationMonths": 6,
+      "notes": "Requires a minimum two-night stay booked through the Bilt Travel portal."
+    },
+    {
+      "description": "$50 Semi-Annual Bilt Travel Hotel Credit (Jul-Dec)",
+      "category": "Travel",
+      "maxAmount": 50,
+      "frequency": "YEARLY",
+      "cycleAlignment": "CALENDAR_FIXED",
+      "fixedCycleStartMonth": 7,
+      "fixedCycleDurationMonths": 6,
+      "notes": "Requires a minimum two-night stay booked through the Bilt Travel portal."
+    }
+  ],
+  "reviewNotes": "Mid tier of the Bilt Card 2.0 lineup launched 2026-02-07. The $100 annual Bilt Travel hotel credit is issued as two $50 credits that reset on calendar halves, so it is modeled as two CALENDAR_FIXED six-month benefits matching the existing Chase Sapphire Reserve semi-annual pattern. The $200 Bilt Cash account-opening offer is a welcome bonus and is omitted. Image is unset pending licensed card artwork."
+}

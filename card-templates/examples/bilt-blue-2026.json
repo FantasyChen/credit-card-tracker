@@ -1,0 +1,21 @@
+{
+  "$schema": "../schema.json",
+  "name": "Bilt Blue Card",
+  "issuer": "Bilt",
+  "annualFee": 0,
+  "imageUrl": "/images/cards/bilt-blue.png",
+  "sources": [
+    {
+      "label": "Bilt newsroom: Meet Bilt Card 2.0",
+      "url": "https://newsroom.biltrewards.com/meetbiltcard2.0",
+      "accessed": "2026-08-27"
+    },
+    {
+      "label": "Doctor of Credit: Three brand new Bilt 2.0 cards",
+      "url": "https://www.doctorofcredit.com/three-brand-new-bilt-2-0-cards-blue-obsidian-palladium/",
+      "accessed": "2026-08-27"
+    }
+  ],
+  "benefits": [],
+  "reviewNotes": "Entry tier of the Bilt Card 2.0 lineup launched 2026-02-07. No annual fee and no recurring trackable statement credits. The $100 Bilt Cash account-opening offer is a welcome bonus, not a recurring benefit, so it is intentionally omitted. 4% Bilt Cash earning is an earning multiplier and is excluded per contributor rules. Image is unset pending licensed card artwork."
+}
