@@ -12,6 +12,7 @@ import {
   ShieldCheckIcon,
   SparklesIcon,
   PuzzlePieceIcon,
+  AdjustmentsHorizontalIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/ui/PageHeader';
 
@@ -83,6 +84,12 @@ export default async function SettingsPage() {
       icon: <ArrowDownTrayIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />,
       title: 'Import & Export Data',
       description: 'Backup your data or import from a previous export.',
+    },
+    {
+      href: '/settings/benefit-tracking',
+      icon: <AdjustmentsHorizontalIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />,
+      title: 'Benefit Tracking',
+      description: 'Review benefits you auto-claim or ignore, and return them to normal tracking.',
     },
     {
       href: '/integrations/amex-sync/setup',

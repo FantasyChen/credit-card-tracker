@@ -17,6 +17,10 @@ import {
 import { z } from 'zod';
 import { redirect } from 'next/navigation';
 import { findEffectiveBenefitStatus } from '@/lib/effective-benefit';
+import {
+  initialStatusFieldsForTrackingMode,
+  isBenefitTrackingMode,
+} from '@/lib/benefit-tracking-modes';
 
 interface StatusTransitionRecord {
   id: string;
@@ -784,3 +788,163 @@ export async function deleteCustomBenefitAction(formData: FormData) {
     throw new Error('Failed to delete custom benefit.');
   }
 } 
+
+/**
+ * Sets the cycle-independent tracking mode for the benefit behind one status
+ * row, then brings the currently open cycle in line with the new choice.
+ *
+ * Writing the preference alone would only take effect from the next cycle, so
+ * AUTO_CLAIM also claims the open cycle immediately and returning to TRACK
+ * reopens a cycle that this feature had auto-claimed.
+ */
+export async function setBenefitTrackingModeAction(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated.');
+  }
+  const userId = session.user.id;
+
+  const benefitStatusId = formData.get('benefitStatusId') as string;
+  const requestedMode = formData.get('trackingMode');
+  if (!benefitStatusId) {
+    throw new Error('Benefit Status ID is missing.');
+  }
+  if (!isBenefitTrackingMode(requestedMode)) {
+    throw new Error('Unknown benefit tracking mode.');
+  }
+
+  // Ownership is enforced by loading the status through the effective-benefit
+  // reader before anything is written.
+  const status = await findEffectiveBenefitStatus(prisma, userId, benefitStatusId);
+  if (!status) {
+    throw new Error('Benefit status not found or permission denied.');
+  }
+
+  const target = status.predefinedBenefitId
+    ? {
+        creditCardId: status.creditCardId,
+        predefinedBenefitId: status.predefinedBenefitId,
+        benefitId: null,
+      }
+    : { creditCardId: null, predefinedBenefitId: null, benefitId: status.benefitId };
+
+  try {
+    await prisma.$transaction(async (transaction) => {
+      const existing = await transaction.benefitTrackingPreference.findFirst({
+        where: { userId, ...target },
+        select: { id: true, mode: true },
+      });
+      const previousMode = existing?.mode ?? 'TRACK';
+
+      if (existing) {
+        await transaction.benefitTrackingPreference.update({
+          where: { id: existing.id },
+          data: { mode: requestedMode },
+        });
+      } else if (requestedMode !== 'TRACK') {
+        await transaction.benefitTrackingPreference.create({
+          data: { userId, ...target, mode: requestedMode },
+        });
+      }
+
+      if (requestedMode === 'AUTO_CLAIM' && !status.isCompleted) {
+        await transaction.benefitStatus.updateMany({
+          where: { id: benefitStatusId, userId },
+          data: initialStatusFieldsForTrackingMode(
+            'AUTO_CLAIM',
+            status.benefit.maxAmount,
+            new Date()
+          ),
+        });
+      }
+
+      // Leaving AUTO_CLAIM reopens a cycle this feature had claimed on the
+      // user's behalf. A cycle claimed while the benefit was tracked normally
+      // was claimed by the user, so it is left alone.
+      if (previousMode === 'AUTO_CLAIM' && requestedMode !== 'AUTO_CLAIM' && status.isCompleted) {
+        await transaction.benefitStatus.updateMany({
+          where: { id: benefitStatusId, userId },
+          data: { isCompleted: false, completedAt: null, usedAmount: 0 },
+        });
+      }
+    });
+
+    revalidatePath('/benefits');
+    revalidatePath('/');
+
+    return { success: true, mode: requestedMode };
+  } catch (error) {
+    console.error('Error setting benefit tracking mode:', error);
+    throw new Error('Failed to update benefit tracking mode.');
+  }
+}
+
+/**
+ * Clears one tracking preference from the settings screen, returning the
+ * benefit to the normal per-cycle workflow.
+ *
+ * This is the only way back for an IGNORE'd benefit, which by definition no
+ * longer appears on the dashboard. A cycle that was auto-claimed on the user's
+ * behalf is reopened so the benefit does not sit there falsely marked claimed.
+ */
+export async function resetBenefitTrackingPreferenceAction(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated.');
+  }
+  const userId = session.user.id;
+
+  const preferenceId = formData.get('preferenceId') as string;
+  if (!preferenceId) {
+    throw new Error('Preference ID is missing.');
+  }
+
+  try {
+    await prisma.$transaction(async (transaction) => {
+      // Scoping the read to the session user is what enforces ownership.
+      const preference = await transaction.benefitTrackingPreference.findFirst({
+        where: { id: preferenceId, userId },
+        select: {
+          id: true,
+          mode: true,
+          creditCardId: true,
+          predefinedBenefitId: true,
+          benefitId: true,
+        },
+      });
+      if (!preference) {
+        throw new Error('Tracking preference not found or permission denied.');
+      }
+
+      if (preference.mode === 'AUTO_CLAIM') {
+        const now = new Date();
+        await transaction.benefitStatus.updateMany({
+          where: {
+            userId,
+            isCompleted: true,
+            cycleStartDate: { lte: now },
+            cycleEndDate: { gte: now },
+            ...(preference.predefinedBenefitId
+              ? {
+                  creditCardId: preference.creditCardId,
+                  predefinedBenefitId: preference.predefinedBenefitId,
+                }
+              : { benefitId: preference.benefitId }),
+          },
+          data: { isCompleted: false, completedAt: null, usedAmount: 0 },
+        });
+      }
+
+      await transaction.benefitTrackingPreference.delete({ where: { id: preference.id } });
+    });
+
+    revalidatePath('/benefits');
+    revalidatePath('/settings/benefit-tracking');
+    revalidatePath('/');
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error resetting benefit tracking preference:', error);
+    throw new Error('Failed to reset benefit tracking preference.');
+  }
+}

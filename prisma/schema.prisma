@@ -33,6 +33,7 @@ model User {
   emailAlertsResetAt      DateTime?
   accounts                Account[]
   benefitStatuses         BenefitStatus[]
+  benefitTrackingPreferences BenefitTrackingPreference[]
   cardEvents              CreditCardEvent[]
   creditCards             CreditCard[]
   loyaltyAccounts         LoyaltyAccount[]
@@ -114,6 +115,7 @@ model CreditCard {
   predefinedCardId    String?
   benefits            Benefit[]
   benefitStatuses     BenefitStatus[]
+  benefitTrackingPreferences BenefitTrackingPreference[]
   events              CreditCardEvent[]
   externalMappings    ExternalCardMapping[]
   syncRowAudits                    AmexSyncRowAudit[]
@@ -167,6 +169,7 @@ model Benefit {
   creditCard               CreditCard?            @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
   user                     User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   benefitStatuses          BenefitStatus[]
+  trackingPreferences      BenefitTrackingPreference[]
   syncRowAudits            AmexSyncRowAudit[]
   categoryRepair           GlobalBenefitCategoryRepair? @relation("CategoryRepairLegacyBenefit")
 
@@ -210,6 +213,7 @@ model PredefinedBenefit {
   creditFamilyKey          String?
   periodKey                String?
   usageWayId               String?
+  trackingPreferences      BenefitTrackingPreference[]
   predefinedCard           PredefinedCard         @relation(fields: [predefinedCardId], references: [id], onDelete: Restrict)
   usageWay                 BenefitUsageWay?       @relation(fields: [usageWayId], references: [id])
   benefitStatuses          BenefitStatus[]
@@ -264,6 +268,29 @@ model BenefitStatus {
   @@index([userId, orderIndex, cycleEndDate], map: "BenefitStatus_dashboard_user_order_end_idx")
   @@index([userId, cycleEndDate], map: "BenefitStatus_dashboard_user_end_idx")
   @@index([userId, isCompleted, isNotUsable, cycleEndDate], map: "BenefitStatus_dashboard_user_state_end_idx")
+}
+
+/// A user-owned, cycle-independent tracking choice for one benefit. Absence of
+/// a row means TRACK. Standard benefits are identified by the
+/// (creditCardId, predefinedBenefitId) pair used by BenefitStatus; custom
+/// benefits are identified by benefitId.
+model BenefitTrackingPreference {
+  id                  String              @id @default(cuid())
+  userId              String
+  creditCardId        String?
+  predefinedBenefitId String?
+  benefitId           String?
+  mode                BenefitTrackingMode @default(TRACK)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creditCard          CreditCard?         @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  predefinedBenefit   PredefinedBenefit?  @relation(fields: [predefinedBenefitId], references: [id], onDelete: Restrict)
+  benefit             Benefit?            @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, creditCardId, predefinedBenefitId], map: "BenefitTrackingPreference_standard_key")
+  @@unique([userId, benefitId], map: "BenefitTrackingPreference_custom_key")
+  @@index([userId, mode])
 }
 
 model ExternalCardMapping {
@@ -555,6 +582,14 @@ enum BenefitFrequency {
   QUARTERLY
   YEARLY
   ONE_TIME
+}
+
+/// How a user chose to track one benefit across every future Benefit Cycle.
+/// TRACK is the default and preserves the original per-cycle workflow.
+enum BenefitTrackingMode {
+  TRACK
+  AUTO_CLAIM
+  IGNORE
 }
 
 enum BenefitCycleAlignment {

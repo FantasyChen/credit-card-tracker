@@ -3,6 +3,7 @@ import type {
   EffectiveBenefitStatus,
   EffectiveCreditCard,
 } from '@/lib/effective-benefit';
+import type { BenefitTrackingMode } from '@/lib/benefit-tracking-modes';
 
 /**
  * Types and pure helpers shared by the server dashboard projection and the
@@ -49,6 +50,8 @@ export interface DisplayBenefitStatus extends Omit<
   usageWaySlug?: string | null;
   isCustomBenefit?: boolean;
   canMutateDefinition?: boolean;
+  /** Cycle-independent tracking choice; absent means the TRACK default. */
+  trackingMode?: BenefitTrackingMode;
 }
 
 export interface CardLevelRoi {
