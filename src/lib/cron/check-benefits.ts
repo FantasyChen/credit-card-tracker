@@ -118,7 +118,7 @@ async function loadTrackingModesForUsers(
     if (existing) existing.push(preference);
     else grouped.set(preference.userId, [preference]);
   }
-  for (const [userId, userPreferences] of grouped) {
+  for (const [userId, userPreferences] of Array.from(grouped.entries())) {
     byUser.set(userId, buildBenefitTrackingModeMap(userPreferences));
   }
   return byUser;
