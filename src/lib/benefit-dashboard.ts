@@ -36,12 +36,11 @@ export type {
 } from '@/lib/benefit-dashboard-client';
 
 import {
-  buildBenefitTrackingModeMap,
   excludeIgnoredBenefits,
   resolveBenefitTrackingMode,
   type BenefitTrackingModeMap,
-  type BenefitTrackingPreferenceRecord,
 } from '@/lib/benefit-tracking-modes';
+import { loadBenefitTrackingModes } from '@/lib/benefit-tracking-preferences';
 
 export interface UsageWayForDashboard {
   slug: string;
@@ -318,26 +317,6 @@ type BenefitDashboardDatabase = Pick<
   '$queryRaw' | 'benefitUsageWay' | 'creditCard' | 'user' | 'benefitTrackingPreference'
 >;
 
-/**
- * Loads the user's cycle-independent tracking choices. Users with no
- * preferences get an empty map and the original behaviour.
- */
-async function fetchBenefitTrackingModes(
-  database: BenefitDashboardDatabase,
-  userId: string
-): Promise<BenefitTrackingModeMap> {
-  const preferences = await database.benefitTrackingPreference.findMany({
-    where: { userId, mode: { not: 'TRACK' } },
-    select: {
-      creditCardId: true,
-      predefinedBenefitId: true,
-      benefitId: true,
-      mode: true,
-    },
-  }) as unknown as BenefitTrackingPreferenceRecord[];
-  return buildBenefitTrackingModeMap(preferences);
-}
-
 export interface LoadedBenefitDashboard extends BenefitDashboardProjection {
   cardCount: number;
   notifyBenefitExpiration: boolean;
@@ -436,7 +415,7 @@ export async function loadBenefitDashboard(
     database.creditCard.findMany({ where: { userId } }),
     fetchEffectiveCardTerms(database, userId),
     fetchDashboardBenefitStatuses(database, userId, now),
-    fetchBenefitTrackingModes(database, userId),
+    loadBenefitTrackingModes(database, userId),
     database.user.findUnique({
       where: { id: userId },
       select: {
@@ -492,7 +471,7 @@ export async function loadHomeDashboardSummary(
       cycleStartOnOrBefore: now,
       cycleEndOnOrAfter: now,
     }),
-    fetchBenefitTrackingModes(database, userId),
+    loadBenefitTrackingModes(database, userId),
   ]);
 
   // Ignored benefits stay out of the home summary the same way they stay out

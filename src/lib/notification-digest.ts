@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
 import { SITE_NAME } from '@/lib/site';
 import { BenefitFrequency } from '@/generated/prisma';
-import { fetchEffectiveBenefitStatuses } from '@/lib/effective-benefit';
+import { fetchTrackedBenefitStatuses } from '@/lib/benefit-tracking-preferences';
 
 const MIN_EMAILABLE_BENEFIT_CYCLE_MS = 28 * 24 * 60 * 60 * 1000 - 1;
 
@@ -79,7 +79,7 @@ export async function runNotificationDigest({
 
     const [newStatuses, expiringStatuses, expiringLoyalty, expiringCertificates] = await Promise.all([
       newBenefitUserIds.length > 0
-        ? fetchEffectiveBenefitStatuses(prisma, {
+        ? fetchTrackedBenefitStatuses(prisma, {
             userIds: newBenefitUserIds,
             completed: false,
             notUsable: false,
@@ -89,7 +89,7 @@ export async function runNotificationDigest({
         : Promise.resolve([]),
 
       expirationUserIds.length > 0 && maxExpirationDays > 0
-        ? fetchEffectiveBenefitStatuses(prisma, {
+        ? fetchTrackedBenefitStatuses(prisma, {
             userIds: expirationUserIds,
             completed: false,
             notUsable: false,

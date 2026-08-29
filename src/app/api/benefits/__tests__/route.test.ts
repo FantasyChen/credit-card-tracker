@@ -194,6 +194,7 @@ describe('/api/benefits', () => {
         cycleEndDate: new Date('2026-07-31T23:59:59.999Z'),
         occurrenceIndex: 0,
         isCompleted: false,
+        completedAt: null,
         usedAmount: 0,
       }],
     });

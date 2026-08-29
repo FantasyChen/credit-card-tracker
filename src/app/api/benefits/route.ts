@@ -5,7 +5,10 @@ import { BenefitCycleAlignment, BenefitFrequency } from '@/generated/prisma';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { materializeBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
-import { fetchEffectiveBenefitStatuses } from '@/lib/effective-benefit';
+import {
+  applyTrackingModesToPlannedRows,
+  fetchTrackedBenefitStatuses,
+} from '@/lib/benefit-tracking-preferences';
 
 const createCardLinkedCustomBenefitSchema = z.object({
   category: z.string().min(1).max(100),
@@ -25,7 +28,7 @@ export async function GET() {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const statuses = await fetchEffectiveBenefitStatuses(prisma, {
+    const statuses = await fetchTrackedBenefitStatuses(prisma, {
       userId: session.user.id,
     });
     const definitions = new Map<string, (typeof statuses)[number]['benefit']>();
@@ -88,12 +91,9 @@ export async function POST(request: Request) {
         }
       );
       if (materialized.rows.length > 0) {
+        const defaults = await applyTrackingModesToPlannedRows(transaction, materialized.rows);
         await transaction.benefitStatus.createMany({
-          data: materialized.rows.map((row) => ({
-            ...row,
-            isCompleted: false,
-            usedAmount: 0,
-          })),
+          data: materialized.rows.map((row, index) => ({ ...row, ...defaults[index] })),
         });
       }
       return created;

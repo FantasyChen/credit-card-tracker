@@ -21,6 +21,7 @@ import {
   initialStatusFieldsForTrackingMode,
   isBenefitTrackingMode,
 } from '@/lib/benefit-tracking-modes';
+import { applyTrackingModesToPlannedRows } from '@/lib/benefit-tracking-preferences';
 
 interface StatusTransitionRecord {
   id: string;
@@ -600,12 +601,9 @@ export async function createCustomBenefitAction(formData: FormData) {
       );
 
       if (materialized.rows.length > 0) {
+        const defaults = await applyTrackingModesToPlannedRows(transaction, materialized.rows);
         await transaction.benefitStatus.createMany({
-          data: materialized.rows.map((row) => ({
-            ...row,
-            isCompleted: false,
-            usedAmount: 0,
-          })),
+          data: materialized.rows.map((row, index) => ({ ...row, ...defaults[index] })),
         });
       }
     });
