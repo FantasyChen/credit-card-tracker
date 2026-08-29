@@ -142,7 +142,7 @@ export const predefinedCardsData = [
         {
           catalogKey: 'benefit:csr:150-semi-annual-fine-dining-credit-select-restaurants-jan-jun',
           parentCatalogKey: 'card:csr',
-          description: '$150 Semi-Annual Fine Dining Credit (Select Restaurants - Jan-Jun)',
+          description: '$150 Semi-Annual Fine Dining Credit (Select Restaurants — Jan-Jun)',
           category: 'Dining',
           maxAmount: 150,
           frequency: 'YEARLY',
