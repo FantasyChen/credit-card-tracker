@@ -1,0 +1,104 @@
+name: Global catalog sync
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - src/lib/static-catalog.ts
+      - src/lib/catalog/**
+      - scripts/sync-global-catalog.ts
+      - scripts/verify-catalog-sync-target.ts
+      - package.json
+      - package-lock.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: global-catalog-sync-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dry-run:
+    name: Review catalog sync plan
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: catalog-sync-preview
+    steps:
+      - name: Check out merged source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify catalog database target
+        env:
+          DATABASE_URL: ${{ secrets.CATALOG_SYNC_DATABASE_URL }}
+          CATALOG_SYNC_EXPECTED_FINGERPRINT: ${{ secrets.CATALOG_SYNC_EXPECTED_FINGERPRINT }}
+        run: npx tsx scripts/verify-catalog-sync-target.ts
+      - name: Generate and validate dry-run plan
+        env:
+          DATABASE_URL: ${{ secrets.CATALOG_SYNC_DATABASE_URL }}
+        run: |
+          if ! npm run sync:global-catalog -- --dry-run > catalog-sync-report.json 2>catalog-sync-error.log; then
+            echo "Catalog sync dry-run failed." >&2
+            exit 1
+          fi
+          node scripts/validate-catalog-sync-report.mjs catalog-sync-report.json dry-run
+      - name: Record aggregate dry-run result
+        if: always()
+        run: |
+          if [ -f catalog-sync-report.json ]; then
+            node scripts/append-catalog-sync-summary.mjs catalog-sync-report.json "$GITHUB_STEP_SUMMARY"
+          fi
+
+  apply:
+    name: Apply approved catalog sync
+    needs: dry-run
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: catalog-sync-production
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify catalog database target
+        env:
+          DATABASE_URL: ${{ secrets.CATALOG_SYNC_DATABASE_URL }}
+          CATALOG_SYNC_EXPECTED_FINGERPRINT: ${{ secrets.CATALOG_SYNC_EXPECTED_FINGERPRINT }}
+        run: npx tsx scripts/verify-catalog-sync-target.ts
+      - name: Apply approved catalog plan
+        env:
+          DATABASE_URL: ${{ secrets.CATALOG_SYNC_DATABASE_URL }}
+        run: |
+          if ! npm run sync:global-catalog -- \
+              --apply \
+              --target-verified \
+              --confirm=SYNC_GLOBAL_CATALOG > catalog-sync-report.json 2>catalog-sync-error.log; then
+            echo "Catalog sync apply failed; stop without compensating writes." >&2
+            exit 1
+          fi
+          node scripts/validate-catalog-sync-report.mjs catalog-sync-report.json apply
+      - name: Record aggregate result
+        if: always()
+        run: |
+          if [ -f catalog-sync-report.json ]; then
+            node scripts/append-catalog-sync-summary.mjs catalog-sync-report.json "$GITHUB_STEP_SUMMARY"
+          fi

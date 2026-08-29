@@ -30,6 +30,7 @@
     "check:public-db": "node scripts/check-public-db-invariant.cjs",
     "check:public-build:no-db": "node scripts/check-public-build-without-db.cjs",
     "card-template:validate": "node scripts/validate-card-template.cjs",
+    "check:catalog-sync-workflow": "node scripts/check-catalog-sync-workflow.mjs",
     "build:amex-userscript": "node scripts/build-amex-benefit-reader.mjs",
     "build:amex-userscript:local": "node scripts/build-amex-benefit-reader.mjs local",
     "check:amex-userscripts": "node scripts/check-amex-userscript-artifacts.mjs",
