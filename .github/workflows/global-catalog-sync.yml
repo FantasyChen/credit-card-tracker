@@ -48,7 +48,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.CATALOG_SYNC_DATABASE_URL }}
         run: |
-          if ! npm run sync:global-catalog -- --dry-run > catalog-sync-report.json 2>catalog-sync-error.log; then
+          if ! npm run --silent sync:global-catalog -- --dry-run > catalog-sync-report.json 2>catalog-sync-error.log; then
             echo "Catalog sync dry-run failed." >&2
             exit 1
           fi
@@ -88,7 +88,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.CATALOG_SYNC_DATABASE_URL }}
         run: |
-          if ! npm run sync:global-catalog -- \
+          if ! npm run --silent sync:global-catalog -- \
               --apply \
               --target-verified \
               --confirm=SYNC_GLOBAL_CATALOG > catalog-sync-report.json 2>catalog-sync-error.log; then

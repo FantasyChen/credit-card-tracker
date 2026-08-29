@@ -26,6 +26,7 @@ const requiredFragments = [
   "Record aggregate dry-run result",
   "2>catalog-sync-error.log",
   "stop without compensating writes",
+  "npm run --silent sync:global-catalog",
 ];
 for (const fragment of requiredFragments) {
   if (!workflow.includes(fragment)) throw new Error(`Catalog sync workflow is missing: ${fragment}`);
