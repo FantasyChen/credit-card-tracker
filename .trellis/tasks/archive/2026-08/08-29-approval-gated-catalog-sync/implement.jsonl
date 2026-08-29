@@ -1,0 +1,4 @@
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Catalog synchronization, propagation, and dry-run requirements."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Target verification and mutation safety gates."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Automatic deployment and external-effect boundaries."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Safe static checks and truthful reporting."}

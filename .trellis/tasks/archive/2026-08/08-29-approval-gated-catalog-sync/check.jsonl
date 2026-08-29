@@ -1,0 +1,4 @@
+{"file":".trellis/spec/perks-reminder/catalog-and-benefit-updates.md","reason":"Review catalog rollout and existing-user disposition."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Review no-write defaults and target gates."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Review protected production workflow behavior."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Review static verification and truthful reporting."}
