@@ -13,7 +13,7 @@ These specifications are the durable project context for Perks Reminder, a Next.
 7. For card, benefit, guide, or catalog changes, follow [Catalog and Benefit Updates](catalog-and-benefit-updates.md); checked-in source changes require key-preserving global synchronization and explicit status propagation.
 8. Read [Deployment and External Effects](deployment-and-external-effects.md) before builds, deployments, cron calls, email/notification work, Vercel changes, or production-domain checks.
 9. Choose checks from [Verification](verification.md). Never substitute a production-affecting command for a safe static check.
-10. Do not read, create, copy, or modify `.env`; secrets and runtime configuration stay outside Git and in provider dashboards or existing local state.
+10. Do not access `.env` by default. An explicitly requested repair may inspect and update only named values in an existing Git-ignored local `.env` under the narrow contract in [Database and Data Safety](database-and-data-safety.md); never create, copy, display, or commit secret values. Provider runtime configuration stays in provider dashboards.
 
 ## Topics
 

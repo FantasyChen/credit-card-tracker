@@ -2,11 +2,70 @@
 
 ## Non-negotiable rules
 
-- Do not read, create, or modify `.env`. Existing local configuration is private; production secrets belong in provider dashboards.
+- Do not access `.env` by default. The only exception is an explicitly requested repair of named values in an existing Git-ignored local `.env` under the contract below. Existing local configuration is private; production secrets belong in provider dashboards.
 - Treat `DATABASE_URL` as an application/pooler connection, `DIRECT_URL` as the direct migration connection, and `DATABASE_URL_DEV` as the development branch. Shell variables override dotenv values, so target identity must be verified rather than assumed.
 - Never run `prisma migrate reset`, `prisma db push --force-reset`, any `--force-reset` command, manual destructive SQL, or data deletion against production.
 - Do not run any Prisma migration, seed, reset, push, or data-mutation command merely as validation. Database operations require task scope, explicit human authorization, verified target identity, and a rollback/recovery plan.
 - A command named `dev` is not proof of safety. Verify the actual endpoint before destructive development-database work.
+
+## Scenario: repair stale local database connection values
+
+### 1. Scope / Trigger
+
+This exception applies only when the user explicitly asks to repair named database connection values in an existing Git-ignored local `.env`. It does not authorize creating an environment file, inspecting unrelated values, rotating credentials, changing provider-managed configuration, or reusing the values in another project.
+
+### 2. Signatures
+
+- Allowed local target: the repository-root `.env` only when `git check-ignore .env` succeeds and the file already exists.
+- Allowed keys: only the user-named database connection keys, normally `DATABASE_URL`, `DIRECT_URL`, or `DATABASE_URL_DEV`.
+- Allowed source: an authenticated provider CLI or dashboard for the target project and branch identified during the repair.
+
+### 3. Contracts
+
+- Verify the provider project, branch, database, and connection role without printing a connection string before updating the file.
+- Parse and replace only the named assignments; preserve every unrelated line byte-for-byte where practical.
+- Keep fetched values in process memory, suppress command output that could contain them, and never place them in shell history, logs, chat, tracked artifacts, or plaintext backup copies.
+- Do not rotate or mint credentials unless the user separately and explicitly requests rotation.
+- After repair, report only which key names changed and whether a redacted, non-mutating connection check passed.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| `.env` is absent or not Git-ignored | Stop; do not create or modify it. |
+| Requested key is not explicitly named or is unrelated to database connectivity | Stop and request narrower authorization. |
+| Provider project/branch/database is ambiguous | Stop before fetching or writing a value. |
+| Provider CLI would print a secret into captured output | Use a non-printing path or stop. |
+| Targeted assignment is absent | Stop unless the user explicitly authorizes adding that named key. |
+| Redacted connection verification fails | Leave the repaired value in place only if it came from the verified provider source; report the failure without exposing the value. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: the user names `DATABASE_URL` and `DIRECT_URL`; the authenticated Neon CLI confirms the intended project and production branch; an in-memory script replaces exactly those existing assignments and a redacted Prisma status check succeeds.
+- Base: no `.env` repair was requested, so agents do not inspect the file.
+- Bad: print the file, dump provider CLI output, copy `.env` for backup, replace every URL-like value, create a missing `.env`, or rotate a password as part of repair.
+
+### 6. Tests Required
+
+- Assert `.env` exists and `git check-ignore .env` succeeds before access.
+- Assert every requested key already occurs exactly once and every replacement value is non-empty before writing.
+- Assert the rewrite changes only the authorized key assignments without emitting old or new values.
+- Run only a non-mutating, target-verified connectivity or migration-status check and expose no connection details.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+cat .env
+cp .env .env.backup
+```
+
+This exposes unrelated secrets and creates another plaintext copy.
+
+#### Correct
+
+Use a non-logging process that validates the existing ignored file, obtains the authorized values from the verified provider target in memory, replaces only the named assignments, and reports key names plus redacted verification results.
 
 ## Changes and migrations
 

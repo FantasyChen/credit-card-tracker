@@ -22,4 +22,4 @@ Managed by Trellis. Edits outside this block are preserved; edits inside may be 
 
 ## Perks Reminder Safety Boundary
 
-Before changing application code or running project commands, read `.trellis/spec/perks-reminder/index.md` and the linked topic specifications. Never read, create, or modify `.env`; never run database, build, deployment, cron, email, or notification operations without satisfying the target-verification and authorization rules in those specs.
+Before changing application code or running project commands, read `.trellis/spec/perks-reminder/index.md` and the linked topic specifications. Do not access `.env` by default. When the user explicitly requests repair of named values in an existing Git-ignored local `.env`, follow the narrow repair contract in the database safety spec; never create, copy, display, or commit secret values. Never run database, build, deployment, cron, email, or notification operations without satisfying the target-verification and authorization rules in those specs.
