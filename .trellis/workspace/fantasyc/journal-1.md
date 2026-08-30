@@ -443,3 +443,24 @@ Validated the exact public userscript, stable live scans, zero-write production 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 16: Bilt catalog rollout and UI verification
+
+**Date**: 2026-08-29
+**Task**: Bilt catalog rollout and UI verification
+**Branch**: `main`
+
+### Summary
+
+Merged PR #20 for the Bilt Card 2.0 catalog lineup. Ran the approval-gated Global catalog sync through preview approval and production approval; apply succeeded. Verified Neon totals and Bilt catalog records read-only. Created a disposable UI test account, verified Bilt Blue/Obsidian/Palladium add and benefit flows, removed all test cards, then deleted the empty disposable user directly in Neon with serializable transaction and post-delete verification. Left unrelated .codex edits untouched. Active AMEX activation task remains in progress and was not archived.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `78a2556` | (see git log) |
+
+### Status
+
+[OK] **Completed**
