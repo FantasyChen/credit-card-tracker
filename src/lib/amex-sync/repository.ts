@@ -1113,6 +1113,9 @@ export async function applyAmexSyncRow(input: {
         usedAmount: after.usedAmount,
         isCompleted: after.isCompleted,
         completedAt: after.completedAt ? new Date(after.completedAt) : null,
+        // An applied AMEX Sync Confirmation is user-approved state; stamping it
+        // USER keeps tracking-mode changes from ever undoing it.
+        claimSource: "USER",
       },
     });
     if (update.count !== 1) throw new Error("conflict_repreview_required");
@@ -1205,6 +1208,9 @@ export async function applyAmexSyncGroup(input: {
           usedAmount: after.usedAmount,
           isCompleted: after.isCompleted,
           completedAt: after.completedAt ? new Date(after.completedAt) : null,
+          // An applied AMEX Sync Confirmation is user-approved state; stamping
+          // it USER keeps tracking-mode changes from ever undoing it.
+          claimSource: "USER",
         },
       });
       if (update.count !== 1) throw new Error("conflict_repreview_required");

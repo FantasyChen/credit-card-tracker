@@ -10,6 +10,7 @@ import {
   INSERT_BATCH_SIZE,
   insertMissingBenefitStatuses,
 } from '@/lib/cron/check-benefits';
+import { claimWindowEntryAutoClaims } from '@/lib/benefit-tracking-preferences';
 import {
   amexSyncAuditRetentionCutoff,
   deleteExpiredAmexSyncRowAudits,
@@ -347,6 +348,13 @@ async function runCheckBenefitsLogic(dryRun = false) {
       }
     }
 
+    // Pre-materialized rows whose cycle has since opened are claimed here:
+    // the insert path above only sees brand-new rows, so window entry is the
+    // remaining materialization moment for AUTO_CLAIM.
+    const windowEntryAutoClaims = dryRun
+      ? 0
+      : await claimWindowEntryAutoClaims(prisma, now);
+
     const amexSyncAuditsDeleted = dryRun
       ? 0
       : await deleteExpiredAmexSyncRowAudits(amexSyncAuditRetentionCutoff(now));
@@ -362,6 +370,7 @@ async function runCheckBenefitsLogic(dryRun = false) {
       standardDefinitionsProcessed: standardDefinitions.length,
       customAndLegacyDefinitionsProcessed: customAndLegacyDefinitions.length,
       validationWarnings: plan.warnings.length,
+      windowEntryAutoClaims,
       amexSyncAuditsDeleted,
       fetchMs,
       durationMs,

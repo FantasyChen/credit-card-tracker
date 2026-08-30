@@ -58,6 +58,7 @@ describe('batchCompleteBenefitsByCategoryAction', () => {
         isCompleted: true,
         completedAt: expect.any(Date),
         usedAmount: 100,
+        claimSource: 'USER',
       },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith('/benefits');

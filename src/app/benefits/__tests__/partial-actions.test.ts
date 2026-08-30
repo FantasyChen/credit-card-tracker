@@ -110,6 +110,7 @@ describe('addPartialCompletionAction', () => {
         usedAmount: 50,
         isCompleted: false,
         completedAt: null,
+        claimSource: 'USER',
       },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith('/benefits');
@@ -269,6 +270,7 @@ describe('markFullCompletionAction', () => {
         usedAmount: 100,
         isCompleted: true,
         completedAt: expect.any(Date),
+        claimSource: 'USER',
       },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith('/benefits');
@@ -369,6 +371,7 @@ describe('resetBenefitCompletionAction', () => {
         usedAmount: 0,
         isCompleted: false,
         completedAt: null,
+        claimSource: 'USER',
       },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith('/benefits');

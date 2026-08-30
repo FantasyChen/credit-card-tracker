@@ -4,6 +4,7 @@ jest.mock('@/lib/effective-benefit', () => ({
 
 import {
   applyTrackingModesToPlannedRows,
+  claimWindowEntryAutoClaims,
   fetchTrackedBenefitStatuses,
   loadBenefitTrackingModes,
   loadBenefitTrackingModesByUser,
@@ -20,6 +21,7 @@ function database(preferences: unknown[] = [], amounts: {
     benefitTrackingPreference: { findMany: jest.fn().mockResolvedValue(preferences) },
     predefinedBenefit: { findMany: jest.fn().mockResolvedValue(amounts.predefined ?? []) },
     benefit: { findMany: jest.fn().mockResolvedValue(amounts.custom ?? []) },
+    benefitStatus: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     $queryRaw: jest.fn(),
   } as never;
 }
@@ -154,7 +156,7 @@ describe('applyTrackingModesToPlannedRows', () => {
 
     const [row] = await applyTrackingModesToPlannedRows(db, [plannedStandard()]);
 
-    expect(row).toEqual({ isCompleted: true, completedAt: expect.any(Date), usedAmount: 15 });
+    expect(row).toEqual({ isCompleted: true, completedAt: expect.any(Date), usedAmount: 15, claimSource: 'AUTO' });
   });
 
   it('opens tracked and ignored rows unclaimed', async () => {
@@ -165,8 +167,8 @@ describe('applyTrackingModesToPlannedRows', () => {
       plannedStandard({ predefinedBenefitId: 'pb-2' }),
     ]);
 
-    expect(ignored).toEqual({ isCompleted: false, completedAt: null, usedAmount: 0 });
-    expect(tracked).toEqual({ isCompleted: false, completedAt: null, usedAmount: 0 });
+    expect(ignored).toEqual({ isCompleted: false, completedAt: null, usedAmount: 0, claimSource: null });
+    expect(tracked).toEqual({ isCompleted: false, completedAt: null, usedAmount: 0, claimSource: null });
   });
 
   it('applies one user auto-claim without touching another user identical benefit', async () => {
@@ -194,7 +196,7 @@ describe('applyTrackingModesToPlannedRows', () => {
       plannedStandard({ creditCardId: null, predefinedBenefitId: null, benefitId: 'custom-1' }),
     ]);
 
-    expect(row).toEqual({ isCompleted: true, completedAt: expect.any(Date), usedAmount: 40 });
+    expect(row).toEqual({ isCompleted: true, completedAt: expect.any(Date), usedAmount: 40, claimSource: 'AUTO' });
   });
 
   it('claims zero when the auto-claimed benefit has no stored maximum', async () => {
@@ -205,7 +207,7 @@ describe('applyTrackingModesToPlannedRows', () => {
 
     const [row] = await applyTrackingModesToPlannedRows(db, [plannedStandard()]);
 
-    expect(row).toEqual({ isCompleted: true, completedAt: expect.any(Date), usedAmount: 0 });
+    expect(row).toEqual({ isCompleted: true, completedAt: expect.any(Date), usedAmount: 0, claimSource: 'AUTO' });
   });
 
   it('skips the amount lookup when nothing is auto-claimed', async () => {
@@ -238,5 +240,69 @@ describe('applyTrackingModesToPlannedRows', () => {
     ]);
 
     expect(defaults.map((row) => row.isCompleted)).toEqual([false, true, false]);
+  });
+});
+
+describe('claimWindowEntryAutoClaims', () => {
+  const NOW = new Date('2026-08-30T12:00:00.000Z');
+  const updateManyOf = (db: unknown) =>
+    (db as { benefitStatus: { updateMany: jest.Mock } }).benefitStatus.updateMany;
+
+  it('claims only virgin open-cycle rows for AUTO_CLAIM preferences', async () => {
+    const db = database(
+      [standardPreference({ mode: 'AUTO_CLAIM' })],
+      { predefined: [{ id: 'pb-1', maxAmount: 15 }] }
+    );
+
+    const claimed = await claimWindowEntryAutoClaims(db, NOW);
+
+    expect(claimed).toBe(1);
+    expect(updateManyOf(db)).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        creditCardId: 'card-1',
+        predefinedBenefitId: 'pb-1',
+        cycleStartDate: { lte: NOW },
+        cycleEndDate: { gte: NOW },
+        // The virgin guard: a row the user reopened carries claimSource USER
+        // and a row with any recorded usage is someone's real state.
+        isCompleted: false,
+        isNotUsable: false,
+        usedAmount: 0,
+        claimSource: null,
+      },
+      data: { isCompleted: true, completedAt: NOW, usedAmount: 15, claimSource: 'AUTO' },
+    });
+  });
+
+  it('issues no status write when no AUTO_CLAIM preferences exist', async () => {
+    const db = database([]);
+
+    const claimed = await claimWindowEntryAutoClaims(db, NOW);
+
+    expect(claimed).toBe(0);
+    expect(updateManyOf(db)).not.toHaveBeenCalled();
+    expect(
+      (db as never as { benefitTrackingPreference: { findMany: jest.Mock } })
+        .benefitTrackingPreference.findMany
+    ).toHaveBeenCalledWith(expect.objectContaining({ where: { mode: 'AUTO_CLAIM' } }));
+  });
+
+  it('claims each preference at its own benefit maximum', async () => {
+    const db = database(
+      [
+        standardPreference({ mode: 'AUTO_CLAIM' }),
+        standardPreference({ mode: 'AUTO_CLAIM', predefinedBenefitId: 'pb-2' }),
+      ],
+      { predefined: [{ id: 'pb-1', maxAmount: 15 }, { id: 'pb-2', maxAmount: 300 }] }
+    );
+
+    const claimed = await claimWindowEntryAutoClaims(db, NOW);
+
+    expect(claimed).toBe(2);
+    const amounts = updateManyOf(db).mock.calls.map(
+      ([args]: [{ data: { usedAmount: number } }]) => args.data.usedAmount
+    );
+    expect(amounts.sort((a: number, b: number) => a - b)).toEqual([15, 300]);
   });
 });

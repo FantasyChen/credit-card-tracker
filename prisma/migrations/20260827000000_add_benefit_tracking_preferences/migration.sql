@@ -41,3 +41,21 @@ ALTER TABLE "BenefitTrackingPreference"
 ALTER TABLE "BenefitTrackingPreference"
   ADD CONSTRAINT "BenefitTrackingPreference_benefitId_fkey"
   FOREIGN KEY ("benefitId") REFERENCES "Benefit"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Exactly one target shape per preference: a standard benefit is addressed by
+-- the (card, predefined benefit) pair, a custom benefit by benefitId alone.
+ALTER TABLE "BenefitTrackingPreference"
+  ADD CONSTRAINT "BenefitTrackingPreference_target_shape_check"
+  CHECK (
+    ("creditCardId" IS NOT NULL AND "predefinedBenefitId" IS NOT NULL AND "benefitId" IS NULL)
+    OR ("creditCardId" IS NULL AND "predefinedBenefitId" IS NULL AND "benefitId" IS NOT NULL)
+  );
+
+-- Claim provenance: AUTO rows were claimed by the tracking feature and are the
+-- only rows a mode change may reopen. USER rows carry manual or user-confirmed
+-- state and are immutable to mode changes. NULL rows are untouched since
+-- materialization.
+CREATE TYPE "BenefitStatusClaimSource" AS ENUM ('AUTO', 'USER');
+
+ALTER TABLE "BenefitStatus"
+  ADD COLUMN "claimSource" "BenefitStatusClaimSource";

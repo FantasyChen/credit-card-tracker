@@ -133,6 +133,7 @@ describe('initialStatusFieldsForTrackingMode', () => {
       isCompleted: false,
       completedAt: null,
       usedAmount: 0,
+      claimSource: null,
     });
   });
 
@@ -141,6 +142,7 @@ describe('initialStatusFieldsForTrackingMode', () => {
       isCompleted: false,
       completedAt: null,
       usedAmount: 0,
+      claimSource: null,
     });
   });
 
@@ -149,6 +151,7 @@ describe('initialStatusFieldsForTrackingMode', () => {
       isCompleted: true,
       completedAt: NOW,
       usedAmount: 10,
+      claimSource: 'AUTO',
     });
   });
 
@@ -157,6 +160,7 @@ describe('initialStatusFieldsForTrackingMode', () => {
       isCompleted: true,
       completedAt: NOW,
       usedAmount: 0,
+      claimSource: 'AUTO',
     });
     expect(initialStatusFieldsForTrackingMode('AUTO_CLAIM', Number.NaN, NOW).usedAmount).toBe(0);
     expect(initialStatusFieldsForTrackingMode('AUTO_CLAIM', -5, NOW).usedAmount).toBe(0);

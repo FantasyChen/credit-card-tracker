@@ -10,6 +10,7 @@ import {
   excludeIgnoredBenefits,
   initialStatusFieldsForTrackingMode,
   resolveBenefitTrackingMode,
+  type BenefitClaimSource,
   type BenefitTrackingModeMap,
   type BenefitTrackingPreferenceRecord,
   type BenefitTrackingTarget,
@@ -117,6 +118,7 @@ export interface MaterializedStatusDefaults {
   isCompleted: boolean;
   completedAt: Date | null;
   usedAmount: number;
+  claimSource: BenefitClaimSource | null;
 }
 
 /**
@@ -141,7 +143,7 @@ export async function applyTrackingModesToPlannedRows<T extends PlannedStatusRow
   );
   // Nothing is auto-claimed, so no amount lookup is needed at all.
   if (modesByUser.size === 0) {
-    return rows.map(() => ({ isCompleted: false, completedAt: null, usedAmount: 0 }));
+    return rows.map(() => ({ isCompleted: false, completedAt: null, usedAmount: 0, claimSource: null }));
   }
 
   const autoClaimRows = rows.filter(
@@ -206,4 +208,56 @@ async function loadClaimableAmounts(
     );
   }
   return amounts;
+}
+
+/**
+ * Claims pre-materialized rows whose Benefit Cycle has since opened.
+ *
+ * Materialization creates future cycles ahead of time, so a row can exist
+ * before its owner's AUTO_CLAIM preference applies to it and simply become
+ * "current" as time passes — the insert-only cron never revisits it. This runs
+ * from the same cron and claims exactly those rows.
+ *
+ * Only virgin rows are touched: unclaimed, unused, usable, and never stamped by
+ * the user or this feature (`claimSource` null). A row the user deliberately
+ * reopened carries `claimSource: 'USER'` and is skipped forever.
+ */
+export async function claimWindowEntryAutoClaims(
+  database: TrackingPreferenceDatabase & Pick<PrismaClient, 'predefinedBenefit' | 'benefit' | 'benefitStatus'>,
+  now: Date = new Date()
+): Promise<number> {
+  const preferences = await database.benefitTrackingPreference.findMany({
+    where: { mode: 'AUTO_CLAIM' },
+    select: PREFERENCE_SELECT,
+  }) as unknown as PreferenceRow[];
+  if (preferences.length === 0) return 0;
+
+  const amounts = await loadClaimableAmounts(database, preferences);
+
+  let claimed = 0;
+  for (const preference of preferences) {
+    const key = benefitTrackingKey(preference);
+    if (key === null) continue;
+    const fields = initialStatusFieldsForTrackingMode('AUTO_CLAIM', amounts.get(key), now);
+    const result = await database.benefitStatus.updateMany({
+      where: {
+        userId: preference.userId,
+        cycleStartDate: { lte: now },
+        cycleEndDate: { gte: now },
+        isCompleted: false,
+        isNotUsable: false,
+        usedAmount: 0,
+        claimSource: null,
+        ...(preference.predefinedBenefitId
+          ? {
+              creditCardId: preference.creditCardId,
+              predefinedBenefitId: preference.predefinedBenefitId,
+            }
+          : { benefitId: preference.benefitId }),
+      },
+      data: fields,
+    });
+    claimed += result.count;
+  }
+  return claimed;
 }

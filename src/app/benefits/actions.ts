@@ -124,6 +124,7 @@ export async function toggleBenefitStatusAction(formData: FormData) {
         isCompleted: transition.isCompleted,
         completedAt: transition.completedAt,
         usedAmount: transition.usedAmount,
+        claimSource: 'USER',
       },
     });
 
@@ -188,6 +189,7 @@ export async function addPartialCompletionAction(formData: FormData) {
         usedAmount: transition.usedAmount,
         isCompleted: transition.isCompleted,
         completedAt: transition.completedAt,
+        claimSource: 'USER',
       },
     });
     if (updatedStatus.count === 0) {
@@ -246,6 +248,7 @@ export async function markFullCompletionAction(formData: FormData) {
         usedAmount: transition.usedAmount,
         isCompleted: transition.isCompleted,
         completedAt: transition.completedAt,
+        claimSource: 'USER',
       },
     });
     if (updatedStatus.count === 0) {
@@ -294,6 +297,7 @@ export async function resetBenefitCompletionAction(formData: FormData) {
         usedAmount: transition.usedAmount,
         isCompleted: transition.isCompleted,
         completedAt: transition.completedAt,
+        claimSource: 'USER',
       },
     });
 
@@ -353,6 +357,7 @@ export async function updateUsedAmountAction(formData: FormData) {
         usedAmount: transition.usedAmount,
         isCompleted: transition.isCompleted,
         completedAt: transition.completedAt,
+        claimSource: 'USER',
       },
     });
     if (updatedStatus.count === 0) {
@@ -411,6 +416,7 @@ export async function markBenefitAsNotUsableAction(formData: FormData) {
         isNotUsable: transition.isNotUsable,
         isCompleted: transition.isCompleted,
         completedAt: transition.completedAt,
+        claimSource: 'USER',
       },
     });
 
@@ -492,6 +498,7 @@ export async function batchCompleteBenefitsByCategoryAction(category: string, be
           isCompleted: true,
           completedAt: now,
           usedAmount: maxAmount > 0 ? maxAmount : currentUsed,
+          claimSource: 'USER',
         },
       });
     });
@@ -826,6 +833,22 @@ export async function setBenefitTrackingModeAction(formData: FormData) {
       }
     : { creditCardId: null, predefinedBenefitId: null, benefitId: status.benefitId };
 
+  // Mode changes address the benefit, not the clicked row: every occurrence in
+  // the currently open Benefit Cycle transitions together, and rows outside
+  // that window — closed history and future scheduled cycles — are immutable.
+  const now = new Date();
+  const openCycleWhere = {
+    userId,
+    cycleStartDate: { lte: now },
+    cycleEndDate: { gte: now },
+    ...(target.predefinedBenefitId
+      ? {
+          creditCardId: target.creditCardId,
+          predefinedBenefitId: target.predefinedBenefitId,
+        }
+      : { benefitId: target.benefitId }),
+  };
+
   try {
     await prisma.$transaction(async (transaction) => {
       const existing = await transaction.benefitTrackingPreference.findFirst({
@@ -834,35 +857,44 @@ export async function setBenefitTrackingModeAction(formData: FormData) {
       });
       const previousMode = existing?.mode ?? 'TRACK';
 
-      if (existing) {
-        await transaction.benefitTrackingPreference.update({
-          where: { id: existing.id },
-          data: { mode: requestedMode },
-        });
-      } else if (requestedMode !== 'TRACK') {
+      if (requestedMode === 'TRACK') {
+        // Absence of a row is the documented representation of the default.
+        if (existing) {
+          await transaction.benefitTrackingPreference.delete({ where: { id: existing.id } });
+        }
+      } else if (existing) {
+        if (existing.mode !== requestedMode) {
+          await transaction.benefitTrackingPreference.update({
+            where: { id: existing.id },
+            data: { mode: requestedMode },
+          });
+        }
+      } else {
         await transaction.benefitTrackingPreference.create({
           data: { userId, ...target, mode: requestedMode },
         });
       }
 
-      if (requestedMode === 'AUTO_CLAIM' && !status.isCompleted) {
+      if (requestedMode === 'AUTO_CLAIM') {
+        // Claims every still-open occurrence, stamps the claim as feature-made,
+        // and atomically clears isNotUsable so a row can never sit in both the
+        // claimed and not-usable accounting paths.
         await transaction.benefitStatus.updateMany({
-          where: { id: benefitStatusId, userId },
-          data: initialStatusFieldsForTrackingMode(
-            'AUTO_CLAIM',
-            status.benefit.maxAmount,
-            new Date()
-          ),
+          where: { ...openCycleWhere, isCompleted: false },
+          data: {
+            ...initialStatusFieldsForTrackingMode('AUTO_CLAIM', status.benefit.maxAmount, now),
+            isNotUsable: false,
+          },
         });
       }
 
-      // Leaving AUTO_CLAIM reopens a cycle this feature had claimed on the
-      // user's behalf. A cycle claimed while the benefit was tracked normally
-      // was claimed by the user, so it is left alone.
-      if (previousMode === 'AUTO_CLAIM' && requestedMode !== 'AUTO_CLAIM' && status.isCompleted) {
+      // Leaving AUTO_CLAIM reopens only claims this feature made. Rows the user
+      // claimed or edited carry claimSource USER and are never undone here, and
+      // the open-cycle window keeps closed history immutable.
+      if (previousMode === 'AUTO_CLAIM' && requestedMode !== 'AUTO_CLAIM') {
         await transaction.benefitStatus.updateMany({
-          where: { id: benefitStatusId, userId },
-          data: { isCompleted: false, completedAt: null, usedAmount: 0 },
+          where: { ...openCycleWhere, isCompleted: true, claimSource: 'AUTO' },
+          data: { isCompleted: false, completedAt: null, usedAmount: 0, claimSource: null },
         });
       }
     });
@@ -915,11 +947,15 @@ export async function resetBenefitTrackingPreferenceAction(formData: FormData) {
       }
 
       if (preference.mode === 'AUTO_CLAIM') {
+        // Reopens only claims this feature made in the currently open cycle;
+        // user-claimed or user-edited rows (claimSource USER) and closed
+        // history stay untouched.
         const now = new Date();
         await transaction.benefitStatus.updateMany({
           where: {
             userId,
             isCompleted: true,
+            claimSource: 'AUTO',
             cycleStartDate: { lte: now },
             cycleEndDate: { gte: now },
             ...(preference.predefinedBenefitId
@@ -929,7 +965,7 @@ export async function resetBenefitTrackingPreferenceAction(formData: FormData) {
                 }
               : { benefitId: preference.benefitId }),
           },
-          data: { isCompleted: false, completedAt: null, usedAmount: 0 },
+          data: { isCompleted: false, completedAt: null, usedAmount: 0, claimSource: null },
         });
       }
 

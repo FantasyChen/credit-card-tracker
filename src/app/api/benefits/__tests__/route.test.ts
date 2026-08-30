@@ -195,6 +195,7 @@ describe('/api/benefits', () => {
         occurrenceIndex: 0,
         isCompleted: false,
         completedAt: null,
+        claimSource: null,
         usedAmount: 0,
       }],
     });

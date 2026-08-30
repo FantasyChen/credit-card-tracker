@@ -45,6 +45,19 @@ function form(fields: Record<string, string>) {
   return data;
 }
 
+/**
+ * Every status mutation must address the benefit identity inside the currently
+ * open cycle — never a bare row id. This shape is the regression guard for
+ * closed-cycle immutability and for multi-occurrence coverage.
+ */
+const OPEN_CYCLE_STANDARD_WHERE = {
+  userId: 'user-1',
+  creditCardId: 'card-1',
+  predefinedBenefitId: 'pb-1',
+  cycleStartDate: { lte: expect.any(Date) },
+  cycleEndDate: { gte: expect.any(Date) },
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockGetServerSession.mockResolvedValue(SESSION);
@@ -70,10 +83,19 @@ describe('setBenefitTrackingModeAction', () => {
         mode: 'AUTO_CLAIM',
       },
     });
-    // The open cycle is claimed at the benefit maximum, not left for next cycle.
+    // Every open-cycle occurrence is claimed at the benefit maximum, stamped as
+    // a feature-made claim, and isNotUsable is cleared atomically. Closed and
+    // future cycles are excluded by the window; siblings are included because
+    // the where keys on benefit identity rather than the clicked row id.
     expect(statusUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'status-1', userId: 'user-1' },
-      data: { isCompleted: true, completedAt: expect.any(Date), usedAmount: 15 },
+      where: { ...OPEN_CYCLE_STANDARD_WHERE, isCompleted: false },
+      data: {
+        isCompleted: true,
+        completedAt: expect.any(Date),
+        usedAmount: 15,
+        claimSource: 'AUTO',
+        isNotUsable: false,
+      },
     });
   });
 
@@ -131,6 +153,19 @@ describe('setBenefitTrackingModeAction', () => {
 
     expect(preference.create).not.toHaveBeenCalled();
     expect(preference.update).not.toHaveBeenCalled();
+    expect(preference.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes the stored row when returning to TRACK, preserving absence-means-default', async () => {
+    preference.findFirst.mockResolvedValue({ id: 'pref-1', mode: 'IGNORE' });
+    mockFindStatus.mockResolvedValue(standardStatus());
+
+    await setBenefitTrackingModeAction(
+      form({ benefitStatusId: 'status-1', trackingMode: 'TRACK' })
+    );
+
+    expect(preference.delete).toHaveBeenCalledWith({ where: { id: 'pref-1' } });
+    expect(preference.update).not.toHaveBeenCalled();
   });
 
   it('reopens a cycle this feature auto-claimed when leaving AUTO_CLAIM', async () => {
@@ -141,14 +176,17 @@ describe('setBenefitTrackingModeAction', () => {
       form({ benefitStatusId: 'status-1', trackingMode: 'TRACK' })
     );
 
+    // Only feature-made claims reopen: the claimSource filter is what protects
+    // rows the user claimed or edited, and the window is what protects history.
     expect(statusUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'status-1', userId: 'user-1' },
-      data: { isCompleted: false, completedAt: null, usedAmount: 0 },
+      where: { ...OPEN_CYCLE_STANDARD_WHERE, isCompleted: true, claimSource: 'AUTO' },
+      data: { isCompleted: false, completedAt: null, usedAmount: 0, claimSource: null },
     });
   });
 
   it('leaves a cycle the user claimed themselves untouched', async () => {
-    // No stored preference means the completion was the user's own action.
+    // With no stored preference there is nothing to reopen: the previous mode
+    // was TRACK, so switching to IGNORE writes no status change at all.
     preference.findFirst.mockResolvedValue(null);
     mockFindStatus.mockResolvedValue(standardStatus({ isCompleted: true }));
 
@@ -159,6 +197,54 @@ describe('setBenefitTrackingModeAction', () => {
     expect(statusUpdateMany).not.toHaveBeenCalled();
   });
 
+  it('never reopens a manually edited claim when leaving AUTO_CLAIM', async () => {
+    // Regression for the auto-claim → manual edit → back-to-TRACK sequence:
+    // the reopen query must carry claimSource AUTO, so a row the user edited
+    // (stamped USER by every manual action) can never match it.
+    preference.findFirst.mockResolvedValue({ id: 'pref-1', mode: 'AUTO_CLAIM' });
+    mockFindStatus.mockResolvedValue(standardStatus({ isCompleted: true }));
+
+    await setBenefitTrackingModeAction(
+      form({ benefitStatusId: 'status-1', trackingMode: 'TRACK' })
+    );
+
+    const reopenCall = statusUpdateMany.mock.calls.find(
+      ([args]: [{ data: { isCompleted: boolean } }]) => args.data.isCompleted === false
+    );
+    expect(reopenCall[0].where.claimSource).toBe('AUTO');
+  });
+
+  it('confines every status mutation to the currently open cycle', async () => {
+    // Regression for closed-cycle immutability: no update may address a bare
+    // row id, and each must carry the open-cycle window bounds.
+    preference.findFirst.mockResolvedValue({ id: 'pref-1', mode: 'AUTO_CLAIM' });
+    mockFindStatus.mockResolvedValue(standardStatus({ isCompleted: true }));
+
+    await setBenefitTrackingModeAction(
+      form({ benefitStatusId: 'status-1', trackingMode: 'IGNORE' })
+    );
+
+    for (const [args] of statusUpdateMany.mock.calls) {
+      expect(args.where.id).toBeUndefined();
+      expect(args.where.cycleStartDate).toEqual({ lte: expect.any(Date) });
+      expect(args.where.cycleEndDate).toEqual({ gte: expect.any(Date) });
+    }
+  });
+
+  it('clears isNotUsable atomically when auto-claiming', async () => {
+    // Regression: a row must never sit in both the claimed and not-usable
+    // accounting paths at once.
+    mockFindStatus.mockResolvedValue(standardStatus({ isNotUsable: true }));
+
+    await setBenefitTrackingModeAction(
+      form({ benefitStatusId: 'status-1', trackingMode: 'AUTO_CLAIM' })
+    );
+
+    const [args] = statusUpdateMany.mock.calls[0];
+    expect(args.data.isNotUsable).toBe(false);
+    expect(args.data.isCompleted).toBe(true);
+  });
+
   it('claims zero rather than inventing value when the benefit has no maximum', async () => {
     mockFindStatus.mockResolvedValue(standardStatus({ benefit: { maxAmount: null, category: 'Travel' } }));
 
@@ -167,8 +253,14 @@ describe('setBenefitTrackingModeAction', () => {
     );
 
     expect(statusUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'status-1', userId: 'user-1' },
-      data: { isCompleted: true, completedAt: expect.any(Date), usedAmount: 0 },
+      where: { ...OPEN_CYCLE_STANDARD_WHERE, isCompleted: false },
+      data: {
+        isCompleted: true,
+        completedAt: expect.any(Date),
+        usedAmount: 0,
+        claimSource: 'AUTO',
+        isNotUsable: false,
+      },
     });
   });
 
@@ -223,10 +315,11 @@ describe('resetBenefitTrackingPreferenceAction', () => {
       where: expect.objectContaining({
         userId: 'user-1',
         isCompleted: true,
+        claimSource: 'AUTO',
         creditCardId: 'card-1',
         predefinedBenefitId: 'pb-1',
       }),
-      data: { isCompleted: false, completedAt: null, usedAmount: 0 },
+      data: { isCompleted: false, completedAt: null, usedAmount: 0, claimSource: null },
     });
     expect(preference.delete).toHaveBeenCalledWith({ where: { id: 'pref-1' } });
   });
