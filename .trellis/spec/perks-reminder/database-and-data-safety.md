@@ -2,7 +2,7 @@
 
 ## Non-negotiable rules
 
-- Do not access `.env` by default. The only exception is an explicitly requested repair of named values in an existing Git-ignored local `.env` under the contract below. Existing local configuration is private; production secrets belong in provider dashboards.
+- Do not access `.env` by default. The exceptions are (a) an explicitly requested repair of named values and (b) the disposable testing-account workflow below. Existing local configuration is private; production secrets belong in provider dashboards.
 - Treat `DATABASE_URL` as an application/pooler connection, `DIRECT_URL` as the direct migration connection, and `DATABASE_URL_DEV` as the development branch. Shell variables override dotenv values, so target identity must be verified rather than assumed.
 - Never run `prisma migrate reset`, `prisma db push --force-reset`, any `--force-reset` command, manual destructive SQL, or data deletion against production.
 - Do not run any Prisma migration, seed, reset, push, or data-mutation command merely as validation. Database operations require task scope, explicit human authorization, verified target identity, and a rollback/recovery plan.
@@ -66,6 +66,75 @@ This exposes unrelated secrets and creates another plaintext copy.
 #### Correct
 
 Use a non-logging process that validates the existing ignored file, obtains the authorized values from the verified provider target in memory, replaces only the named assignments, and reports key names plus redacted verification results.
+
+## Scenario: disposable production testing account
+
+### 1. Scope / Trigger
+
+This exception applies only when the policy owner explicitly requests a disposable account for authenticated production UI verification. It permits one clearly labeled test identity, temporary local credential storage, and direct database management limited to that identity. It does not authorize general production data editing, credential rotation, or access to another user's records.
+
+### 2. Signatures
+
+```text
+local repository `.env` keys:
+PERKS_TEST_EMAIL=<dedicated test email>
+PERKS_TEST_PASSWORD=<random test password>
+```
+
+```text
+allowed database scope: User with the exact test email, plus rows whose owner
+foreign key is that User.id; cleanup may delete only that test-owned graph.
+```
+
+### 3. Contracts
+
+- Before access, verify `.env` is repository-local and Git-ignored (`git check-ignore .env`). Creating it is allowed only when that check succeeds; never create a backup or copy.
+- The policy owner must explicitly authorize the test account and its exact email. Use a disposable, non-personal address and a newly generated password; do not reuse a real user's credentials.
+- Read or write only `PERKS_TEST_EMAIL` and `PERKS_TEST_PASSWORD`. Keep values in process memory or the local ignored file; never print, log, commit, screenshot, or send them.
+- Verify the exact production project, branch, database role, and recovery/stop conditions immediately before any direct database operation. Prefer UI signup for account creation; direct SQL/Prisma is permitted only for the exact test user and test-owned rows.
+- Direct management may create fixtures, inspect aggregate test-owned state, and remove the complete test-owned graph. It must not query, update, or delete records belonging to other users, and it must stop on an ownership or uniqueness mismatch.
+- Remove the account and its test-owned rows after verification unless the owner explicitly requests retention. Report only aggregate outcomes and key names, never credential values or row data.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| `.env` is absent or not Git-ignored | Stop; do not create or access it. |
+| Either dedicated test key is missing, duplicated, or unrelated keys would be touched | Stop before reading or writing. |
+| Email is personal, already used by a non-test account, or authorization is ambiguous | Stop; do not create or mutate an account. |
+| Production target identity or recovery state cannot be verified | Stop before database access. |
+| Any selected row is not owned by the exact test user | Roll back and stop; do not widen the query. |
+| Cleanup finds unexpected dependents or multiple matching users | Stop and preserve state for review. |
+| Credential or row value would appear in output/evidence | Redact it and fail the operation. |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** The owner authorizes a disposable address, the ignored `.env` contains only the two dedicated keys, the verified production target is used, and all DB operations are constrained by the exact test-user ID.
+- **Base:** The account is created through the UI, browser verification completes, and the account is deleted afterward with aggregate-only evidence.
+- **Bad:** Create `.env` in an unignored checkout, store a real user's password, query by a broad email pattern, edit production rows outside the test-user graph, or print credentials in a command log.
+
+### 6. Tests Required
+
+- Assert `.env` ignore status and exact single occurrence of both dedicated keys before access.
+- Assert generated credentials are non-empty, non-personal, and never emitted to stdout/stderr.
+- Assert database queries include the exact test email/User.id owner scope and reject cross-user rows.
+- Assert account creation, fixture writes, and cleanup affect only the test-owned graph; verify aggregate counts before/after.
+- Run the narrowest authenticated browser checks and record only pass/fail and aggregate results.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+echo "EMAIL=$REAL_USER_EMAIL" >> .env
+psql "$DATABASE_URL" -c "delete from \"User\" where email like '%test%'"
+```
+
+This stores a real credential and uses an unsafe broad production delete.
+
+#### Correct
+
+Use a newly generated `PERKS_TEST_EMAIL`/`PERKS_TEST_PASSWORD` pair in a verified ignored local `.env`, constrain every database operation to that exact email/User.id, and report only aggregate results.
 
 ## Changes and migrations
 
