@@ -2,10 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import {
-  fetchEffectiveBenefitStatuses,
-  fetchEffectiveCardTerms,
-} from '@/lib/effective-benefit';
+import { fetchTrackedBenefitStatuses } from '@/lib/benefit-tracking-preferences';
+import { fetchEffectiveCardTerms } from '@/lib/effective-benefit';
 
 // Force dynamic rendering to ensure fresh data and session check
 export const dynamic = 'force-dynamic';
@@ -37,7 +35,7 @@ export async function GET() {
           createdAt: 'desc',
         },
       }),
-      fetchEffectiveBenefitStatuses(prisma, { userId: session.user.id }),
+      fetchTrackedBenefitStatuses(prisma, { userId: session.user.id }),
       fetchEffectiveCardTerms(prisma, session.user.id),
     ]);
 

@@ -5,10 +5,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import PageHeader from '@/components/ui/PageHeader';
 import { buildCardCalendarEvents } from '@/lib/card-lifecycle';
-import {
-  fetchEffectiveBenefitStatuses,
-  fetchEffectiveCardTerms,
-} from '@/lib/effective-benefit';
+import { fetchEffectiveCardTerms } from '@/lib/effective-benefit';
+import { fetchTrackedBenefitStatuses } from '@/lib/benefit-tracking-preferences';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,7 +79,7 @@ export default async function CardCalendarPage() {
         },
       },
     }),
-    fetchEffectiveBenefitStatuses(prisma, {
+    fetchTrackedBenefitStatuses(prisma, {
       userId: session.user.id,
       completed: false,
       notUsable: false,

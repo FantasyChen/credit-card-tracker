@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useId, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/dateUtils';
 import {
@@ -9,10 +9,34 @@ import {
   deleteCustomBenefitAction,
   addPartialCompletionAction,
   markFullCompletionAction,
+  setBenefitTrackingModeAction,
 } from '@/app/benefits/actions';
+import type { BenefitTrackingMode } from '@/lib/benefit-tracking-modes';
 import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard-client';
 import { calculateCompletionPercentage } from '@/lib/partial-completion';
 import SuggestCorrectionLink from '@/components/SuggestCorrectionLink';
+
+const TRACKING_MODE_OPTIONS: ReadonlyArray<{
+  mode: BenefitTrackingMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    mode: 'TRACK',
+    label: 'Track every cycle',
+    description: 'Confirm this benefit yourself each cycle.',
+  },
+  {
+    mode: 'AUTO_CLAIM',
+    label: 'Always claim it for me',
+    description: 'Opens each cycle already claimed. Still counts toward ROI.',
+  },
+  {
+    mode: 'IGNORE',
+    label: 'Ignore this benefit',
+    description: 'Hides it everywhere and drops it from claimed value and ROI.',
+  },
+];
 
 interface BenefitCardClientProps {
   status: DisplayBenefitStatus;
@@ -30,6 +54,31 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
   const [partialAmount, setPartialAmount] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showTrackingMenu, setShowTrackingMenu] = useState(false);
+
+  const trackingPanelId = useId();
+  const trackingMode: BenefitTrackingMode = status.trackingMode ?? 'TRACK';
+
+  const handleTrackingModeChange = (mode: BenefitTrackingMode) => {
+    if (mode === trackingMode) {
+      setShowTrackingMenu(false);
+      return;
+    }
+    const formData = new FormData();
+    formData.append('benefitStatusId', status.id);
+    formData.append('trackingMode', mode);
+
+    startTransition(async () => {
+      try {
+        setActionError(null);
+        await setBenefitTrackingModeAction(formData);
+        setShowTrackingMenu(false);
+      } catch (error) {
+        console.error('Failed to set benefit tracking mode:', error);
+        setActionError(error instanceof Error ? error.message : 'Failed to update tracking mode.');
+      }
+    });
+  };
 
   const benefitAmount = status.benefit.maxAmount || 0;
   const usedAmount = status.usedAmount ?? 0;
@@ -468,6 +517,43 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 </form>
               )}
 
+              {/* Cycle-independent tracking choice for benefits the user does
+                  not want to confirm again every cycle. Available on scheduled
+                  cards too: the preference stores immediately and status rows
+                  are only ever touched once their cycle opens. */}
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => setShowTrackingMenu((open) => !open)}
+                aria-expanded={showTrackingMenu}
+                aria-controls={trackingPanelId}
+                className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium border transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                  showTrackingMenu || trackingMode !== 'TRACK'
+                    ? 'border-indigo-300 bg-accent text-foreground dark:border-indigo-700'
+                    : 'border-border bg-card text-foreground hover:bg-accent'
+                } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <div className="flex items-center justify-center">
+                  <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {trackingMode === 'AUTO_CLAIM'
+                    ? 'Auto-claimed'
+                    : trackingMode === 'IGNORE'
+                      ? 'Ignored'
+                      : 'Tracking'}
+                  <svg
+                    className={`h-3 w-3 ml-1 transition-transform ${showTrackingMenu ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+
               {/* Delete button - only show for custom benefits */}
               {isCustomBenefit && (
                 <button
@@ -485,6 +571,49 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 </button>
               )}
             </div>
+
+            {/* Expands inline rather than overlaying: the card root is
+                overflow-hidden for its rounded corners and status bar, which
+                would clip an absolutely positioned menu. */}
+            {showTrackingMenu && (
+              <div
+                id={trackingPanelId}
+                className="mt-2 rounded-lg border border-border bg-background/60 p-2"
+              >
+                <p className="px-2 pb-1 pt-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  How should this benefit be tracked?
+                </p>
+                <div className="flex flex-col gap-1">
+                  {TRACKING_MODE_OPTIONS.map((option) => {
+                    const isActive = option.mode === trackingMode;
+                    return (
+                      <button
+                        key={option.mode}
+                        type="button"
+                        disabled={isPending}
+                        aria-pressed={isActive}
+                        onClick={() => handleTrackingModeChange(option.mode)}
+                        className={`w-full rounded-md border px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
+                          isActive
+                            ? 'border-indigo-300 bg-accent dark:border-indigo-700'
+                            : 'border-transparent hover:bg-accent'
+                        } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <div className="flex items-center text-sm font-medium text-foreground">
+                          {isActive && (
+                            <svg className="h-4 w-4 mr-1 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                          {option.label}
+                        </div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">{option.description}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

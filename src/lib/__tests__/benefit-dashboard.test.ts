@@ -10,6 +10,7 @@ import {
   type DisplayBenefitStatus,
   type RawDisplayBenefitStatus,
 } from '../benefit-dashboard';
+import { buildBenefitTrackingModeMap } from '@/lib/benefit-tracking-modes';
 import { CardLifecycleStatus } from '@/generated/prisma';
 
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
@@ -201,6 +202,50 @@ describe('buildBenefitDashboardProjection', () => {
     expect(projection.upcomingBenefits[0].benefit.creditCard?.displayName).toBe('Test Card');
     expect(projection.upcomingBenefits[0].usageWaySlug).toBe('monthly-travel-credit');
     expect(projection.cardLevelRoi.map((row) => row.cardName)).toContain(CUSTOM_BENEFITS_CARD_NAME);
+  });
+
+  it('drops ignored benefits from the tabs, totals, and ROI', () => {
+    const inputs = {
+      statuses: [
+        rawStatus('kept', { usedAmount: 10 }),
+        rawStatus('ignored', { isCompleted: true, usedAmount: 50 }),
+      ],
+      userCards: [card],
+      usageWays: [],
+      predefinedCardFees: [{ name: 'Test Card', annualFee: 95 }],
+      now: date('2026-05-15'),
+    };
+
+    const tracked = buildBenefitDashboardProjection(inputs);
+    const withIgnored = buildBenefitDashboardProjection({
+      ...inputs,
+      trackingModes: buildBenefitTrackingModeMap([
+        { creditCardId: card.id, predefinedBenefitId: null, benefitId: 'benefit-ignored', mode: 'IGNORE' },
+      ]),
+    });
+
+    expect(tracked.completedBenefits.map((item) => item.id)).toEqual(['ignored']);
+    expect(withIgnored.completedBenefits).toEqual([]);
+    expect(withIgnored.upcomingBenefits.map((item) => item.id)).toEqual(['kept']);
+    // The ignored benefit stops contributing its claimed value to ROI.
+    expect(withIgnored.totalUsedValue).toBe(tracked.totalUsedValue - 50);
+  });
+
+  it('marks an auto-claimed benefit without removing it from the dashboard', () => {
+    const projection = buildBenefitDashboardProjection({
+      statuses: [rawStatus('auto', { isCompleted: true, usedAmount: 50 })],
+      userCards: [card],
+      usageWays: [],
+      predefinedCardFees: [{ name: 'Test Card', annualFee: 95 }],
+      now: date('2026-05-15'),
+      trackingModes: buildBenefitTrackingModeMap([
+        { creditCardId: card.id, predefinedBenefitId: null, benefitId: 'benefit-auto', mode: 'AUTO_CLAIM' },
+      ]),
+    });
+
+    expect(projection.completedBenefits.map((item) => item.id)).toEqual(['auto']);
+    expect(projection.completedBenefits[0].trackingMode).toBe('AUTO_CLAIM');
+    expect(projection.totalUsedValue).toBe(50);
   });
 
   it('uses authoritative global card terms instead of stale copied names', () => {

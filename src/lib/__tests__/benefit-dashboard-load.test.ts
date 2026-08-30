@@ -102,6 +102,7 @@ describe('deep Benefit Dashboard loading interface', () => {
         }),
       },
       benefitUsageWay: { findMany: jest.fn() },
+      benefitTrackingPreference: { findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: jest.fn(),
     };
     fetchCardTerms.mockResolvedValue([
@@ -145,7 +146,10 @@ describe('deep Benefit Dashboard loading interface', () => {
       .mockResolvedValueOnce(currentYearStatuses)
       .mockResolvedValueOnce(activeStatuses);
 
-    const summary = await loadHomeDashboardSummary({ $queryRaw: jest.fn() } as never, {
+    const summary = await loadHomeDashboardSummary({
+      $queryRaw: jest.fn(),
+      benefitTrackingPreference: { findMany: jest.fn().mockResolvedValue([]) },
+    } as never, {
       userId: 'user-1',
       now,
     });

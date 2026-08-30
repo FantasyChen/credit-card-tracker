@@ -10,6 +10,7 @@ jest.mock('@/lib/prisma', () => ({
     user: { findMany: jest.fn(), update: jest.fn() },
     loyaltyAccount: { findMany: jest.fn() },
     loyaltyCertificate: { findMany: jest.fn() },
+    benefitTrackingPreference: { findMany: jest.fn().mockResolvedValue([]) },
   },
 }));
 

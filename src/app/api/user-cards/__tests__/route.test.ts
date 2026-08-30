@@ -26,6 +26,9 @@ jest.mock('@/lib/prisma', () => ({
     creditCard: {
       findMany: jest.fn(),
     },
+    benefitTrackingPreference: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   },
 }));
 jest.mock('@/lib/effective-benefit', () => ({

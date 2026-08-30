@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import type { PlannedBenefitStatusInsert } from '@/lib/global-benefit-materialization';
+import { applyTrackingModesToPlannedRows } from '@/lib/benefit-tracking-preferences';
 
 export const INSERT_BATCH_SIZE = 2_000;
 
@@ -55,14 +56,16 @@ export async function insertMissingBenefitStatuses(
 
   if (rowsToInsert.length === 0) return 0;
 
+  // Centralized: AUTO_CLAIM rows open already claimed, resolved per owner.
+  const defaults = await applyTrackingModesToPlannedRows(prisma, rowsToInsert);
+
   // Prisma emits parameterized INSERT ... ON CONFLICT DO NOTHING for
   // skipDuplicates. Keeping Date values on the normal Prisma boundary avoids
   // session-time-zone conversion from hand-written timestamptz casts.
   const result = await prisma.benefitStatus.createMany({
-    data: rowsToInsert.map((row) => ({
+    data: rowsToInsert.map((row, index) => ({
       ...row,
-      isCompleted: false,
-      usedAmount: 0,
+      ...defaults[index],
       isNotUsable: false,
       orderIndex: null,
     })),

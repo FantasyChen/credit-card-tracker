@@ -35,6 +35,13 @@ export type {
   DisplayBenefitStatus,
 } from '@/lib/benefit-dashboard-client';
 
+import {
+  excludeIgnoredBenefits,
+  resolveBenefitTrackingMode,
+  type BenefitTrackingModeMap,
+} from '@/lib/benefit-tracking-modes';
+import { loadBenefitTrackingModes } from '@/lib/benefit-tracking-preferences';
+
 export interface UsageWayForDashboard {
   slug: string;
   predefinedBenefits: Array<{
@@ -83,7 +90,8 @@ export function buildUsageWaySlugMap(usageWays: UsageWayForDashboard[]): Map<str
 export function augmentBenefitStatusesForDashboard(
   statuses: RawDisplayBenefitStatus[],
   userCards: PrismaCreditCard[],
-  usageWays: UsageWayForDashboard[]
+  usageWays: UsageWayForDashboard[],
+  trackingModes?: BenefitTrackingModeMap
 ): DisplayBenefitStatus[] {
   const authoritativeCards = new Map<string, {
     id: string;
@@ -118,6 +126,7 @@ export function augmentBenefitStatusesForDashboard(
           creditCard: null,
         },
         usageWaySlug,
+        trackingMode: resolveBenefitTrackingMode(trackingModes, status),
       };
     }
 
@@ -131,6 +140,7 @@ export function augmentBenefitStatusesForDashboard(
         },
       },
       usageWaySlug,
+      trackingMode: resolveBenefitTrackingMode(trackingModes, status),
     };
   });
 }
@@ -273,14 +283,19 @@ export function buildBenefitDashboardProjection({
   usageWays,
   predefinedCardFees,
   now,
+  trackingModes,
 }: {
   statuses: RawDisplayBenefitStatus[];
   userCards: PrismaCreditCard[];
   usageWays: UsageWayForDashboard[];
   predefinedCardFees: PredefinedCardFee[];
   now: Date;
+  trackingModes?: BenefitTrackingModeMap;
 }): BenefitDashboardProjection {
-  const augmentedStatuses = augmentBenefitStatusesForDashboard(statuses, userCards, usageWays);
+  // Ignored benefits are dropped before partitioning so they stay out of the
+  // dashboard, claimed-value totals, and card-level ROI alike.
+  const trackedStatuses = excludeIgnoredBenefits(statuses, trackingModes);
+  const augmentedStatuses = augmentBenefitStatusesForDashboard(trackedStatuses, userCards, usageWays, trackingModes);
   const deduplicatedStatuses = deduplicateBenefitStatusesForDashboard(augmentedStatuses);
   const partitions = partitionBenefitStatusesForDashboard(deduplicatedStatuses, now);
   const totals = calculateBenefitDashboardTotals(partitions);
@@ -299,7 +314,7 @@ export function buildBenefitDashboardProjection({
 
 type BenefitDashboardDatabase = Pick<
   PrismaClient,
-  '$queryRaw' | 'benefitUsageWay' | 'creditCard' | 'user'
+  '$queryRaw' | 'benefitUsageWay' | 'creditCard' | 'user' | 'benefitTrackingPreference'
 >;
 
 export interface LoadedBenefitDashboard extends BenefitDashboardProjection {
@@ -396,10 +411,11 @@ export async function loadBenefitDashboard(
   input: { userId: string; now: Date }
 ): Promise<LoadedBenefitDashboard> {
   const { userId, now } = input;
-  const [storedUserCards, cardTerms, statuses, notificationSettings] = await Promise.all([
+  const [storedUserCards, cardTerms, statuses, trackingModes, notificationSettings] = await Promise.all([
     database.creditCard.findMany({ where: { userId } }),
     fetchEffectiveCardTerms(database, userId),
     fetchDashboardBenefitStatuses(database, userId, now),
+    loadBenefitTrackingModes(database, userId),
     database.user.findUnique({
       where: { id: userId },
       select: {
@@ -424,6 +440,7 @@ export async function loadBenefitDashboard(
       annualFee: card.annualFee,
     })),
     now,
+    trackingModes,
   });
 
   return {
@@ -440,7 +457,7 @@ export async function loadHomeDashboardSummary(
 ): Promise<HomeDashboardSummary> {
   const { userId, now } = input;
   const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const [cardTerms, currentYearStatuses, activeStatuses] = await Promise.all([
+  const [cardTerms, currentYearStatuses, rawActiveStatuses, trackingModes] = await Promise.all([
     fetchEffectiveCardTerms(database, userId),
     fetchEffectiveBenefitStatuses(database, {
       userId,
@@ -454,13 +471,17 @@ export async function loadHomeDashboardSummary(
       cycleStartOnOrBefore: now,
       cycleEndOnOrAfter: now,
     }),
+    loadBenefitTrackingModes(database, userId),
   ]);
 
+  // Ignored benefits stay out of the home summary the same way they stay out
+  // of the dashboard projection.
+  const activeStatuses = excludeIgnoredBenefits(rawActiveStatuses, trackingModes);
   const yearStart = calendarYearStart(now);
   const yearEnd = calendarYearEnd(now);
   const claimedStatuses = deduplicateBenefitStatusesForDashboard(
     augmentBenefitStatusesForDashboard(
-      currentYearStatuses.filter((status) =>
+      excludeIgnoredBenefits(currentYearStatuses, trackingModes).filter((status) =>
         status.cycleStartDate <= yearEnd && status.cycleEndDate >= yearStart
       ),
       [],

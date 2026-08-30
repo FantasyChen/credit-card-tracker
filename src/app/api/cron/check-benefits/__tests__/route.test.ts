@@ -17,6 +17,9 @@ jest.mock('@/lib/prisma', () => ({
       findMany: jest.fn(),
       createMany: jest.fn(),
     },
+    benefitTrackingPreference: { findMany: jest.fn() },
+    predefinedBenefit: { findMany: jest.fn() },
+    benefit: { findMany: jest.fn() },
   },
 }));
 
@@ -42,6 +45,9 @@ jest.mock('next/server', () => ({
 const mockQueryRaw = prisma.$queryRaw as jest.Mock;
 const mockFindMany = prisma.benefitStatus.findMany as jest.Mock;
 const mockCreateMany = prisma.benefitStatus.createMany as jest.Mock;
+const mockTrackingPreferenceFindMany = prisma.benefitTrackingPreference.findMany as jest.Mock;
+const mockPredefinedBenefitFindMany = prisma.predefinedBenefit.findMany as jest.Mock;
+const mockBenefitFindMany = prisma.benefit.findMany as jest.Mock;
 const mockCalculateBenefitCycle = calculateBenefitCycle as jest.Mock;
 const mockDeleteExpiredAudits = deleteExpiredAmexSyncRowAudits as jest.Mock;
 const utcDate = (year: number, month: number, day: number) =>
@@ -168,6 +174,9 @@ describe('/api/cron/check-benefits', () => {
     mockQueryRaw.mockResolvedValue([]);
     mockFindMany.mockResolvedValue([]);
     mockCreateMany.mockResolvedValue({ count: 0 });
+    mockTrackingPreferenceFindMany.mockResolvedValue([]);
+    mockPredefinedBenefitFindMany.mockResolvedValue([]);
+    mockBenefitFindMany.mockResolvedValue([]);
     mockCalculateBenefitCycle.mockReturnValue({
       cycleStartDate: utcDate(2026, 7, 1),
       cycleEndDate: new Date('2026-07-31T23:59:59.999Z'),
@@ -261,6 +270,8 @@ describe('/api/cron/check-benefits', () => {
           cycleEndDate: new Date('2026-07-31T23:59:59.999Z'),
           occurrenceIndex: 0,
           isCompleted: false,
+          completedAt: null,
+          claimSource: null,
           usedAmount: 0,
           isNotUsable: false,
           orderIndex: null,
@@ -274,6 +285,8 @@ describe('/api/cron/check-benefits', () => {
           cycleEndDate: new Date('2026-09-30T23:59:59.999Z'),
           occurrenceIndex: 0,
           isCompleted: false,
+          completedAt: null,
+          claimSource: null,
           usedAmount: 0,
           isNotUsable: false,
           orderIndex: null,
@@ -379,7 +392,12 @@ describe('/api/cron/check-benefits', () => {
 });
 
 describe('insertMissingBenefitStatuses', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockTrackingPreferenceFindMany.mockResolvedValue([]);
+    mockPredefinedBenefitFindMany.mockResolvedValue([]);
+    mockBenefitFindMany.mockResolvedValue([]);
+  });
 
   it('does not execute SQL for an empty candidate list', async () => {
     await expect(insertMissingBenefitStatuses([])).resolves.toBe(0);
@@ -421,6 +439,119 @@ describe('insertMissingBenefitStatuses', () => {
     await expect(insertMissingBenefitStatuses([row]))
       .rejects.toThrow('Benefit status cycle discrepancy detected');
     expect(mockCreateMany).not.toHaveBeenCalled();
+  });
+
+  it('opens a new cycle unclaimed when the benefit is tracked normally', async () => {
+    const row = {
+      benefitId: null,
+      creditCardId: 'card-1',
+      predefinedBenefitId: 'global-benefit-1',
+      userId: 'user-1',
+      cycleStartDate: utcDate(2026, 7, 1),
+      cycleEndDate: new Date('2026-07-31T23:59:59.999Z'),
+      occurrenceIndex: 0,
+    };
+    mockFindMany.mockResolvedValue([]);
+    mockCreateMany.mockResolvedValue({ count: 1 });
+
+    await expect(insertMissingBenefitStatuses([row])).resolves.toBe(1);
+    expect(mockCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({ isCompleted: false, completedAt: null, usedAmount: 0 })],
+    }));
+  });
+
+  it('opens a new cycle already claimed at full value when the benefit is auto-claimed', async () => {
+    const row = {
+      benefitId: null,
+      creditCardId: 'card-1',
+      predefinedBenefitId: 'global-benefit-1',
+      userId: 'user-1',
+      cycleStartDate: utcDate(2026, 7, 1),
+      cycleEndDate: new Date('2026-07-31T23:59:59.999Z'),
+      occurrenceIndex: 0,
+    };
+    mockFindMany.mockResolvedValue([]);
+    mockCreateMany.mockResolvedValue({ count: 1 });
+    mockTrackingPreferenceFindMany.mockResolvedValue([{
+      userId: 'user-1',
+      creditCardId: 'card-1',
+      predefinedBenefitId: 'global-benefit-1',
+      benefitId: null,
+      mode: 'AUTO_CLAIM',
+    }]);
+    mockPredefinedBenefitFindMany.mockResolvedValue([
+      { id: 'global-benefit-1', maxAmount: 15 },
+    ]);
+
+    await expect(insertMissingBenefitStatuses([row])).resolves.toBe(1);
+    expect(mockCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({
+        isCompleted: true,
+        usedAmount: 15,
+        completedAt: expect.any(Date),
+      })],
+    }));
+  });
+
+  it('applies one user auto-claim without touching another user with the same benefit', async () => {
+    const base = {
+      benefitId: null,
+      creditCardId: 'card-1',
+      predefinedBenefitId: 'global-benefit-1',
+      cycleStartDate: utcDate(2026, 7, 1),
+      cycleEndDate: new Date('2026-07-31T23:59:59.999Z'),
+      occurrenceIndex: 0,
+    };
+    mockFindMany.mockResolvedValue([]);
+    mockCreateMany.mockResolvedValue({ count: 2 });
+    mockTrackingPreferenceFindMany.mockResolvedValue([{
+      userId: 'user-1',
+      creditCardId: 'card-1',
+      predefinedBenefitId: 'global-benefit-1',
+      benefitId: null,
+      mode: 'AUTO_CLAIM',
+    }]);
+    mockPredefinedBenefitFindMany.mockResolvedValue([
+      { id: 'global-benefit-1', maxAmount: 15 },
+    ]);
+
+    await insertMissingBenefitStatuses([
+      { ...base, userId: 'user-1' },
+      { ...base, userId: 'user-2' },
+    ]);
+
+    expect(mockCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [
+        expect.objectContaining({ userId: 'user-1', isCompleted: true, usedAmount: 15 }),
+        expect.objectContaining({ userId: 'user-2', isCompleted: false, usedAmount: 0 }),
+      ],
+    }));
+  });
+
+  it('leaves a new cycle unclaimed for an ignored benefit, since ignoring only hides it', async () => {
+    const row = {
+      benefitId: null,
+      creditCardId: 'card-1',
+      predefinedBenefitId: 'global-benefit-1',
+      userId: 'user-1',
+      cycleStartDate: utcDate(2026, 7, 1),
+      cycleEndDate: new Date('2026-07-31T23:59:59.999Z'),
+      occurrenceIndex: 0,
+    };
+    mockFindMany.mockResolvedValue([]);
+    mockCreateMany.mockResolvedValue({ count: 1 });
+    mockTrackingPreferenceFindMany.mockResolvedValue([{
+      userId: 'user-1',
+      creditCardId: 'card-1',
+      predefinedBenefitId: 'global-benefit-1',
+      benefitId: null,
+      mode: 'IGNORE',
+    }]);
+
+    await insertMissingBenefitStatuses([row]);
+    expect(mockCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({ isCompleted: false, usedAmount: 0 })],
+    }));
   });
 
   it('rejects an oversized insert batch before persistence', async () => {

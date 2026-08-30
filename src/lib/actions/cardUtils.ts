@@ -1,6 +1,7 @@
 import type { BenefitCycleAlignment, BenefitFrequency } from '@/generated/prisma';
 import { prisma } from '@/lib/prisma';
 import { materializeStandardBenefitStatusRows } from '@/lib/benefit-cycle-materialization';
+import { applyTrackingModesToPlannedRows } from '@/lib/benefit-tracking-preferences';
 import { deriveNextAnnualFeeDueDate } from '@/lib/card-lifecycle';
 
 interface CreateCardResult {
@@ -111,15 +112,17 @@ export async function createCardForUser(
         for (const warning of materialized.warnings) {
           console.warn(`Benefit validation warning for "${benefit.description}": ${warning}`);
         }
-        return materialized.rows.map((row) => ({
-          ...row,
-          isCompleted: false,
-          usedAmount: 0,
-        }));
+        return materialized.rows;
       });
 
       if (statusRows.length > 0) {
-        await transaction.benefitStatus.createMany({ data: statusRows } as never);
+        // A brand-new physical card cannot have a preference yet, since
+        // preferences key on its id. Routed through the shared helper anyway so
+        // every materialization path resolves modes the same way.
+        const defaults = await applyTrackingModesToPlannedRows(transaction, statusRows);
+        await transaction.benefitStatus.createMany({
+          data: statusRows.map((row, index) => ({ ...row, ...defaults[index] })),
+        } as never);
       }
 
       return newCreditCard.id;

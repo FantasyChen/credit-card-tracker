@@ -66,7 +66,7 @@ jest.mock('@/lib/prisma', () => {
       update: jest.fn(),
     },
     benefit: {
-      findMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -77,6 +77,18 @@ jest.mock('@/lib/prisma', () => {
     predefinedCard: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+    },
+    predefinedBenefit: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    // Absent preferences mean every benefit is TRACKed, which is the default
+    // any suite that does not care about tracking modes should see.
+    benefitTrackingPreference: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     },
     benefitUsageWay: {
       findMany: jest.fn(),

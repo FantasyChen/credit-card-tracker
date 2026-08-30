@@ -328,7 +328,7 @@ describe("Amex sync persistence boundary", () => {
         usedAmount: 50,
         isCompleted: true,
       }),
-      data: { usedAmount: 25, isCompleted: false, completedAt: null },
+      data: { usedAmount: 25, isCompleted: false, completedAt: null, claimSource: "USER" },
     }));
     expect(db.benefitStatusSourceProvenance.upsert).toHaveBeenCalledWith(expect.objectContaining({
       create: expect.objectContaining({ source: "AMEX", attemptId: "attempt-1", sourceObservationDigest: row.sourceObservationDigest }),
