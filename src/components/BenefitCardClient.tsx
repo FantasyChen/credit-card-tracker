@@ -33,7 +33,7 @@ const TRACKING_MODE_OPTIONS: ReadonlyArray<{
   {
     mode: 'IGNORE',
     label: 'Ignore this benefit',
-    description: 'Hides it everywhere and drops it from claimed value and ROI.',
+    description: 'Moves it to the Ignored tab and drops it from totals and ROI.',
   },
 ];
 
