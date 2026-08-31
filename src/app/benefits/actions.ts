@@ -927,9 +927,10 @@ export async function setBenefitTrackingModeAction(formData: FormData) {
  * Clears one tracking preference from the settings screen, returning the
  * benefit to the normal per-cycle workflow.
  *
- * This is the only way back for an IGNORE'd benefit, which by definition no
- * longer appears on the dashboard. A cycle that was auto-claimed on the user's
- * behalf is reopened so the benefit does not sit there falsely marked claimed.
+ * The settings screen is one restoration path for an IGNORE'd benefit; the
+ * dashboard's Ignored tab offers the same tracking-mode choice inline. A cycle
+ * that was auto-claimed on the user's behalf is reopened so the benefit does
+ * not sit there falsely marked claimed.
  */
 export async function resetBenefitTrackingPreferenceAction(formData: FormData) {
   const session = await getServerSession(authOptions);
