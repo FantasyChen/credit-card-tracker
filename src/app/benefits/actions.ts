@@ -891,6 +891,15 @@ export async function setBenefitTrackingModeAction(formData: FormData) {
             isNotUsable: false,
           },
         });
+      } else if (status.isNotUsable) {
+        // Legacy rows may still carry the deprecated cycle-level flag until the
+        // data migration runs. Any explicit tracking choice adopts the new
+        // model for the open cycle and clears that flag so restoring TRACK does
+        // not make the row disappear from the dashboard on revalidation.
+        await transaction.benefitStatus.updateMany({
+          where: { ...openCycleWhere, isNotUsable: true },
+          data: { isNotUsable: false },
+        });
       }
 
       // Leaving AUTO_CLAIM reopens only claims this feature made. Rows the user

@@ -245,6 +245,42 @@ describe('setBenefitTrackingModeAction', () => {
     expect(args.data.isCompleted).toBe(true);
   });
 
+  it('adopts IGNORE for a legacy not-usable row and clears the flag', async () => {
+    mockFindStatus.mockResolvedValue(standardStatus({ isNotUsable: true }));
+
+    await setBenefitTrackingModeAction(
+      form({ benefitStatusId: 'status-1', trackingMode: 'IGNORE' })
+    );
+
+    expect(preference.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        creditCardId: 'card-1',
+        predefinedBenefitId: 'pb-1',
+        benefitId: null,
+        mode: 'IGNORE',
+      },
+    });
+    expect(statusUpdateMany).toHaveBeenCalledWith({
+      where: { ...OPEN_CYCLE_STANDARD_WHERE, isNotUsable: true },
+      data: { isNotUsable: false },
+    });
+  });
+
+  it('clears the legacy flag when restoring TRACK on an open row', async () => {
+    mockFindStatus.mockResolvedValue(standardStatus({ isNotUsable: true }));
+
+    await setBenefitTrackingModeAction(
+      form({ benefitStatusId: 'status-1', trackingMode: 'TRACK' })
+    );
+
+    expect(preference.create).not.toHaveBeenCalled();
+    expect(statusUpdateMany).toHaveBeenCalledWith({
+      where: { ...OPEN_CYCLE_STANDARD_WHERE, isNotUsable: true },
+      data: { isNotUsable: false },
+    });
+  });
+
   it('claims zero rather than inventing value when the benefit has no maximum', async () => {
     mockFindStatus.mockResolvedValue(standardStatus({ benefit: { maxAmount: null, category: 'Travel' } }));
 
