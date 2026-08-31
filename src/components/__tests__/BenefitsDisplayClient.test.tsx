@@ -126,6 +126,19 @@ describe('BenefitsDisplayClient', () => {
     expect(screen.getByRole('button', { name: /Upcoming/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Claimed/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Not Usable/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ignored \(0\)/i })).toBeInTheDocument();
+  });
+
+  it('shows ignored benefits in the Ignored tab', () => {
+    render(
+      <BenefitsDisplayClient
+        {...defaultProps}
+        ignoredBenefits={[{ ...benefitStatus('ignored', 'Ignored dining credit', 'MONTHLY'), trackingMode: 'IGNORE' }]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Ignored \(1\)/i }));
+    expect(screen.getByText('Ignored dining credit')).toBeInTheDocument();
   });
 
   it('renders summary widgets with value totals', () => {

@@ -15,6 +15,7 @@ interface CategoryBenefitsGroupProps {
   onDelete?: (benefitId: string) => void;
   onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;
   onTrackingModeChange?: (statusId: string, previousMode: BenefitTrackingMode, mode: BenefitTrackingMode) => void;
+  isIgnoredView?: boolean;
 }
 
 // Category icons mapping
@@ -157,12 +158,13 @@ export default function CategoryBenefitsGroup({
   onDelete,
   onPartialCompletionChange,
   onTrackingModeChange,
+  isIgnoredView = false,
 }: CategoryBenefitsGroupProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isPending, startTransition] = useTransition();
 
   // Filter benefits that can be batch completed (all open benefits)
-  const completableBenefits = benefits.filter(
+  const completableBenefits = isIgnoredView ? [] : benefits.filter(
     (benefit) => !benefit.isCompleted && benefit.trackingMode !== 'AUTO_CLAIM'
   );
   const categoryTotal = benefits.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
@@ -262,6 +264,7 @@ export default function CategoryBenefitsGroup({
                 onDelete={onDelete}
                 onPartialCompletionChange={onPartialCompletionChange}
                 onTrackingModeChange={onTrackingModeChange}
+                isIgnoredView={isIgnoredView}
               />
             ))}
           </div>

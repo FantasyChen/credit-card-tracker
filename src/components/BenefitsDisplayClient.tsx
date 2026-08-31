@@ -20,6 +20,7 @@ import type { BenefitTrackingMode } from '@/lib/benefit-tracking-modes';
 interface BenefitsDisplayProps {
   upcomingBenefits: DisplayBenefitStatus[];
   completedBenefits: DisplayBenefitStatus[];
+  ignoredBenefits?: DisplayBenefitStatus[];
   scheduledBenefits: DisplayBenefitStatus[];
   totalUnusedValue: number;
   totalUsedValue: number;
@@ -33,6 +34,7 @@ interface BenefitsDisplayProps {
 export default function BenefitsDisplayClient({
   upcomingBenefits,
   completedBenefits,
+  ignoredBenefits = [],
   scheduledBenefits,
   totalUnusedValue,
   totalUsedValue,
@@ -56,6 +58,7 @@ export default function BenefitsDisplayClient({
   const [sortMode, setSortMode] = useState<'expires' | 'value' | 'card'>('expires');
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
+  const [localIgnoredBenefits, setLocalIgnoredBenefits] = useState(ignoredBenefits);
   const [localScheduledBenefits, setLocalScheduledBenefits] = useState(scheduledBenefits);
   const [localTotalUnusedValue, setLocalTotalUnusedValue] = useState(totalUnusedValue);
   const [localTotalUsedValue, setLocalTotalUsedValue] = useState(totalUsedValue);
@@ -167,7 +170,7 @@ export default function BenefitsDisplayClient({
       list.filter(b => b.benefit.id !== benefitId);
     
     // Find the benefit to get its value for updating totals
-    const allBenefits = [...localUpcomingBenefits, ...localCompletedBenefits];
+    const allBenefits = [...localUpcomingBenefits, ...localCompletedBenefits, ...localIgnoredBenefits];
     const deletedBenefit = allBenefits.find(b => b.benefit.id === benefitId);
     
     if (deletedBenefit) {
@@ -190,7 +193,8 @@ export default function BenefitsDisplayClient({
   /**
    * Mirror the server-side tracking transition immediately in the dashboard.
    * AUTO_CLAIM claims the currently open row and moves it to Claimed; IGNORE
-   * removes the row from every visible tab and its corresponding totals.
+   * moves the row into the Ignored tab. Restoring an ignored row puts it back
+   * into the tab dictated by its current cycle state.
    */
   const handleTrackingModeChange = (
     statusId: string,
@@ -199,8 +203,9 @@ export default function BenefitsDisplayClient({
   ) => {
     const upcoming = localUpcomingBenefits.find((benefit) => benefit.id === statusId);
     const completed = localCompletedBenefits.find((benefit) => benefit.id === statusId);
+    const ignored = localIgnoredBenefits.find((benefit) => benefit.id === statusId);
     const scheduled = localScheduledBenefits.find((benefit) => benefit.id === statusId);
-    const status = upcoming ?? completed ?? scheduled;
+    const status = upcoming ?? completed ?? ignored ?? scheduled;
     if (!status) return;
 
     const maxAmount = Math.max(0, status.benefit.maxAmount ?? 0);
@@ -211,12 +216,36 @@ export default function BenefitsDisplayClient({
       setLocalUpcomingBenefits((items) => items.filter((item) => item.id !== statusId));
       setLocalCompletedBenefits((items) => items.filter((item) => item.id !== statusId));
       setLocalScheduledBenefits((items) => items.filter((item) => item.id !== statusId));
+      setLocalIgnoredBenefits((items) => [...items.filter((item) => item.id !== statusId), { ...status, trackingMode: mode }]);
 
       if (upcoming) {
         setLocalTotalUnusedValue((value) => value - Math.max(0, maxAmount - usedAmount));
         setLocalTotalUsedValue((value) => value - usedAmount);
       } else if (completed) {
         setLocalTotalUsedValue((value) => value - claimedAmount);
+      }
+      return;
+    }
+
+    if (ignored) {
+      const restoredStatus = { ...ignored, trackingMode: mode };
+      setLocalIgnoredBenefits((items) => items.filter((item) => item.id !== statusId));
+      let restoredToTrackedTab = false;
+      if (restoredStatus.isCompleted) {
+        setLocalCompletedBenefits((items) => [...items, restoredStatus]);
+        restoredToTrackedTab = true;
+      } else if (new Date(restoredStatus.cycleStartDate).getTime() > Date.now()) {
+        setLocalScheduledBenefits((items) => [...items, restoredStatus]);
+        // Scheduled benefits do not contribute to current totals yet.
+      } else if (new Date(restoredStatus.cycleEndDate).getTime() >= Date.now()) {
+        setLocalUpcomingBenefits((items) => [...items, restoredStatus]);
+        restoredToTrackedTab = true;
+      }
+      if (restoredStatus.isCompleted) {
+        setLocalTotalUsedValue((value) => value + claimedAmount);
+      } else if (restoredToTrackedTab) {
+        setLocalTotalUnusedValue((value) => value + Math.max(0, maxAmount - usedAmount));
+        setLocalTotalUsedValue((value) => value + usedAmount);
       }
       return;
     }
@@ -296,10 +325,12 @@ export default function BenefitsDisplayClient({
         return localCompletedBenefits;
       case 'scheduled':
         return localScheduledBenefits;
+      case 'ignored':
+        return localIgnoredBenefits;
       default:
         return [];
     }
-  }, [activeTab, localUpcomingBenefits, localCompletedBenefits, localScheduledBenefits]);
+  }, [activeTab, localUpcomingBenefits, localCompletedBenefits, localScheduledBenefits, localIgnoredBenefits]);
 
   const uniqueCategories = useMemo(
     () => Array.from(new Set(allBenefitsForTab.map((b) => b.benefit.category))).sort(),
@@ -441,6 +472,11 @@ export default function BenefitsDisplayClient({
           title: 'No completed benefits yet',
           description: 'Mark benefits as complete when you use them to track your ROI.',
         },
+        ignored: {
+          icon: 'clock' as const,
+          title: 'No ignored benefits',
+          description: 'Benefits you choose to ignore will appear here for review and restoration.',
+        },
       };
       const props = emptyStateProps[activeTab as keyof typeof emptyStateProps] || emptyStateProps.upcoming;
       return <EmptyState {...props} />;
@@ -459,6 +495,7 @@ export default function BenefitsDisplayClient({
             onDelete={handleDeleteBenefit}
             onPartialCompletionChange={handlePartialCompletionChange}
             onTrackingModeChange={handleTrackingModeChange}
+            isIgnoredView={activeTab === 'ignored'}
           />
         ))}
       </div>
@@ -488,6 +525,11 @@ export default function BenefitsDisplayClient({
           title: 'No Benefits Available',
           description: 'No completed benefits yet. Start using your credit card benefits!',
         },
+        ignored: {
+          icon: 'clock' as const,
+          title: 'No ignored benefits',
+          description: 'Benefits you choose to ignore will appear here for review and restoration.',
+        },
       };
       const props = emptyStateProps[activeTab as keyof typeof emptyStateProps] || emptyStateProps.upcoming;
       return <EmptyState {...props} />;
@@ -506,6 +548,7 @@ export default function BenefitsDisplayClient({
             onDelete={handleDeleteBenefit}
             onPartialCompletionChange={handlePartialCompletionChange}
             onTrackingModeChange={handleTrackingModeChange}
+            isIgnoredView={activeTab === 'ignored'}
           />
         ))}
       </div>
@@ -694,6 +737,16 @@ export default function BenefitsDisplayClient({
               <span className="sm:hidden">Scheduled ({localScheduledBenefits.length})</span>
             </button>
           )}
+          <button
+            onClick={() => setActiveTab('ignored')}
+            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm
+              ${activeTab === 'ignored'
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}
+            `}
+          >
+            <span>Ignored ({localIgnoredBenefits.length})</span>
+          </button>
         </nav>
       </div>
 
@@ -841,6 +894,18 @@ export default function BenefitsDisplayClient({
               </p>
             </div>
             {renderScheduledBenefitsList(sortBenefits(applyPowerUserFilters(filterBenefits(localScheduledBenefits))))}
+          </section>
+        )}
+        {activeTab === 'ignored' && (
+          <section>
+            <div className="mb-4 rounded-xl border border-border bg-card p-4 shadow-sm shadow-black/[0.03]">
+              <p className="text-sm text-muted-foreground">
+                These benefits are excluded from tracking and totals. Choose a different tracking mode on a benefit to restore it.
+              </p>
+            </div>
+            {viewMode === 'category'
+              ? renderCategoryView(sortBenefits(applyPowerUserFilters(filterBenefits(localIgnoredBenefits))))
+              : renderCardView(sortBenefits(applyPowerUserFilters(filterBenefits(localIgnoredBenefits))))}
           </section>
         )}
       </div>

@@ -44,9 +44,11 @@ interface BenefitCardClientProps {
   onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;
   onTrackingModeChange?: (statusId: string, previousMode: BenefitTrackingMode, mode: BenefitTrackingMode) => void;
   isScheduled?: boolean;
+  /** Render a read-only card from the dashboard's Ignored tab. */
+  isIgnoredView?: boolean;
 }
 
-export default function BenefitCardClient({ status, onStatusChange, onDelete, onPartialCompletionChange, onTrackingModeChange, isScheduled = false }: BenefitCardClientProps) {
+export default function BenefitCardClient({ status, onStatusChange, onDelete, onPartialCompletionChange, onTrackingModeChange, isScheduled = false, isIgnoredView = false }: BenefitCardClientProps) {
   const [isPending, startTransition] = useTransition();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPartialModal, setShowPartialModal] = useState(false);
@@ -185,7 +187,7 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
   const isCompleted = status.isCompleted;
   const isCustomBenefit = status.isCustomBenefit;
   const hasPartialProgress = usedAmount > 0 && !isCompleted;
-  const statusLabel = isScheduled ? 'Scheduled' : isCompleted ? 'Claimed' : hasPartialProgress ? 'Partially used' : 'Open';
+  const statusLabel = isIgnoredView ? 'Ignored' : isScheduled ? 'Scheduled' : isCompleted ? 'Claimed' : hasPartialProgress ? 'Partially used' : 'Open';
 
   const card = status.benefit.creditCard;
   const cardIdentityDetails = card
@@ -377,7 +379,7 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
           <div className="sm:pl-11">
             <div className="flex flex-col sm:flex-row gap-2">
               {/* Completion buttons - hide for scheduled benefits */}
-              {!isScheduled && trackingMode !== 'AUTO_CLAIM' && (
+              {!isIgnoredView && !isScheduled && trackingMode !== 'AUTO_CLAIM' && (
                 <>
                   {isCompleted ? (
                     // For completed benefits, show "Mark Pending" to undo

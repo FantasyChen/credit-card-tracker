@@ -138,6 +138,16 @@ describe('BenefitCardClient', () => {
     expect(screen.getByRole('button', { name: /Track every cycle/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('keeps ignored cards read-only while allowing tracking restoration', () => {
+    const status = createMockStatus({ trackingMode: 'IGNORE' });
+    render(<BenefitCardClient status={status} isIgnoredView />);
+
+    expect(screen.getByText('Ignored')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Mark Complete/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add Amount/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Tracking mode: Ignore this benefit/i })).toBeInTheDocument();
+  });
+
   it('updates the visible mode after a successful tracking choice', async () => {
     const status = createMockStatus();
     render(<BenefitCardClient status={status} />);
