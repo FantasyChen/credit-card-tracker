@@ -15,6 +15,7 @@ import {
   type BenefitDashboardFrequency,
   type DisplayBenefitStatus,
 } from '@/lib/benefit-dashboard-client';
+import type { BenefitTrackingMode } from '@/lib/benefit-tracking-modes';
 
 interface BenefitsDisplayProps {
   upcomingBenefits: DisplayBenefitStatus[];
@@ -60,7 +61,7 @@ export default function BenefitsDisplayClient({
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
   const [localNotUsableBenefits, setLocalNotUsableBenefits] = useState(notUsableBenefits);
-  const [localScheduledBenefits] = useState(scheduledBenefits);
+  const [localScheduledBenefits, setLocalScheduledBenefits] = useState(scheduledBenefits);
   const [localTotalUnusedValue, setLocalTotalUnusedValue] = useState(totalUnusedValue);
   const [localTotalUsedValue, setLocalTotalUsedValue] = useState(totalUsedValue);
   const [localTotalNotUsableValue, setLocalTotalNotUsableValue] = useState(totalNotUsableValue);
@@ -193,6 +194,89 @@ export default function BenefitsDisplayClient({
         setLocalTotalNotUsableValue(prev => prev - maxAmount);
       }
     }
+  };
+
+  /**
+   * Mirror the server-side tracking transition immediately in the dashboard.
+   * AUTO_CLAIM claims the currently open row and moves it to Claimed; IGNORE
+   * removes the row from every visible tab and its corresponding totals.
+   */
+  const handleTrackingModeChange = (
+    statusId: string,
+    _previousMode: BenefitTrackingMode,
+    mode: BenefitTrackingMode,
+  ) => {
+    const upcoming = localUpcomingBenefits.find((benefit) => benefit.id === statusId);
+    const completed = localCompletedBenefits.find((benefit) => benefit.id === statusId);
+    const notUsable = localNotUsableBenefits.find((benefit) => benefit.id === statusId);
+    const scheduled = localScheduledBenefits.find((benefit) => benefit.id === statusId);
+    const status = upcoming ?? completed ?? notUsable ?? scheduled;
+    if (!status) return;
+
+    const maxAmount = Math.max(0, status.benefit.maxAmount ?? 0);
+    const usedAmount = Math.max(0, status.usedAmount ?? 0);
+    const claimedAmount = resolveBenefitClaimedValue(status);
+
+    if (mode === 'IGNORE') {
+      setLocalUpcomingBenefits((items) => items.filter((item) => item.id !== statusId));
+      setLocalCompletedBenefits((items) => items.filter((item) => item.id !== statusId));
+      setLocalNotUsableBenefits((items) => items.filter((item) => item.id !== statusId));
+      setLocalScheduledBenefits((items) => items.filter((item) => item.id !== statusId));
+
+      if (upcoming) {
+        setLocalTotalUnusedValue((value) => value - Math.max(0, maxAmount - usedAmount));
+        setLocalTotalUsedValue((value) => value - usedAmount);
+      } else if (completed) {
+        setLocalTotalUsedValue((value) => value - claimedAmount);
+      } else if (notUsable) {
+        setLocalTotalNotUsableValue((value) => value - maxAmount);
+      }
+      return;
+    }
+
+    // AUTO_CLAIM only changes the currently open cycle. Scheduled rows remain
+    // scheduled until their cycle opens and the server materializes the claim.
+    if (mode === 'AUTO_CLAIM' && upcoming && !status.isCompleted && !status.isNotUsable) {
+      const claimedStatus: DisplayBenefitStatus = {
+        ...status,
+        isCompleted: true,
+        isNotUsable: false,
+        completedAt: new Date(),
+        usedAmount: maxAmount,
+        trackingMode: mode,
+      };
+      setLocalUpcomingBenefits((items) => items.filter((item) => item.id !== statusId));
+      setLocalCompletedBenefits((items) => [...items, claimedStatus]);
+      setLocalTotalUnusedValue((value) => value - Math.max(0, maxAmount - usedAmount));
+      setLocalTotalUsedValue((value) => value + Math.max(0, maxAmount - usedAmount));
+      return;
+    }
+
+    // An ignored/not-usable open row can also be auto-claimed; account for
+    // that transition when the server clears isNotUsable.
+    if (mode === 'AUTO_CLAIM' && notUsable && !status.isCompleted) {
+      const claimedStatus: DisplayBenefitStatus = {
+        ...status,
+        isCompleted: true,
+        isNotUsable: false,
+        completedAt: new Date(),
+        usedAmount: maxAmount,
+        trackingMode: mode,
+      };
+      setLocalNotUsableBenefits((items) => items.filter((item) => item.id !== statusId));
+      setLocalCompletedBenefits((items) => [...items, claimedStatus]);
+      setLocalTotalNotUsableValue((value) => value - maxAmount);
+      setLocalTotalUsedValue((value) => value + maxAmount);
+      return;
+    }
+
+    // Keep the mode in the local row when no list transition is needed.
+    const updateMode = (items: DisplayBenefitStatus[]) =>
+      items.map((item) => item.id === statusId ? { ...item, trackingMode: mode } : item);
+    setLocalUpcomingBenefits(updateMode);
+    setLocalCompletedBenefits(updateMode);
+    setLocalNotUsableBenefits(updateMode);
+    setLocalScheduledBenefits(updateMode);
   };
 
 
@@ -361,6 +445,7 @@ export default function BenefitsDisplayClient({
             onStatusChange={handleStatusChange} 
             onDelete={handleDeleteBenefit}
             onPartialCompletionChange={handlePartialCompletionChange}
+            onTrackingModeChange={handleTrackingModeChange}
             isScheduled={true}
           />
         ))}
@@ -413,6 +498,7 @@ export default function BenefitsDisplayClient({
             onStatusChange={handleStatusChange}
             onDelete={handleDeleteBenefit}
             onPartialCompletionChange={handlePartialCompletionChange}
+            onTrackingModeChange={handleTrackingModeChange}
           />
         ))}
       </div>
@@ -464,6 +550,7 @@ export default function BenefitsDisplayClient({
             onStatusChange={handleStatusChange}
             onDelete={handleDeleteBenefit}
             onPartialCompletionChange={handlePartialCompletionChange}
+            onTrackingModeChange={handleTrackingModeChange}
           />
         ))}
       </div>

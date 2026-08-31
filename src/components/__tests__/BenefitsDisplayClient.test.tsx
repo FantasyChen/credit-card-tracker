@@ -14,13 +14,25 @@ jest.mock('../BenefitCardClient', () => {
 });
 jest.mock('../CategoryBenefitsGroup', () => ({
   __esModule: true,
-  default: function MockCategoryBenefitsGroup({ category, benefits }: { category: string; benefits: DisplayBenefitStatus[] }) {
+  default: function MockCategoryBenefitsGroup({
+    category,
+    benefits,
+    onTrackingModeChange,
+  }: {
+    category: string;
+    benefits: DisplayBenefitStatus[];
+    onTrackingModeChange?: (statusId: string, previousMode: 'TRACK' | 'AUTO_CLAIM' | 'IGNORE', mode: 'TRACK' | 'AUTO_CLAIM' | 'IGNORE') => void;
+  }) {
     return (
       <div data-testid="category-group">
         <h2>{category}</h2>
         <div data-testid="category-count">{benefits.length}</div>
         {benefits.map((b) => (
-          <div key={b.id}>{b.benefit.description}</div>
+          <div key={b.id}>
+            {b.benefit.description}
+            <button type="button" onClick={() => onTrackingModeChange?.(b.id, 'TRACK', 'AUTO_CLAIM')}>Auto claim</button>
+            <button type="button" onClick={() => onTrackingModeChange?.(b.id, 'TRACK', 'IGNORE')}>Ignore</button>
+          </div>
         ))}
       </div>
     );
@@ -249,5 +261,39 @@ describe('BenefitsDisplayClient', () => {
     expect(screen.getAllByText('American Express Gold Card')).toHaveLength(2);
     expect(groups[0]).toHaveTextContent('Dining credit - first physical card');
     expect(groups[1]).toHaveTextContent('Dining credit - second physical card');
+  });
+
+  it('moves an open benefit to Claimed when AUTO_CLAIM is selected', () => {
+    render(
+      <BenefitsDisplayClient
+        {...defaultProps}
+        upcomingBenefits={[benefitStatus('auto', 'Auto claim me', 'MONTHLY')]}
+        totalUnusedValue={100}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Auto claim' }));
+
+    expect(screen.getByRole('button', { name: /Claimed \(1\)/i })).toBeInTheDocument();
+    expect(screen.getByText('Claimed Benefits')).toBeInTheDocument();
+    expect(screen.getAllByText('$100.00').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /Upcoming \(0\)/i })).toBeInTheDocument();
+  });
+
+  it('removes an ignored benefit from the dashboard and totals', () => {
+    render(
+      <BenefitsDisplayClient
+        {...defaultProps}
+        upcomingBenefits={[benefitStatus('ignore', 'Ignore me', 'MONTHLY')]}
+        totalUnusedValue={100}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ignore' }));
+
+    expect(screen.queryByText('Ignore me')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Upcoming \(0\)/i })).toBeInTheDocument();
+    expect(screen.getByText('Upcoming Benefits')).toBeInTheDocument();
+    expect(screen.getAllByText('$0.00').length).toBeGreaterThan(0);
   });
 });

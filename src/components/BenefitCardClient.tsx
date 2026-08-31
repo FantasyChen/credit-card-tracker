@@ -42,10 +42,11 @@ interface BenefitCardClientProps {
   onStatusChange?: (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => void;
   onDelete?: (benefitId: string) => void;
   onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;
+  onTrackingModeChange?: (statusId: string, previousMode: BenefitTrackingMode, mode: BenefitTrackingMode) => void;
   isScheduled?: boolean;
 }
 
-export default function BenefitCardClient({ status, onStatusChange, onDelete, onPartialCompletionChange, isScheduled = false }: BenefitCardClientProps) {
+export default function BenefitCardClient({ status, onStatusChange, onDelete, onPartialCompletionChange, onTrackingModeChange, isScheduled = false }: BenefitCardClientProps) {
   const [isPending, startTransition] = useTransition();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPartialModal, setShowPartialModal] = useState(false);
@@ -71,6 +72,7 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
       setShowTrackingMenu(false);
       return;
     }
+    const previousMode = trackingMode;
     const formData = new FormData();
     formData.append('benefitStatusId', status.id);
     formData.append('trackingMode', mode);
@@ -81,6 +83,7 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
         await setBenefitTrackingModeAction(formData);
         setTrackingMode(mode);
         setShowTrackingMenu(false);
+        onTrackingModeChange?.(status.id, previousMode, mode);
       } catch (error) {
         console.error('Failed to set benefit tracking mode:', error);
         setActionError(error instanceof Error ? error.message : 'Failed to update tracking mode.');
@@ -184,6 +187,7 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
   const isNotUsable = status.isNotUsable;
   const hasPartialProgress = usedAmount > 0 && !isCompleted;
   const statusLabel = isScheduled ? 'Scheduled' : isCompleted ? 'Claimed' : isNotUsable ? 'Not usable' : hasPartialProgress ? 'Partially used' : 'Open';
+
   const card = status.benefit.creditCard;
   const cardIdentityDetails = card
     ? [
@@ -386,7 +390,7 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
           <div className="sm:pl-11">
             <div className="flex flex-col sm:flex-row gap-2">
               {/* Completion buttons - hide for scheduled benefits */}
-              {!isScheduled && !isNotUsable && (
+              {!isScheduled && !isNotUsable && trackingMode !== 'AUTO_CLAIM' && (
                 <>
                   {isCompleted ? (
                     // For completed benefits, show "Mark Pending" to undo
