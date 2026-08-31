@@ -380,6 +380,11 @@ export async function updateUsedAmountAction(formData: FormData) {
   }
 }
 
+/**
+ * @deprecated The dashboard no longer exposes this cycle-level mutation. Keep
+ * the server action for compatibility with legacy callers and persisted rows;
+ * existing not-usable statuses remain readable in the dashboard.
+ */
 export async function markBenefitAsNotUsableAction(formData: FormData) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
