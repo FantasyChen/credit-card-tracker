@@ -11,7 +11,6 @@ interface CategoryBenefitsGroupProps {
   category: string;
   benefits: DisplayBenefitStatus[];
   onStatusChange?: (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => void;
-  onNotUsableChange?: (statusId: string, newIsNotUsable: boolean) => void;
   onDelete?: (benefitId: string) => void;
   onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;
 }
@@ -153,7 +152,6 @@ export default function CategoryBenefitsGroup({
   category, 
   benefits, 
   onStatusChange, 
-  onNotUsableChange,
   onDelete,
   onPartialCompletionChange
 }: CategoryBenefitsGroupProps) {
@@ -256,7 +254,6 @@ export default function CategoryBenefitsGroup({
                 key={benefit.id} 
                 status={benefit} 
                 onStatusChange={onStatusChange}
-                onNotUsableChange={onNotUsableChange}
                 onDelete={onDelete}
                 onPartialCompletionChange={onPartialCompletionChange}
               />

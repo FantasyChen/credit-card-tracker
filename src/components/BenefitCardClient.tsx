@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { formatDate } from '@/lib/dateUtils';
 import {
   toggleBenefitStatusAction,
-  markBenefitAsNotUsableAction,
   deleteCustomBenefitAction,
   addPartialCompletionAction,
   markFullCompletionAction,
@@ -41,13 +40,12 @@ const TRACKING_MODE_OPTIONS: ReadonlyArray<{
 interface BenefitCardClientProps {
   status: DisplayBenefitStatus;
   onStatusChange?: (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => void;
-  onNotUsableChange?: (statusId: string, newIsNotUsable: boolean) => void;
   onDelete?: (benefitId: string) => void;
   onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;
   isScheduled?: boolean;
 }
 
-export default function BenefitCardClient({ status, onStatusChange, onNotUsableChange, onDelete, onPartialCompletionChange, isScheduled = false }: BenefitCardClientProps) {
+export default function BenefitCardClient({ status, onStatusChange, onDelete, onPartialCompletionChange, isScheduled = false }: BenefitCardClientProps) {
   const [isPending, startTransition] = useTransition();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPartialModal, setShowPartialModal] = useState(false);
@@ -160,24 +158,6 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
       } catch (error) {
         console.error('Failed to add partial completion:', error);
         setActionError(error instanceof Error ? error.message : 'Failed to add used amount.');
-      }
-    });
-  };
-
-  const handleNotUsableSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const newIsNotUsable = !status.isNotUsable;
-
-    startTransition(async () => {
-      try {
-        setActionError(null);
-        await markBenefitAsNotUsableAction(formData);
-        // Call the callback to update parent state
-        onNotUsableChange?.(status.id, newIsNotUsable);
-      } catch (error) {
-        console.error('Failed to mark benefit as not usable:', error);
-        setActionError(error instanceof Error ? error.message : 'Failed to update benefit status.');
       }
     });
   };
@@ -482,52 +462,8 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 </>
               )}
 
-              {/* Cycle-level exception: unlike the standing IGNORE preference,
-                  this only marks the current benefit cycle as unusable. */}
-              {!isCompleted && !isScheduled && (
-                <form onSubmit={handleNotUsableSubmit}>
-                  <input type="hidden" name="benefitStatusId" value={status.id} />
-                  <input type="hidden" name="isNotUsable" value={status.isNotUsable.toString()} />
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    title="Applies to this cycle only. Use the tracking menu to ignore this benefit in every cycle."
-                    className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                      isNotUsable
-                        ? 'border border-border bg-card text-foreground hover:bg-accent focus:ring-ring'
-                        : 'border border-border bg-card text-foreground hover:bg-accent focus:ring-ring'
-                    } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {isPending ? (
-                      <div className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Updating...
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center">
-                        {isNotUsable ? (
-                          <>
-                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Mark usable this cycle
-                          </>
-                        ) : (
-                          <>
-                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
-                            Not usable this cycle
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </button>
-                </form>
-              )}
+              {/* Legacy cycle-level not-usable statuses remain visible for
+                  history, but this deprecated mutation is no longer exposed. */}
 
               {/* Cycle-independent tracking choice for benefits the user does
                   not want to confirm again every cycle. Available on scheduled

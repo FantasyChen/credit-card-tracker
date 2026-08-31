@@ -9,7 +9,6 @@ import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard-client';
 
 jest.mock('@/app/benefits/actions', () => ({
   toggleBenefitStatusAction: jest.fn().mockResolvedValue(undefined),
-  markBenefitAsNotUsableAction: jest.fn().mockResolvedValue(undefined),
   deleteCustomBenefitAction: jest.fn().mockResolvedValue(undefined),
   addPartialCompletionAction: jest.fn().mockResolvedValue({ success: true, isComplete: false, newUsedAmount: 10 }),
   markFullCompletionAction: jest.fn().mockResolvedValue({ success: true, usedAmount: 10 }),
@@ -151,13 +150,18 @@ describe('BenefitCardClient', () => {
     });
   });
 
-  it('labels the cycle-level unusable action distinctly from Ignore', () => {
+  it('does not expose the deprecated cycle-level not-usable action', () => {
     const status = createMockStatus();
     render(<BenefitCardClient status={status} />);
 
-    expect(screen.getByRole('button', { name: /Not usable this cycle/i })).toHaveAttribute(
-      'title',
-      expect.stringContaining('ignore this benefit in every cycle')
-    );
+    expect(screen.queryByRole('button', { name: /Not usable this cycle|Mark usable this cycle/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps legacy not-usable statuses visible without mutation controls', () => {
+    const status = createMockStatus({ isNotUsable: true });
+    render(<BenefitCardClient status={status} />);
+
+    expect(screen.getByText('Not usable')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Not usable this cycle|Mark usable this cycle/i })).not.toBeInTheDocument();
   });
 });

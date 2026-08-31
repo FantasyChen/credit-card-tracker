@@ -166,36 +166,6 @@ export default function BenefitsDisplayClient({
     }
   };
 
-  const handleNotUsableChange = (statusId: string, newIsNotUsable: boolean) => {
-    if (newIsNotUsable) {
-      // Moving from upcoming to not usable
-      const benefitToMove = localUpcomingBenefits.find(b => b.id === statusId);
-      if (benefitToMove) {
-        const updatedBenefit = { ...benefitToMove, isNotUsable: true, isCompleted: false, completedAt: null };
-        setLocalUpcomingBenefits(prev => prev.filter(b => b.id !== statusId));
-        setLocalNotUsableBenefits(prev => [...prev, updatedBenefit]);
-        
-        // Update totals
-        const benefitValue = benefitToMove.benefit.maxAmount || 0;
-        setLocalTotalUnusedValue(prev => prev - benefitValue);
-        setLocalTotalNotUsableValue(prev => prev + benefitValue);
-      }
-    } else {
-      // Moving from not usable back to upcoming
-      const benefitToMove = localNotUsableBenefits.find(b => b.id === statusId);
-      if (benefitToMove) {
-        const updatedBenefit = { ...benefitToMove, isNotUsable: false };
-        setLocalNotUsableBenefits(prev => prev.filter(b => b.id !== statusId));
-        setLocalUpcomingBenefits(prev => [...prev, updatedBenefit]);
-        
-        // Update totals
-        const benefitValue = benefitToMove.benefit.maxAmount || 0;
-        setLocalTotalNotUsableValue(prev => prev - benefitValue);
-        setLocalTotalUnusedValue(prev => prev + benefitValue);
-      }
-    }
-  };
-
   const handleDeleteBenefit = (benefitId: string) => {
     // Remove from all lists based on benefit ID
     const findAndRemove = (list: DisplayBenefitStatus[]) => 
@@ -389,7 +359,6 @@ export default function BenefitsDisplayClient({
             key={status.id} 
             status={status} 
             onStatusChange={handleStatusChange} 
-            onNotUsableChange={handleNotUsableChange}
             onDelete={handleDeleteBenefit}
             onPartialCompletionChange={handlePartialCompletionChange}
             isScheduled={true}
@@ -442,7 +411,6 @@ export default function BenefitsDisplayClient({
             category={category}
             benefits={categoryBenefits}
             onStatusChange={handleStatusChange}
-            onNotUsableChange={handleNotUsableChange}
             onDelete={handleDeleteBenefit}
             onPartialCompletionChange={handlePartialCompletionChange}
           />
@@ -494,7 +462,6 @@ export default function BenefitsDisplayClient({
             category={group.label}
             benefits={group.benefits}
             onStatusChange={handleStatusChange}
-            onNotUsableChange={handleNotUsableChange}
             onDelete={handleDeleteBenefit}
             onPartialCompletionChange={handlePartialCompletionChange}
           />
