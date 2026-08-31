@@ -20,6 +20,48 @@ BEGIN
   END IF;
 END $$;
 
+-- Do not manufacture a preference for a row whose related physical card is
+-- owned by another user (or missing). The effective-benefit reader rejects
+-- that relationship, so guessing here would either strand the preference or
+-- hide a malformed status instead of failing closed.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM "BenefitStatus" status
+    LEFT JOIN "CreditCard" card ON card."id" = status."creditCardId"
+    WHERE status."isNotUsable" = true
+      AND status."predefinedBenefitId" IS NOT NULL
+      AND (card."id" IS NULL OR card."userId" <> status."userId")
+  ) THEN
+    RAISE EXCEPTION 'Cannot migrate not-usable status with cross-owner or missing standard card';
+  END IF;
+END $$;
+
+-- Custom rows may carry a card through either the status or its legacy
+-- definition. Reject a cross-owner/missing card, while retaining support for
+-- standalone legacy definitions whose Benefit.userId is intentionally NULL.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM "BenefitStatus" status
+    JOIN "Benefit" benefit ON benefit."id" = status."benefitId"
+    LEFT JOIN "CreditCard" card
+      ON card."id" = COALESCE(status."creditCardId", benefit."creditCardId")
+    WHERE status."isNotUsable" = true
+      AND status."predefinedBenefitId" IS NULL
+      AND status."benefitId" IS NOT NULL
+      AND (
+        (benefit."userId" IS NOT NULL AND benefit."userId" <> status."userId")
+        OR (COALESCE(status."creditCardId", benefit."creditCardId") IS NOT NULL
+          AND (card."id" IS NULL OR card."userId" <> status."userId"))
+      )
+  ) THEN
+    RAISE EXCEPTION 'Cannot migrate not-usable status with cross-owner or missing custom benefit owner';
+  END IF;
+END $$;
+
 -- Existing preferences win only on identity; the requested migration adopts
 -- IGNORE for every target that has a legacy not-usable status.
 UPDATE "BenefitTrackingPreference" preference
@@ -114,6 +156,5 @@ WHERE NOT EXISTS (
 );
 
 UPDATE "BenefitStatus"
-SET "isNotUsable" = false,
-    "updatedAt" = CURRENT_TIMESTAMP
+SET "isNotUsable" = false
 WHERE "isNotUsable" = true;
