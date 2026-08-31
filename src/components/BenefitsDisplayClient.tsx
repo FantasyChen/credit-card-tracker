@@ -231,19 +231,32 @@ export default function BenefitsDisplayClient({
       const restoredStatus = { ...ignored, trackingMode: mode };
       setLocalIgnoredBenefits((items) => items.filter((item) => item.id !== statusId));
       let restoredToTrackedTab = false;
-      if (restoredStatus.isCompleted) {
+      const cycleStart = new Date(restoredStatus.cycleStartDate).getTime();
+      const cycleEnd = new Date(restoredStatus.cycleEndDate).getTime();
+      const cycleIsOpen = cycleStart <= Date.now() && cycleEnd >= Date.now();
+      if (mode === 'AUTO_CLAIM' && !restoredStatus.isCompleted && cycleIsOpen) {
+        setLocalCompletedBenefits((items) => [...items, {
+          ...restoredStatus,
+          isCompleted: true,
+          completedAt: new Date(),
+          usedAmount: maxAmount,
+        }]);
+        restoredToTrackedTab = true;
+        setLocalTotalUnusedValue((value) => value - Math.max(0, maxAmount - usedAmount));
+        setLocalTotalUsedValue((value) => value + Math.max(0, maxAmount - usedAmount));
+      } else if (restoredStatus.isCompleted) {
         setLocalCompletedBenefits((items) => [...items, restoredStatus]);
         restoredToTrackedTab = true;
-      } else if (new Date(restoredStatus.cycleStartDate).getTime() > Date.now()) {
+      } else if (cycleStart > Date.now()) {
         setLocalScheduledBenefits((items) => [...items, restoredStatus]);
         // Scheduled benefits do not contribute to current totals yet.
-      } else if (new Date(restoredStatus.cycleEndDate).getTime() >= Date.now()) {
+      } else if (cycleEnd >= Date.now()) {
         setLocalUpcomingBenefits((items) => [...items, restoredStatus]);
         restoredToTrackedTab = true;
       }
       if (restoredStatus.isCompleted) {
         setLocalTotalUsedValue((value) => value + claimedAmount);
-      } else if (restoredToTrackedTab) {
+      } else if (restoredToTrackedTab && mode !== 'AUTO_CLAIM') {
         setLocalTotalUnusedValue((value) => value + Math.max(0, maxAmount - usedAmount));
         setLocalTotalUsedValue((value) => value + usedAmount);
       }

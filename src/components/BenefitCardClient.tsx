@@ -491,7 +491,7 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
               </button>
 
               {/* Delete button - only show for custom benefits */}
-              {isCustomBenefit && (
+              {isCustomBenefit && !isIgnoredView && (
                 <button
                   type="button"
                   onClick={() => setShowDeleteConfirm(true)}
