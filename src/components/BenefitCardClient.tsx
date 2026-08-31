@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId, useState, useTransition } from 'react';
+import React, { useEffect, useId, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/dateUtils';
 import {
@@ -57,7 +57,16 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
   const [showTrackingMenu, setShowTrackingMenu] = useState(false);
 
   const trackingPanelId = useId();
-  const trackingMode: BenefitTrackingMode = status.trackingMode ?? 'TRACK';
+  const [trackingMode, setTrackingMode] = useState<BenefitTrackingMode>(status.trackingMode ?? 'TRACK');
+  const trackingModeLabel = TRACKING_MODE_OPTIONS.find((option) => option.mode === trackingMode)?.label ?? 'Track every cycle';
+
+  // The tracking action revalidates the server data, but this card can remain
+  // mounted in the dashboard's local mirror. Keep the control responsive until
+  // the parent receives fresh props, while still treating the server action as
+  // the source of truth (only update after it succeeds).
+  useEffect(() => {
+    setTrackingMode(status.trackingMode ?? 'TRACK');
+  }, [status.trackingMode]);
 
   const handleTrackingModeChange = (mode: BenefitTrackingMode) => {
     if (mode === trackingMode) {
@@ -72,6 +81,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
       try {
         setActionError(null);
         await setBenefitTrackingModeAction(formData);
+        setTrackingMode(mode);
         setShowTrackingMenu(false);
       } catch (error) {
         console.error('Failed to set benefit tracking mode:', error);
@@ -472,7 +482,8 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 </>
               )}
 
-              {/* Not Usable button - only show for upcoming benefits, not scheduled */}
+              {/* Cycle-level exception: unlike the standing IGNORE preference,
+                  this only marks the current benefit cycle as unusable. */}
               {!isCompleted && !isScheduled && (
                 <form onSubmit={handleNotUsableSubmit}>
                   <input type="hidden" name="benefitStatusId" value={status.id} />
@@ -480,6 +491,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                   <button
                     type="submit"
                     disabled={isPending}
+                    title="Applies to this cycle only. Use the tracking menu to ignore this benefit in every cycle."
                     className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                       isNotUsable
                         ? 'border border-border bg-card text-foreground hover:bg-accent focus:ring-ring'
@@ -501,14 +513,14 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                             <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
-                            Mark Usable
+                            Mark usable this cycle
                           </>
                         ) : (
                           <>
                             <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
                             </svg>
-                            Not Usable
+                            Not usable this cycle
                           </>
                         )}
                       </div>
@@ -527,23 +539,21 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 onClick={() => setShowTrackingMenu((open) => !open)}
                 aria-expanded={showTrackingMenu}
                 aria-controls={trackingPanelId}
+                aria-label={`Tracking mode: ${trackingModeLabel}. ${showTrackingMenu ? 'Close' : 'Choose'} tracking mode`}
                 className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium border transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
                   showTrackingMenu || trackingMode !== 'TRACK'
-                    ? 'border-indigo-300 bg-accent text-foreground dark:border-indigo-700'
+                    ? 'border-indigo-400 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-100'
                     : 'border-border bg-card text-foreground hover:bg-accent'
                 } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <div className="flex items-center justify-center">
-                  <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg aria-hidden="true" className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  {trackingMode === 'AUTO_CLAIM'
-                    ? 'Auto-claimed'
-                    : trackingMode === 'IGNORE'
-                      ? 'Ignored'
-                      : 'Tracking'}
+                  <span>Tracking: {trackingModeLabel}</span>
                   <svg
+                    aria-hidden="true"
                     className={`h-3 w-3 ml-1 transition-transform ${showTrackingMenu ? 'rotate-180' : ''}`}
                     fill="none"
                     stroke="currentColor"
@@ -595,17 +605,33 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                         onClick={() => handleTrackingModeChange(option.mode)}
                         className={`w-full rounded-md border px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
                           isActive
-                            ? 'border-indigo-300 bg-accent dark:border-indigo-700'
+                            ? 'border-indigo-400 bg-indigo-50 shadow-sm dark:border-indigo-600 dark:bg-indigo-950/40'
                             : 'border-transparent hover:bg-accent'
                         } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        <div className="flex items-center text-sm font-medium text-foreground">
+                        <div className="flex items-center justify-between gap-2 text-sm font-medium text-foreground">
+                          <span className="flex items-center">
+                            <span
+                              aria-hidden="true"
+                              className={`mr-2 flex h-4 w-4 items-center justify-center rounded-full border ${
+                                isActive
+                                  ? 'border-indigo-600 bg-indigo-600 text-white dark:border-indigo-400 dark:bg-indigo-400 dark:text-indigo-950'
+                                  : 'border-muted-foreground/50'
+                              }`}
+                            >
+                              {isActive && (
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </span>
+                            {option.label}
+                          </span>
                           {isActive && (
-                            <svg className="h-4 w-4 mr-1 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
+                            <span className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                              Current
+                            </span>
                           )}
-                          {option.label}
                         </div>
                         <div className="mt-0.5 text-xs text-muted-foreground">{option.description}</div>
                       </button>

@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BenefitCardClient from '../BenefitCardClient';
 import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard-client';
 
@@ -13,6 +13,7 @@ jest.mock('@/app/benefits/actions', () => ({
   deleteCustomBenefitAction: jest.fn().mockResolvedValue(undefined),
   addPartialCompletionAction: jest.fn().mockResolvedValue({ success: true, isComplete: false, newUsedAmount: 10 }),
   markFullCompletionAction: jest.fn().mockResolvedValue({ success: true, usedAmount: 10 }),
+  setBenefitTrackingModeAction: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@/lib/partial-completion', () => ({
@@ -121,6 +122,42 @@ describe('BenefitCardClient', () => {
     expect(screen.getByRole('link', { name: /How to use/i })).toHaveAttribute(
       'href',
       '/benefits/how-to-use/brilliant-doordash-amazon-gift-card'
+    );
+  });
+
+  it('shows the current tracking mode in the trigger and marks it selected', () => {
+    const status = createMockStatus({ trackingMode: 'IGNORE' });
+    render(<BenefitCardClient status={status} />);
+
+    const trigger = screen.getByRole('button', { name: /Tracking mode: Ignore this benefit/i });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(trigger);
+
+    const selectedOption = screen.getByRole('button', { name: /Ignore this benefit.*Current/i });
+    expect(selectedOption).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Track every cycle/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('updates the visible mode after a successful tracking choice', async () => {
+    const status = createMockStatus();
+    render(<BenefitCardClient status={status} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Tracking mode: Track every cycle/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Always claim it for me/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Tracking mode: Always claim it for me/i })).toBeInTheDocument();
+    });
+  });
+
+  it('labels the cycle-level unusable action distinctly from Ignore', () => {
+    const status = createMockStatus();
+    render(<BenefitCardClient status={status} />);
+
+    expect(screen.getByRole('button', { name: /Not usable this cycle/i })).toHaveAttribute(
+      'title',
+      expect.stringContaining('ignore this benefit in every cycle')
     );
   });
 });
