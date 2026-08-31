@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useId, useState, useTransition } from 'react';
+import React, { useEffect, useId, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/dateUtils';
 import {
   toggleBenefitStatusAction,
-  markBenefitAsNotUsableAction,
   deleteCustomBenefitAction,
   addPartialCompletionAction,
   markFullCompletionAction,
@@ -34,20 +33,22 @@ const TRACKING_MODE_OPTIONS: ReadonlyArray<{
   {
     mode: 'IGNORE',
     label: 'Ignore this benefit',
-    description: 'Hides it everywhere and drops it from claimed value and ROI.',
+    description: 'Moves it to the Ignored tab and drops it from totals and ROI.',
   },
 ];
 
 interface BenefitCardClientProps {
   status: DisplayBenefitStatus;
   onStatusChange?: (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => void;
-  onNotUsableChange?: (statusId: string, newIsNotUsable: boolean) => void;
   onDelete?: (benefitId: string) => void;
   onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;
+  onTrackingModeChange?: (statusId: string, previousMode: BenefitTrackingMode, mode: BenefitTrackingMode) => void;
   isScheduled?: boolean;
+  /** Render a read-only card from the dashboard's Ignored tab. */
+  isIgnoredView?: boolean;
 }
 
-export default function BenefitCardClient({ status, onStatusChange, onNotUsableChange, onDelete, onPartialCompletionChange, isScheduled = false }: BenefitCardClientProps) {
+export default function BenefitCardClient({ status, onStatusChange, onDelete, onPartialCompletionChange, onTrackingModeChange, isScheduled = false, isIgnoredView = false }: BenefitCardClientProps) {
   const [isPending, startTransition] = useTransition();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPartialModal, setShowPartialModal] = useState(false);
@@ -57,13 +58,23 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
   const [showTrackingMenu, setShowTrackingMenu] = useState(false);
 
   const trackingPanelId = useId();
-  const trackingMode: BenefitTrackingMode = status.trackingMode ?? 'TRACK';
+  const [trackingMode, setTrackingMode] = useState<BenefitTrackingMode>(status.trackingMode ?? 'TRACK');
+  const trackingModeLabel = TRACKING_MODE_OPTIONS.find((option) => option.mode === trackingMode)?.label ?? 'Track every cycle';
+
+  // The tracking action revalidates the server data, but this card can remain
+  // mounted in the dashboard's local mirror. Keep the control responsive until
+  // the parent receives fresh props, while still treating the server action as
+  // the source of truth (only update after it succeeds).
+  useEffect(() => {
+    setTrackingMode(status.trackingMode ?? 'TRACK');
+  }, [status.trackingMode]);
 
   const handleTrackingModeChange = (mode: BenefitTrackingMode) => {
     if (mode === trackingMode) {
       setShowTrackingMenu(false);
       return;
     }
+    const previousMode = trackingMode;
     const formData = new FormData();
     formData.append('benefitStatusId', status.id);
     formData.append('trackingMode', mode);
@@ -72,7 +83,9 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
       try {
         setActionError(null);
         await setBenefitTrackingModeAction(formData);
+        setTrackingMode(mode);
         setShowTrackingMenu(false);
+        onTrackingModeChange?.(status.id, previousMode, mode);
       } catch (error) {
         console.error('Failed to set benefit tracking mode:', error);
         setActionError(error instanceof Error ? error.message : 'Failed to update tracking mode.');
@@ -154,24 +167,6 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
     });
   };
 
-  const handleNotUsableSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const newIsNotUsable = !status.isNotUsable;
-
-    startTransition(async () => {
-      try {
-        setActionError(null);
-        await markBenefitAsNotUsableAction(formData);
-        // Call the callback to update parent state
-        onNotUsableChange?.(status.id, newIsNotUsable);
-      } catch (error) {
-        console.error('Failed to mark benefit as not usable:', error);
-        setActionError(error instanceof Error ? error.message : 'Failed to update benefit status.');
-      }
-    });
-  };
-
   const handleDeleteCustomBenefit = async () => {
     if (!status.isCustomBenefit) return;
 
@@ -191,9 +186,9 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
 
   const isCompleted = status.isCompleted;
   const isCustomBenefit = status.isCustomBenefit;
-  const isNotUsable = status.isNotUsable;
   const hasPartialProgress = usedAmount > 0 && !isCompleted;
-  const statusLabel = isScheduled ? 'Scheduled' : isCompleted ? 'Claimed' : isNotUsable ? 'Not usable' : hasPartialProgress ? 'Partially used' : 'Open';
+  const statusLabel = isIgnoredView ? 'Ignored' : isScheduled ? 'Scheduled' : isCompleted ? 'Claimed' : hasPartialProgress ? 'Partially used' : 'Open';
+
   const card = status.benefit.creditCard;
   const cardIdentityDetails = card
     ? [
@@ -208,12 +203,10 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
         ? 'bg-card border-border'
         : isCompleted
           ? 'bg-card border-emerald-200 dark:border-emerald-900/70'
-          : isNotUsable
-            ? 'bg-muted/45 border-border'
-            : 'bg-card border-border hover:bg-accent/35'
+          : 'bg-card border-border hover:bg-accent/35'
     }`}>
             <div className={`absolute top-0 left-0 w-1 h-full ${
-        isScheduled ? 'bg-muted-foreground' : isCompleted ? 'bg-emerald-500' : isNotUsable ? 'bg-muted-foreground' : 'bg-amber-500'
+        isScheduled ? 'bg-muted-foreground' : isCompleted ? 'bg-emerald-500' : 'bg-amber-500'
       }`} />
 
       <div className="p-4 sm:p-5">
@@ -224,9 +217,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 ? 'bg-muted'
                 : isCompleted
                   ? 'bg-emerald-50 dark:bg-emerald-950/30'
-                  : isNotUsable
-                    ? 'bg-muted'
-                    : 'bg-muted'
+                  : 'bg-muted'
             }`}>
               {isScheduled ? (
                 <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,10 +226,6 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               ) : isCompleted ? (
                 <svg className="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : isNotUsable ? (
-                <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
                 </svg>
               ) : (
                 <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,11 +240,9 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                     ? 'bg-muted text-muted-foreground ring-1 ring-border'
                     : isCompleted
                       ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-800'
-                      : isNotUsable
-                        ? 'bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600'
-                        : hasPartialProgress
-                          ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-800'
-                          : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:ring-amber-900/60'
+                      : hasPartialProgress
+                        ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-800'
+                        : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:ring-amber-900/60'
                 }`}>
                   {statusLabel}
                 </span>
@@ -278,11 +263,9 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                   <p className={`text-lg sm:text-xl font-semibold tabular-nums ${
                     isCompleted
                       ? 'text-emerald-600 dark:text-emerald-400'
-                      : isNotUsable
-                        ? 'text-muted-foreground'
-                        : hasPartialProgress
-                          ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-muted-foreground'
+                      : hasPartialProgress
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-muted-foreground'
                   }`}>
                     {hasPartialProgress ? (
                       <span>
@@ -396,7 +379,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
           <div className="sm:pl-11">
             <div className="flex flex-col sm:flex-row gap-2">
               {/* Completion buttons - hide for scheduled benefits */}
-              {!isScheduled && !isNotUsable && (
+              {!isIgnoredView && !isScheduled && trackingMode !== 'AUTO_CLAIM' && (
                 <>
                   {isCompleted ? (
                     // For completed benefits, show "Mark Pending" to undo
@@ -472,51 +455,6 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 </>
               )}
 
-              {/* Not Usable button - only show for upcoming benefits, not scheduled */}
-              {!isCompleted && !isScheduled && (
-                <form onSubmit={handleNotUsableSubmit}>
-                  <input type="hidden" name="benefitStatusId" value={status.id} />
-                  <input type="hidden" name="isNotUsable" value={status.isNotUsable.toString()} />
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className={`w-full sm:w-auto relative px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                      isNotUsable
-                        ? 'border border-border bg-card text-foreground hover:bg-accent focus:ring-ring'
-                        : 'border border-border bg-card text-foreground hover:bg-accent focus:ring-ring'
-                    } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {isPending ? (
-                      <div className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Updating...
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center">
-                        {isNotUsable ? (
-                          <>
-                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Mark Usable
-                          </>
-                        ) : (
-                          <>
-                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
-                            Not Usable
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </button>
-                </form>
-              )}
-
               {/* Cycle-independent tracking choice for benefits the user does
                   not want to confirm again every cycle. Available on scheduled
                   cards too: the preference stores immediately and status rows
@@ -527,23 +465,21 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                 onClick={() => setShowTrackingMenu((open) => !open)}
                 aria-expanded={showTrackingMenu}
                 aria-controls={trackingPanelId}
+                aria-label={`Tracking mode: ${trackingModeLabel}. ${showTrackingMenu ? 'Close' : 'Choose'} tracking mode`}
                 className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium border transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
                   showTrackingMenu || trackingMode !== 'TRACK'
-                    ? 'border-indigo-300 bg-accent text-foreground dark:border-indigo-700'
+                    ? 'border-indigo-400 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-100'
                     : 'border-border bg-card text-foreground hover:bg-accent'
                 } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <div className="flex items-center justify-center">
-                  <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg aria-hidden="true" className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  {trackingMode === 'AUTO_CLAIM'
-                    ? 'Auto-claimed'
-                    : trackingMode === 'IGNORE'
-                      ? 'Ignored'
-                      : 'Tracking'}
+                  <span>Tracking: {trackingModeLabel}</span>
                   <svg
+                    aria-hidden="true"
                     className={`h-3 w-3 ml-1 transition-transform ${showTrackingMenu ? 'rotate-180' : ''}`}
                     fill="none"
                     stroke="currentColor"
@@ -555,7 +491,7 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
               </button>
 
               {/* Delete button - only show for custom benefits */}
-              {isCustomBenefit && (
+              {isCustomBenefit && !isIgnoredView && (
                 <button
                   type="button"
                   onClick={() => setShowDeleteConfirm(true)}
@@ -595,17 +531,33 @@ export default function BenefitCardClient({ status, onStatusChange, onNotUsableC
                         onClick={() => handleTrackingModeChange(option.mode)}
                         className={`w-full rounded-md border px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
                           isActive
-                            ? 'border-indigo-300 bg-accent dark:border-indigo-700'
+                            ? 'border-indigo-400 bg-indigo-50 shadow-sm dark:border-indigo-600 dark:bg-indigo-950/40'
                             : 'border-transparent hover:bg-accent'
                         } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        <div className="flex items-center text-sm font-medium text-foreground">
+                        <div className="flex items-center justify-between gap-2 text-sm font-medium text-foreground">
+                          <span className="flex items-center">
+                            <span
+                              aria-hidden="true"
+                              className={`mr-2 flex h-4 w-4 items-center justify-center rounded-full border ${
+                                isActive
+                                  ? 'border-indigo-600 bg-indigo-600 text-white dark:border-indigo-400 dark:bg-indigo-400 dark:text-indigo-950'
+                                  : 'border-muted-foreground/50'
+                              }`}
+                            >
+                              {isActive && (
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </span>
+                            {option.label}
+                          </span>
                           {isActive && (
-                            <svg className="h-4 w-4 mr-1 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
+                            <span className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                              Current
+                            </span>
                           )}
-                          {option.label}
                         </div>
                         <div className="mt-0.5 text-xs text-muted-foreground">{option.description}</div>
                       </button>

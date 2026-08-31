@@ -4,6 +4,7 @@ import React, { useState, useTransition } from 'react';
 import BenefitCardClient from '@/components/BenefitCardClient';
 import { batchCompleteBenefitsByCategoryAction } from '@/app/benefits/actions';
 import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard-client';
+import type { BenefitTrackingMode } from '@/lib/benefit-tracking-modes';
 import { formatDate } from '@/lib/dateUtils';
 import { calculateBenefitGroupSummary } from '@/lib/benefit-dashboard-client';
 
@@ -11,9 +12,10 @@ interface CategoryBenefitsGroupProps {
   category: string;
   benefits: DisplayBenefitStatus[];
   onStatusChange?: (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => void;
-  onNotUsableChange?: (statusId: string, newIsNotUsable: boolean) => void;
   onDelete?: (benefitId: string) => void;
   onPartialCompletionChange?: (statusId: string, newUsedAmount: number, isNowComplete: boolean) => void;
+  onTrackingModeChange?: (statusId: string, previousMode: BenefitTrackingMode, mode: BenefitTrackingMode) => void;
+  isIgnoredView?: boolean;
 }
 
 // Category icons mapping
@@ -153,15 +155,18 @@ export default function CategoryBenefitsGroup({
   category, 
   benefits, 
   onStatusChange, 
-  onNotUsableChange,
   onDelete,
-  onPartialCompletionChange
+  onPartialCompletionChange,
+  onTrackingModeChange,
+  isIgnoredView = false,
 }: CategoryBenefitsGroupProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  // Filter benefits that can be batch completed (not completed and not marked as not usable)
-  const completableBenefits = benefits.filter(benefit => !benefit.isCompleted && !benefit.isNotUsable);
+  // Filter benefits that can be batch completed (all open benefits)
+  const completableBenefits = isIgnoredView ? [] : benefits.filter(
+    (benefit) => !benefit.isCompleted && benefit.trackingMode !== 'AUTO_CLAIM'
+  );
   const categoryTotal = benefits.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
   const completedTotal = benefits
     .filter(benefit => benefit.isCompleted)
@@ -256,9 +261,10 @@ export default function CategoryBenefitsGroup({
                 key={benefit.id} 
                 status={benefit} 
                 onStatusChange={onStatusChange}
-                onNotUsableChange={onNotUsableChange}
                 onDelete={onDelete}
                 onPartialCompletionChange={onPartialCompletionChange}
+                onTrackingModeChange={onTrackingModeChange}
+                isIgnoredView={isIgnoredView}
               />
             ))}
           </div>

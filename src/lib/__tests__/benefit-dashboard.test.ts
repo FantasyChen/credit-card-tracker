@@ -226,6 +226,7 @@ describe('buildBenefitDashboardProjection', () => {
 
     expect(tracked.completedBenefits.map((item) => item.id)).toEqual(['ignored']);
     expect(withIgnored.completedBenefits).toEqual([]);
+    expect(withIgnored.ignoredBenefits.map((item) => item.id)).toEqual(['ignored']);
     expect(withIgnored.upcomingBenefits.map((item) => item.id)).toEqual(['kept']);
     // The ignored benefit stops contributing its claimed value to ROI.
     expect(withIgnored.totalUsedValue).toBe(tracked.totalUsedValue - 50);

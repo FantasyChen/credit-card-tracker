@@ -380,6 +380,11 @@ export async function updateUsedAmountAction(formData: FormData) {
   }
 }
 
+/**
+ * @deprecated The dashboard no longer exposes this cycle-level mutation. Keep
+ * the server action for compatibility with legacy callers and persisted rows;
+ * existing not-usable statuses remain readable in the dashboard.
+ */
 export async function markBenefitAsNotUsableAction(formData: FormData) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -886,6 +891,15 @@ export async function setBenefitTrackingModeAction(formData: FormData) {
             isNotUsable: false,
           },
         });
+      } else if (status.isNotUsable) {
+        // Legacy rows may still carry the deprecated cycle-level flag until the
+        // data migration runs. Any explicit tracking choice adopts the new
+        // model for the open cycle and clears that flag so restoring TRACK does
+        // not make the row disappear from the dashboard on revalidation.
+        await transaction.benefitStatus.updateMany({
+          where: { ...openCycleWhere, isNotUsable: true },
+          data: { isNotUsable: false },
+        });
       }
 
       // Leaving AUTO_CLAIM reopens only claims this feature made. Rows the user
@@ -913,9 +927,10 @@ export async function setBenefitTrackingModeAction(formData: FormData) {
  * Clears one tracking preference from the settings screen, returning the
  * benefit to the normal per-cycle workflow.
  *
- * This is the only way back for an IGNORE'd benefit, which by definition no
- * longer appears on the dashboard. A cycle that was auto-claimed on the user's
- * behalf is reopened so the benefit does not sit there falsely marked claimed.
+ * The settings screen is one restoration path for an IGNORE'd benefit; the
+ * dashboard's Ignored tab offers the same tracking-mode choice inline. A cycle
+ * that was auto-claimed on the user's behalf is reopened so the benefit does
+ * not sit there falsely marked claimed.
  */
 export async function resetBenefitTrackingPreferenceAction(formData: FormData) {
   const session = await getServerSession(authOptions);

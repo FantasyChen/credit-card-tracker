@@ -3,16 +3,16 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BenefitCardClient from '../BenefitCardClient';
 import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard-client';
 
 jest.mock('@/app/benefits/actions', () => ({
   toggleBenefitStatusAction: jest.fn().mockResolvedValue(undefined),
-  markBenefitAsNotUsableAction: jest.fn().mockResolvedValue(undefined),
   deleteCustomBenefitAction: jest.fn().mockResolvedValue(undefined),
   addPartialCompletionAction: jest.fn().mockResolvedValue({ success: true, isComplete: false, newUsedAmount: 10 }),
   markFullCompletionAction: jest.fn().mockResolvedValue({ success: true, usedAmount: 10 }),
+  setBenefitTrackingModeAction: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@/lib/partial-completion', () => ({
@@ -122,5 +122,57 @@ describe('BenefitCardClient', () => {
       'href',
       '/benefits/how-to-use/brilliant-doordash-amazon-gift-card'
     );
+  });
+
+  it('shows the current tracking mode in the trigger and marks it selected', () => {
+    const status = createMockStatus({ trackingMode: 'IGNORE' });
+    render(<BenefitCardClient status={status} />);
+
+    const trigger = screen.getByRole('button', { name: /Tracking mode: Ignore this benefit/i });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(trigger);
+
+    const selectedOption = screen.getByRole('button', { name: /Ignore this benefit.*Current/i });
+    expect(selectedOption).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Track every cycle/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('keeps ignored cards read-only while allowing tracking restoration', () => {
+    const status = createMockStatus({ trackingMode: 'IGNORE', isCustomBenefit: true });
+    render(<BenefitCardClient status={status} isIgnoredView />);
+
+    expect(screen.getByText('Ignored')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Mark Complete/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add Amount/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Delete/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Tracking mode: Ignore this benefit/i })).toBeInTheDocument();
+  });
+
+  it('updates the visible mode after a successful tracking choice', async () => {
+    const status = createMockStatus();
+    render(<BenefitCardClient status={status} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Tracking mode: Track every cycle/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Always claim it for me/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Tracking mode: Always claim it for me/i })).toBeInTheDocument();
+    });
+  });
+
+  it('does not expose the deprecated cycle-level not-usable action', () => {
+    const status = createMockStatus();
+    render(<BenefitCardClient status={status} />);
+
+    expect(screen.queryByRole('button', { name: /Not usable this cycle|Mark usable this cycle/i })).not.toBeInTheDocument();
+  });
+
+  it('does not present a legacy not-usable status differently', () => {
+    const status = createMockStatus({ isNotUsable: true });
+    render(<BenefitCardClient status={status} />);
+
+    expect(screen.getByText('Open')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mark Complete/i })).toBeInTheDocument();
   });
 });

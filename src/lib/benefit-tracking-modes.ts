@@ -9,8 +9,8 @@
  *   no preference row exists.
  * - `AUTO_CLAIM` materializes each new cycle already claimed, so the benefit
  *   leaves the to-do list but still counts toward claimed value and ROI.
- * - `IGNORE` removes the benefit from the dashboard entirely and excludes it
- *   from claimed value and ROI.
+ * - `IGNORE` moves the benefit to the dashboard's Ignored tab and excludes it
+ *   from tracked tabs, claimed value, and ROI.
  *
  * Every function here is pure so the behaviour can be tested without a
  * database.
@@ -92,8 +92,8 @@ export function resolveBenefitTrackingMode(
 }
 
 /**
- * Drops the benefits the user chose to ignore. Applied before any dashboard
- * partitioning so totals and ROI exclude them too.
+ * Drops the benefits the user chose to ignore from tracked projections. The
+ * dashboard keeps a separate Ignored tab for review and restoration.
  */
 export function excludeIgnoredBenefits<T extends BenefitTrackingTarget>(
   rows: readonly T[],

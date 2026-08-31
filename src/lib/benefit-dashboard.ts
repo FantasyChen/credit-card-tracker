@@ -61,6 +61,8 @@ export interface PredefinedCardFee {
 export interface BenefitDashboardProjection {
   upcomingBenefits: DisplayBenefitStatus[];
   completedBenefits: DisplayBenefitStatus[];
+  /** Benefits explicitly excluded from tracking, kept visible for review/restoration. */
+  ignoredBenefits: DisplayBenefitStatus[];
   notUsableBenefits: DisplayBenefitStatus[];
   scheduledBenefits: DisplayBenefitStatus[];
   totalUnusedValue: number;
@@ -292,12 +294,14 @@ export function buildBenefitDashboardProjection({
   now: Date;
   trackingModes?: BenefitTrackingModeMap;
 }): BenefitDashboardProjection {
-  // Ignored benefits are dropped before partitioning so they stay out of the
-  // dashboard, claimed-value totals, and card-level ROI alike.
-  const trackedStatuses = excludeIgnoredBenefits(statuses, trackingModes);
-  const augmentedStatuses = augmentBenefitStatusesForDashboard(trackedStatuses, userCards, usageWays, trackingModes);
+  // Keep ignored benefits in a dedicated read-only partition. They remain out
+  // of tracked tabs, totals, and card-level ROI, while still being available
+  // for users to review and restore.
+  const augmentedStatuses = augmentBenefitStatusesForDashboard(statuses, userCards, usageWays, trackingModes);
   const deduplicatedStatuses = deduplicateBenefitStatusesForDashboard(augmentedStatuses);
-  const partitions = partitionBenefitStatusesForDashboard(deduplicatedStatuses, now);
+  const ignoredBenefits = deduplicatedStatuses.filter((status) => status.trackingMode === 'IGNORE');
+  const trackedStatuses = excludeIgnoredBenefits(deduplicatedStatuses, trackingModes);
+  const partitions = partitionBenefitStatusesForDashboard(trackedStatuses, now);
   const totals = calculateBenefitDashboardTotals(partitions);
   const roi = calculateCardLevelRoi(
     [...partitions.upcomingBenefits, ...partitions.completedBenefits],
@@ -307,6 +311,7 @@ export function buildBenefitDashboardProjection({
 
   return {
     ...partitions,
+    ignoredBenefits,
     ...totals,
     ...roi,
   };
