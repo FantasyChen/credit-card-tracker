@@ -184,9 +184,8 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
 
   const isCompleted = status.isCompleted;
   const isCustomBenefit = status.isCustomBenefit;
-  const isNotUsable = status.isNotUsable;
   const hasPartialProgress = usedAmount > 0 && !isCompleted;
-  const statusLabel = isScheduled ? 'Scheduled' : isCompleted ? 'Claimed' : isNotUsable ? 'Not usable' : hasPartialProgress ? 'Partially used' : 'Open';
+  const statusLabel = isScheduled ? 'Scheduled' : isCompleted ? 'Claimed' : hasPartialProgress ? 'Partially used' : 'Open';
 
   const card = status.benefit.creditCard;
   const cardIdentityDetails = card
@@ -202,12 +201,10 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
         ? 'bg-card border-border'
         : isCompleted
           ? 'bg-card border-emerald-200 dark:border-emerald-900/70'
-          : isNotUsable
-            ? 'bg-muted/45 border-border'
-            : 'bg-card border-border hover:bg-accent/35'
+          : 'bg-card border-border hover:bg-accent/35'
     }`}>
             <div className={`absolute top-0 left-0 w-1 h-full ${
-        isScheduled ? 'bg-muted-foreground' : isCompleted ? 'bg-emerald-500' : isNotUsable ? 'bg-muted-foreground' : 'bg-amber-500'
+        isScheduled ? 'bg-muted-foreground' : isCompleted ? 'bg-emerald-500' : 'bg-amber-500'
       }`} />
 
       <div className="p-4 sm:p-5">
@@ -218,9 +215,7 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
                 ? 'bg-muted'
                 : isCompleted
                   ? 'bg-emerald-50 dark:bg-emerald-950/30'
-                  : isNotUsable
-                    ? 'bg-muted'
-                    : 'bg-muted'
+                  : 'bg-muted'
             }`}>
               {isScheduled ? (
                 <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -229,10 +224,6 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
               ) : isCompleted ? (
                 <svg className="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : isNotUsable ? (
-                <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
                 </svg>
               ) : (
                 <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -247,11 +238,9 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
                     ? 'bg-muted text-muted-foreground ring-1 ring-border'
                     : isCompleted
                       ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-800'
-                      : isNotUsable
-                        ? 'bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600'
-                        : hasPartialProgress
-                          ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-800'
-                          : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:ring-amber-900/60'
+                      : hasPartialProgress
+                        ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-800'
+                        : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:ring-amber-900/60'
                 }`}>
                   {statusLabel}
                 </span>
@@ -272,11 +261,9 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
                   <p className={`text-lg sm:text-xl font-semibold tabular-nums ${
                     isCompleted
                       ? 'text-emerald-600 dark:text-emerald-400'
-                      : isNotUsable
-                        ? 'text-muted-foreground'
-                        : hasPartialProgress
-                          ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-muted-foreground'
+                      : hasPartialProgress
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-muted-foreground'
                   }`}>
                     {hasPartialProgress ? (
                       <span>
@@ -390,7 +377,7 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
           <div className="sm:pl-11">
             <div className="flex flex-col sm:flex-row gap-2">
               {/* Completion buttons - hide for scheduled benefits */}
-              {!isScheduled && !isNotUsable && trackingMode !== 'AUTO_CLAIM' && (
+              {!isScheduled && trackingMode !== 'AUTO_CLAIM' && (
                 <>
                   {isCompleted ? (
                     // For completed benefits, show "Mark Pending" to undo
@@ -465,9 +452,6 @@ export default function BenefitCardClient({ status, onStatusChange, onDelete, on
                   )}
                 </>
               )}
-
-              {/* Legacy cycle-level not-usable statuses remain visible for
-                  history, but this deprecated mutation is no longer exposed. */}
 
               {/* Cycle-independent tracking choice for benefits the user does
                   not want to confirm again every cycle. Available on scheduled

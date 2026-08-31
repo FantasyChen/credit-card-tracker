@@ -42,11 +42,9 @@ jest.mock('../CategoryBenefitsGroup', () => ({
 const defaultProps = {
   upcomingBenefits: [] as DisplayBenefitStatus[],
   completedBenefits: [] as DisplayBenefitStatus[],
-  notUsableBenefits: [] as DisplayBenefitStatus[],
   scheduledBenefits: [] as DisplayBenefitStatus[],
   totalUnusedValue: 0,
   totalUsedValue: 0,
-  totalNotUsableValue: 0,
   totalAnnualFees: 0,
 };
 
@@ -122,12 +120,12 @@ function benefitStatus(
 }
 
 describe('BenefitsDisplayClient', () => {
-  it('renders tabs for Upcoming, Claimed, and Not usable', () => {
+  it('renders tabs for Upcoming and Claimed without the deprecated Not Usable tab', () => {
     render(<BenefitsDisplayClient {...defaultProps} />);
 
     expect(screen.getByRole('button', { name: /Upcoming/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Claimed/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Not Usable/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Not Usable/i })).not.toBeInTheDocument();
   });
 
   it('renders summary widgets with value totals', () => {
@@ -142,6 +140,7 @@ describe('BenefitsDisplayClient', () => {
 
     expect(screen.getByText('Claimed Benefits')).toBeInTheDocument();
     expect(screen.getByText('Annual Fee ROI')).toBeInTheDocument();
+    expect(screen.queryByText('Not Usable')).not.toBeInTheDocument();
     expect(screen.getByText(/\$50\.00 claimed vs \$95\.00 fees/)).toBeInTheDocument();
   });
 

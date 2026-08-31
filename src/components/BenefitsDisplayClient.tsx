@@ -20,11 +20,9 @@ import type { BenefitTrackingMode } from '@/lib/benefit-tracking-modes';
 interface BenefitsDisplayProps {
   upcomingBenefits: DisplayBenefitStatus[];
   completedBenefits: DisplayBenefitStatus[];
-  notUsableBenefits: DisplayBenefitStatus[];
   scheduledBenefits: DisplayBenefitStatus[];
   totalUnusedValue: number;
   totalUsedValue: number;
-  totalNotUsableValue: number;
   totalAnnualFees: number;
   cardLevelRoi?: CardLevelRoi[];
   cardCount?: number;
@@ -35,11 +33,9 @@ interface BenefitsDisplayProps {
 export default function BenefitsDisplayClient({
   upcomingBenefits,
   completedBenefits,
-  notUsableBenefits,
   scheduledBenefits,
   totalUnusedValue,
   totalUsedValue,
-  totalNotUsableValue,
   totalAnnualFees,
   cardLevelRoi = [],
   cardCount = 0,
@@ -60,11 +56,9 @@ export default function BenefitsDisplayClient({
   const [sortMode, setSortMode] = useState<'expires' | 'value' | 'card'>('expires');
   const [localUpcomingBenefits, setLocalUpcomingBenefits] = useState(upcomingBenefits);
   const [localCompletedBenefits, setLocalCompletedBenefits] = useState(completedBenefits);
-  const [localNotUsableBenefits, setLocalNotUsableBenefits] = useState(notUsableBenefits);
   const [localScheduledBenefits, setLocalScheduledBenefits] = useState(scheduledBenefits);
   const [localTotalUnusedValue, setLocalTotalUnusedValue] = useState(totalUnusedValue);
   const [localTotalUsedValue, setLocalTotalUsedValue] = useState(totalUsedValue);
-  const [localTotalNotUsableValue, setLocalTotalNotUsableValue] = useState(totalNotUsableValue);
 
   // Recompute per-card claimed value from local benefits so ROI breakdown updates when user marks complete
   const cardLevelRoiLive = useMemo(() => {
@@ -173,7 +167,7 @@ export default function BenefitsDisplayClient({
       list.filter(b => b.benefit.id !== benefitId);
     
     // Find the benefit to get its value for updating totals
-    const allBenefits = [...localUpcomingBenefits, ...localCompletedBenefits, ...localNotUsableBenefits];
+    const allBenefits = [...localUpcomingBenefits, ...localCompletedBenefits];
     const deletedBenefit = allBenefits.find(b => b.benefit.id === benefitId);
     
     if (deletedBenefit) {
@@ -189,9 +183,6 @@ export default function BenefitsDisplayClient({
         setLocalCompletedBenefits(findAndRemove);
         // For completed: remove the used amount
         setLocalTotalUsedValue(prev => prev - usedAmount);
-      } else if (localNotUsableBenefits.some(b => b.benefit.id === benefitId)) {
-        setLocalNotUsableBenefits(findAndRemove);
-        setLocalTotalNotUsableValue(prev => prev - maxAmount);
       }
     }
   };
@@ -208,9 +199,8 @@ export default function BenefitsDisplayClient({
   ) => {
     const upcoming = localUpcomingBenefits.find((benefit) => benefit.id === statusId);
     const completed = localCompletedBenefits.find((benefit) => benefit.id === statusId);
-    const notUsable = localNotUsableBenefits.find((benefit) => benefit.id === statusId);
     const scheduled = localScheduledBenefits.find((benefit) => benefit.id === statusId);
-    const status = upcoming ?? completed ?? notUsable ?? scheduled;
+    const status = upcoming ?? completed ?? scheduled;
     if (!status) return;
 
     const maxAmount = Math.max(0, status.benefit.maxAmount ?? 0);
@@ -220,7 +210,6 @@ export default function BenefitsDisplayClient({
     if (mode === 'IGNORE') {
       setLocalUpcomingBenefits((items) => items.filter((item) => item.id !== statusId));
       setLocalCompletedBenefits((items) => items.filter((item) => item.id !== statusId));
-      setLocalNotUsableBenefits((items) => items.filter((item) => item.id !== statusId));
       setLocalScheduledBenefits((items) => items.filter((item) => item.id !== statusId));
 
       if (upcoming) {
@@ -228,19 +217,16 @@ export default function BenefitsDisplayClient({
         setLocalTotalUsedValue((value) => value - usedAmount);
       } else if (completed) {
         setLocalTotalUsedValue((value) => value - claimedAmount);
-      } else if (notUsable) {
-        setLocalTotalNotUsableValue((value) => value - maxAmount);
       }
       return;
     }
 
     // AUTO_CLAIM only changes the currently open cycle. Scheduled rows remain
     // scheduled until their cycle opens and the server materializes the claim.
-    if (mode === 'AUTO_CLAIM' && upcoming && !status.isCompleted && !status.isNotUsable) {
+    if (mode === 'AUTO_CLAIM' && upcoming && !status.isCompleted) {
       const claimedStatus: DisplayBenefitStatus = {
         ...status,
         isCompleted: true,
-        isNotUsable: false,
         completedAt: new Date(),
         usedAmount: maxAmount,
         trackingMode: mode,
@@ -252,30 +238,11 @@ export default function BenefitsDisplayClient({
       return;
     }
 
-    // An ignored/not-usable open row can also be auto-claimed; account for
-    // that transition when the server clears isNotUsable.
-    if (mode === 'AUTO_CLAIM' && notUsable && !status.isCompleted) {
-      const claimedStatus: DisplayBenefitStatus = {
-        ...status,
-        isCompleted: true,
-        isNotUsable: false,
-        completedAt: new Date(),
-        usedAmount: maxAmount,
-        trackingMode: mode,
-      };
-      setLocalNotUsableBenefits((items) => items.filter((item) => item.id !== statusId));
-      setLocalCompletedBenefits((items) => [...items, claimedStatus]);
-      setLocalTotalNotUsableValue((value) => value - maxAmount);
-      setLocalTotalUsedValue((value) => value + maxAmount);
-      return;
-    }
-
     // Keep the mode in the local row when no list transition is needed.
     const updateMode = (items: DisplayBenefitStatus[]) =>
       items.map((item) => item.id === statusId ? { ...item, trackingMode: mode } : item);
     setLocalUpcomingBenefits(updateMode);
     setLocalCompletedBenefits(updateMode);
-    setLocalNotUsableBenefits(updateMode);
     setLocalScheduledBenefits(updateMode);
   };
 
@@ -327,14 +294,12 @@ export default function BenefitsDisplayClient({
         return localUpcomingBenefits;
       case 'completed':
         return localCompletedBenefits;
-      case 'not-usable':
-        return localNotUsableBenefits;
       case 'scheduled':
         return localScheduledBenefits;
       default:
         return [];
     }
-  }, [activeTab, localUpcomingBenefits, localCompletedBenefits, localNotUsableBenefits, localScheduledBenefits]);
+  }, [activeTab, localUpcomingBenefits, localCompletedBenefits, localScheduledBenefits]);
 
   const uniqueCategories = useMemo(
     () => Array.from(new Set(allBenefitsForTab.map((b) => b.benefit.category))).sort(),
@@ -476,11 +441,6 @@ export default function BenefitsDisplayClient({
           title: 'No completed benefits yet',
           description: 'Mark benefits as complete when you use them to track your ROI.',
         },
-        'not-usable': {
-          icon: 'x-circle' as const,
-          title: 'No not usable benefits',
-          description: 'Benefits marked as not usable will appear here.',
-        },
       };
       const props = emptyStateProps[activeTab as keyof typeof emptyStateProps] || emptyStateProps.upcoming;
       return <EmptyState {...props} />;
@@ -527,11 +487,6 @@ export default function BenefitsDisplayClient({
           icon: 'check' as const,
           title: 'No Benefits Available',
           description: 'No completed benefits yet. Start using your credit card benefits!',
-        },
-        'not-usable': {
-          icon: 'x-circle' as const,
-          title: 'No Benefits Available',
-          description: 'No unusable benefits found.',
         },
       };
       const props = emptyStateProps[activeTab as keyof typeof emptyStateProps] || emptyStateProps.upcoming;
@@ -644,7 +599,6 @@ export default function BenefitsDisplayClient({
         {[
           ['Upcoming Benefits', `$${localTotalUnusedValue.toFixed(2)}`, 'Still available this cycle'],
           ['Claimed Benefits', `$${localTotalUsedValue.toFixed(2)}`, 'Recorded as used'],
-          ['Not Usable', `$${localTotalNotUsableValue.toFixed(2)}`, 'Excluded from ROI'],
           ['Annual Fee ROI', `$${(localTotalUsedValue - totalAnnualFees).toFixed(2)}`, `$${localTotalUsedValue.toFixed(2)} claimed vs $${totalAnnualFees.toFixed(2)} fees`],
         ].map(([label, value, detail]) => (
           <div key={label} className="rounded-xl border border-border bg-card p-4 shadow-sm shadow-black/[0.03]">
@@ -726,17 +680,6 @@ export default function BenefitsDisplayClient({
           >
             <span className="hidden sm:inline">Claimed ({localCompletedBenefits.length})</span>
             <span className="sm:hidden">Claimed ({localCompletedBenefits.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('not-usable')}
-            className={`flex-shrink-0 py-4 px-1 border-b-2 font-medium text-sm
-              ${activeTab === 'not-usable'
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}
-            `}
-          >
-            <span className="hidden sm:inline">Not Usable ({localNotUsableBenefits.length})</span>
-            <span className="sm:hidden">Not Usable ({localNotUsableBenefits.length})</span>
           </button>
           {localScheduledBenefits.length > 0 && (
             <button
@@ -888,11 +831,6 @@ export default function BenefitsDisplayClient({
         {activeTab === 'completed' && (
           <section>
             {viewMode === 'category' ? renderCategoryView(sortBenefits(applyPowerUserFilters(filterBenefits(localCompletedBenefits)))) : renderCardView(sortBenefits(applyPowerUserFilters(filterBenefits(localCompletedBenefits))))}
-          </section>
-        )}
-        {activeTab === 'not-usable' && (
-          <section>
-            {viewMode === 'category' ? renderCategoryView(sortBenefits(applyPowerUserFilters(filterBenefits(localNotUsableBenefits)))) : renderCardView(sortBenefits(applyPowerUserFilters(filterBenefits(localNotUsableBenefits))))}
           </section>
         )}
         {activeTab === 'scheduled' && (

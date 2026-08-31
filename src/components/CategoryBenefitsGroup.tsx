@@ -161,9 +161,9 @@ export default function CategoryBenefitsGroup({
   const [isExpanded, setIsExpanded] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  // Filter benefits that can be batch completed (not completed and not marked as not usable)
+  // Filter benefits that can be batch completed (all open benefits)
   const completableBenefits = benefits.filter(
-    (benefit) => !benefit.isCompleted && !benefit.isNotUsable && benefit.trackingMode !== 'AUTO_CLAIM'
+    (benefit) => !benefit.isCompleted && benefit.trackingMode !== 'AUTO_CLAIM'
   );
   const categoryTotal = benefits.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
   const completedTotal = benefits

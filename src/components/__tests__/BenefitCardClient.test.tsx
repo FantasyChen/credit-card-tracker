@@ -157,11 +157,11 @@ describe('BenefitCardClient', () => {
     expect(screen.queryByRole('button', { name: /Not usable this cycle|Mark usable this cycle/i })).not.toBeInTheDocument();
   });
 
-  it('keeps legacy not-usable statuses visible without mutation controls', () => {
+  it('does not present a legacy not-usable status differently', () => {
     const status = createMockStatus({ isNotUsable: true });
     render(<BenefitCardClient status={status} />);
 
-    expect(screen.getByText('Not usable')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Not usable this cycle|Mark usable this cycle/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Open')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mark Complete/i })).toBeInTheDocument();
   });
 });
