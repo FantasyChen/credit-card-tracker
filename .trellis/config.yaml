@@ -30,7 +30,7 @@ max_journal_lines: 2000
 #
 # Accepts: true / false / yes / no / 1 / 0 / on / off (case-insensitive).
 #
-session_auto_commit: false
+# session_auto_commit: true
 
 #-------------------------------------------------------------------------------
 # Task Lifecycle Hooks
@@ -156,3 +156,7 @@ channel:
 #
 # prompt_injection:
 #   skip_keyword: "no-trellis"   # "" disables the escape hatch entirely
+session_auto_commit: false
+
+codex:
+  hook_mode: plugin
