@@ -419,15 +419,11 @@ export default function BenefitsDisplayClient({
       return acc;
     }, {} as Record<string, { label: string; benefits: DisplayBenefitStatus[] }>);
 
-    // Sort cards by total value (descending), but always put "Custom Benefits" first
+    // Keep card groups stable as benefits move between dashboard tabs.
     return Object.entries(grouped).sort(([keyA, a], [keyB, b]) => {
-      // Put custom benefits first
       if (keyA === CUSTOM_BENEFITS_CARD_NAME) return -1;
       if (keyB === CUSTOM_BENEFITS_CARD_NAME) return 1;
-
-      const aTotal = a.benefits.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
-      const bTotal = b.benefits.reduce((sum, benefit) => sum + (benefit.benefit.maxAmount || 0), 0);
-      return bTotal - aTotal || a.label.localeCompare(b.label) || keyA.localeCompare(keyB);
+      return a.label.localeCompare(b.label) || keyA.localeCompare(keyB);
     });
   };
 

@@ -3,9 +3,12 @@
  */
 
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import BenefitsDisplayClient from '../BenefitsDisplayClient';
-import type { DisplayBenefitStatus } from '@/lib/benefit-dashboard-client';
+import {
+  CUSTOM_BENEFITS_CARD_NAME,
+  type DisplayBenefitStatus,
+} from '@/lib/benefit-dashboard-client';
 
 jest.mock('../BenefitCardClient', () => {
   return function MockBenefitCardClient({ status }: { status: DisplayBenefitStatus }) {
@@ -17,10 +20,12 @@ jest.mock('../CategoryBenefitsGroup', () => ({
   default: function MockCategoryBenefitsGroup({
     category,
     benefits,
+    onStatusChange,
     onTrackingModeChange,
   }: {
     category: string;
     benefits: DisplayBenefitStatus[];
+    onStatusChange?: (statusId: string, newIsCompleted: boolean, newUsedAmount?: number) => void;
     onTrackingModeChange?: (statusId: string, previousMode: 'TRACK' | 'AUTO_CLAIM' | 'IGNORE', mode: 'TRACK' | 'AUTO_CLAIM' | 'IGNORE') => void;
   }) {
     return (
@@ -30,6 +35,12 @@ jest.mock('../CategoryBenefitsGroup', () => ({
         {benefits.map((b) => (
           <div key={b.id}>
             {b.benefit.description}
+            <button
+              type="button"
+              onClick={() => onStatusChange?.(b.id, !b.isCompleted)}
+            >
+              {b.isCompleted ? `Restore ${b.benefit.description}` : `Complete ${b.benefit.description}`}
+            </button>
             <button type="button" onClick={() => onTrackingModeChange?.(b.id, 'TRACK', 'AUTO_CLAIM')}>Auto claim</button>
             <button type="button" onClick={() => onTrackingModeChange?.(b.id, 'TRACK', 'IGNORE')}>Ignore</button>
           </div>
@@ -254,13 +265,13 @@ describe('BenefitsDisplayClient', () => {
       <BenefitsDisplayClient
         {...defaultProps}
         upcomingBenefits={[
-          benefitStatus('duplicate-1', 'Dining credit - first physical card', 'MONTHLY', {
-            id: 'card-duplicate-1',
+          benefitStatus('duplicate-2', 'Dining credit - second physical card', 'MONTHLY', {
+            id: 'card-duplicate-2',
             name: 'American Express Gold Card',
             displayName: 'American Express Gold Card',
           }),
-          benefitStatus('duplicate-2', 'Dining credit - second physical card', 'MONTHLY', {
-            id: 'card-duplicate-2',
+          benefitStatus('duplicate-1', 'Dining credit - first physical card', 'MONTHLY', {
+            id: 'card-duplicate-1',
             name: 'American Express Gold Card',
             displayName: 'American Express Gold Card',
           }),
@@ -273,6 +284,59 @@ describe('BenefitsDisplayClient', () => {
     expect(screen.getAllByText('American Express Gold Card')).toHaveLength(2);
     expect(groups[0]).toHaveTextContent('Dining credit - first physical card');
     expect(groups[1]).toHaveTextContent('Dining credit - second physical card');
+  });
+
+  it('keeps card groups alphabetized across completion and restoration', () => {
+    const alphaPrimary = benefitStatus('alpha-primary', 'Alpha primary benefit', 'MONTHLY', {
+      id: 'card-alpha',
+      name: 'Alpha Card',
+      displayName: 'Alpha Card',
+    });
+    const alphaRemaining = benefitStatus('alpha-remaining', 'Alpha remaining benefit', 'MONTHLY', {
+      id: 'card-alpha',
+      name: 'Alpha Card',
+      displayName: 'Alpha Card',
+    });
+    alphaRemaining.benefit.maxAmount = 25;
+
+    const customBenefit = benefitStatus('custom', 'Custom benefit', 'MONTHLY');
+    customBenefit.benefit.creditCardId = null;
+    customBenefit.benefit.creditCard = null;
+    customBenefit.isCustomBenefit = true;
+
+    render(
+      <BenefitsDisplayClient
+        {...defaultProps}
+        upcomingBenefits={[
+          benefitStatus('bravo', 'Bravo benefit', 'MONTHLY', {
+            id: 'card-bravo',
+            name: 'Bravo Card',
+            displayName: 'Bravo Card',
+          }),
+          alphaPrimary,
+          alphaRemaining,
+          customBenefit,
+        ]}
+        totalUnusedValue={325}
+      />
+    );
+
+    const groupLabels = () => screen.getAllByTestId('category-group').map((group) => (
+      within(group).getByRole('heading').textContent
+    ));
+
+    expect(groupLabels()).toEqual([CUSTOM_BENEFITS_CARD_NAME, 'Alpha Card', 'Bravo Card']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Complete Alpha primary benefit' }));
+
+    expect(groupLabels()).toEqual([CUSTOM_BENEFITS_CARD_NAME, 'Alpha Card', 'Bravo Card']);
+
+    fireEvent.click(screen.getByRole('button', { name: /Claimed \(1\)/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Alpha primary benefit' }));
+    fireEvent.click(screen.getByRole('button', { name: /Upcoming \(4\)/i }));
+
+    expect(groupLabels()).toEqual([CUSTOM_BENEFITS_CARD_NAME, 'Alpha Card', 'Bravo Card']);
+    expect(screen.getByRole('button', { name: 'Complete Alpha primary benefit' })).toBeInTheDocument();
   });
 
   it('moves an open benefit to Claimed when AUTO_CLAIM is selected', () => {

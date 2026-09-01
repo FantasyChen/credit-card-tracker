@@ -1,0 +1,5 @@
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Defines the safe frontend verification matrix."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Requires regression coverage for list movement and duplicate-card identity."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines component test style, strict TypeScript, and diff checks."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Defines safe browser mutation verification and restoration expectations."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Defines deployment readiness and target verification requirements."}
