@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/perks-reminder/verification.md", "reason": "Safe verification matrix and truthful reporting"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Frontend test and type-check expectations"}
+{"file": ".trellis/spec/perks-reminder/deployment-and-external-effects.md", "reason": "Alias/deployment post-check requirements"}

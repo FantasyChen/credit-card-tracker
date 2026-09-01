@@ -8,7 +8,7 @@ benefit should be tracked. It answers a question `BenefitStatus` cannot: not
 | --- | --- | --- | --- | --- |
 | `TRACK` | No row | Unclaimed | Visible | Counted when the user claims it |
 | `AUTO_CLAIM` | Row | Already claimed at `maxAmount` | Visible, in Claimed | **Counted** |
-| `IGNORE` | Row | Unclaimed | Hidden everywhere | Excluded |
+| `IGNORE` | Row | Unclaimed | Visible in the read-only Ignored tab | Excluded |
 
 `TRACK` is the default and is represented by the *absence* of a row, so the
 feature adds nothing for users who never touch it.
@@ -80,9 +80,9 @@ those rows are a mix of history under previous modes:
   Closed cycles it claimed remain claimed and keep counting, and open-cycle
   claims the user made or edited (`USER`) are untouched.
 - `IGNORE` is a **read filter, not a delete**. Status rows survive, so ignoring a
-  benefit removes its value from every total while the preference is set, and
-  resetting to `TRACK` restores that value exactly. Nothing is lost, and the
-  change is reversible.
+  benefit moves it to the read-only Ignored tab and removes its value from
+  tracked tabs and totals while the preference is set. Resetting to `TRACK`
+  restores it exactly. Nothing is lost, and the change is reversible.
 
 So `IGNORE` retroactively changes what totals *display*, while `AUTO_CLAIM`
 changes only what happens from now on. That asymmetry is deliberate: ignoring
@@ -137,10 +137,11 @@ The migration is purely additive — a new table, two new enums, one nullable
 column, and a CHECK constraint on the new table — and old application code
 never references any of it. The safe order is therefore strict but simple:
 
-1. `npm run db:prod:migrate` (applies `20260827000000_add_benefit_tracking_preferences`)
-2. Verify with `npm run db:prod:status` and a smoke `SELECT` against
-   `"BenefitTrackingPreference"`
-3. Deploy the application
+1. `npm run db:prod:migrate` (applies the tracking-preference schema migration
+   and, when pending, `20260831000000_migrate_not_usable_to_ignore`)
+2. Verify with `npm run db:prod:status` and an aggregate/read-only check of
+   `"BenefitTrackingPreference"`; never expose row values
+3. Deploy or promote the application release and verify the primary alias
 
 Deploying the application before the migration would 500 every authenticated
 read, since the dashboard queries the new table unconditionally. Where `main`
@@ -148,7 +149,7 @@ auto-deploys, run the migration before merging.
 
 ## Reset surface
 
-An `IGNORE`d benefit cannot be reached from the dashboard by definition, so
-`/settings/benefit-tracking` lists every non-default choice and offers a reset.
-It is the only route back, which is why the feature would be incomplete without
-it.
+The dashboard's Ignored tab is read-only except for the tracking-mode control.
+`/settings/benefit-tracking` also lists every non-default choice and offers a
+reset, so both surfaces can restore a benefit to `TRACK` without deleting its
+history.
