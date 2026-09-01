@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/perks-reminder/verification.md", "reason": "Select only targeted checks for configuration and documentation removal."}
+{"file": ".trellis/spec/perks-reminder/deployment-and-external-effects.md", "reason": "Confirm the guard is removed without changing the current production capability."}

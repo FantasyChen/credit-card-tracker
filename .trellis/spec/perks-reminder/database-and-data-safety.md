@@ -160,13 +160,6 @@ A feature is not deployment-ready merely because `schema.prisma`, TypeScript, `p
 
 Because GitHub `main` deploys automatically, merging request-path code that parses, selects, joins, inserts, updates, or deletes a new database object is itself a production application release. Such code may merge only after the production migration gate has passed, or when a reviewed server capability defaults `off` and the complete `off` path is schema-independent: it must not import a generated delegate for the new object, reference the object in raw SQL, or execute a readiness probe that assumes the object exists. A friendly catch boundary does not make an unconditional missing-table query deployment-safe.
 
-After a migration-bearing release, retain a sanitized release record containing
-the source commit, migration status result, immutable deployment ID, and
-primary-alias deployment ID. Require the IDs to match before calling the
-release live. Any intentional rollback must name its source commit and remain
-visible as the active release until the newer migration/application pair is
-re-verified; never infer freshness from a successful build alone.
-
 ## Migration-history caveat
 
 The checked-in migration history does not currently replay cleanly on an empty database: three January 2025 migrations sort before the initial schema migration, and the first two try to create indexes on tables that have not yet been created. The third is defensive cleanup, but its position does not repair the earlier failure. `docs/supabase-fallback.md` is the authoritative emergency procedure. Do not improvise with reset/force-reset or treat the fallback procedure as preservation of existing user data.
