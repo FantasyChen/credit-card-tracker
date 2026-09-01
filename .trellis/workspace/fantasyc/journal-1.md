@@ -486,3 +486,25 @@ Promoted the verified tracking release to the production alias, confirmed all mi
 ### Status
 
 [OK] **Completed**
+
+
+## Session 19: Remove production release guard
+<!-- trellis-session: v=2 fp=b42c4f20060f5aef -->
+
+**Date**: 2026-09-01
+**Task**: Remove production release guard
+**Branch**: `codex/promote-tracking-release`
+
+### Summary
+
+Removed the standalone production release-identity guard, its dedicated tests and command, and guard-only documentation while preserving the live tracking feature and unrelated AMEX work.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c2e2aab` | chore: remove production release guard |
+
+### Status
+
+[OK] **Completed**
