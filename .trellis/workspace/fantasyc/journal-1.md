@@ -464,3 +464,25 @@ Merged PR #20 for the Bilt Card 2.0 catalog lineup. Ran the approval-gated Globa
 ### Status
 
 [OK] **Completed**
+
+
+## Session 18: Promote tracking release
+<!-- trellis-session: v=2 fp=9a3b56c59a2ec175 -->
+
+**Date**: 2026-09-01
+**Task**: Promote tracking release
+**Branch**: `codex/promote-tracking-release`
+
+### Summary
+
+Promoted the verified tracking release to the production alias, confirmed all migrations were already applied, verified the Ignored dashboard in an authenticated read-only session, and added a tested release-identity drift guard.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9b79bf2` | fix: guard production release identity |
+
+### Status
+
+[OK] **Completed**

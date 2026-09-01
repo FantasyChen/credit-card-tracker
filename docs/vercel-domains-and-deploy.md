@@ -46,6 +46,23 @@ prisma generate && next build
 - Generic Preview and Production builds do not run migrations
 - `npm run db:prod:migrate` is the separate attended migration command and requires explicit authorization plus immediate target and recovery verification
 
+### Production release identity check
+
+For every migration-bearing release, retain only the aggregate release facts:
+the source commit, migration-status result, immutable Ready deployment ID, and
+the deployment ID currently serving the primary alias. Treat the release as
+live only when the two deployment IDs match. A later manual redeploy or AMEX
+rollback can move the alias to an older source even when the original GitHub
+Vercel check is green, so an intentional rollback must record its source commit
+and the capabilities it omits before the next release is announced.
+
+The repository includes a read-only check for this gate:
+`npm run check:production-release`. Provide the exact project, immutable
+deployment, expected source commit, and primary alias through environment
+variables or CI secret bindings. The command performs no deployment or
+migration and emits only pass/fail booleans; run it after Vercel reports Ready
+and before announcing the release.
+
 ## Required Vercel Environment Variables
 
 | Variable | Description |

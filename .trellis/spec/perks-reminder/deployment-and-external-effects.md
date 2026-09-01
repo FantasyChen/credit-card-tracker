@@ -8,6 +8,21 @@
 - The production domains are served by the Vercel `coupon-cycle` project even though a local checkout may be linked to a different project. Never infer the production target from ignored `.vercel/project.json` alone.
 - Provider environment values are managed in Vercel or other provider dashboards. Do not write secret values, project-local copies, or command output containing them to tracked files.
 
+### Release/alias drift prevention
+
+After every production deployment from `main`, verify the primary alias resolves
+to that exact deployment ID before reporting the release live. A successful
+GitHub/Vercel deployment check is not sufficient: a later rollback or manual
+redeploy can silently move the alias to an older source tree. If a rollback is
+intentional, record the rollback source commit and the capabilities it omits,
+then re-run the release check before the next feature is announced.
+
+For releases that include Prisma migrations, the migration status gate must be
+completed before the application deployment is promoted. A Ready build without
+the corresponding production migration is an incomplete release. Keep the
+release and migration checks separate, aggregate-only, and repeatable so a
+manual redeploy cannot hide a pending migration.
+
 ## Cron and notification safety
 
 - `vercel.json` currently schedules `/api/cron/check-benefits` at `0 5 * * *` and `/api/cron/send-notifications` at `30 5 * * *`; both handlers export `maxDuration = 10`. Preserve those source-controlled contracts unless the task intentionally changes scheduling/runtime behavior. Provider plan limits and available cron slots are external state and must be verified in Vercel rather than asserted from the repository.
