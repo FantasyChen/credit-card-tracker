@@ -30,9 +30,9 @@ Keep the benefit dashboard spatially predictable: completing or restoring an ent
 - [x] Custom Benefits remains before physical-card groups when present.
 - [x] The focused `BenefitsDisplayClient` test passes, strict TypeScript passes, and `git diff --check` passes.
 - [x] Browser validation demonstrates unchanged card-group order across complete and restore interactions, and the tested benefit ends in its original state.
-- [ ] Only task-owned files are committed; existing unrelated working-tree changes remain untouched.
-- [ ] The isolated feature branch is pushed and Vercel automatically deploys that exact commit to Preview; the deployment reaches Ready and the deployed benefits surface receives a narrow smoke check.
-- [ ] If automatic deployment is initially absent or failed because of Git integration configuration, the exact repo/project connection is repaired and auto-deployment is re-verified without manually deploying the application.
+- [x] Only task-owned files are committed; existing unrelated working-tree changes remain untouched.
+- [x] The isolated feature branch is pushed and Vercel automatically deploys that exact commit to Preview; the deployment reaches Ready and the deployed benefits surface receives a narrow smoke check.
+- [x] If automatic deployment is initially absent or failed because of Git integration configuration, the exact repo/project connection is repaired and auto-deployment is re-verified without manually deploying the application. No repair was required because Git-triggered deployment succeeded immediately.
 
 ## Out of Scope
 
@@ -46,3 +46,4 @@ Keep the benefit dashboard spatially predictable: completing or restoring an ent
 
 - The code change is client-only; browser verification and the conditional Git-integration repair are covered by `design.md` and `implement.md` as an operational release plan.
 - The current checkout is six commits ahead of `origin/main`, three commits ahead of its remote feature branch, and contains unrelated uncommitted work. Release isolation is required; those changes must not be folded into this task's commit or push.
+- Release evidence: the isolated commit passed 14 focused tests and strict TypeScript, the authenticated local UI preserved all 11 card groups across completion/restoration and restored the original benefit state, and Vercel automatically produced a Ready Preview whose protected `/benefits` route served the application authentication boundary.
