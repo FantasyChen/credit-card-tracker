@@ -508,3 +508,25 @@ Removed the standalone production release-identity guard, its dedicated tests an
 ### Status
 
 [OK] **Completed**
+
+
+## Session 21: Keep benefit card groups stable
+<!-- trellis-session: v=2 fp=76b4fcf6a859b0f0 -->
+
+**Date**: 2026-09-01
+**Task**: Keep benefit card groups stable
+**Branch**: `codex/promote-tracking-release`
+
+### Summary
+
+Kept benefit groups in a stable card order: custom benefits first, then physical cards alphabetized by display name with card ID tie-breaking. Added completion/restoration regression coverage, validated the authenticated UI, and confirmed the pushed branch's Vercel Preview deployment.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `05731ea` | fix: keep benefit card groups stable |
+
+### Status
+
+[OK] **Completed**

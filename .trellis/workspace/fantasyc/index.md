@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
+- **Total Sessions**: 21
 - **Last Active**: 2026-09-01
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~510 | Active |
+| `journal-1.md` | ~532 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 21 | 2026-09-01 | Keep benefit card groups stable | `05731ea` | `codex/promote-tracking-release` |
 | 19 | 2026-09-01 | Remove production release guard | `c2e2aab` | `codex/promote-tracking-release` |
 | 18 | 2026-09-01 | Promote tracking release | `9b79bf2` | `codex/promote-tracking-release` |
 | 16 | 2026-08-29 | Bilt catalog rollout and UI verification | `78a2556` | `main` |
