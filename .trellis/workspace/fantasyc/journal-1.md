@@ -464,3 +464,25 @@ Merged PR #20 for the Bilt Card 2.0 catalog lineup. Ran the approval-gated Globa
 ### Status
 
 [OK] **Completed**
+
+
+## Session 20: Stabilize benefit card group order
+<!-- trellis-session: v=2 fp=a26f3c046d5d17d3 -->
+
+**Date**: 2026-09-01
+**Task**: Stabilize benefit card group order
+**Branch**: `codex/stable-benefit-card-group-order`
+
+### Summary
+
+Sorted benefit card groups by stable display identity, added completion/restoration regression coverage, validated the authenticated UI, and verified Git-triggered Vercel Preview deployment.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `608d2d856a8be2a1708b12fe001c16d5657bbe73` | fix: keep benefit card groups stable |
+
+### Status
+
+[OK] **Completed**

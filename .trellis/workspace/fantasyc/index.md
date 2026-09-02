@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 16
-- **Last Active**: 2026-08-29
+- **Total Sessions**: 20
+- **Last Active**: 2026-09-01
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~466 | Active |
+| `journal-1.md` | ~488 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-09-01 | Stabilize benefit card group order | `608d2d856a8be2a1708b12fe001c16d5657bbe73` | `codex/stable-benefit-card-group-order` |
 | 16 | 2026-08-29 | Bilt catalog rollout and UI verification | `78a2556` | `main` |
 | 15 | 2026-08-16 | Publish and validate public AMEX reader | `1edfe51`, `19fff71` | `main` |
 | 14 | 2026-08-12 | Validate production AMEX sync canary | `5854a48` | `main` |
