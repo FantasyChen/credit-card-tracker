@@ -393,6 +393,37 @@ test("keeps a high-scale account filter-aware without summary or data-quality UI
   harness.assertNetworkStayedSynthetic();
 });
 
+test("renders the Quiet Ledger reader at desktop and narrow widths @visual", async ({ context, page }, testInfo) => {
+  const harness = new SyntheticAmexHarness(context, page, "complete");
+  await harness.installBeforeNavigation();
+  await harness.openAndInject();
+  await page.getByRole("button", { name: "Scan all cards" }).click();
+  await waitForFinalReader(page);
+
+  const reader = page.locator("#perks-reminder-amex-reader");
+  await expect(reader.getByRole("button", { name: "Remaining 1" })).toHaveAttribute("aria-pressed", "true");
+  await expect(reader.getByRole("heading", { name: /American Express Gold Card/ })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("quiet-ledger-desktop.png") });
+
+  for (const width of [320, 375, 414, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: width <= 414 ? 812 : 1000 });
+    const bounds = await reader.getByRole("region", { name: "Amex benefits" }).boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+  }
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.screenshot({ path: testInfo.outputPath("quiet-ledger-mobile.png") });
+
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  const transitionDuration = await reader.locator("button").first().evaluate((control) =>
+    getComputedStyle(control).transitionDuration);
+  expect(transitionDuration).toBe("0s");
+  await page.screenshot({ path: testInfo.outputPath("quiet-ledger-mobile-dark.png") });
+  harness.assertNetworkStayedSynthetic();
+});
+
 test("mounts once and scans manually from a selector-free non-benefits route", async ({ context, page }) => {
   const harness = new SyntheticAmexHarness(context, page, "complete");
   await harness.installBeforeNavigation();

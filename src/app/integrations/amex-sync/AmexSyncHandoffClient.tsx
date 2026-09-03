@@ -6,6 +6,7 @@ import {
   ExclamationTriangleIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
+import Link from "next/link";
 import { z } from "zod";
 import {
   AMEX_SYNC_HANDOFF_PATH,
@@ -22,7 +23,12 @@ import {
   creditFamilyKeySchema,
 } from "@/lib/amex-benefit-reader/contract";
 import type { AmexSyncMode } from "@/lib/amex-sync/mode";
+import {
+  formatAmexBenefitTitle,
+  formatAmexSourcePeriod,
+} from "@/lib/amex-benefit-reader/presentation";
 import { Button } from "@/components/ui/button";
+import styles from "./AmexSyncHandoffClient.module.css";
 
 const statusProjectionSchema = z.object({
   usedAmount: z.number().finite().nonnegative(),
@@ -162,7 +168,7 @@ type HandoffState =
   | "result"
   | "invalid";
 
-function reasonText(reason: string): string {
+function reasonText(reason: string, disposition?: SyncRowResult["disposition"]): string {
   const labels: Record<string, string> = {
     proposed_update: "Ready to update",
     already_current: "Already current",
@@ -196,12 +202,24 @@ function reasonText(reason: string): string {
     conflict_repreview_required: "Your saved data changed; preview again",
     persistence_failed: "This row could not be saved",
   };
+  if (reason === "proposed_update" && disposition === "updated") return "Updated";
   return labels[reason] ?? "Skipped safely";
 }
 
 function familyLabel(key: string): string {
   const family = key.slice(key.lastIndexOf(":") + 1);
   return family.charAt(0).toUpperCase() + family.slice(1);
+}
+
+function dispositionLabel(disposition: SyncRowResult["disposition"]): string {
+  const labels: Record<SyncRowResult["disposition"], string> = {
+    proposed: "Proposed",
+    updated: "Updated",
+    unchanged: "Current",
+    skipped: "Skipped",
+    failed: "Failed",
+  };
+  return labels[disposition];
 }
 
 function exclusionText(reason: AmexSyncEnvelope["exclusions"][number]["reason"]): string {
@@ -225,30 +243,63 @@ function amount(value: StatusProjection | null): string {
   return value ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value.usedAmount) : "—";
 }
 
-function RowCard({ row }: { row: SyncRowResult }) {
+interface RowContext {
+  cardKey: string;
+  cardLabel: string;
+  title: string;
+  period: string | null;
+}
+
+const PLATINUM_UBER_FAMILY = "american-express-platinum-card:uber-cash";
+const PLATINUM_UBER_DECEMBER_BONUS_FAMILY = `${PLATINUM_UBER_FAMILY}-december-bonus`;
+
+function resolveRowContext(envelope: AmexSyncEnvelope, row: SyncRowResult): RowContext {
+  const card = envelope.cards.find((candidate) => candidate.sourceLocalCardId === row.sourceLocalCardId);
+  if (!card) {
+    return {
+      cardKey: row.sourceLocalCardId,
+      cardLabel: "Amex card",
+      title: familyLabel(row.creditFamilyKey),
+      period: null,
+    };
+  }
+  const source = card.rows.find((candidate) =>
+    candidate.creditFamilyKey === row.creditFamilyKey
+    || (
+      row.creditFamilyKey === PLATINUM_UBER_DECEMBER_BONUS_FAMILY
+      && candidate.creditFamilyKey === PLATINUM_UBER_FAMILY
+    ));
+  return {
+    cardKey: card.sourceLocalCardId,
+    cardLabel: `${card.providerProductName} ••••• ${card.endingDigits}`,
+    title: source ? formatAmexBenefitTitle(source.providerTitle) : familyLabel(row.creditFamilyKey),
+    period: source?.sourcePeriod ? formatAmexSourcePeriod(source.sourcePeriod) : null,
+  };
+}
+
+function RowCard({ row, context }: { row: SyncRowResult; context: RowContext }) {
   const warning = row.changes.amountDecrease || row.changes.completionCleared;
   return (
-    <li className="rounded-xl border border-border bg-card p-4 shadow-sm shadow-black/[0.03]" data-disposition={row.disposition}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <li className={styles.row} data-disposition={row.disposition}>
+      <div className={styles.rowTop}>
         <div>
-          <h3 className="font-semibold text-foreground">{familyLabel(row.creditFamilyKey)}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{reasonText(row.reason)}</p>
+          <h4 className={styles.benefitTitle}>{context.title}</h4>
+          {context.period && <p className={styles.period}>{context.period}</p>}
+          <p className={styles.reason}>{reasonText(row.reason, row.disposition)}</p>
         </div>
-        <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-semibold capitalize text-muted-foreground">
-          {row.disposition}
+        <span className={styles.badge} data-disposition={row.disposition}>
+          {dispositionLabel(row.disposition)}
         </span>
       </div>
       {row.before && row.after && (
-        <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-          <dt className="text-muted-foreground">Amount used</dt>
-          <dd className="font-medium tabular-nums text-foreground">{amount(row.before)} → {amount(row.after)}</dd>
-          <dt className="text-muted-foreground">Completed</dt>
-          <dd className="font-medium text-foreground">{row.before.isCompleted ? "Yes" : "No"} → {row.after.isCompleted ? "Yes" : "No"}</dd>
+        <dl className={styles.comparison}>
+          <div><dt>Amount used</dt><dd>{amount(row.before)} → {amount(row.after)}</dd></div>
+          <div><dt>Completed</dt><dd>{row.before.isCompleted ? "Yes" : "No"} → {row.after.isCompleted ? "Yes" : "No"}</dd></div>
         </dl>
       )}
       {warning && (
-        <p className="mt-3 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <p className={styles.warning}>
+          <ExclamationTriangleIcon aria-hidden="true" />
           {row.changes.amountDecrease && row.changes.completionCleared
             ? "This newer Amex observation decreases the amount and clears completion."
             : row.changes.amountDecrease
@@ -258,6 +309,52 @@ function RowCard({ row }: { row: SyncRowResult }) {
       )}
     </li>
   );
+}
+
+function RowGroups({ rows, envelope }: { rows: SyncRowResult[]; envelope: AmexSyncEnvelope }) {
+  const groups = rows.reduce<Array<{ cardKey: string; cardLabel: string; rows: Array<{ row: SyncRowResult; context: RowContext }> }>>(
+    (current, row) => {
+      const context = resolveRowContext(envelope, row);
+      let group = current.find((candidate) => candidate.cardKey === context.cardKey);
+      if (!group) {
+        group = { cardKey: context.cardKey, cardLabel: context.cardLabel, rows: [] };
+        current.push(group);
+      }
+      group.rows.push({ row, context });
+      return current;
+    },
+    [],
+  );
+  return (
+    <div className={styles.cardGroups}>
+      {groups.map((group) => (
+        <section className={styles.cardGroup} key={group.cardKey} aria-label={group.cardLabel}>
+          <h3 className={styles.cardHeading}>{group.cardLabel}</h3>
+          <ul className={styles.rowList}>
+            {group.rows.map(({ row, context }) => <RowCard key={row.sourceRowIdentity} row={row} context={context} />)}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function proposalFreshness(expiresAt: string, now: number) {
+  const remainingMs = Date.parse(expiresAt) - now;
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) {
+    return { label: "Preview expired", urgent: true, expired: true, remainingMs: 0 };
+  }
+  if (remainingMs > 120_000) {
+    const minutes = Math.ceil(remainingMs / 60_000);
+    return { label: `Ready · ${minutes} min left`, urgent: false, expired: false, remainingMs };
+  }
+  const seconds = Math.ceil(remainingMs / 1_000);
+  return {
+    label: `Expires soon · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} left`,
+    urgent: true,
+    expired: false,
+    remainingMs,
+  };
 }
 
 async function postJson(path: string, body: unknown): Promise<{ ok: boolean; status: number; value: unknown }> {
@@ -273,6 +370,11 @@ async function postJson(path: string, body: unknown): Promise<{ ok: boolean; sta
   return { ok: response.ok, status: response.status, value };
 }
 
+function rowsBelongToEnvelope(envelope: AmexSyncEnvelope, rows: SyncRowResult[]): boolean {
+  const cardIds = new Set(envelope.cards.map((card) => card.sourceLocalCardId));
+  return rows.every((row) => cardIds.has(row.sourceLocalCardId));
+}
+
 export function AmexSyncHandoffClient({
   transferId,
   initialMode,
@@ -285,6 +387,7 @@ export function AmexSyncHandoffClient({
   const [envelope, setEnvelope] = useState<AmexSyncEnvelope | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [result, setResult] = useState<ConfirmationResponse | null>(null);
+  const [clock, setClock] = useState(() => Date.now());
   const acceptedPayload = useRef(false);
   const actionInFlight = useRef(false);
 
@@ -297,7 +400,7 @@ export function AmexSyncHandoffClient({
     try {
       const response = await postJson("/api/integrations/amex-sync/preview", { envelope: nextEnvelope });
       const parsed = previewResponseSchema.safeParse(response.value);
-      if (!response.ok || !parsed.success) {
+      if (!response.ok || !parsed.success || !rowsBelongToEnvelope(nextEnvelope, parsed.data.rows)) {
         setState("invalid");
         setMessage(response.status === 503
           ? "Amex sync is currently turned off. No data was changed."
@@ -383,8 +486,26 @@ export function AmexSyncHandoffClient({
     };
   }, [initialMode, runPreview, transferId]);
 
+  useEffect(() => {
+    if (!preview || state === "result" || state === "invalid") return;
+    const freshness = proposalFreshness(preview.proposalExpiresAt, Date.now());
+    if (freshness.expired) return;
+    const timer = window.setTimeout(
+      () => setClock(Date.now()),
+      freshness.urgent ? Math.min(1_000, freshness.remainingMs) : Math.min(30_000, freshness.remainingMs - 120_000),
+    );
+    return () => window.clearTimeout(timer);
+  }, [clock, preview, state]);
+
   const confirm = async () => {
-    if (actionInFlight.current || !envelope || !preview || preview.mode !== "write" || state !== "preview") return;
+    if (
+      actionInFlight.current
+      || !envelope
+      || !preview
+      || preview.mode !== "write"
+      || state !== "preview"
+      || Date.parse(preview.proposalExpiresAt) <= Date.now()
+    ) return;
     actionInFlight.current = true;
     setState("confirming");
     setMessage("Applying each approved row independently…");
@@ -400,7 +521,7 @@ export function AmexSyncHandoffClient({
         return;
       }
       const parsed = confirmationResponseSchema.safeParse(response.value);
-      if (!response.ok || !parsed.success) {
+      if (!response.ok || !parsed.success || !rowsBelongToEnvelope(envelope, parsed.data.rows)) {
         setState("preview");
         setMessage("Confirmation failed safely. No unreported row is assumed to be updated. Retry only while this preview remains valid, or return to Amex and run a fresh scan.");
         return;
@@ -424,130 +545,196 @@ export function AmexSyncHandoffClient({
   };
 
   const rows = result?.rows ?? preview?.rows ?? [];
-  const counts = rows.reduce((current, row) => {
-    current[row.disposition] = (current[row.disposition] ?? 0) + 1;
-    return current;
-  }, {} as Record<string, number>);
   const hasProposedRows = rows.some((row) => row.disposition === "proposed");
+  const proposedRows = rows.filter((row) => row.disposition === "proposed");
+  const updatedRows = rows.filter((row) => row.disposition === "updated");
+  const failedRows = rows.filter((row) => row.disposition === "failed");
+  const unchangedRows = rows.filter((row) => row.disposition === "unchanged");
+  const skippedRows = rows.filter((row) => row.disposition === "skipped");
+  const primaryRows = result ? [...updatedRows, ...failedRows] : proposedRows;
+  const freshness = preview ? proposalFreshness(preview.proposalExpiresAt, clock) : null;
+  const exclusionCount = envelope?.exclusions.reduce((sum, exclusion) => sum + exclusion.count, 0) ?? 0;
+  const heading = state === "result"
+    ? failedRows.length > 0 ? "Sync finished with items to review" : "Benefit sync complete"
+    : state === "preview" || state === "confirming"
+      ? proposedRows.length > 0
+        ? `Review ${proposedRows.length} benefit update${proposedRows.length === 1 ? "" : "s"}`
+        : "Review sync details"
+      : state === "invalid" ? "A fresh handoff is needed" : "Preparing your benefit review";
+  const tone = state === "invalid" || failedRows.length > 0 || freshness?.expired
+    ? "invalid"
+    : state === "result" ? "complete"
+      : preview?.cardSkips.length || freshness?.urgent ? "attention" : "ready";
 
   return (
-    <div className="mx-auto max-w-3xl" data-amex-sync-state={state}>
-      <header className="rounded-2xl border border-border bg-card p-6 shadow-sm shadow-black/[0.03] sm:p-8">
-        <div className="flex items-start gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <ShieldCheckIcon className="h-6 w-6" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-muted-foreground">American Express integration</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">Review benefit sync</h1>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              The local reader shares only reviewed normalized observations. Perks Reminder never receives your Amex login, cookies, account token, or raw responses.
-            </p>
-          </div>
-        </div>
-        <p className="mt-5 rounded-xl border border-border bg-muted/50 p-4 text-sm text-foreground" role="status" aria-live="polite">
-          {message}
-        </p>
-      </header>
-
-      {envelope && envelope.exclusions.length > 0 && state !== "previewing" && state !== "invalid" && (
-        <section className="mt-6 rounded-2xl border border-border bg-card p-6" aria-labelledby="excluded-heading">
-          <h2 id="excluded-heading" className="text-lg font-semibold text-foreground">Excluded local observations</h2>
-          <p className="mt-2 text-sm text-muted-foreground">These observations remain available in the local reader but cannot be synchronized.</p>
-          <ul className="mt-4 grid gap-2 text-sm text-foreground">
-            {envelope.exclusions.map((exclusion) => (
-              <li key={exclusion.reason} className="flex items-start justify-between gap-4 rounded-lg bg-muted/50 px-3 py-2">
-                <span>{exclusionText(exclusion.reason)}</span>
-                <span className="font-semibold tabular-nums" aria-label={`${exclusion.count} excluded`}>{exclusion.count}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {preview && preview.cardSkips.length > 0 && state !== "invalid" && (
-        <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900 dark:bg-amber-950/30" aria-labelledby="card-prerequisites-heading">
-          <h2 id="card-prerequisites-heading" className="text-lg font-semibold text-foreground">Card details needed for Amex sync</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Exactly five ending digits are required. Card names and manual selections cannot bypass this identity check.</p>
-          <p id="card-edit-guidance" className="mt-2 text-sm text-muted-foreground">
-            Editing opens in a new tab. Save the card there, return to this page, then refresh the preview.
-          </p>
-          <ul className="mt-4 grid gap-3">
-            {preview.cardSkips.map((skip) => (
-              <li key={skip.destinationCardId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-background p-3 dark:border-amber-900">
-                <span className="text-sm font-medium text-foreground">{skip.label}</span>
-                <a
-                  className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
-                  href={skip.editHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Add five ending digits for ${skip.label}`}
-                  aria-describedby="card-edit-guidance"
-                >
-                  Add five ending digits
-                </a>
-              </li>
-            ))}
-          </ul>
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-4"
-            disabled={!envelope || state === "previewing" || state === "confirming"}
-            onClick={refreshPreview}
-          >
-            {state === "previewing" ? "Refreshing preview…" : "Refresh after editing cards"}
-          </Button>
-        </section>
-      )}
-
-      {(state === "preview" || state === "confirming" || state === "result") && rows.length > 0 && (
-        <section className="mt-6" aria-labelledby="rows-heading">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+    <main className={styles.shell} data-amex-sync-state={state}>
+      <article className={styles.folio} data-tone={tone}>
+        <header className={styles.hero}>
+          <div className={styles.identity}>
+            <span className={styles.mark}><ShieldCheckIcon aria-hidden="true" /></span>
             <div>
-              <h2 id="rows-heading" className="text-lg font-semibold text-foreground">Benefit rows</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {Object.entries(counts).map(([label, count]) => `${count} ${label}`).join(" · ")}
+              <p className={styles.product}>American Express integration</p>
+              <h1 className={styles.title}>{heading}</h1>
+              <p className={styles.privacy}>
+                Only reviewed, normalized observations arrive here. Your Amex login, cookies, account token, and raw responses stay out of Perks Reminder.
               </p>
             </div>
-            {preview && <p className="text-xs text-muted-foreground">Preview expires {new Date(preview.proposalExpiresAt).toLocaleTimeString()}</p>}
           </div>
-          <ul className="mt-4 grid gap-3">
-            {rows.map((row) => <RowCard key={row.sourceRowIdentity} row={row} />)}
-          </ul>
-        </section>
-      )}
+          <p className={styles.statusLine} role="status" aria-live="polite" aria-atomic="true">
+            <ShieldCheckIcon aria-hidden="true" />
+            <span>{message}</span>
+          </p>
+        </header>
 
-      {state === "preview" && preview && (
-        <section className="mt-6 rounded-2xl border border-border bg-card p-6">
-          {preview.mode === "write" ? (
-            <>
-              <h2 className="text-lg font-semibold text-foreground">Confirm separately</h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Only rows marked proposed can change benefit status. Cards are matched by owned active Amex product and exact last five; there is no manual override. Unchanged and skipped benefit statuses remain untouched. You can close this page to cancel.
+        {state !== "invalid" && (preview || result) && (
+          <dl className={styles.summary} aria-label={state === "result" ? "Sync result summary" : "Sync preview summary"}>
+            <div className={styles.metric}><dt>{result ? "Updated" : "Will update"}</dt><dd>{result ? updatedRows.length : proposedRows.length}</dd></div>
+            <div className={styles.metric}><dt>Needs attention</dt><dd>{failedRows.length + (preview?.cardSkips.length ?? 0)}</dd></div>
+            <div className={styles.metric}><dt>Already current</dt><dd>{unchangedRows.length}</dd></div>
+            <div className={styles.metric}><dt>Skipped</dt><dd>{skippedRows.length}</dd></div>
+            <div className={styles.metric}><dt>Local exclusions</dt><dd>{exclusionCount}</dd></div>
+          </dl>
+        )}
+
+        <div className={styles.body}>
+          {state !== "invalid" && <section className={styles.review} aria-labelledby="review-heading">
+            <h2 className={styles.sectionHeading} id="review-heading">
+              {result ? "Recorded outcomes" : "Updates to review"}
+            </h2>
+            <p className={styles.sectionCopy}>
+              {result
+                ? "Each row shows the final recorded outcome. Failed rows remain visible for follow-up."
+                : "Card, benefit, and period context stay together so repeated credits are easy to distinguish."}
+            </p>
+            {freshness && state !== "result" && (
+              <p
+                className={styles.freshness}
+                data-urgent={freshness.urgent}
+                data-expired={freshness.expired}
+              >
+                {freshness.label}
               </p>
-              <Button className="mt-5" disabled={!hasProposedRows} onClick={() => void confirm()}>
-                Confirm proposed updates
-              </Button>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Server mode is preview-only. Confirmation is disabled and no writes can occur.</p>
+            )}
+
+            {envelope && primaryRows.length > 0 && <RowGroups rows={primaryRows} envelope={envelope} />}
+            {(state === "preview" || state === "result") && primaryRows.length === 0 && (
+              <p className={styles.empty}>No eligible benefit updates need review.</p>
+            )}
+
+          </section>}
+
+          {(state === "preview" || state === "confirming" || state === "result") && preview && (
+            <aside className={styles.actionRail} aria-label="Sync action">
+              {state === "result" && result ? (
+                <>
+                  <div className={styles.resultMark}><CheckCircleIcon aria-hidden="true" /><h2>{result.replayed ? "Result already recorded" : "Confirmation recorded"}</h2></div>
+                  <p>{updatedRows.length} updated, {unchangedRows.length} unchanged, {skippedRows.length} skipped, and {failedRows.length} failed.</p>
+                  <p>{failedRows.length > 0 ? "Review the failed rows and scan again when ready." : "The final row outcomes are shown beside this summary."}</p>
+                </>
+              ) : preview.mode === "write" ? (
+                <>
+                  <h2>Confirm separately</h2>
+                  <p>Only the {proposedRows.length} proposed {proposedRows.length === 1 ? "row" : "rows"} can change. Unchanged and skipped benefits stay untouched.</p>
+                  <Button
+                    className={styles.confirm}
+                    disabled={!hasProposedRows || state === "confirming" || freshness?.expired}
+                    onClick={() => void confirm()}
+                  >
+                    {state === "confirming" ? "Applying updates…" : `Confirm ${proposedRows.length} update${proposedRows.length === 1 ? "" : "s"}`}
+                  </Button>
+                  <span className={styles.cancelCopy}>Close this page to cancel.</span>
+                </>
+              ) : (
+                <>
+                  <h2>Preview only</h2>
+                  <p>Confirmation is disabled by the server. No writes can occur from this review.</p>
+                </>
+              )}
+            </aside>
           )}
-        </section>
-      )}
 
-      {state === "result" && result && (
-        <section className="mt-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
-          <CheckCircleIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
-          <div><h2 className="font-semibold">Confirmation recorded</h2><p className="mt-1 text-sm">Review row results above. Failed rows were isolated from successful rows.</p></div>
-        </section>
-      )}
+          <section className={styles.followup} aria-label="Additional sync details">
+            {preview && preview.cardSkips.length > 0 && state !== "invalid" && (
+              <section className={styles.attention} aria-labelledby="card-prerequisites-heading">
+                <div className={styles.attentionHeader}>
+                  <ExclamationTriangleIcon aria-hidden="true" />
+                  <div>
+                    <h2 className={styles.sectionHeading} id="card-prerequisites-heading">Card details needed</h2>
+                    <p className={styles.sectionCopy}>Add exactly five ending digits to each card. Names and manual selections cannot bypass this identity check.</p>
+                  </div>
+                </div>
+                <p id="card-edit-guidance" className={styles.sectionCopy}>
+                  Each card opens in a new tab. Save it there, return here, then check the details again.
+                </p>
+                <ul className={styles.checklist}>
+                  {preview.cardSkips.map((skip) => (
+                    <li className={styles.checkItem} key={skip.destinationCardId}>
+                      <span>{skip.label}</span>
+                      <Link
+                        href={skip.editHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Add five ending digits for ${skip.label}`}
+                        aria-describedby="card-edit-guidance"
+                      >
+                        Add five ending digits
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={styles.checkAction}
+                  disabled={!envelope || state === "previewing" || state === "confirming"}
+                  onClick={refreshPreview}
+                >
+                  {state === "previewing" ? "Checking card details…" : state === "result" ? "Check again" : "Check card details"}
+                </Button>
+              </section>
+            )}
 
-      {state === "invalid" && (
-        <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-          No benefit data was changed. Return to Amex, run a fresh scan, then choose Sync reviewed again when ready.
-        </section>
-      )}
-    </div>
+            {state !== "invalid" && envelope && (
+              <div className={styles.disclosures}>
+                {unchangedRows.length > 0 && (
+                  <details className={styles.details}>
+                    <summary>Already current <span>{unchangedRows.length}</span></summary>
+                    <div className={styles.detailsContent}><RowGroups rows={unchangedRows} envelope={envelope} /></div>
+                  </details>
+                )}
+                {skippedRows.length > 0 && (
+                  <details className={styles.details} open={primaryRows.length === 0}>
+                    <summary>Skipped safely <span>{skippedRows.length}</span></summary>
+                    <div className={styles.detailsContent}><RowGroups rows={skippedRows} envelope={envelope} /></div>
+                  </details>
+                )}
+                {envelope.exclusions.length > 0 && (
+                  <details className={styles.details}>
+                    <summary>Not included from local scan <span>{exclusionCount}</span></summary>
+                    <div className={styles.detailsContent}>
+                      <p className={styles.sectionCopy}>These observations remain in the local reader but cannot be synchronized.</p>
+                      <ul className={styles.exclusions}>
+                        {envelope.exclusions.map((exclusion) => (
+                          <li className={styles.exclusion} key={exclusion.reason}>
+                            <span>{exclusionText(exclusion.reason)}</span>
+                            <strong aria-label={`${exclusion.count} excluded`}>{exclusion.count}</strong>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {(state === "invalid" || freshness?.expired) && (
+              <p className={styles.recovery}>
+                No benefit data was changed. Return to Amex, run a fresh scan, then choose <strong>Sync reviewed</strong> again.
+              </p>
+            )}
+          </section>
+        </div>
+      </article>
+    </main>
   );
 }
