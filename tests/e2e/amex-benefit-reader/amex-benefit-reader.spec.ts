@@ -192,7 +192,7 @@ test("shows only real scan progress until the built reader reaches a terminal re
   await harness.openAndInject();
 
   const readerHost = page.locator("#perks-reminder-amex-reader");
-  await expect(readerHost).toHaveAttribute("data-reader-version", "1.0.0");
+  await expect(readerHost).toHaveAttribute("data-reader-version", "1.0.1");
   const scanButton = page.getByRole("button", { name: "Scan all cards" });
   expect(harness.apiRequests()).toHaveLength(0);
   await scanButton.click();

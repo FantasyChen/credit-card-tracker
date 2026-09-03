@@ -5,13 +5,14 @@ import { build } from "esbuild";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const requestedTarget = process.argv[2] ?? "production";
+const publicReleaseVersion = "1.0.1";
 
 const targetConfigurations = Object.freeze({
   production: Object.freeze({
     output: "build/amex-benefit-reader.user.js",
     userscriptName: "Perks Reminder — Amex Benefit Reader",
     namespace: "https://perks-reminder.com/",
-    version: "1.0.0",
+    version: publicReleaseVersion,
     handoffMatch: null,
     handoffInclude: "https://www.perks-reminder.com/integrations/amex-sync?transfer=*",
     unsafeWindowGrant: true,

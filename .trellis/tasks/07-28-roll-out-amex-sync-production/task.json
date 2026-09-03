@@ -12,7 +12,7 @@
   "assignee": "fantasyc",
   "createdAt": "2026-07-28",
   "completedAt": null,
-  "branch": null,
+  "branch": "codex/amex-quiet-ledger-release",
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,

@@ -1,8 +1,8 @@
 # Local-development AMEX userscript handoff
 
-This workflow is only for an explicitly authorized manual development test. It does not replace or retarget the production userscript. `npm run build:amex-userscript` creates only `build/amex-benefit-reader.user.js` with name `Perks Reminder — Amex Benefit Reader`, namespace `https://perks-reminder.com/`, version `0.5.3`, and the exact transfer handoff include `https://www.perks-reminder.com/integrations/amex-sync?transfer=*`.
+This workflow is only for an explicitly authorized manual development test. It does not replace or retarget the production userscript. `npm run build:amex-userscript` creates only `build/amex-benefit-reader.user.js` with name `Perks Reminder — Amex Benefit Reader`, namespace `https://perks-reminder.com/`, version `1.0.1`, and the exact transfer handoff include `https://www.perks-reminder.com/integrations/amex-sync?transfer=*`.
 
-The production output lives under the ignored `build/` directory and is not distributed by Vercel. Deploying the Next application therefore does not update an installed userscript. Publishing or installing production `0.5.3` is a separate release action that must use the reviewed generated artifact and separate authorization; this development workflow performs neither action.
+The production output lives under the ignored `build/` directory and is not distributed by Vercel. Deploying the Next application therefore does not update an installed userscript. Publishing or installing production `1.0.1` is a separate release action that must use the reviewed generated artifact and separate authorization; this development workflow performs neither action.
 
 ## Prerequisites
 
@@ -56,7 +56,7 @@ The local artifact uses name `Perks Reminder — Amex Benefit Reader (Local Deve
 
 The localhost handoff uses `@include` because Chrome-style `@match` host patterns do not support ports. The include is limited to the exact localhost origin, port, path, and transfer-query shape; runtime code additionally requires exact origin `http://localhost:3000` and exact pathname `/integrations/amex-sync` before mounting the bridge.
 
-It has `GM.getValue`, `GM.setValue`, `GM.deleteValue`, and `unsafeWindow` grants. `unsafeWindow` is required by both production and local builds so the isolated Tampermonkey bridge exchanges same-window messages with the app's page realm; it does not add a provider operation or privileged network transport. The production `0.5.3` identity remains fixed to the exact production transfer URL, while the local identity remains fixed to localhost.
+It has `GM.getValue`, `GM.setValue`, `GM.deleteValue`, and `unsafeWindow` grants. `unsafeWindow` is required by both production and local builds so the isolated Tampermonkey bridge exchanges same-window messages with the app's page realm; it does not add a provider operation or privileged network transport. The production `1.0.1` identity remains fixed to the exact production transfer URL, while the local identity remains fixed to localhost.
 
 ## Manual run
 

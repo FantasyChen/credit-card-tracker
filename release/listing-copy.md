@@ -1,4 +1,4 @@
-# Perks Reminder AMEX Benefit Reader 1.0.0
+# Perks Reminder AMEX Benefit Reader 1.0.1
 
 ## Chrome Web Store short description
 
@@ -36,5 +36,7 @@ No `tabs`, `activeTab`, `scripting`, background worker, analytics, or remote exe
 - Authentication: uses the existing browser session; never reads credentials or cookies.
 
 ## Release notes
+
+1.0.1 — Introduces the Quiet Ledger redesign with clearer card and benefit context, calmer progress and result states, responsive dark-mode layouts, and improved keyboard focus.
 
 1.0.0 — First public release with a shared read-only runtime, local normalized storage, exact handoff validation, accessible panel, and Chrome/Greasy Fork distribution parity.

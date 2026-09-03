@@ -25,7 +25,7 @@ const setupSteps = [
   {
     title: "Install the userscript",
     description:
-      "Install the published 1.0.0 userscript from Greasy Fork in Tampermonkey or another compatible userscript manager.",
+      "Install the userscript from Greasy Fork in Tampermonkey or another compatible userscript manager.",
   },
   {
     title: "Open Amex while signed in",
@@ -55,7 +55,7 @@ export default function AmexReaderSetupPage() {
               Read-only browser setup
             </span>
             <span className="rounded-full border border-border bg-background px-3 py-1">
-              Greasy Fork 1.0.0
+              Greasy Fork
             </span>
           </div>
           <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">

@@ -9,7 +9,7 @@ const artifacts = [
     path: resolve(root, "build/amex-benefit-reader.user.js"),
     name: "Perks Reminder — Amex Benefit Reader",
     namespace: "https://perks-reminder.com/",
-    version: "1.0.0",
+    version: "1.0.1",
     targetName: "production",
     matches: [
       "https://global.americanexpress.com/*",
@@ -72,7 +72,7 @@ function compareNumericVersions(left, right) {
   return 0;
 }
 
-const previouslyInstalledProductionVersion = "0.5.3";
+const previouslyInstalledProductionVersion = "1.0.0";
 const approvedArtifactOrigins = new Set([
   "http://localhost:3000",
   "https://functions.americanexpress.com",
