@@ -552,3 +552,25 @@ Completed owner-authorized production AMEX scan, preview, bounded two-row canary
 ### Status
 
 [OK] **Completed**
+
+
+## Session 23: Redesign AMEX sync review UI
+<!-- trellis-session: v=2 fp=b85f480df5d1718a -->
+
+**Date**: 2026-09-03
+**Task**: Redesign AMEX sync review UI
+**Branch**: `codex/promote-tracking-release`
+
+### Summary
+
+Implemented and verified the Quiet Ledger AMEX reader and authenticated sync handoff redesign, including safe row context, responsive and dark-mode presentation, truthful confirmation outcomes, proposal expiry recovery, accessible disclosures, and synthetic visual coverage.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3047374` | feat: redesign Amex sync review experience |
+
+### Status
+
+[OK] **Completed**
