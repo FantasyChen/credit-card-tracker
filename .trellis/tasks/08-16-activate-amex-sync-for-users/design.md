@@ -6,7 +6,7 @@
 verified off
   -> exact preview deployment
   -> fresh owner preview with zero-write proof
-  -> exactly-one-proposal eligibility
+  -> bounded-proposal eligibility
   -> fresh action-time confirmation
   -> bounded write canary
   -> replay + fresh preview
@@ -20,17 +20,27 @@ Any mismatch transitions directly to a newly deployed and runtime-proven exact `
 
 The application and public reader are already released. Activation changes only the production capability mode and performs attended runtime verification. The ignored userscript/extension build outputs are not Vercel inputs, and tracked Trellis-only commits are not pushed merely to force a deployment. Any required configuration deployment uses the reviewed application release source and excludes `.env*`, Trellis workspace/task data, and unrelated local changes.
 
+## 2a. Owner-authorized live E2E lane
+
+The policy owner may authorize the agent to drive the bounded sequence against
+the currently authenticated owner session. The server derives one exact
+`userId` from that session; the account email is not required in task artifacts
+and no other user scope is permitted. This lane allows agent-led preparation,
+manual scan, handoff, preview, canary, replay, and rollback, while retaining
+the platform action-time confirmations required immediately before sensitive
+observation transmission and status confirmation.
+
 ## 3. Preview and canary boundary
 
-Preview is authenticated and read-only. Its proposal token is mode-bound and cannot be reused after switching to `write`. Eligibility requires exactly one proposed status change; zero proposals, more than one proposal, or any blocking classification ends the attempt in `off`.
+Preview is authenticated and read-only. Its proposal token is mode-bound and cannot be reused after switching to `write`. Eligibility requires one or two proposed status changes with no blocking classification; zero proposals, more than two proposals, or a changed write-mode proposal ends the attempt in `off`.
 
-The write step creates a new proposal in effective `write` mode, confirms once, and verifies only aggregate expected deltas. Completed-attempt replay must return the durable result without a second mutation. A new scan/preview must show the confirmed destination as current and must not create a duplicate occurrence.
+The write step creates a new proposal in effective `write` mode, requires the exact reviewed proposal set, confirms once, and verifies only aggregate expected deltas. Completed-attempt replay must return the durable result without a second mutation. A new scan/preview must show the confirmed destinations as current and must not create a duplicate occurrence.
 
 ## 4. User-wide launch
 
-The canary always returns to `off` first, proving rollback independently of launch. After a fully passing canary, the same action-time authorization may conditionally activate `write` for users. This exposes only the existing manual **Sync reviewed** flow: each user must run a manual scan, review a fresh proposal, and explicitly confirm. There is no automatic or batch synchronization.
+The canary always returns to `off` first, proving rollback independently of launch. After a fully passing canary, the owner may separately request the existing user-wide launch. This exposes only the existing manual **Sync reviewed** flow: each user must run a manual scan, review a fresh proposal, and explicitly confirm. There is no automatic or batch synchronization.
 
-The launch verification uses a fresh synthetic nonexistent identity and invented zero-row envelope so it proves effective `write` mode, private/no-store behavior, and zero database mutation without touching a real user's data.
+Launch verification may reuse the exact immutable `write` deployment that passed the owner canary and same-envelope zero-proposal preview. A newly built deployment instead requires a fresh synthetic nonexistent identity and invented zero-row envelope so it proves effective `write` mode, private/no-store behavior, and zero database mutation without touching a real user's data.
 
 ## 5. Privacy and evidence
 

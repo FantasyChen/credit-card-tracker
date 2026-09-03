@@ -2,7 +2,7 @@
 
 ## Non-negotiable rules
 
-- Do not access `.env` by default. The exceptions are (a) an explicitly requested repair of named values and (b) the disposable testing-account workflow below. Existing local configuration is private; production secrets belong in provider dashboards.
+- Do not access `.env` by default. The exceptions are (a) an explicitly requested repair of named values and (b) the disposable testing-account workflow below. The owner-authorized live E2E workflow below uses the existing authenticated session and does not authorize `.env` access. Existing local configuration is private; production secrets belong in provider dashboards.
 - Treat `DATABASE_URL` as an application/pooler connection, `DIRECT_URL` as the direct migration connection, and `DATABASE_URL_DEV` as the development branch. Shell variables override dotenv values, so target identity must be verified rather than assumed.
 - Never run `prisma migrate reset`, `prisma db push --force-reset`, any `--force-reset` command, manual destructive SQL, or data deletion against production.
 - Do not run any Prisma migration, seed, reset, push, or data-mutation command merely as validation. Database operations require task scope, explicit human authorization, verified target identity, and a rollback/recovery plan.
@@ -135,6 +135,85 @@ This stores a real credential and uses an unsafe broad production delete.
 #### Correct
 
 Use a newly generated `PERKS_TEST_EMAIL`/`PERKS_TEST_PASSWORD` pair in a verified ignored local `.env`, constrain every database operation to that exact email/User.id, and report only aggregate results.
+
+## Scenario: owner-authorized live E2E verification
+
+### 1. Scope / Trigger
+
+This exception applies when the policy owner explicitly authorizes the agent
+to run a bounded end-to-end test through the currently authenticated browser
+session. It removes the disposable-account requirement for that test lane, but
+does not authorize credential access, account discovery by email, or operations
+outside the one session-derived owner scope.
+
+### 2. Signatures
+
+```text
+owner E2E scope:
+source = authenticated application session
+userId = server-derived exact owner id
+purpose = amex-e2e
+```
+
+```text
+allowed database scope: rows whose owner foreign key is the exact session-
+derived User.id, plus explicitly created test fixtures linked to that user;
+no email search or cross-user query is permitted.
+```
+
+### 3. Contracts
+
+- Require explicit owner authorization for the bounded E2E purpose and verify the exact production project, database role, recovery point, and stop conditions immediately before any database operation.
+- Derive `userId` from the authenticated server session or an exact owner-scoped application response. Do not search for, persist, or add the account email to task artifacts.
+- Route normal AMEX test behavior through the existing authenticated browser/API flow. Direct database reads may verify only the scoped user's aggregate before/after state; direct writes are limited to reversible fixtures or recovery for rows already proven to belong to that user.
+- Preserve the scoped pre-state and perform each fixture/recovery write transactionally. Never delete or rewrite pre-existing user rows merely to manufacture a proposal; cleanup may remove only rows created by the test or explicitly changed by it.
+- Do not read `.env`, passwords, session tokens, provider responses, or raw request payloads. Keep evidence aggregate-only and retain only URL/method/status metadata where needed.
+- The AMEX preview/confirmation contract, provider no-mutation boundary, bounded one-or-two-row owner canary, replay, rollback, and platform action-time confirmations remain in force.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| No authenticated session or more than one possible owner scope | Stop before reading or writing. |
+| Production target, recovery point, or database identity is not verified | Stop before database access. |
+| A query or mutation lacks the exact session-derived `userId` predicate | Reject it; do not broaden the scope. |
+| Any selected row is not owned by the scoped user | Roll back the current transaction and stop. |
+| Operation requests migration, seed, reset, schema change, or unrelated-user data | Reject it as outside this exception. |
+| Pre-state differs from the reviewed test scope or an unexpected side effect appears | Stop and preserve recovery evidence; do not issue compensating writes automatically. |
+| Output would contain email, credentials, tokens, raw observations, or row values | Redact it and fail the evidence gate. |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** The owner authorizes the AMEX E2E lane, the signed-in session resolves one user ID, the agent runs scan/preview/canary/replay/rollback, and database checks are limited to aggregate before/after counts for that user.
+- **Base:** The browser flow completes but no write proposal is eligible; production remains `off` and no database mutation is attempted.
+- **Bad:** Query production users by an email pattern, inspect `.env` for credentials, update another user's status, or alter data to manufacture or resize a canary proposal.
+
+### 6. Tests Required
+
+- Assert that owner scope is derived once from the authenticated session and is never selected by a broad email query.
+- Assert every database read/write carries the exact owner predicate and rejects cross-owner rows before mutation.
+- Assert pre-existing rows are preserved byte-for-byte outside the explicitly expected canary fields and that cleanup removes only test-created/changed rows.
+- Assert no `.env`, credential, token, raw provider payload, or account email enters logs, artifacts, screenshots, or task evidence.
+- Run the narrowest authenticated browser checks and report only sanitized aggregates plus URL/method/status metadata.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```sql
+UPDATE "BenefitStatus" SET "isCompleted" = true
+WHERE "benefitId" = $1;
+```
+
+This can mutate another user's status and is not an owner-scoped test.
+
+#### Correct
+
+```text
+Resolve the current session's exact User.id, verify the target and recovery
+point, and perform only a transactionally scoped read/write whose predicates
+include that User.id. Preserve the pre-state and emit aggregate evidence.
+```
 
 ## Changes and migrations
 
