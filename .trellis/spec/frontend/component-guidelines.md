@@ -115,3 +115,18 @@ Some interactive dashboards mirror server-derived props locally so mutations upd
 - keep the server action as the durable source of truth;
 - ensure revalidation covers the affected server routes;
 - add tests for list movement, totals, filtering, and duplicate-card identity.
+
+### Stable card-group ordering
+
+In the benefit card view, top-level groups are presentation hierarchy. Order them only by stable card presentation identity: Custom Benefits first, then `displayName`, then physical `CreditCard.id` for duplicate-name ties. Do not rank groups by the benefits currently visible in a tab, claimed totals, or remaining value; optimistic completion/restoration changes those inputs and makes the surrounding cards jump.
+
+```ts
+// Correct: completion can change group membership without changing group rank.
+groups.sort(([keyA, a], [keyB, b]) => {
+  if (keyA === CUSTOM_BENEFITS_CARD_NAME) return -1;
+  if (keyB === CUSTOM_BENEFITS_CARD_NAME) return 1;
+  return a.label.localeCompare(b.label) || keyA.localeCompare(keyB);
+});
+```
+
+Continue applying the selected benefit sort within each group. Regression coverage must leave another Upcoming benefit on the card being completed, assert the remaining group order before/after completion, restore the benefit, and assert the original order and state return. Keep the same-name physical-card case so the ID tie-breaker cannot collapse or reorder duplicate products nondeterministically.

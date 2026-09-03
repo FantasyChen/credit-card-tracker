@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Targeted Jest, accessibility assertions, strict type-check, lint, and diff verification requirements."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review semantic elements, visible focus, accessible state, touch targets, and client/server boundaries."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Review strict DTO and client-safe type/import boundaries."}
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Verify reader safety, hidden diagnostics, active-scan isolation, filter identity, inert provider text, and synthetic browser coverage."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Verify no regression to preview/confirm separation, exact links, memory-only refresh, expiry, or outcome truthfulness."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Select safe checks and report prohibited operational checks as skipped."}
+{"file":".trellis/tasks/09-03-redesign-amex-sync-ui/research/vetted-ui-design-skills.md","reason":"Check final visual work against the curated Quiet Ledger direction and rejected generic patterns."}
+{"file":".trellis/tasks/09-03-redesign-amex-sync-ui/research/current-flow-ui-audit.md","reason":"Check that each observed usability defect is addressed without losing current contractual behavior."}

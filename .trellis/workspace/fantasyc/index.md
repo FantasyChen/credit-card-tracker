@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 18
-- **Last Active**: 2026-09-01
+- **Total Sessions**: 23
+- **Last Active**: 2026-09-03
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~488 | Active |
+| `journal-1.md` | ~576 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,10 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 23 | 2026-09-03 | Redesign AMEX sync review UI | `3047374` | `codex/promote-tracking-release` |
+| 22 | 2026-09-03 | Activate AMEX sync for users | `695164e` | `codex/promote-tracking-release` |
+| 21 | 2026-09-01 | Keep benefit card groups stable | `05731ea` | `codex/promote-tracking-release` |
+| 19 | 2026-09-01 | Remove production release guard | `c2e2aab` | `codex/promote-tracking-release` |
 | 18 | 2026-09-01 | Promote tracking release | `9b79bf2` | `codex/promote-tracking-release` |
 | 16 | 2026-08-29 | Bilt catalog rollout and UI verification | `78a2556` | `main` |
 | 15 | 2026-08-16 | Publish and validate public AMEX reader | `1edfe51`, `19fff71` | `main` |

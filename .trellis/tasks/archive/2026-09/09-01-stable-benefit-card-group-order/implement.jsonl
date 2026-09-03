@@ -1,0 +1,6 @@
+{"file":".trellis/spec/perks-reminder/architecture-and-domain.md","reason":"Defines physical-card identity and benefit dashboard ownership invariants."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Defines client component grouping, optimistic mirror, and list-movement test requirements."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Defines local mutation mirror and derived display state expectations."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines focused component test and static verification requirements."}
+{"file":".trellis/spec/perks-reminder/database-and-data-safety.md","reason":"Defines bounded authenticated UI verification and state-restoration constraints."}
+{"file":".trellis/spec/perks-reminder/deployment-and-external-effects.md","reason":"Defines preview/production deployment identity and authorization boundaries."}

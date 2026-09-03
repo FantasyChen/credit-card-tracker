@@ -1,4 +1,4 @@
-import { cp, mkdir, rm, utimes, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { dirname, resolve } from "node:path";
@@ -15,11 +15,18 @@ const iconsDir = resolve(chromeDir, "icons");
 const master = resolve(extensionDir, "icon.svg");
 const execFileAsync = promisify(execFile);
 const reproducibleDate = new Date("2020-01-01T00:00:00.000Z");
+const publicReleaseVersion = "1.0.1";
+const chromeZipName = `perks-reminder-amex-reader-chrome-${publicReleaseVersion}.zip`;
 
 await rm(chromeDir, { recursive: true, force: true });
 await rm(storeDir, { recursive: true, force: true });
 await mkdir(iconsDir, { recursive: true });
 await mkdir(storeDir, { recursive: true });
+const obsoleteChromeZips = (await readdir(releaseDir)).filter((file) =>
+  /^perks-reminder-amex-reader-chrome-\d+\.\d+\.\d+\.zip$/.test(file)
+  && file !== chromeZipName
+);
+await Promise.all(obsoleteChromeZips.map((file) => rm(resolve(releaseDir, file), { force: true })));
 
 for (const size of [16, 32, 48, 128]) {
   await sharp(master).resize(size, size).png().toFile(resolve(iconsDir, `icon-${size}.png`));
@@ -46,7 +53,7 @@ await build({
   charset: "utf8",
   legalComments: "none",
   minify: true,
-  define: { __AMEX_EXTENSION_VERSION__: JSON.stringify("1.0.0") },
+  define: { __AMEX_EXTENSION_VERSION__: JSON.stringify(publicReleaseVersion) },
   tsconfig: resolve(root, "tsconfig.json"),
 });
 await execFileAsync("node", [resolve(root, "scripts/capture-amex-reader-screenshot.mjs"), resolve(storeDir, "screenshot-1280x800.png")], { cwd: root });
@@ -54,7 +61,7 @@ await execFileAsync("node", [resolve(root, "scripts/capture-amex-reader-screensh
 const greasymetadata = `// ==UserScript==
 // @name         Perks Reminder — Amex Benefit Reader
 // @namespace    https://perks-reminder.com/
-// @version      1.0.0
+// @version      ${publicReleaseVersion}
 // @description  Manually reads normalized benefit progress from your signed-in American Express session. Nothing scans automatically.
 // @match        https://global.americanexpress.com/*
 // @include      https://www.perks-reminder.com/integrations/amex-sync?transfer=*
@@ -79,13 +86,13 @@ const bundled = await build({
   charset: "utf8",
   legalComments: "none",
   write: false,
-  define: { __AMEX_READER_VERSION__: JSON.stringify("1.0.0"), __AMEX_SYNC_HANDOFF_TARGET__: JSON.stringify("production") },
+  define: { __AMEX_READER_VERSION__: JSON.stringify(publicReleaseVersion), __AMEX_SYNC_HANDOFF_TARGET__: JSON.stringify("production") },
   tsconfig: resolve(root, "tsconfig.json"),
 });
 await writeFile(resolve(releaseDir, "perks-reminder-amex-reader.user.js"), `${greasymetadata}${bundled.outputFiles[0].text}`, "utf8");
 
 const runtimeFiles = ["manifest.json", "content.js", "popup.html", "popup.css", "LICENSE", "icons/icon-16.png", "icons/icon-32.png", "icons/icon-48.png", "icons/icon-128.png"];
 await Promise.all(runtimeFiles.map((file) => utimes(resolve(chromeDir, file), reproducibleDate, reproducibleDate)));
-await rm(resolve(releaseDir, "perks-reminder-amex-reader-chrome-1.0.0.zip"), { force: true });
-await execFileAsync("zip", ["-X", "-q", resolve(releaseDir, "perks-reminder-amex-reader-chrome-1.0.0.zip"), ...runtimeFiles], { cwd: chromeDir });
+await rm(resolve(releaseDir, chromeZipName), { force: true });
+await execFileAsync("zip", ["-X", "-q", resolve(releaseDir, chromeZipName), ...runtimeFiles], { cwd: chromeDir });
 console.log("Built upload-ready Chrome and Greasy Fork artifacts in release/.");

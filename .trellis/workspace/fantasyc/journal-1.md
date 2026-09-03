@@ -486,3 +486,91 @@ Promoted the verified tracking release to the production alias, confirmed all mi
 ### Status
 
 [OK] **Completed**
+
+
+## Session 19: Remove production release guard
+<!-- trellis-session: v=2 fp=b42c4f20060f5aef -->
+
+**Date**: 2026-09-01
+**Task**: Remove production release guard
+**Branch**: `codex/promote-tracking-release`
+
+### Summary
+
+Removed the standalone production release-identity guard, its dedicated tests and command, and guard-only documentation while preserving the live tracking feature and unrelated AMEX work.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c2e2aab` | chore: remove production release guard |
+
+### Status
+
+[OK] **Completed**
+
+
+## Session 21: Keep benefit card groups stable
+<!-- trellis-session: v=2 fp=76b4fcf6a859b0f0 -->
+
+**Date**: 2026-09-01
+**Task**: Keep benefit card groups stable
+**Branch**: `codex/promote-tracking-release`
+
+### Summary
+
+Kept benefit groups in a stable card order: custom benefits first, then physical cards alphabetized by display name with card ID tie-breaking. Added completion/restoration regression coverage, validated the authenticated UI, and confirmed the pushed branch's Vercel Preview deployment.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `05731ea` | fix: keep benefit card groups stable |
+
+### Status
+
+[OK] **Completed**
+
+
+## Session 22: Activate AMEX sync for users
+<!-- trellis-session: v=2 fp=fc16cd5ed5c3be3e -->
+
+**Date**: 2026-09-03
+**Task**: Activate AMEX sync for users
+**Branch**: `codex/promote-tracking-release`
+
+### Summary
+
+Completed owner-authorized production AMEX scan, preview, bounded two-row canary, zero-repeat preview, verified rollback, and user-wide write activation on the proven immutable deployment.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `695164e` | docs: complete owner-authorized Amex activation |
+
+### Status
+
+[OK] **Completed**
+
+
+## Session 23: Redesign AMEX sync review UI
+<!-- trellis-session: v=2 fp=b85f480df5d1718a -->
+
+**Date**: 2026-09-03
+**Task**: Redesign AMEX sync review UI
+**Branch**: `codex/promote-tracking-release`
+
+### Summary
+
+Implemented and verified the Quiet Ledger AMEX reader and authenticated sync handoff redesign, including safe row context, responsive and dark-mode presentation, truthful confirmation outcomes, proposal expiry recovery, accessible disclosures, and synthetic visual coverage.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3047374` | feat: redesign Amex sync review experience |
+
+### Status
+
+[OK] **Completed**

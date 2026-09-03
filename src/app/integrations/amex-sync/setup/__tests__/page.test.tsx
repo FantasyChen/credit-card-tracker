@@ -16,6 +16,7 @@ describe("public Amex reader setup page", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Tampermonkey/i)).toBeInTheDocument();
+    expect(screen.getByText("Greasy Fork")).toBeInTheDocument();
     expect(screen.getByText(/signed-in American Express session/i)).toBeInTheDocument();
     expect(screen.getByText(/Scan all cards/i)).toBeInTheDocument();
     expect(screen.getByText(/exact five ending digits/i)).toBeInTheDocument();

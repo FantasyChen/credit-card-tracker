@@ -1,0 +1,10 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend entrypoint and pre-development checklist for App Router, client UI, and tests."}
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Route-local component and shared client-safe helper ownership."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Server/client boundaries, semantic UI, accessibility, touch targets, and render-state requirements."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Keeps mailbox, timer, network, and transient interaction state locally owned without a new global store."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Strict DTO parsing, client-safe imports, and unknown-boundary requirements."}
+{"file":".trellis/spec/perks-reminder/browser-read-integrations.md","reason":"Canonical reader presentation, manual scan, Shadow DOM, filter, progress isolation, inert text, and hidden-diagnostic contracts."}
+{"file":".trellis/spec/perks-reminder/amex-sync-reconciliation.md","reason":"Canonical memory-only handoff, exact card prerequisite, preview/confirm, refresh, expiry, and public DTO contracts."}
+{"file":".trellis/spec/perks-reminder/verification.md","reason":"Safe validation matrix and prohibition on routine live/provider/database/build operations."}
+{"file":".trellis/tasks/09-03-redesign-amex-sync-ui/research/vetted-ui-design-skills.md","reason":"Selected external design principles, verified searches, rejected mismatches, and Quiet Ledger synthesis."}
+{"file":".trellis/tasks/09-03-redesign-amex-sync-ui/research/current-flow-ui-audit.md","reason":"Evidence-backed UX gaps, code anchors, and behavioral tests that must remain intact."}

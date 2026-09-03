@@ -3,12 +3,16 @@ import type {
   ObservedField,
   QuantityV1,
   ScanSummaryV1,
-  SourcePeriodV2,
   StoreEnvelopeV1,
   StoredCardRecordV1,
 } from "@/lib/amex-benefit-reader/contract";
 import type { ScanProgress, ScanReporter } from "@/lib/amex-benefit-reader/scan-engine";
-import { formatAmexBenefitTitle } from "./provider-text";
+import {
+  formatAmexBenefitTitle,
+  formatAmexSourcePeriod,
+} from "@/lib/amex-benefit-reader/presentation";
+
+export { formatAmexSourcePeriod } from "@/lib/amex-benefit-reader/presentation";
 
 export const AMEX_READER_HOST_ID = "perks-reminder-amex-reader";
 export const PERKS_REMINDER_MARK_SVG = `<svg viewBox="0 0 40 40" role="img" aria-label="Perks Reminder" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="12" fill="#172033"/><path d="M11 20a9 9 0 0 1 15.2-6.5M29 20a9 9 0 0 1-15.2 6.5" fill="none" stroke="#8fe3c1" stroke-width="3" stroke-linecap="round"/><path d="m25 10 2 4-4 1M15 30l-2-4 4-1" fill="none" stroke="#ffcf70" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -51,51 +55,6 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string): 
   const result = document.createElement(tag);
   if (text != null) result.textContent = text;
   return result;
-}
-
-const COMPACT_MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-] as const;
-
-interface CalendarDateParts {
-  year: number;
-  month: number;
-  day: number;
-}
-
-function calendarDateParts(value: string): CalendarDateParts {
-  const [year, month, day] = value.split("-").map(Number);
-  return { year, month, day };
-}
-
-function lastDayOfMonth(year: number, month: number): number {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
-function compactExplicitDateRange(start: CalendarDateParts, end: CalendarDateParts): string {
-  const startMonth = COMPACT_MONTHS[start.month - 1];
-  const endMonth = COMPACT_MONTHS[end.month - 1];
-  if (start.year === end.year && start.month === end.month) {
-    return `${startMonth} ${start.day}–${end.day}, ${start.year}`;
-  }
-  if (start.year === end.year) {
-    return `${startMonth} ${start.day}–${endMonth} ${end.day}, ${start.year}`;
-  }
-  return `${startMonth} ${start.day}, ${start.year}–${endMonth} ${end.day}, ${end.year}`;
-}
-
-export function formatAmexSourcePeriod(period: SourcePeriodV2): string {
-  const start = calendarDateParts(period.startDate);
-  const end = calendarDateParts(period.endDate);
-  const startsOnMonthBoundary = start.day === 1;
-  const endsOnMonthBoundary = end.day === lastDayOfMonth(end.year, end.month);
-  if (startsOnMonthBoundary && endsOnMonthBoundary && start.year === end.year) {
-    if (start.month === 1 && end.month === 12) return String(start.year);
-    if (start.month === end.month) return `${COMPACT_MONTHS[start.month - 1]} ${start.year}`;
-    return `${COMPACT_MONTHS[start.month - 1]}–${COMPACT_MONTHS[end.month - 1]} ${start.year}`;
-  }
-  return compactExplicitDateRange(start, end);
 }
 
 function quantityText(quantity: QuantityV1): string {
@@ -487,67 +446,66 @@ export class AmexBenefitReaderPanel implements ScanReporter {
     this.root.replaceChildren();
     const style = element("style");
     style.textContent = `
-      :host { all: initial; --pr-bg: #f8fafc; --pr-card: #ffffff; --pr-text: #1f2937; --pr-muted: #667085; --pr-control: #475467; --pr-amount: #111827; --pr-muted-surface: #f8fafc; --pr-muted-surface-text: #667085; --pr-filter-active-bg: #eef2f6; --pr-filter-active-text: #1f2937; --pr-empty-border: #cbd5e1; --pr-border: #e4e7ec; --pr-primary: #27313d; --pr-primary-hover: #1f2933; --pr-amber: #d97706; --pr-amber-bg: #fffbeb; --pr-amber-border: #fde68a; --pr-blue: #2563eb; --pr-blue-bg: #eff6ff; --pr-blue-border: #bfdbfe; --pr-green: #059669; --pr-green-bg: #ecfdf5; --pr-green-border: #a7f3d0; --pr-red: #dc2626; --pr-red-bg: #fef2f2; --pr-red-border: #fecaca; }
+      :host { all: initial; --pr-ink:#172033; --pr-paper:#f7f8f6; --pr-white:#fff; --pr-text:#172033; --pr-muted:#667085; --pr-rule:#dfe3e8; --pr-mint:#8fe3c1; --pr-mint-soft:#eafaf4; --pr-gold:#ffcf70; --pr-gold-soft:#fff8e7; --pr-blue:#2563eb; --pr-blue-soft:#eff6ff; --pr-red:#b42318; --pr-red-soft:#fff1f0; }
       * { box-sizing: border-box; }
-      .launcher { position: fixed; z-index: 2147483647; top: 16px; right: 16px; display: grid; width: 52px; min-height: 52px; padding: 7px; place-items: center; border: 1px solid #475467; border-radius: 16px; background: var(--pr-primary); color: #fff; box-shadow: 0 8px 24px rgba(15,23,42,.2); }
-      .launcher:hover { background: var(--pr-primary-hover); }
-      .launcher svg { width: 36px; height: 36px; }
       .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
-      .panel { position: fixed; z-index: 2147483647; top: 16px; right: 16px; width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; border: 1px solid var(--pr-border); border-radius: 20px; background: var(--pr-bg); color: var(--pr-text); box-shadow: 0 18px 50px rgba(15,23,42,.18); font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      h2,h3,h4,p { margin: 0; } h2 { font-size: 19px; line-height: 1.2; } h3 { font-size: 16px; line-height: 1.3; } h4 { font-size: 14px; line-height: 1.35; } ul { margin: 0; }
-      .top { padding: 18px; border-bottom: 1px solid var(--pr-border); background: var(--pr-card); border-radius: 16px 16px 0 0; }
-      .brand-row { display: flex; align-items: center; gap: 10px; }
-      .brand-mark { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 12px; background: var(--pr-primary); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .04em; overflow: hidden; }
-      .brand-mark svg { width: 34px; height: 34px; }
-      .collapse-button { min-height: 34px; margin-left: auto; padding: 6px 9px; color: var(--pr-control); font-size: 12px; }
-      .eyebrow { margin-top: 2px; color: var(--pr-muted); font-size: 12px; }
-      .privacy-banner { margin-top: 14px; padding: 10px 12px; border: 1px solid #dbeafe; border-radius: 10px; background: #f0f7ff; color: #334155; font-size: 12px; }
-      .privacy-banner strong { display: block; margin-bottom: 2px; color: #1e3a5f; font-size: 13px; }
-      .controls { display: flex; gap: 8px; margin-top: 14px; }
-      button { min-height: 40px; border-radius: 9px; font: inherit; }
-      button { border: 1px solid var(--pr-border); background: var(--pr-card); color: var(--pr-text); font-weight: 650; cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .15s ease; }
-      button:active { transform: translateY(1px); }
-      button.primary { flex: 1; border-color: var(--pr-primary); background: var(--pr-primary); color: #fff; box-shadow: 0 2px 5px rgba(15,23,42,.12); }
-      button.primary:hover { background: var(--pr-primary-hover); }
-      button:focus-visible, summary:focus-visible { outline: 3px solid rgba(71,85,105,.28); outline-offset: 2px; }
-      button:disabled { opacity: .52; cursor: default; transform: none; }
-      .scan-workspace { display: grid; gap: 14px; padding: 22px 18px; }
-      .scan-status { padding: 10px 12px; border: 1px solid var(--pr-border); border-radius: 10px; background: var(--pr-muted-surface); color: var(--pr-muted-surface-text); font-size: 13px; }
-      .scan-progress { width: 100%; height: 10px; accent-color: var(--pr-primary); }
-      .scan-cancel { width: 100%; }
-      .notice { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
-      .notice-warning { border: 1px solid var(--pr-amber-border); background: var(--pr-amber-bg); color: #92400e; }
-      .content { padding: 16px; }
-      .card-groups { display: grid; gap: 12px; margin-top: 14px; }
-      .card-group { padding: 14px; border: 1px solid var(--pr-border); border-radius: 14px; background: var(--pr-card); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
-      .card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-      .card-summary { margin-top: 4px; color: var(--pr-muted); font-size: 12px; }
-      .status-pill { display: inline-flex; align-items: center; flex: 0 0 auto; border: 1px solid; border-radius: 999px; font-size: 11px; font-weight: 750; white-space: nowrap; padding: 3px 7px; }
-      .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-      .filter-button { min-height: 40px; padding: 7px 10px; color: var(--pr-control); font-size: 13px; }
-      .filter-button[aria-pressed="true"] { border-color: #94a3b8; background: var(--pr-filter-active-bg); color: var(--pr-filter-active-text); box-shadow: inset 0 0 0 1px rgba(71,85,105,.08); }
-      .benefit-list { display: grid; gap: 10px; padding: 0; margin-top: 12px; list-style: none; }
-      .benefit-card { position: relative; overflow: hidden; padding: 13px 13px 12px 16px; border: 1px solid var(--pr-border); border-radius: 11px; background: var(--pr-card); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
-      .benefit-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: #94a3b8; }
-      .benefit-card.tone-amber::before { background: #f59e0b; } .benefit-card.tone-blue::before { background: #3b82f6; } .benefit-card.tone-green::before { background: #10b981; }
-      .benefit-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-      .status-pill { padding: 3px 7px; }
-      .status-pill.tone-amber { border-color: var(--pr-amber-border); background: var(--pr-amber-bg); color: #92400e; }
-      .status-pill.tone-blue { border-color: var(--pr-blue-border); background: var(--pr-blue-bg); color: #1d4ed8; }
-      .status-pill.tone-green { border-color: var(--pr-green-border); background: var(--pr-green-bg); color: #047857; }
-      .status-pill.tone-muted { border-color: var(--pr-border); background: var(--pr-muted-surface); color: var(--pr-muted-surface-text); }
-      .benefit-essentials { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; margin-top: 7px; }
-      .amount { color: var(--pr-amount); font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; }
-      .period { color: var(--pr-muted); font-size: 12px; }
-      details { margin-top: 10px; }
-      summary { color: var(--pr-control); font-size: 12px; font-weight: 700; cursor: pointer; }
-      .empty-state { margin-top: 12px; padding: 18px 12px; border: 1px dashed var(--pr-empty-border); border-radius: 10px; color: var(--pr-muted); text-align: center; }
-      .footer { padding: 0 16px 16px; }
-      .privacy-details p { margin-top: 8px; color: var(--pr-muted); font-size: 12px; }
-      .clear-button { width: 100%; margin-top: 10px; padding: 8px 10px; border-color: var(--pr-red-border); color: #b91c1c; }
-      @media (prefers-color-scheme: dark) { :host { --pr-bg:#111827; --pr-card:#1f2937; --pr-text:#f8fafc; --pr-muted:#cbd5e1; --pr-control:#e2e8f0; --pr-amount:#f8fafc; --pr-muted-surface:#172033; --pr-muted-surface-text:#cbd5e1; --pr-filter-active-bg:#374151; --pr-filter-active-text:#f8fafc; --pr-empty-border:#4b5563; --pr-border:#374151; --pr-primary:#0f766e; --pr-primary-hover:#115e59; } .privacy-banner { background:#172554; color:#dbeafe; border-color:#1d4ed8; } .privacy-banner strong { color:#fef3c7; } }
-      @media (max-width: 520px) { .panel { top: 8px; right: 8px; width: calc(100vw - 16px); max-height: calc(100vh - 16px); } }
-      @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+      .launcher { position:fixed; z-index:2147483647; top:16px; right:16px; display:grid; width:56px; min-height:56px; padding:8px; place-items:center; border:1px solid #354157; border-radius:18px; background:var(--pr-ink); color:#fff; box-shadow:0 14px 36px rgba(23,32,51,.24); cursor:pointer; transition:transform .18s ease, box-shadow .18s ease; }
+      .launcher:hover { transform:translateY(-1px); box-shadow:0 18px 42px rgba(23,32,51,.28); }
+      .launcher svg { width:38px; height:38px; }
+      .panel { position:fixed; z-index:2147483647; top:16px; right:16px; width:min(468px, calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; border:1px solid var(--pr-rule); border-radius:22px; background:var(--pr-paper); color:var(--pr-text); box-shadow:0 24px 70px rgba(23,32,51,.2); font:14px/1.5 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+      h2,h3,h4,p { margin:0; } h2 { font-size:20px; line-height:1.15; letter-spacing:-.02em; } h3 { font-size:15px; line-height:1.35; } h4 { font-size:14px; line-height:1.4; } ul { margin:0; }
+      .top { position:relative; padding:20px; border-bottom:1px solid var(--pr-rule); background:var(--pr-white); border-radius:21px 21px 0 0; }
+      .top::before { position:absolute; inset:0 auto 0 0; width:4px; border-radius:21px 0 0 0; background:var(--pr-mint); content:""; }
+      .brand-row { display:flex; align-items:center; gap:11px; }
+      .brand-mark { display:grid; width:40px; height:40px; flex:0 0 auto; place-items:center; border-radius:13px; background:var(--pr-ink); color:#fff; overflow:hidden; }
+      .brand-mark svg { width:36px; height:36px; }
+      .collapse-button { min-height:44px; margin-left:auto; padding:8px 11px; color:var(--pr-muted); font-size:12px; }
+      .eyebrow { margin-top:2px; color:var(--pr-muted); font-size:12px; }
+      .privacy-banner { margin-top:14px; padding:10px 0 0; border-top:1px solid var(--pr-rule); color:var(--pr-muted); font-size:12px; }
+      .privacy-banner strong { display:block; margin-bottom:2px; color:var(--pr-text); font-size:12px; }
+      .controls { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; margin-top:16px; }
+      button { min-height:44px; border:1px solid var(--pr-rule); border-radius:10px; background:var(--pr-white); color:var(--pr-text); font:inherit; font-weight:680; cursor:pointer; transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .15s ease; }
+      button:active { transform:translateY(1px); }
+      button.primary { border-color:var(--pr-ink); background:var(--pr-ink); color:#fff; box-shadow:0 3px 8px rgba(23,32,51,.14); }
+      button.primary:hover { background:#26334c; }
+      button:focus-visible,summary:focus-visible { outline:3px solid var(--pr-mint); outline-offset:2px; }
+      button:disabled { opacity:.52; cursor:default; transform:none; }
+      .scan-workspace { display:grid; gap:16px; padding:24px 20px; }
+      .scan-status { padding:12px; border-left:3px solid var(--pr-mint); background:var(--pr-white); color:var(--pr-muted); font-size:13px; }
+      .scan-progress { width:100%; height:10px; accent-color:#277f68; }
+      .scan-cancel { width:100%; }
+      .notice { margin-top:12px; padding:11px 12px; border-left:3px solid var(--pr-gold); background:var(--pr-gold-soft); font-size:13px; }
+      .notice-warning { color:#684000; }
+      .content { padding:18px 20px; }
+      .filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; border:1px solid var(--pr-rule); border-radius:11px; overflow:hidden; }
+      .filter-button { min-height:44px; border:0; border-radius:0; padding:8px 10px; color:var(--pr-muted); font-size:13px; }
+      .filter-button + .filter-button { border-left:1px solid var(--pr-rule); }
+      .filter-button[aria-pressed="true"] { background:var(--pr-ink); color:#fff; }
+      .card-groups { display:grid; gap:24px; margin-top:20px; }
+      .card-group { min-width:0; }
+      .card-heading { padding-bottom:9px; border-bottom:1px solid var(--pr-ink); }
+      .card-summary { margin-top:3px; color:var(--pr-muted); font-size:12px; }
+      .benefit-list { padding:0; list-style:none; }
+      .benefit-card { position:relative; padding:14px 0 14px 14px; border-bottom:1px solid var(--pr-rule); }
+      .benefit-card::before { position:absolute; inset:14px auto 14px 0; width:3px; border-radius:3px; background:#98a2b3; content:""; }
+      .benefit-card.tone-amber::before { background:var(--pr-gold); } .benefit-card.tone-blue::before { background:#72a8ff; } .benefit-card.tone-green::before { background:var(--pr-mint); }
+      .benefit-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+      .status-pill { display:inline-flex; min-height:24px; align-items:center; flex:0 0 auto; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:750; white-space:nowrap; }
+      .status-pill.tone-amber { background:var(--pr-gold-soft); color:#704500; } .status-pill.tone-blue { background:var(--pr-blue-soft); color:#1d4ed8; } .status-pill.tone-green { background:var(--pr-mint-soft); color:#16664f; } .status-pill.tone-muted { background:#edf0f3; color:#475467; }
+      .benefit-essentials { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:7px; }
+      .amount { color:var(--pr-text); font-size:13px; font-weight:720; font-variant-numeric:tabular-nums; }
+      .period { color:var(--pr-muted); font-size:12px; }
+      details { margin-top:0; }
+      summary { min-height:44px; color:var(--pr-muted); font-size:12px; font-weight:680; cursor:pointer; }
+      .empty-state { margin-top:16px; padding:22px 12px; border-block:1px solid var(--pr-rule); color:var(--pr-muted); text-align:center; }
+      .footer { padding:0 20px 18px; }
+      .privacy-details { border-top:1px solid var(--pr-rule); }
+      .privacy-details summary { display:flex; align-items:center; }
+      .privacy-details p { margin-top:8px; color:var(--pr-muted); font-size:12px; }
+      .clear-button { width:100%; margin-top:10px; padding:8px 10px; border-color:#f3b7b2; color:var(--pr-red); }
+      @media (prefers-color-scheme:dark) { :host { --pr-ink:#f4f7fb; --pr-paper:#111827; --pr-white:#172033; --pr-text:#f4f7fb; --pr-muted:#b5c0cf; --pr-rule:#354157; --pr-mint-soft:#153e35; --pr-gold-soft:#3b2d13; --pr-blue-soft:#172554; --pr-red:#ffb4ab; --pr-red-soft:#401e1c; } .launcher,.brand-mark,button.primary,.filter-button[aria-pressed="true"] { background:#0e1524; border-color:#526078; } button.primary:hover { background:#26334c; } .notice-warning { color:#ffe5ad; } .status-pill.tone-amber { color:#ffe5ad; } .status-pill.tone-blue { color:#bfdbfe; } .status-pill.tone-green { color:#a9edd4; } .status-pill.tone-muted { background:#28344a; color:#d5dceb; } .clear-button { border-color:#7a3a35; } }
+      @media (max-width:520px) { .panel { top:8px; right:8px; width:calc(100vw - 16px); max-height:calc(100vh - 16px); border-radius:17px; } .top { padding:17px; } .content { padding:16px 17px; } .footer { padding:0 17px 16px; } .controls { grid-template-columns:1fr; } .benefit-top { display:grid; } .status-pill { justify-self:start; } }
+      @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; transition:none!important; } }
     `;
 
     if (this.collapsed) {

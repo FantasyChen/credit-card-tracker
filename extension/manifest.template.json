@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Perks Reminder — AMEX Benefit Reader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Manually read normalized benefit progress from your signed-in American Express session.",
   "permissions": ["storage"],
   "content_scripts": [{

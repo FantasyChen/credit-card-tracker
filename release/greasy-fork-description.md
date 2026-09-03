@@ -11,4 +11,8 @@ Privacy: https://www.perks-reminder.com/privacy
 
 ## Install and upgrade
 
-Install the 1.0.0 artifact from Greasy Fork. Existing Perks Reminder userscript installations under the same name and namespace can upgrade monotonically from 0.5.3. Review the grants and exact matches before enabling it.
+Install the 1.0.1 artifact from Greasy Fork. Existing Perks Reminder userscript installations under the same name and namespace can upgrade monotonically from 1.0.0. Review the grants and exact matches before enabling it.
+
+## What's new in 1.0.1
+
+The Quiet Ledger redesign makes physical-card and benefit context easier to scan, clarifies progress and result states, improves responsive and dark-mode layouts, and strengthens keyboard focus without changing the manual-scan or local-storage boundaries.

@@ -54,7 +54,6 @@
     "db:dev:reset": "node scripts/with-dev-db.js npx prisma migrate reset",
     "db:prod:status": "npx prisma migrate status",
     "db:prod:migrate": "npx prisma migrate deploy",
-    "check:production-release": "node scripts/verify-production-release.mjs",
     "migrate:diff": "npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios"

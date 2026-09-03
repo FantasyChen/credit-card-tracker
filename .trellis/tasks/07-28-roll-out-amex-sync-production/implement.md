@@ -127,3 +127,11 @@ The following sanitized evidence is retained from the superseded rollout and rem
 ## Current status
 
 Development validation and the separately authorized production target/recovery, additive schema, global catalog, exact legacy bridge, preservation, hybrid-parity, idempotent-replay, reviewed merge, application deployment, anonymous smoke, authenticated zero-write preview, and write-configuration gates have passed. The parent remains `in_progress`; production AMEX now resolves to `write`, but no proposal has been confirmed. Cleanup, userscript/provider activity, live scanning, first confirmation, and rollback-window removal remain independent later gates.
+
+## Quiet Ledger 1.0.1 release readiness
+
+- [x] Advanced both public reader distributions from `1.0.0` to `1.0.1` while preserving the separately named local-development userscript at `0.5.0-local.3`.
+- [x] Updated the canonical builders, artifact audits, Chrome manifest template, public setup copy, synthetic E2E version assertion, store listing, Greasy Fork description, and current reader runbooks/specs for one monotonic public update.
+- [x] Regenerated the tracked unpacked extension, Greasy Fork userscript, synthetic store screenshot, hashes, and runtime-only `perks-reminder-amex-reader-chrome-1.0.1.zip`; the builder removes the obsolete versioned ZIP so only the current upload package remains.
+- [x] Both artifact audits passed, including reproducible hashes, strict metadata/version increase, target separation, MV3 permission and route scope, approved origins, runtime-only ZIP contents, store assets, and forbidden remote-code/sensitive markers. Strict TypeScript, explicit changed-script/source lint, 3 focused Jest suites with 15 tests, and all 15 synthetic generated-userscript Playwright scenarios passed.
+- [ ] External publication remains pending: the generated Greasy Fork artifact and Chrome Web Store ZIP are upload-ready local release inputs only; neither channel has been published or deployed by this work.

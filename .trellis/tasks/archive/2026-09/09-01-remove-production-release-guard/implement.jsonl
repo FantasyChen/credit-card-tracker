@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/perks-reminder/deployment-and-external-effects.md", "reason": "Preserve deployment boundaries while removing only the release-identity guard."}
+{"file": ".trellis/spec/perks-reminder/database-and-data-safety.md", "reason": "Avoid database operations and preserve unrelated edits in this already-modified spec."}
