@@ -530,3 +530,25 @@ Kept benefit groups in a stable card order: custom benefits first, then physical
 ### Status
 
 [OK] **Completed**
+
+
+## Session 22: Activate AMEX sync for users
+<!-- trellis-session: v=2 fp=fc16cd5ed5c3be3e -->
+
+**Date**: 2026-09-03
+**Task**: Activate AMEX sync for users
+**Branch**: `codex/promote-tracking-release`
+
+### Summary
+
+Completed owner-authorized production AMEX scan, preview, bounded two-row canary, zero-repeat preview, verified rollback, and user-wide write activation on the proven immutable deployment.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `695164e` | docs: complete owner-authorized Amex activation |
+
+### Status
+
+[OK] **Completed**
